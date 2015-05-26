@@ -201,52 +201,68 @@ func CreatePool(dm *DeviceMapper) error {
 		return nil
 	}
     // Create data file and metadata file
-    parms := fmt.Sprintf("fallocate -l %d %s", dm.Size, dm.Datafile)
-    if err := exec.Command("/bin/sh", "-c", parms).Run(); err != nil {
-		glog.Error(err.Error())
-        return err
+    parms := fmt.Sprintf("dd if=/dev/zero of=%s bs=1 seek=%d count=0", dm.Datafile, dm.Size)
+    if res, err := exec.Command("/bin/sh", "-c", parms).CombinedOutput(); err != nil {
+		glog.Error(string(res))
+        return fmt.Errorf(string(res))
     }
     parms = fmt.Sprintf("fallocate -l 128M %s", dm.Metadatafile)
-    if err := exec.Command("/bin/sh", "-c", parms).Run(); err != nil {
-		glog.Error(err.Error())
-        return err
+    if res, err := exec.Command("/bin/sh", "-c", parms).CombinedOutput(); err != nil {
+		glog.Error(string(res))
+        return fmt.Errorf(string(res))
     }
 
+	if _, err := os.Stat(dm.DataLoopFile); err != nil {
+		l := len(dm.DataLoopFile)
+		parms = fmt.Sprintf("mknod -m 0660 %s b 7 %s", dm.DataLoopFile, dm.DataLoopFile[(l-1):l])
+		if res, err := exec.Command("/bin/sh", "-c", parms).CombinedOutput(); err != nil {
+			glog.Error(string(res))
+			return fmt.Errorf(string(res))
+		}
+	}
+	if _, err := os.Stat(dm.MetadataLoopFile); err != nil {
+		l := len(dm.MetadataLoopFile)
+		parms = fmt.Sprintf("mknod -m 0660 %s b 7 %s", dm.MetadataLoopFile, dm.MetadataLoopFile[(l-1):l])
+		if res, err := exec.Command("/bin/sh", "-c", parms).CombinedOutput(); err != nil {
+			glog.Error(string(res))
+			return fmt.Errorf(string(res))
+		}
+	}
     // Setup the loop device for data and metadata files
     parms = fmt.Sprintf("losetup %s %s", dm.DataLoopFile, dm.Datafile)
-    if err := exec.Command("/bin/sh", "-c", parms).Run(); err != nil {
-		glog.Error(err.Error())
-        return err
-    }
+	if res, err := exec.Command("/bin/sh", "-c", parms).CombinedOutput(); err != nil {
+		glog.Error(string(res))
+		return fmt.Errorf(string(res))
+	}
+
     parms = fmt.Sprintf("losetup %s %s", dm.MetadataLoopFile, dm.Metadatafile)
-    if err := exec.Command("/bin/sh", "-c", parms).Run(); err != nil {
-		glog.Error(err.Error())
-        return err
-    }
+	if res, err := exec.Command("/bin/sh", "-c", parms).CombinedOutput(); err != nil {
+		glog.Error(string(res))
+		return fmt.Errorf(string(res))
+	}
 
     // Make filesystem for data loop device and metadata loop device
     parms = fmt.Sprintf("mkfs.ext4 %s", dm.DataLoopFile)
-    if err := exec.Command("/bin/sh", "-c", parms).Run(); err != nil {
-		glog.Error(err.Error())
-        return err
-    }
+	if res, err := exec.Command("/bin/sh", "-c", parms).CombinedOutput(); err != nil {
+		glog.Error(string(res))
+		return fmt.Errorf(string(res))
+	}
     parms = fmt.Sprintf("mkfs.ext4 %s", dm.MetadataLoopFile)
-    if err := exec.Command("/bin/sh", "-c", parms).Run(); err != nil {
-		glog.Error(err.Error())
-        return err
-    }
+	if res, err := exec.Command("/bin/sh", "-c", parms).CombinedOutput(); err != nil {
+		glog.Error(string(res))
+		return fmt.Errorf(string(res))
+	}
     parms = fmt.Sprintf("dd if=/dev/zero of=%s bs=4096 count=1", dm.MetadataLoopFile)
-    if err := exec.Command("/bin/sh", "-c", parms).Run(); err != nil {
-		glog.Error(err.Error())
-        return err
-    }
+	if res, err := exec.Command("/bin/sh", "-c", parms).CombinedOutput(); err != nil {
+		glog.Error(string(res))
+		return fmt.Errorf(string(res))
+	}
 
-    // Create the thin pool for test
     parms = fmt.Sprintf("dmsetup create %s --table '0 %d thin-pool %s %s 128 0'", dm.PoolName, dm.Size/512, dm.MetadataLoopFile, dm.DataLoopFile)
-    if err := exec.Command("/bin/sh", "-c", parms).Run(); err != nil {
-		glog.Error(err.Error(), " ", parms)
-        return err
-    }
+	if res, err := exec.Command("/bin/sh", "-c", parms).CombinedOutput(); err != nil {
+		glog.Error(string(res))
+		return fmt.Errorf(string(res))
+	}
 	return nil
 }
 
@@ -257,23 +273,22 @@ func CreateVolume(poolName, volName, dev_id string, size int, restore bool) erro
 	}
 	if restore == false {
 		parms := fmt.Sprintf("dmsetup message /dev/mapper/%s 0 \"create_thin %s\"", poolName, dev_id)
-		if err := exec.Command("/bin/sh", "-c", parms).Run(); err != nil {
-			glog.Error(parms)
-			glog.Error(err.Error())
-			return err
+		if res, err := exec.Command("/bin/sh", "-c", parms).CombinedOutput(); err != nil {
+			glog.Error(string(res))
+			return fmt.Errorf(string(res))
 		}
 	}
 	parms := fmt.Sprintf("dmsetup create %s --table \"0 %d thin /dev/mapper/%s %s\"", volName, size/512, poolName, dev_id)
-    if err := exec.Command("/bin/sh", "-c", parms).Run(); err != nil {
-		glog.Error(parms)
-		glog.Error(err.Error())
-		return err
-    }
+	if res, err := exec.Command("/bin/sh", "-c", parms).CombinedOutput(); err != nil {
+		glog.Error(string(res))
+		return fmt.Errorf(string(res))
+	}
+
 	if restore == false {
 		parms = fmt.Sprintf("mkfs.ext4 \"/dev/mapper/%s\"", volName)
-		if err := exec.Command("/bin/sh", "-c", parms).Run(); err != nil {
-			glog.Error(err.Error())
-			return err
+		if res, err := exec.Command("/bin/sh", "-c", parms).CombinedOutput(); err != nil {
+			glog.Error(string(res))
+			return fmt.Errorf(string(res))
 		}
 	}
 	return nil
@@ -283,11 +298,10 @@ func DeleteVolume(dm *DeviceMapper, dev_id int) error {
     var parms string
     // Delete the thin pool for test
     parms = fmt.Sprintf("dmsetup message /dev/mapper/%s 0 \"delete %d\"", dm.PoolName, dev_id)
-	glog.Error(parms)
-    if err := exec.Command("/bin/sh", "-c", parms).Run(); err != nil {
-		glog.Error(parms)
-        return err
-    }
+	if res, err := exec.Command("/bin/sh", "-c", parms).CombinedOutput(); err != nil {
+		glog.Error(string(res))
+		return fmt.Errorf(string(res))
+	}
     return nil
 }
 // Delete the pool which is created in 'Init' function
@@ -295,17 +309,20 @@ func DMCleanup(dm *DeviceMapper) error {
     var parms string
     // Delete the thin pool for test
     parms = fmt.Sprintf("dmsetup remove \"/dev/mapper/%s\"", dm.PoolName)
-    if err := exec.Command("/bin/sh", "-c", parms).Run(); err != nil {
-        return err
-    }
+	if res, err := exec.Command("/bin/sh", "-c", parms).CombinedOutput(); err != nil {
+		glog.Error(string(res))
+		return fmt.Errorf(string(res))
+	}
     // Delete the loop device
     parms = fmt.Sprintf("losetup -d %s", dm.MetadataLoopFile)
-    if err := exec.Command("/bin/sh", "-c", parms).Run(); err != nil {
-        return err
-    }
+	if res, err := exec.Command("/bin/sh", "-c", parms).CombinedOutput(); err != nil {
+		glog.Error(string(res))
+		return fmt.Errorf(string(res))
+	}
     parms = fmt.Sprintf("losetup -d %s", dm.DataLoopFile)
-    if err := exec.Command("/bin/sh", "-c", parms).Run(); err != nil {
-        return err
-    }
+	if res, err := exec.Command("/bin/sh", "-c", parms).CombinedOutput(); err != nil {
+		glog.Error(string(res))
+		return fmt.Errorf(string(res))
+	}
     return nil
 }

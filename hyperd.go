@@ -55,7 +55,7 @@ func mainDaemon(config, host string) {
 
 	d, err := daemon.NewDaemon(eng)
 	if err != nil {
-		glog.Error("The hyperd create failed, %s\n", err.Error())
+		glog.Errorf("The hyperd create failed, %s\n", err.Error())
 		return
 	}
 
@@ -66,7 +66,7 @@ func mainDaemon(config, host string) {
 
 	// Install the accepted jobs
 	if err := d.Install(eng); err != nil {
-		glog.Error("The hyperd install failed, %s\n", err.Error())
+		glog.Errorf("The hyperd install failed, %s\n", err.Error())
 		return
 	}
 
