@@ -1,0 +1,27 @@
+{
+	"id": "test-container-multi",
+	"containers" : [{
+	    "name": "web",
+	    "image": "tomcat:latest"
+	},
+	{
+	    "name": "top",
+	    "image": "ubuntu:latest",
+	    "workdir": "/",
+	    "command": ["/usr/bin/top"]
+	},
+	{
+	    "name": "vmstat",
+	    "image": "ubuntu:latest",
+	    "workdir": "/",
+	    "command": ["/usr/bin/vmstat", "1", "10"],
+            "restartPolicy": "always"
+	}],
+	"resource": {
+	    "vcpu": 1,
+	    "memory": 512
+	},
+	"files": [],
+	"volumes": [],
+	"tty": true
+}
