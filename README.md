@@ -60,9 +60,9 @@ Ensure you are running Linux (kernel 3.8 or later) and have Docker
 ## Find out more
 
  * [Documentation](https://docs.hyper.sh)
- * [Get Started](http://gnep.gitbooks.io/hyper/content/get_started/index.html)
- * [Reference](http://gnep.gitbooks.io/hyper/content/reference/index.html)
- * [Release Notes](http://gnep.gitbooks.io/hyper/content/release_notes/index.html)
+ * [Get Started](https://docs.hyper.sh/get_started/index.html)
+ * [Reference](https://docs.hyper.sh/reference/index.html)
+ * [Release Notes](https://docs.hyper.sh/release_notes/latest.html)
 
 ## Contact Us
 
