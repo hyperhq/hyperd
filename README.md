@@ -27,20 +27,10 @@ Hyper - Hypervisor-agnostic Docker Runtime
 
 > **BYOK* = bring your own kernel
 
-Requirements
-------------
+## Requirements
 
 - Docker 1.5 or later
 - QEMU 2.0 or later
-
-Building
----------
-
-
-To run *hyper*, use `bin/hyper`, or if you've installed packages, just type `hyper`.
-
-For information on using the command line, just type `hyper`. You may use
-`hyper <command> --help` for detailed information on any specific command.
 
 ## Installation
 
@@ -49,7 +39,34 @@ Ensure you are running Linux (kernel 3.8 or later) and have Docker
 
     sudo curl https://install.hyper.sh | sh
 
+To run *hyper*, just type `hyper` if you've installed packages.
+
+For information on using the command line, just type `hyper`. You may use
+`hyper <command> --help` for detailed information on any specific command.
+
+
 ## Example
+
+
+## Build From Source
+
+Clone hyper in GoPath
+
+    > cd ${GOPATH}/src
+	> git clone https://github.com/hyperhq/hyper.git hyper
+
+Makesure some dependency go packages installed
+
+    > cd hyper
+    > ./make_deps.sh
+
+And got hyper binaries with `go build`
+
+    > go build hyperd.go
+    > go build hyper.go
+
+You may also need the kernel and initrd from [HyperStart](https://github.com/hyperhq/hyperstart) to run your own hyper.
+
 
 ## Find out more
 
