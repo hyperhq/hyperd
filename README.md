@@ -30,23 +30,17 @@ Hyper - Hypervisor-agnostic Docker Runtime
 Requirements
 ------------
 
-*Hyper* requires at least go 1.1 in order to build and at least Linux 3.8, with appropriate headers. If your headers are not recent enough, you may see some compilation errors related to
-`KVM_SIGNAL_MSI` or `KVM_CAP_SIGNAL_MSI`.
+- Docker 1.5 or later
+- QEMU 2.0 or later
 
 Building
 ---------
 
-To build *hyper*, simply clone the repo and run `make`.
-
-Optionally, you can build packages by running `make deb` or `make rpm`.
 
 To run *hyper*, use `bin/hyper`, or if you've installed packages, just type `hyper`.
 
 For information on using the command line, just type `hyper`. You may use
 `hyper <command> --help` for detailed information on any specific command.
-
-To create a instance, try using `hyper run --com1 /bin/ls`.
-
 
 ## Installation
 
