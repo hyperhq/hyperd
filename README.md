@@ -82,6 +82,6 @@ Found a bug, want to suggest a feature, or have a question?
 hyper you are running, as shown by `hyper --version`.
 
 Twitter: [@hyperhq](https://twitter.com/hyper_sh)
-Blog: [https://hyper.sh/blog](https://hyper.sh/blog)
+Blog: [https://hyper.sh/blog](https://hyper.sh/blog.html)
 IRC: [#hyper](https://botbot.me/freenode/hyper/)
 
