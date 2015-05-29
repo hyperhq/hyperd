@@ -39,6 +39,8 @@ Ensure you are running Linux (kernel 3.8 or later) and have Docker
 
     curl -sSL https://hyper.sh/install | bash
 
+Or download the [binary tarball](https://hyper-install.s3.amazonaws.com/hyper-latest.tgz) and install it directly.
+
 To run *hyper*, just type `hyper` if you've installed packages.
 
 For information on using the command line, just type `hyper`. You may use
