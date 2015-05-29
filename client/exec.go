@@ -1,20 +1,21 @@
 package client
 
 import (
+	"encoding/json"
 	"fmt"
+	"hyper/engine"
+	"hyper/lib/promise"
 	"io"
 	"net/url"
 	"strings"
-	"encoding/json"
-	"hyper/engine"
-	"hyper/lib/promise"
+
 	gflag "github.com/jessevdk/go-flags"
 )
 
 func (cli *HyperClient) HyperCmdExec(args ...string) error {
 	var opts struct {
-		Attach     bool     `short:"a" long:"attach" default:"true" value-name:"false" description:"attach current terminal to the stdio of command"`
-		Vm         bool     `long:"vm" default:"false" value-name:"false" description:"attach to vm"`
+		Attach bool `short:"a" long:"attach" default:"true" value-name:"false" description:"attach current terminal to the stdio of command"`
+		Vm     bool `long:"vm" default:"false" value-name:"false" description:"attach to vm"`
 	}
 	var parser = gflag.NewParser(&opts, gflag.Default|gflag.IgnoreUnknown)
 	parser.Usage = "exec [OPTIONS] POD|CONTAINER COMMAND [ARGS...]\n\nrun a command in a container of a running pod"
@@ -33,9 +34,9 @@ func (cli *HyperClient) HyperCmdExec(args ...string) error {
 		return fmt.Errorf("Can not accept the 'exec' command without command!")
 	}
 	var (
-		podName = args[1]
-		hostname = ""
-		tag = cli.GetTag()
+		podName     = args[1]
+		hostname    = ""
+		tag         = cli.GetTag()
 		containerId string
 	)
 	command, err := json.Marshal(args[2:])
@@ -72,8 +73,8 @@ func (cli *HyperClient) HyperCmdExec(args ...string) error {
 	v.Set("tag", tag)
 
 	var (
-		hijacked    = make(chan io.Closer)
-		errCh       chan error
+		hijacked = make(chan io.Closer)
+		errCh    chan error
 	)
 	// Block the return until the chan gets closed
 	defer func() {
@@ -120,7 +121,7 @@ func (cli *HyperClient) GetPodInfo(podName string) (string, error) {
 	v.Set("podName", podName)
 	body, _, err := readBody(cli.call("GET", "/pod/info?"+v.Encode(), nil, nil))
 	if err != nil {
-		fmt.Printf("The Error is encountered, %s\n", err)
+		fmt.Printf("Error: %s\n", err)
 		return "", err
 	}
 
