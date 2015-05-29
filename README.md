@@ -83,4 +83,4 @@ hyper you are running, as shown by `hyper --version`.
 
 Twitter: [@hyperhq](https://twitter.com/hyper_sh)
 Blog: [https://hyper.sh/blog](https://hyper.sh/blog.html)
-IRC: #hyperhq on [freenode](https://webchat.freenode.net/)
+IRC: [#hyperhq](http://webchat.freenode.net?channels=hyper&uio=d4) on freenode
