@@ -269,9 +269,11 @@ func (pts *pseudoTtys) ptyConnect(ctx *VmContext, container int, session uint64,
 
                 glog.V(3).Infof("trying to input char: %d and %d chars", buf[0], nr)
 
+                mbuf := make([]byte, nr)
+                copy(mbuf, buf[:nr])
                 pts.channel <- &ttyMessage{
                     session: session,
-                    message: buf[:nr],
+                    message: mbuf[:nr],
                 }
             }
         }()

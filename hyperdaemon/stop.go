@@ -34,12 +34,20 @@ func (daemon *Daemon) CmdPodStop(job *engine.Job) error {
 func (daemon *Daemon) StopPod(podId, stopVm string) (int, string, error) {
 	glog.V(1).Infof("Prepare to stop the POD: %s", podId)
 	// find the vm id which running POD, and stop it
+	if daemon.podList[podId].Status != types.S_POD_RUNNING {
+		return -1, "", fmt.Errorf("The POD %s has aleady stopped, can not stop again!", podId)
+	}
 	vmid, err := daemon.GetPodVmByName(podId)
 	if err != nil {
 		return -1, "", err
 	}
-	if daemon.podList[podId].Status != types.S_POD_RUNNING {
-		return -1, "", fmt.Errorf("The POD %s has aleady stopped, can not stop again!", podId)
+	// we need to set the 'RestartPolicy' of the pod to 'never' if stop command is invoked
+	// for kubernetes
+	if daemon.podList[podId].Type == "kubernetes" {
+		daemon.podList[podId].RestartPolicy = "never"
+		if daemon.podList[podId].Vm == "" {
+			return types.E_VM_SHUTDOWN, "", nil
+		}
 	}
 	qemuPodEvent, _, qemuStatus, err := daemon.GetQemuChan(vmid)
 	if err != nil {
@@ -75,9 +83,7 @@ func (daemon *Daemon) StopPod(podId, stopVm string) (int, string, error) {
 	daemon.DeleteVmByPod(podId)
 
 	if qemuResponse.Code == types.E_VM_SHUTDOWN {
-		daemon.podList[podId].Status = types.S_POD_CREATED
 		daemon.podList[podId].Vm = ""
-		daemon.SetContainerStatus(podId, types.S_POD_CREATED)
 		daemon.RemoveVm(vmid)
 		daemon.DeleteQemuChan(vmid)
 	}

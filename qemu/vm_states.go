@@ -386,6 +386,11 @@ func stateRunning(ctx *VmContext, ev QemuEvent) {
                 if ctx.userSpec.Tty {
                     ctx.setWindowSize(cmd.ClientTag, cmd.Size)
                 }
+            case EVENT_POD_FINISH:
+                result := ev.(*PodFinished)
+                ctx.reportPodFinished(result)
+                ctx.shutdownVM(false, "")
+                ctx.Become(stateTerminating, "TERMINATING")
             case COMMAND_ACK:
                 ack := ev.(*CommandAck)
                 glog.V(1).Infof("[running] got init ack to %d", ack.reply)

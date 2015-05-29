@@ -18,6 +18,7 @@ const(
     EVENT_QEMU_EXIT = iota
     EVENT_QEMU_KILL
     EVENT_QEMU_TIMEOUT
+    EVENT_POD_FINISH
     EVENT_INIT_CONNECTED
     EVENT_QMP_EVENT
     EVENT_CONTAINER_ADD
@@ -76,6 +77,7 @@ const(
     INIT_ERROR
     INIT_WINSIZE
     INIT_PING
+    INIT_FINISHPOD
 )
 
 const (
@@ -94,6 +96,7 @@ func EventString(ev int) string {
         case EVENT_QEMU_EXIT: return "EVENT_QEMU_EXIT"
         case EVENT_QEMU_KILL: return "EVENT_QEMU_KILL"
         case EVENT_QEMU_TIMEOUT: return "EVENT_QEMU_TIMEOUT"
+        case EVENT_POD_FINISH: return "EVENT_POD_FINISH"
         case EVENT_INIT_CONNECTED: return "EVENT_INIT_CONNECTED"
         case EVENT_QMP_EVENT: return "EVENT_QMP_EVENT"
         case EVENT_CONTAINER_ADD: return "EVENT_CONTAINER_ADD"

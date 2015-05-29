@@ -58,6 +58,18 @@ func (daemon *Daemon) CmdList(job *engine.Job) error {
 			case types.S_POD_CREATED:
 				status = "pending"
 				break
+			case types.S_POD_FAILED:
+				status = "failed"
+				if v.Type == "kubernetes" {
+					status = "failed(kubernetes)"
+				}
+				break
+			case types.S_POD_SUCCEEDED:
+				status = "succeeded"
+				if v.Type == "kubernetes" {
+					status = "succeeded(kubernetes)"
+				}
+				break
 			default:
 				status = ""
 				break
@@ -71,10 +83,16 @@ func (daemon *Daemon) CmdList(job *engine.Job) error {
 		for _, c := range daemon.containerList {
 			switch c.Status {
 			case types.S_POD_RUNNING:
-				status = "online"
+				status = "running"
 				break
 			case types.S_POD_CREATED:
-				status = "stop"
+				status = "pending"
+				break
+			case types.S_POD_FAILED:
+				status = "failed"
+				break
+			case types.S_POD_SUCCEEDED:
+				status = "succeeded"
 				break
 			default:
 				status = ""

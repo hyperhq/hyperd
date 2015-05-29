@@ -91,7 +91,6 @@ func (kp *KPod) Convert() (*UserPod, error) {
         case "OnFailure": rpolicy = "onFailure"
         default:
     }
-
     var memory int64 = 0
     containers := make([]UserContainer, len(kp.Spec.Containers))
     for i,kc := range kp.Spec.Containers {
@@ -158,5 +157,6 @@ func (kp *KPod) Convert() (*UserPod, error) {
         },
         Volumes:    volumes,
         Tty:        true,
+        Type:       "kubernetes",
     }, nil
 }

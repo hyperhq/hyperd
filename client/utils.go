@@ -15,10 +15,10 @@ import (
 	"net/url"
 	"strconv"
 
-
 	"hyper/utils"
 	"hyper/lib/term"
 	"hyper/pod"
+	"hyper/lib/yaml"
 )
 
 var (
@@ -92,10 +92,10 @@ func (cli *HyperClient) clientRequest(method, path string, in io.Reader, headers
 		if len(body) == 0 {
 			return nil, "", statusCode, fmt.Errorf("Error: request returned %s for API route and version %s, check if the server supports the requested API version", http.StatusText(statusCode), req.URL)
 		}
-		if len(bytes.TrimSpace(body)) > 50 {
+		if len(bytes.TrimSpace(body)) > 150 {
 			return nil, "", statusCode, fmt.Errorf("Error from daemon's response")
 		}
-		return nil, "", statusCode, fmt.Errorf("Error from daemon's response: %s", bytes.TrimSpace(body))
+		return nil, "", statusCode, fmt.Errorf("%s", bytes.TrimSpace(body))
 	}
 
 	return resp.Body, resp.Header.Get("Content-Type"), statusCode, nil
@@ -142,7 +142,6 @@ func (cli *HyperClient) streamBody(body io.ReadCloser, contentType string, setRa
 		}
 		return nil
 	}
-	fmt.Printf("There is something wrong in print the IO Stream!\n")
 	return nil
 }
 
@@ -207,4 +206,16 @@ func (cli *HyperClient) getTtySize() (int, int) {
 
 func (cli *HyperClient)GetTag() string {
 	return pod.RandStr(8, "alphanum")
+}
+
+func (cli *HyperClient) ConvertYamlToJson(yamlBody []byte) ([]byte, error) {
+	var userPod pod.UserPod
+	if err:= yaml.Unmarshal(yamlBody, &userPod); err != nil {
+		return []byte(""), err
+	}
+	jsonBody, err := json.Marshal(&userPod)
+	if err != nil {
+		return []byte(""), err
+	}
+	return jsonBody, nil
 }

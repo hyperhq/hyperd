@@ -57,6 +57,18 @@ func (daemon *Daemon) CmdPodStart(job *engine.Job) error {
 	vmId := job.Args[1]
 
 	glog.Info("pod:%s, vm:%s", podId, vmId)
+	// Do the status check for the given pod
+	if pod, ok := daemon.podList[podId]; ok {
+		if pod.Status == types.S_POD_RUNNING {
+			return fmt.Errorf("The pod(%s) is running, can not start it", podId)
+		} else {
+			if pod.Type == "kubernetes" && pod.Status != types.S_POD_CREATED {
+				return fmt.Errorf("The pod(%s) is finished with kubernetes type, can not start it again", podId)
+			}
+		}
+	} else {
+		return fmt.Errorf("The pod(%s) can not be found, please create it first", podId)
+	}
 	data, err := daemon.GetPodByName(podId)
 	if err != nil {
 		return err
@@ -92,9 +104,6 @@ func (daemon *Daemon) CmdPodStart(job *engine.Job) error {
 	}
 	daemon.podList[podId].Vm = vmId
 	daemon.AddVm(vm)
-	daemon.podList[podId].Status = types.S_POD_RUNNING
-	// Set the container status to online
-	daemon.SetContainerStatus(podId, types.S_POD_RUNNING)
 
 	// Prepare the qemu status to client
 	v := &engine.Env{}
@@ -148,9 +157,6 @@ func (daemon *Daemon) CmdPodRun(job *engine.Job) error {
 	}
 	daemon.podList[podId].Vm = vmId
 	daemon.AddVm(vm)
-	daemon.podList[podId].Status = types.S_POD_RUNNING
-	// Set the container status to online
-	daemon.SetContainerStatus(podId, types.S_POD_RUNNING)
 
 	// Prepare the qemu status to client
 	v := &engine.Env{}
@@ -191,14 +197,17 @@ func (daemon *Daemon) CreatePod(podArgs, podId string) error {
 			body, _, err := daemon.dockerCli.SendCmdCreate(imgName)
 			if err != nil {
 				glog.Error(err.Error())
+				daemon.DeletePodFromDB(podId)
 				return err
 			}
 			out := engine.NewOutput()
 			remoteInfo, err := out.AddEnv()
 			if err != nil {
+				daemon.DeletePodFromDB(podId)
 				return err
 			}
 			if _, err := out.Write(body); err != nil {
+				daemon.DeletePodFromDB(podId)
 				return fmt.Errorf("Error while reading remote info!\n")
 			}
 			out.Close()
@@ -219,6 +228,8 @@ func (daemon *Daemon) CreatePod(podArgs, podId string) error {
 		Vm:			  "",
 		Containers:   containers,
 		Status:		  types.S_POD_CREATED,
+		Type:         userPod.Type,
+		RestartPolicy:userPod.Containers[0].RestartPolicy,
 	}
 	daemon.AddPod(mypod)
 
@@ -518,16 +529,67 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 		for {
 			qemuResponse :=<-qemuStatus
 			subQemuStatus <- qemuResponse
-			if qemuResponse.Code == types.E_VM_SHUTDOWN {
-				daemon.podList[podId].Status = types.S_POD_CREATED
+			if qemuResponse.Code == types.E_POD_FINISHED {
+				data := qemuResponse.Data.([]uint32)
+				daemon.SetPodContainerStatus(podId, data)
 				daemon.podList[podId].Vm = ""
-				daemon.SetContainerStatus(podId, types.S_POD_CREATED)
+			} else if qemuResponse.Code == types.E_VM_SHUTDOWN {
+				if daemon.podList[podId].Status == types.S_POD_RUNNING {
+					daemon.podList[podId].Status = types.S_POD_SUCCEEDED
+					daemon.SetContainerStatus(podId, types.S_POD_SUCCEEDED)
+				}
+				daemon.podList[podId].Vm = ""
 				daemon.RemoveVm(vmId)
 				daemon.DeleteQemuChan(vmId)
+				mypod = daemon.podList[podId]
+				if mypod.Type == "kubernetes" {
+					switch mypod.Status {
+					case types.S_POD_SUCCEEDED:
+						if mypod.RestartPolicy == "always" {
+							daemon.RestartPod(mypod)
+						} else {
+							daemon.DeletePodFromDB(podId)
+							for _, c := range daemon.podList[podId].Containers {
+								glog.V(1).Infof("Ready to rm container: %s", c.Id)
+								if _, _, err = daemon.dockerCli.SendCmdDelete(c.Id); err != nil {
+									glog.V(1).Infof("Error to rm container: %s", err.Error())
+								}
+							}
+//							daemon.RemovePod(podId)
+							daemon.DeletePodContainerFromDB(podId)
+							daemon.DeleteVolumeId(podId)
+						}
+						break
+					case types.S_POD_FAILED:
+						if mypod.RestartPolicy != "never" {
+							daemon.RestartPod(mypod)
+						} else {
+							daemon.DeletePodFromDB(podId)
+							for _, c := range daemon.podList[podId].Containers {
+								glog.V(1).Infof("Ready to rm container: %s", c.Id)
+								if _, _, err = daemon.dockerCli.SendCmdDelete(c.Id); err != nil {
+									glog.V(1).Infof("Error to rm container: %s", err.Error())
+								}
+							}
+//							daemon.RemovePod(podId)
+							daemon.DeletePodContainerFromDB(podId)
+							daemon.DeleteVolumeId(podId)
+						}
+						break
+					default:
+						break
+					}
+				}
 				break
 			}
 		}
 	}(subQemuStatus)
+
+	if daemon.podList[podId].Type == "kubernetes" {
+		for _, c := range userPod.Containers {
+			c.RestartPolicy = "never"
+		}
+	}
 
 	fmt.Printf("POD id is %s\n", podId)
 	runPodEvent := &qemu.RunPodCommand {
@@ -536,6 +598,10 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 		Volumes: volumuInfoList,
 	}
 	qemuPodEvent <- runPodEvent
+	daemon.podList[podId].Status = types.S_POD_RUNNING
+	// Set the container status to online
+	daemon.SetContainerStatus(podId, types.S_POD_RUNNING)
+
 	// wait for the qemu response
 	var qemuResponse *types.QemuResponse
 	for {
@@ -560,6 +626,50 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 
 	// XXX we should not close qemuStatus chan, it will be closed in shutdown process
 	return qemuResponse.Code, qemuResponse.Cause, nil
+}
+
+// The caller must make sure that the restart policy and the status is right to restart
+func (daemon *Daemon) RestartPod(mypod *Pod) error {
+	// Remove the pod
+	// The pod is stopped, the vm is gone
+	for _, c := range mypod.Containers {
+		glog.V(1).Infof("Ready to rm container: %s", c.Id)
+		if _, _, err := daemon.dockerCli.SendCmdDelete(c.Id); err != nil {
+			glog.V(1).Infof("Error to rm container: %s", err.Error())
+		}
+	}
+	daemon.RemovePod(mypod.Id)
+	daemon.DeletePodContainerFromDB(mypod.Id)
+	daemon.DeleteVolumeId(mypod.Id)
+	podData, err := daemon.GetPodByName(mypod.Id)
+	vmId := fmt.Sprintf("vm-%s", pod.RandStr(10, "alpha"))
+	// Start the pod
+	_, _, err = daemon.StartPod(mypod.Id, vmId, string(podData))
+	if err != nil {
+		daemon.KillVm(vmId)
+		glog.Error(err.Error())
+		return err
+	}
+	if err := daemon.WritePodAndContainers(mypod.Id); err != nil {
+		glog.Error("Found an error while saving the Containers info")
+		return err
+	}
+	userPod, err := pod.ProcessPodBytes(podData)
+	if err != nil {
+		return err
+	}
+
+	vm := &Vm {
+		Id:		   vmId,
+		Pod:	   daemon.podList[mypod.Id],
+		Status:    types.S_VM_ASSOCIATED,
+		Cpu:       userPod.Resource.Vcpu,
+		Mem:       userPod.Resource.Memory,
+	}
+	daemon.podList[mypod.Id].Vm = vmId
+	daemon.AddVm(vm)
+
+	return nil
 }
 
 func (daemon *Daemon) CmdPodInfo(job *engine.Job) error {

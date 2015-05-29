@@ -20,17 +20,24 @@ func (daemon *Daemon) CmdPodRm(job *engine.Job) (err error) {
     }
 
 	if daemon.podList[podId].Status != types.S_POD_RUNNING {
-        daemon.DeletePodFromDB(podId)
-        daemon.RemovePod(podId)
-        for _, c := range pod.Containers {
-            glog.V(1).Infof("Ready to rm container: %s", c.Id)
-            if _, _, err = daemon.dockerCli.SendCmdDelete(c.Id); err != nil {
-                glog.V(1).Infof("Error to rm container: %s", err.Error())
+        // If the pod type is kubernetes, we just remove the pod from the pod list.
+        // The persistent data has been removed since we got the E_VM_SHUTDOWN event.
+        if daemon.podList[podId].Type == "kubernetes" {
+            daemon.RemovePod(podId)
+            code = types.E_OK
+        } else {
+            daemon.DeletePodFromDB(podId)
+            for _, c := range pod.Containers {
+                glog.V(1).Infof("Ready to rm container: %s", c.Id)
+                if _, _, err = daemon.dockerCli.SendCmdDelete(c.Id); err != nil {
+                    glog.V(1).Infof("Error to rm container: %s", err.Error())
+                }
             }
+            daemon.RemovePod(podId)
+            daemon.DeletePodContainerFromDB(podId)
+            daemon.DeleteVolumeId(podId)
+            code = types.E_OK
         }
-        daemon.DeletePodContainerFromDB(podId)
-        daemon.DeleteVolumeId(podId)
-        code = types.E_OK
 	} else {
         code, cause, err = daemon.StopPod(podId, "yes")
         if err != nil {
@@ -38,16 +45,17 @@ func (daemon *Daemon) CmdPodRm(job *engine.Job) (err error) {
         }
         if code == types.E_VM_SHUTDOWN {
             daemon.DeletePodFromDB(podId)
-            daemon.RemovePod(podId)
             for _, c := range pod.Containers {
                 glog.V(1).Infof("Ready to rm container: %s", c.Id)
                 if _, _, err = daemon.dockerCli.SendCmdDelete(c.Id); err != nil {
                     glog.V(1).Infof("Error to rm container: %s", err.Error())
                 }
             }
+            daemon.RemovePod(podId)
             daemon.DeletePodContainerFromDB(podId)
             daemon.DeleteVolumeId(podId)
         }
+        code = types.E_OK
     }
 
 	// Prepare the qemu status to client

@@ -166,14 +166,58 @@ func (daemon *Daemon) AssociateAllVms() error {
 		mypod.Status = types.S_POD_RUNNING
 		go func(interface{}) {
 			for {
+				podId := mypod.Id
 				qemuResponse :=<-qemuStatus
 				subQemuStatus <- qemuResponse
-				if qemuResponse.Code == types.E_VM_SHUTDOWN {
-					daemon.podList[mypod.Id].Status = types.S_POD_CREATED
+				if qemuResponse.Code == types.E_POD_FINISHED {
+					data := qemuResponse.Data.([]uint32)
+					daemon.SetPodContainerStatus(podId, data)
+				} else if qemuResponse.Code == types.E_VM_SHUTDOWN {
+					if daemon.podList[mypod.Id].Status == types.S_POD_RUNNING {
+						daemon.podList[mypod.Id].Status = types.S_POD_SUCCEEDED
+						daemon.SetContainerStatus(podId, types.S_POD_SUCCEEDED)
+					}
 					daemon.podList[mypod.Id].Vm = ""
-					daemon.SetContainerStatus(mypod.Id, types.S_POD_CREATED)
 					daemon.RemoveVm(mypod.Vm)
 					daemon.DeleteQemuChan(mypod.Vm)
+					if mypod.Type == "kubernetes" {
+						switch mypod.Status {
+						case types.S_POD_SUCCEEDED:
+							if mypod.RestartPolicy == "always" {
+								daemon.RestartPod(mypod)
+							} else {
+								daemon.DeletePodFromDB(podId)
+								for _, c := range mypod.Containers {
+									glog.V(1).Infof("Ready to rm container: %s", c.Id)
+									if _, _, err = daemon.dockerCli.SendCmdDelete(c.Id); err != nil {
+										glog.V(1).Infof("Error to rm container: %s", err.Error())
+									}
+								}
+//								daemon.RemovePod(podId)
+								daemon.DeletePodContainerFromDB(podId)
+								daemon.DeleteVolumeId(podId)
+							}
+							break
+						case types.S_POD_FAILED:
+							if mypod.RestartPolicy != "never" {
+								daemon.RestartPod(mypod)
+							} else {
+								daemon.DeletePodFromDB(podId)
+								for _, c := range mypod.Containers {
+									glog.V(1).Infof("Ready to rm container: %s", c.Id)
+									if _, _, err = daemon.dockerCli.SendCmdDelete(c.Id); err != nil {
+										glog.V(1).Infof("Error to rm container: %s", err.Error())
+									}
+								}
+//								daemon.RemovePod(podId)
+								daemon.DeletePodContainerFromDB(podId)
+								daemon.DeleteVolumeId(podId)
+							}
+							break
+						default:
+							break
+						}
+					}
 					break
 				}
 			}

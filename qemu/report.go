@@ -42,6 +42,15 @@ func (ctx *VmContext) reportPodStopped() {
     }
 }
 
+func (ctx *VmContext) reportPodFinished(result *PodFinished) {
+    ctx.client <- &types.QemuResponse{
+        VmId:   ctx.Id,
+        Code:   types.E_POD_FINISHED,
+        Cause:  "POD run finished",
+        Data:   result.result,
+    }
+}
+
 func (ctx *VmContext) reportSuccess(msg string, data interface{}) {
     ctx.client <- &types.QemuResponse{
         VmId: ctx.Id,

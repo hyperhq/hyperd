@@ -74,6 +74,7 @@ type UserPod struct {
     Files           []UserFile           `json:"files"`
     Volumes         []UserVolume         `json:"volumes"`
     Tty             bool                 `json:"tty"`
+    Type            string               `json:"type"`
 }
 
 func ProcessPodFile(jsonFile string) (*UserPod, error ) {

@@ -18,6 +18,10 @@ type QemuKilledEvent struct {
     success bool
 }
 
+type PodFinished struct {
+    result []uint32
+}
+
 type QemuTimeout struct {}
 
 type InitFailedEvent struct {
@@ -172,6 +176,7 @@ type Interrupted struct {
 func (qe* QemuExitEvent)            Event() int { return EVENT_QEMU_EXIT }
 func (qe* QemuKilledEvent)          Event() int { return EVENT_QEMU_KILL }
 func (qe* QemuTimeout)              Event() int { return EVENT_QEMU_TIMEOUT }
+func (qe* PodFinished)              Event() int { return EVENT_POD_FINISH }
 func (qe* InitConnectedEvent)       Event() int { return EVENT_INIT_CONNECTED }
 func (qe* ContainerCreatedEvent)    Event() int { return EVENT_CONTAINER_ADD }
 func (qe* ContainerUnmounted)       Event() int { return EVENT_CONTAINER_DELETE }

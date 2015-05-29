@@ -162,6 +162,18 @@ func waitCmdToInit(ctx *VmContext, init *net.UnixConn) {
             } else {
                 glog.Error("got ack but no command in queue")
             }
+        } else if cmd.code == INIT_FINISHPOD {
+            num := len(cmd.message)/4
+            results := make([]uint32, num)
+            for i:=0 ; i < num ; i ++ {
+                results[i] = binary.BigEndian.Uint32(cmd.message[i*4:i*4+4])
+            }
+
+            glog.V(1).Infof("Pod finished, returned %d values", num)
+
+            ctx.hub <- &PodFinished{
+                result: results,
+            }
         } else{
             if glog.V(1) {
                 glog.Infof("send command %d to init, payload: '%s'.", cmd.code, string(cmd.message))
@@ -188,7 +200,7 @@ func waitInitAck(ctx *VmContext, init *net.UnixConn) {
         if err != nil {
             ctx.hub <- &Interrupted{ reason: "init socket failed " + err.Error(), }
             return
-        } else if res.code == INIT_ACK || res.code == INIT_ERROR {
+        } else if res.code == INIT_ACK || res.code == INIT_ERROR || res.code == INIT_FINISHPOD {
             ctx.vm <- res
         }
     }

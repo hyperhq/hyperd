@@ -37,6 +37,8 @@ type Pod struct {
     Vm              string
     Containers      []*Container
     Status          uint
+    Type            string
+    RestartPolicy   string
 }
 
 type Container struct {
@@ -370,9 +372,21 @@ func (daemon *Daemon) GetRunningPodNum() int64 {
 
 func (daemon *Daemon) WritePodToDB(podName string, podData []byte) error {
     key := fmt.Sprintf("pod-%s", podName)
-    err := (daemon.db).Put([]byte(key), podData, nil)
+    _, err := (daemon.db).Get([]byte(key), nil)
     if err != nil {
-        return err
+        err = (daemon.db).Put([]byte(key), podData, nil)
+        if err != nil {
+            return err
+        }
+    } else {
+        err = (daemon.db).Delete([]byte(key), nil)
+        if err != nil {
+            return err
+        }
+        err = (daemon.db).Put([]byte(key), podData, nil)
+        if err != nil {
+            return err
+        }
     }
     return nil
 }
@@ -649,10 +663,25 @@ func (daemon *Daemon) RemoveVm(vmId string) {
 }
 
 func (daemon *Daemon) SetContainerStatus(podId string, status uint) {
-    for _, v := range daemon.containerList {
-        if v.PodId == podId {
-            v.Status = status
+    for _, c := range daemon.podList[podId].Containers {
+        c.Status = status
+    }
+}
+
+func (daemon *Daemon) SetPodContainerStatus(podId string, data []uint32) {
+    failure := 0
+    for i, c := range daemon.podList[podId].Containers {
+        if data[i] != 0 {
+            failure ++
+            c.Status = types.S_POD_FAILED
+        } else {
+            c.Status = types.S_POD_SUCCEEDED
         }
+    }
+    if failure == 0 {
+        daemon.podList[podId].Status = types.S_POD_SUCCEEDED
+    } else {
+        daemon.podList[podId].Status = types.S_POD_FAILED
     }
 }
 

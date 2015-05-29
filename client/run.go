@@ -24,6 +24,7 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 	var opts struct {
 		PodFile  string   `short:"p" long:"podfile" value-name:"\"\"" description:"Create and Run a pod based on the pod file"`
 		K8s      string   `short:"k" long:"kubernetes" value-name:"\"\"" description:"Create and Run a pod based on the kubernetes pod file"`
+		Yaml     bool     `short:"y" long:"yaml" default:"false" default-mask:"-" description:"Create a pod based on Yaml file"`
 		Name     string   `long:"name" value-name:"\"\"" description:"Assign a name to the container"`
 		Attach   bool     `long:"attach" default:"true" default-mask:"-" description:"Attach the stdin, stdout and stderr to the container"`
 		Workdir  string   `long:"workdir" default:"/" value-name:"\"\"" default-mask:"-" description:"Working directory inside the container"`
@@ -32,7 +33,7 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 		Memory   int      `long:"memory" default:"128" value-name:"128" default-mask:"-" description:"Memory size (MB) for the VM"`
 		Env      []string `long:"env" value-name:"[]" default-mask:"-" description:"Set environment variables"`
 		EntryPoint      string   `long:"entrypoint" value-name:"\"\"" default-mask:"-" description:"Overwrite the default ENTRYPOINT of the image"`
-		RestartPolicy   string   `long:"restart" default:"never" value-name:"\"\"" default-mask:"-" description:"Restart policy to apply when a container exits (no, on-failure[:max-retry], always)"`
+		RestartPolicy   string   `long:"restart" default:"never" value-name:"\"\"" default-mask:"-" description:"Restart policy to apply when a container exits (never, onFailure, always)"`
 	}
 
 	var parser = gflag.NewParser(&opts, gflag.Default|gflag.IgnoreUnknown)
@@ -55,6 +56,12 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 			return err
 		}
 
+		if opts.Yaml == true {
+			jsonbody, err = cli.ConvertYamlToJson(jsonbody)
+			if err != nil {
+				return err
+			}
+		}
 		t1 := time.Now()
 		podId, err := cli.RunPod(string(jsonbody))
 		if err != nil {
@@ -77,6 +84,12 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 		jsonbody, err := ioutil.ReadFile(opts.K8s)
 		if err != nil {
 			return err
+		}
+		if opts.Yaml == true {
+			jsonbody, err = cli.ConvertYamlToJson(jsonbody)
+			if err != nil {
+				return err
+			}
 		}
 		if err := json.Unmarshal(jsonbody, &kpod); err != nil {
 			return err
@@ -170,7 +183,6 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 	if err != nil {
 		return err
 	}
-	cmd, err := json.Marshal(command)
 	var (
 		tag         = cli.GetTag()
 		hijacked    = make(chan io.Closer)
@@ -179,7 +191,6 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 	v := url.Values{}
 	v.Set("type", "container")
 	v.Set("value", containerId)
-	v.Set("command", string(cmd))
 	v.Set("tag", tag)
 
 	// Block the return until the chan gets closed
@@ -191,7 +202,7 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 	}()
 
 	errCh = promise.Go(func() error {
-		return cli.hijack("POST", "/exec?"+v.Encode(), true, cli.in, cli.out, cli.out, hijacked, nil, "")
+		return cli.hijack("POST", "/attach?"+v.Encode(), true, cli.in, cli.out, cli.out, hijacked, nil, "")
 	})
 
 	if err := cli.monitorTtySize(podId, tag); err != nil {

@@ -19,6 +19,7 @@ func (cli *HyperClient) HyperCmdReplace(args ...string) error {
         OldPod       string           `short:"o" long:"oldpod" value-name:"\"\"" description:"The Pod which will be replaced, must be 'running' status"`
         NewPod       string           `short:"n" long:"newpod" value-name:"\"\"" description:"The Pod which will be running, must be 'pending' status"`
         PodFile      string           `short:"f" long:"file" value-name:"\"\"" description:"The Pod file is used to create a new POD and run"`
+		Yaml         bool             `short:"y" long:"yaml" default:"false" default-mask:"-" description:"The Pod file is based on Yaml file"`
     }
 	var parser = gflag.NewParser(&opts, gflag.Default)
 	parser.Usage = "replace --oldpod POD_ID --newpod POD_ID [--file POD_FILE]\n\nreplace the pod in a running VM with a new one"
@@ -67,6 +68,13 @@ func (cli *HyperClient) HyperCmdReplace(args ...string) error {
         if err != nil {
             return err
         }
+
+		if opts.Yaml == true {
+			jsonbody, err = cli.ConvertYamlToJson(jsonbody)
+			if err != nil {
+				return err
+			}
+		}
         newPodId, err := cli.CreatePod(string(jsonbody))
         if err != nil {
             return err
