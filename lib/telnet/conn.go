@@ -1,3 +1,6 @@
+// Copyright (c) 2013, Michal Derkacz
+// All rights reserved.
+
 // Package telnet provides simple interface for interacting with Telnet
 // connection.
 package telnet
