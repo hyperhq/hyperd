@@ -81,6 +81,6 @@ Found a bug, want to suggest a feature, or have a question?
 [File an issue](https://github.com/hyperhq/hyper/issues), or email [bug@hyper.sh](bug@hyper.sh). When reporting a bug, please include which version of
 hyper you are running, as shown by `hyper --version`.
 
-Twitter: [@hyperhq](https://twitter.com/hyper_sh)
+Twitter: [@hyper_sh](https://twitter.com/hyper_sh)
 Blog: [https://hyper.sh/blog](https://hyper.sh/blog.html)
 IRC: [#hyperhq](http://webchat.freenode.net?channels=hyper&uio=d4) on freenode
