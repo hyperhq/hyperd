@@ -1,15 +1,16 @@
 package client
 
 import (
-	"os"
 	"fmt"
-	"strings"
 	"io/ioutil"
 	"net/url"
+	"os"
+	"strings"
 	"time"
 
 	"hyper/engine"
 	"hyper/types"
+
 	gflag "github.com/jessevdk/go-flags"
 )
 
@@ -17,7 +18,7 @@ import (
 func (cli *HyperClient) HyperCmdPod(args ...string) error {
 	t1 := time.Now()
 	var parser = gflag.NewParser(nil, gflag.Default)
-	parser.Usage = "pod POD_FILE\n\nCreate a pod, let a pod become created and run it"
+	parser.Usage = "pod POD_FILE\n\nCreate a pod, initialize a pod and run it"
 	args, err := parser.Parse()
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {
@@ -44,15 +45,15 @@ func (cli *HyperClient) HyperCmdPod(args ...string) error {
 	}
 	fmt.Printf("POD id is %s\n", podId)
 	t2 := time.Now()
-	fmt.Printf("Time to run a POD is %d ms\n", (t2.UnixNano() - t1.UnixNano())/1000000)
+	fmt.Printf("Time to run a POD is %d ms\n", (t2.UnixNano()-t1.UnixNano())/1000000)
 
 	return nil
 }
 
-func (cli *HyperClient)CreatePod(jsonbody string) (string, error) {
+func (cli *HyperClient) CreatePod(jsonbody string) (string, error) {
 	v := url.Values{}
 	v.Set("podArgs", jsonbody)
-	body, _, err := readBody(cli.call("POST", "/pod/create?"+v.Encode(), nil, nil));
+	body, _, err := readBody(cli.call("POST", "/pod/create?"+v.Encode(), nil, nil))
 	if err != nil {
 		return "", err
 	}
@@ -75,7 +76,7 @@ func (cli *HyperClient)CreatePod(jsonbody string) (string, error) {
 		// case types.E_QMP_INIT_FAIL:
 		// case types.E_QMP_COMMAND_FAIL:
 		if errCode != types.E_BAD_REQUEST &&
-		    errCode != types.E_FAILED {
+			errCode != types.E_FAILED {
 			return "", fmt.Errorf("Error code is %d", errCode)
 		} else {
 			return "", fmt.Errorf("Cause is %s", remoteInfo.Get("Cause"))
@@ -84,12 +85,11 @@ func (cli *HyperClient)CreatePod(jsonbody string) (string, error) {
 	return remoteInfo.Get("ID"), nil
 }
 
-
 func (cli *HyperClient) HyperCmdStart(args ...string) error {
 	var opts struct {
-//		OnlyVm    bool     `long:"onlyvm" default:"false" value-name:"false" description:"Only start a new VM"`
-		Cpu       int      `short:"c" long:"cpu" default:"1" value-name:"1" description:"CPU number for the VM"`
-		Mem       int      `short:"m" long:"memory" default:"128" value-name:"128" description:"Memory size (MB) for the VM"`
+		//		OnlyVm    bool     `long:"onlyvm" default:"false" value-name:"false" description:"Only start a new VM"`
+		Cpu int `short:"c" long:"cpu" default:"1" value-name:"1" description:"CPU number for the VM"`
+		Mem int `short:"m" long:"memory" default:"128" value-name:"128" description:"Memory size (MB) for the VM"`
 	}
 	var parser = gflag.NewParser(&opts, gflag.Default)
 	parser.Usage = "start [-c 1 -m 128]| POD_ID \n\nlaunch a 'pending' pod"
@@ -106,7 +106,7 @@ func (cli *HyperClient) HyperCmdStart(args ...string) error {
 		v := url.Values{}
 		v.Set("cpu", fmt.Sprintf("%d", opts.Cpu))
 		v.Set("mem", fmt.Sprintf("%d", opts.Mem))
-		body, _, err := readBody(cli.call("POST", "/vm/create?"+v.Encode(), nil, nil));
+		body, _, err := readBody(cli.call("POST", "/vm/create?"+v.Encode(), nil, nil))
 		if err != nil {
 			return err
 		}
@@ -143,7 +143,7 @@ func (cli *HyperClient) HyperCmdStart(args ...string) error {
 	}
 	var (
 		podId string
-		vmId string
+		vmId  string
 	)
 	if len(args) == 2 {
 		podId = args[1]
@@ -157,7 +157,7 @@ func (cli *HyperClient) HyperCmdStart(args ...string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Successful to start the Pod(%s)\n", podId)
+	fmt.Printf("Successfully started the Pod(%s)\n", podId)
 	return nil
 }
 
@@ -165,7 +165,7 @@ func (cli *HyperClient) StartPod(podId, vmId string) (string, error) {
 	v := url.Values{}
 	v.Set("podId", podId)
 	v.Set("vmId", vmId)
-	body, _, err := readBody(cli.call("POST", "/pod/start?"+v.Encode(), nil, nil));
+	body, _, err := readBody(cli.call("POST", "/pod/start?"+v.Encode(), nil, nil))
 	if err != nil {
 		return "", err
 	}
@@ -200,7 +200,7 @@ func (cli *HyperClient) StartPod(podId, vmId string) (string, error) {
 func (cli *HyperClient) RunPod(podstring string) (string, error) {
 	v := url.Values{}
 	v.Set("podArgs", podstring)
-	body, _, err := readBody(cli.call("POST", "/pod/run?"+v.Encode(), nil, nil));
+	body, _, err := readBody(cli.call("POST", "/pod/run?"+v.Encode(), nil, nil))
 	if err != nil {
 		return "", err
 	}

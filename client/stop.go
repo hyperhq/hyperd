@@ -7,14 +7,14 @@ import (
 
 	"hyper/engine"
 	"hyper/types"
+
 	gflag "github.com/jessevdk/go-flags"
 )
-
 
 func (cli *HyperClient) HyperCmdStop(args ...string) error {
 
 	var opts struct {
-//		Novm        bool     `long:"onlypod" default:"false" value-name:"false" description:"Stop a Pod, but left the VM running"`
+		//		Novm        bool     `long:"onlypod" default:"false" value-name:"false" description:"Stop a Pod, but left the VM running"`
 	}
 	var parser = gflag.NewParser(&opts, gflag.Default)
 	parser.Usage = "stop POD_ID\n\nstop a running pod"
@@ -42,7 +42,7 @@ func (cli *HyperClient) HyperCmdStop(args ...string) error {
 	if code != types.E_POD_STOPPED && code != types.E_VM_SHUTDOWN {
 		return fmt.Errorf("Error code is %d, cause is %s", code, cause)
 	}
-	fmt.Printf("Success to shutdown the POD: %s!\n", podID)
+	fmt.Printf("Successfully shutdown the POD: %s!\n", podID)
 	return nil
 }
 
@@ -50,7 +50,7 @@ func (cli *HyperClient) StopPod(podId, stopVm string) (int, string, error) {
 	v := url.Values{}
 	v.Set("podId", podId)
 	v.Set("stopVm", stopVm)
-	body, _, err := readBody(cli.call("POST", "/pod/stop?"+v.Encode(), nil, nil));
+	body, _, err := readBody(cli.call("POST", "/pod/stop?"+v.Encode(), nil, nil))
 	if err != nil {
 		if strings.Contains(err.Error(), "leveldb: not found") {
 			return -1, "", fmt.Errorf("Can not find that POD ID to stop, please check your POD ID!")

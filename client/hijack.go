@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"hyper/utils"
-	"hyper/lib/term"
 	"hyper/lib/promise"
+	"hyper/lib/term"
+	"hyper/utils"
 )
 
 func (cli *HyperClient) dial() (net.Conn, error) {
@@ -54,7 +54,7 @@ func (cli *HyperClient) hijack(method, path string, setRawTerminal bool, in io.R
 	}
 	if err != nil {
 		if strings.Contains(err.Error(), "connection refused") {
-			return fmt.Errorf("Cannot connect to the Docker daemon. Is 'dameon' running on this host?")
+			return fmt.Errorf("Cannot connect to the Docker daemon. Is 'docker' running on this host?")
 		}
 		return err
 	}
@@ -76,7 +76,7 @@ func (cli *HyperClient) hijack(method, path string, setRawTerminal bool, in io.R
 
 	var (
 		receiveStdout chan error
-		oldState *term.State
+		oldState      *term.State
 	)
 
 	if in != nil && setRawTerminal {
@@ -129,7 +129,7 @@ func (cli *HyperClient) hijack(method, path string, setRawTerminal bool, in io.R
 		sendStdin <- nil
 	}
 	if in != nil {
-		if err := <-sendStdin ; err != nil {
+		if err := <-sendStdin; err != nil {
 			fmt.Printf("Error sendStdin: %s\n", err.Error())
 			return err
 		}
