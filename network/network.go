@@ -265,15 +265,22 @@ func configureBridge(bridgeIP, bridgeIface string) error {
 		return err
 	}
 
-	_, ipNet, err := net.ParseCIDR(ifaceAddr)
+	ipAddr, ipNet, err := net.ParseCIDR(ifaceAddr)
 	if err != nil {
 		return err
 	}
 
-	ipAddr, err := ipAllocator.RequestIP(ipNet, nil);
+	if ipAddr.Equal(ipNet.IP) {
+		ipAddr, err = ipAllocator.RequestIP(ipNet, nil);
+	} else {
+		ipAddr, err = ipAllocator.RequestIP(ipNet, ipAddr);
+	}
+
 	if err != nil {
 		return err
 	}
+
+	glog.V(3).Infof("Allocate IP Address %s for bridge %s\n", ipAddr, bridgeIface)
 
 	if err := NetworkLinkAddIp(iface, ipAddr, ipNet); err != nil {
 		return fmt.Errorf("Unable to add private network: %s", err)
