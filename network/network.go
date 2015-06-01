@@ -193,12 +193,19 @@ func InitNetwork(bIface, bIP string) error {
 		bridgeIPv4Net = addr.(*net.IPNet);
 
 		if BridgeIP != "" {
-			bip, _, err := net.ParseCIDR(BridgeIP)
+			bip, ipnet, err := net.ParseCIDR(BridgeIP)
 			if err != nil {
 				return err
 			}
 			if !bridgeIPv4Net.Contains(bip) {
-				return fmt.Errorf("Bridge ip (%s) does not match existing bridge configuration %s", addr, bip)
+				return fmt.Errorf("Bridge ip (%s) does not match existing bridge configuration %s", addr, BridgeIP)
+			}
+
+			mask1, _ := ipnet.Mask.Size();
+			mask2, _ := bridgeIPv4Net.Mask.Size();
+
+			if mask1 != mask2 {
+				return fmt.Errorf("Bridge netmask (%d) does not match existing bridge netmask %d", mask1, mask2)
 			}
 		}
 	}
