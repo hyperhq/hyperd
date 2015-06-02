@@ -1,6 +1,7 @@
 package qemu
 
 import (
+    "hyper/pod"
     "hyper/types"
     "hyper/lib/glog"
     "encoding/json"
@@ -235,8 +236,16 @@ func deviceRemoveHandler(ctx *VmContext, ev QemuEvent) (bool, bool) {
         case EVENT_INTERFACE_EJECTED:
             n := ev.(*NetDevRemovedEvent)
             nic := ctx.devices.networkMap[n.Index]
+            var maps []pod.UserContainerPort
+
+            for _, c := range ctx.userSpec.Containers {
+                for _, m := range c.Ports {
+                    maps = append(maps, m)
+                }
+            }
+
             glog.V(1).Infof("release %d interface: %s", n.Index, nic.IpAddr)
-            go ReleaseInterface(n.Index, nic.IpAddr, nic.Fd, ctx.hub)
+            go ReleaseInterface(n.Index, nic.IpAddr, nic.Fd, maps, ctx.hub)
         default:
         processed = false
     }

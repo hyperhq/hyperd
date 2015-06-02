@@ -212,10 +212,18 @@ func (ctx* VmContext) setVolumeInfo(info *VolumeInfo) {
 }
 
 func (ctx *VmContext) allocateNetworks() {
-    for i,_ := range ctx.progress.adding.networks {
+    var maps []pod.UserContainerPort
+
+    for _, c := range ctx.userSpec.Containers {
+        for _, m := range c.Ports {
+            maps = append(maps, m)
+        }
+    }
+
+    for i, _ := range ctx.progress.adding.networks {
         name := fmt.Sprintf("eth%d", i)
         addr := ctx.nextPciAddr()
-        go CreateInterface(i, addr, name, i == 0, ctx.hub)
+        go CreateInterface(i, addr, name, i == 0, maps, ctx.hub)
     }
 }
 
@@ -422,10 +430,18 @@ func (ctx *VmContext) removeImageDrive() {
 }
 
 func (ctx *VmContext) releaseNetwork() {
+    var maps []pod.UserContainerPort
+
+    for _, c := range ctx.userSpec.Containers {
+        for _, m := range c.Ports {
+            maps = append(maps, m)
+        }
+    }
+
     for idx,nic := range ctx.devices.networkMap {
         glog.V(1).Infof("remove network card %d: %s", idx, nic.IpAddr)
         ctx.progress.deleting.networks[idx] = true
-        go ReleaseInterface(idx, nic.IpAddr, nic.Fd, ctx.hub)
+        go ReleaseInterface(idx, nic.IpAddr, nic.Fd, maps, ctx.hub)
     }
 }
 

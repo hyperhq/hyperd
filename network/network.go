@@ -5,6 +5,8 @@ import (
 	"net"
 	"io"
 	"os"
+	"os/exec"
+	"strconv"
 	"syscall"
 	"strings"
 	"sync"
@@ -12,8 +14,10 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"sync/atomic"
+	"hyper/pod"
 	"hyper/lib/glog"
 	"hyper/network/iptables"
+	"hyper/network/portmapper"
 	"hyper/network/ipallocator"
 )
 
@@ -37,6 +41,7 @@ var (
 	native		binary.ByteOrder
 	nextSeqNr	uint32
 	ipAllocator	= ipallocator.New()
+	portMapper	= portmapper.New()
 	bridgeIPv4Net	*net.IPNet
 	tapFile		*os.File
 	BridgeIface	string
@@ -754,7 +759,102 @@ func GenRandomMac() (string, error) {
 	return strings.Join(tmp, ":"), nil
 }
 
-func Allocate(requestedIP string) (*Settings, error) {
+func Modprobe(module string) error {
+	modprobePath, err := exec.LookPath("modprobe")
+	if err != nil {
+		return fmt.Errorf("modprobe not found")
+	}
+
+	_, err = exec.Command(modprobePath, module).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("modprobe %s failed", module)
+	}
+
+	return nil
+}
+
+func SetupPortMaps(containerip string, maps []pod.UserContainerPort) error {
+	if len(maps) == 0 {
+		return nil
+	}
+
+	err := Modprobe("br_netfilter")
+	if err != nil {
+		return nil
+	}
+
+	for _, m := range maps {
+		var proto string
+
+		if strings.EqualFold(m.Protocol, "udp") {
+			proto = "udp"
+		} else {
+			proto = "tcp"
+		}
+
+		natArgs := []string{"-p", proto, "-m", "addrtype",
+			    "--dst-type", "LOCAL", "-m", proto, "--dport",
+			    strconv.Itoa(m.HostPort), "-j", "DNAT","--to-destination",
+			    net.JoinHostPort(containerip, strconv.Itoa(m.ContainerPort))}
+
+		if iptables.PortMapExists(natArgs) {
+			return nil
+		}
+
+		if iptables.PortMapUsed(natArgs) {
+			return fmt.Errorf("Host port %d has aleady been used", m.HostPort)
+		}
+
+		err = iptables.OperatePortMap(iptables.Insert, natArgs)
+		if err != nil {
+			return err
+		}
+
+		err = portMapper.AllocateMap(m.Protocol, m.HostPort, containerip, m.ContainerPort)
+		if err != nil {
+			return err
+		}
+	}
+	/* forbid to map ports twice */
+	maps = nil
+	return nil
+}
+
+func ReleasePortMaps(containerip string, maps []pod.UserContainerPort) error {
+	if len(maps) == 0 {
+		return nil
+	}
+
+	for _, m := range maps {
+		err := portMapper.ReleaseMap(m.Protocol, m.HostPort)
+		if err != nil {
+			return err
+		}
+
+		var proto string
+
+		if strings.EqualFold(m.Protocol, "udp") {
+			proto = "udp"
+		} else {
+			proto = "tcp"
+		}
+
+		natArgs := []string{"-p", proto, "-m", "addrtype",
+			    "--dst-type", "LOCAL", "-m", proto, "--dport",
+			    strconv.Itoa(m.HostPort), "-j", "DNAT","--to-destination",
+			    net.JoinHostPort(containerip, strconv.Itoa(m.ContainerPort))}
+
+		err = iptables.OperatePortMap(iptables.Delete, natArgs)
+		if err != nil {
+			return err
+		}
+	}
+	/* forbid to map ports twice */
+	maps = nil
+	return nil
+}
+
+func Allocate(requestedIP string, maps []pod.UserContainerPort) (*Settings, error) {
 	var (
 		req ifReq
 		errno syscall.Errno
@@ -812,9 +912,16 @@ func Allocate(requestedIP string) (*Settings, error) {
 		return nil, err
 	}
 
-	mac, err:= GenRandomMac()
+	mac, err := GenRandomMac()
 	if err != nil {
 		glog.Errorf("Generate Random Mac address failed")
+		tapFile.Close()
+		return nil, err
+	}
+
+	err = SetupPortMaps(ip.String(), maps)
+	if err != nil {
+		glog.Errorf("Setup Port Map failed")
 		tapFile.Close()
 		return nil, err
 	}
@@ -833,11 +940,14 @@ func Allocate(requestedIP string) (*Settings, error) {
 }
 
 // Release an interface for a select ip
-func Release(releasedIP string, file *os.File) error {
+func Release(releasedIP string, maps[]pod.UserContainerPort, file *os.File) error {
 	file.Close()
 	if err := ipAllocator.ReleaseIP(bridgeIPv4Net, net.ParseIP(releasedIP)); err != nil {
 		return err
 	}
 
+	if err := ReleasePortMaps(releasedIP, maps); err != nil {
+		return err
+	}
 	return nil
 }

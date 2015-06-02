@@ -1,6 +1,7 @@
 package qemu
 
 import (
+    "hyper/pod"
     "hyper/network"
     "hyper/lib/glog"
     "fmt"
@@ -8,10 +9,11 @@ import (
     "os"
 )
 
-func CreateInterface(index int, pciAddr int, name string, isDefault bool, callback chan QemuEvent) {
-    inf, err := network.Allocate("")
+func CreateInterface(index int, pciAddr int, name string, isDefault bool,
+                     maps []pod.UserContainerPort, callback chan QemuEvent) {
+    inf, err := network.Allocate("", maps)
     if err != nil {
-        glog.Error("interface creating failed", err.Error())
+        glog.Error("interface creating failed: ", err.Error())
         callback <- &DeviceFailed{
             session: &InterfaceCreated{Index:index, PCIAddr:pciAddr, DeviceName: name,},
         }
@@ -21,9 +23,10 @@ func CreateInterface(index int, pciAddr int, name string, isDefault bool, callba
     interfaceGot(index, pciAddr, name, isDefault, callback, inf)
 }
 
-func ReleaseInterface(index int, ipAddr string, file *os.File, callback chan QemuEvent) {
+func ReleaseInterface(index int, ipAddr string, file *os.File,
+		      maps []pod.UserContainerPort, callback chan QemuEvent) {
     success := true
-    err := network.Release(ipAddr, file)
+    err := network.Release(ipAddr, maps, file)
     if err != nil {
         glog.Warning("Unable to release network interface, address: ", ipAddr)
         success = false
