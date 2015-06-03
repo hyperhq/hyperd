@@ -133,7 +133,7 @@ func (ctx *VmContext) setContainerInfo(index int, container *VmContainer, info *
             container.Workdir = "/"
         }
     }
-    
+
     for _,e := range container.Envs {
         if _,ok := info.Envs[e.Env]; ok {
             delete(info.Envs, e.Env)
@@ -381,10 +381,20 @@ func (ctx *VmContext) removeDMDevice() {
     }
 }
 
+func (ctx *VmContext) releaseOverlayDir() {
+    for idx,container := range ctx.vmSpec.Containers {
+        if container.Fstype == "" {
+            glog.V(1).Info("need unmount overlay dir ", container.Image)
+            ctx.progress.deleting.containers[idx] = true
+            go UmountOverlayContainer(ctx.shareDir, container.Image, idx, ctx.hub)
+        }
+    }
+}
+
 func (ctx *VmContext) releaseAufsDir() {
     for idx,container := range ctx.vmSpec.Containers {
         if container.Fstype == "" {
-            glog.V(1).Info("need unmount aufs", container.Image)
+            glog.V(1).Info("need unmount aufs ", container.Image)
             ctx.progress.deleting.containers[idx] = true
             go UmountAufsContainer(ctx.shareDir, container.Image, idx, ctx.hub)
         }

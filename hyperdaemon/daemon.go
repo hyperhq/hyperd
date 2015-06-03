@@ -298,7 +298,7 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 				}
 			}
 		}
-    } else {
+    } else if storageDriver == "aufs" {
 		if remoteInfo.Exists("DriverStatus") {
 			var driverStatus [][2]string
 			if err := remoteInfo.GetJson("DriverStatus", &driverStatus); err != nil {
@@ -314,6 +314,22 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 				}
 			}
         }
+    } else if storageDriver == "overlay" {
+		if remoteInfo.Exists("DriverStatus") {
+			var driverStatus [][1]string
+			if err := remoteInfo.GetJson("DriverStatus", &driverStatus); err != nil {
+				return nil, err
+			}
+			for _, pair := range driverStatus {
+				if pair[0] == "Backing Filesystem" {
+					stor.Fstype = "dir"
+					break
+				}
+			}
+        }
+        stor.RootPath = "/var/lib/docker/overlay"
+    } else {
+        return nil, fmt.Errorf("hyperd can not support docker's backing storage: %s", storageDriver)
     }
     daemon.Storage = stor
     dmPool := dm.DeviceMapper {

@@ -23,6 +23,7 @@ func (ctx *VmContext) onQemuExit(reclaim bool) bool {
 func (ctx *VmContext) reclaimDevice() {
 
     ctx.releaseVolumeDir()
+    ctx.releaseOverlayDir()
     ctx.releaseAufsDir()
     ctx.removeDMDevice()
     ctx.releaseNetwork()
@@ -31,6 +32,7 @@ func (ctx *VmContext) reclaimDevice() {
 func (ctx *VmContext) detatchDevice() {
 
     ctx.releaseVolumeDir()
+    ctx.releaseOverlayDir()
     ctx.releaseAufsDir()
     ctx.removeVolumeDrive()
     ctx.removeImageDrive()

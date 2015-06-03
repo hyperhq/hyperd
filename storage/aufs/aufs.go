@@ -13,6 +13,7 @@ import (
 	"strconv"
 
 	"hyper/lib/glog"
+	"hyper/utils"
 )
 
 /*
@@ -145,7 +146,7 @@ func aufsMount(ro []string, rw, target, mountLabel string) (err error) {
 				}
 				bp += copy(b[bp:], layer)
 			} else {
-				data := FormatMountLabel(fmt.Sprintf("append%s", layer), mountLabel)
+				data := utils.FormatMountLabel(fmt.Sprintf("append%s", layer), mountLabel)
 				if err = syscall.Mount("none", target, "aufs", MsRemount, data); err != nil {
 					return
 				}
@@ -157,7 +158,7 @@ func aufsMount(ro []string, rw, target, mountLabel string) (err error) {
 			if useDirperm() {
 				opts += ",dirperm1"
 			}
-			data := FormatMountLabel(fmt.Sprintf("%s,%s", string(b[:bp]), opts), mountLabel)
+			data := utils.FormatMountLabel(fmt.Sprintf("%s,%s", string(b[:bp]), opts), mountLabel)
 			if err = syscall.Mount("none", target, "aufs", 0, data); err != nil {
 				return
 			}
@@ -174,24 +175,6 @@ func aufsMount(ro []string, rw, target, mountLabel string) (err error) {
 
 func Unmount(mountPoint string) error {
 	return aufsUnmount(mountPoint)
-}
-
-// FormatMountLabel returns a string to be used by the mount command.
-// The format of this string will be used to alter the labeling of the mountpoint.
-// The string returned is suitable to be used as the options field of the mount command.
-// If you need to have additional mount point options, you can pass them in as
-// the first parameter.  Second parameter is the label that you wish to apply
-// to all content in the mount point.
-func FormatMountLabel(src, mountLabel string) string {
-        if mountLabel != "" {
-                switch src {
-                case "":
-                        src = fmt.Sprintf("context=%q", mountLabel)
-                default:
-                        src = fmt.Sprintf("%s,context=%q", src, mountLabel)
-                }
-        }
-        return src
 }
 
 // useDirperm checks dirperm1 mount option can be used with the current

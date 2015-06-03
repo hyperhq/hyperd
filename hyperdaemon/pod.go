@@ -15,6 +15,7 @@ import (
 	"hyper/types"
 	dm "hyper/storage/devicemapper"
 	"hyper/storage/aufs"
+	"hyper/storage/overlay"
 	"hyper/docker"
 	"hyper/utils"
 )
@@ -330,6 +331,10 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 		rootPath = daemon.Storage.RootPath
 		fstype = daemon.Storage.Fstype
 		rootfs = ""
+	} else if storageDriver == "overlay" {
+		rootPath = daemon.Storage.RootPath
+		fstype = daemon.Storage.Fstype
+		rootfs = ""
 	}
 
 	// Process the 'Files' section
@@ -354,9 +359,15 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 				glog.Error("got error when mount container to share dir ", err.Error())
 				return -1, "", err
 			}
-		}
-		if storageDriver == "aufs" {
+		} else if storageDriver == "aufs" {
 			devFullName, err = aufs.MountContainerToSharedDir(c.Id, rootPath, sharedDir, "")
+			if err != nil {
+				glog.Error("got error when mount container to share dir ", err.Error())
+				return -1, "", err
+			}
+			devFullName = "/"+c.Id+"/rootfs"
+		} else if storageDriver == "overlay" {
+			devFullName, err = overlay.MountContainerToSharedDir(c.Id, rootPath, sharedDir, "")
 			if err != nil {
 				glog.Error("got error when mount container to share dir ", err.Error())
 				return -1, "", err
@@ -416,9 +427,14 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 					glog.Error("got error when attach files ", err.Error())
 					return -1, "", err
 				}
-			}
-			if storageDriver == "aufs" {
+			} else if storageDriver == "aufs" {
 				err := aufs.AttachFiles(c.Id, fromFile, targetPath, rootPath, f.Perm)
+				if err != nil {
+					glog.Error("got error when attach files ", err.Error())
+					return -1, "", err
+				}
+			} else if storageDriver == "overlay" {
+				err := overlay.AttachFiles(c.Id, fromFile, targetPath, rootPath, f.Perm)
 				if err != nil {
 					glog.Error("got error when attach files ", err.Error())
 					return -1, "", err

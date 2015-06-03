@@ -16,6 +16,23 @@ func CreateContainer(userPod *pod.UserPod, sharedDir string, hub chan QemuEvent)
 	return "", nil
 }
 
+func UmountOverlayContainer(shareDir, image string, index int, hub chan QemuEvent) {
+	mount := path.Join(shareDir, image)
+	success := true
+	for i := 0; i < 10; i ++ {
+		time.Sleep(3*time.Second/1000);
+		err := syscall.Unmount(mount, 0)
+		if err != nil {
+			glog.Warningf("Cannot umount overlay %s: %s", mount, err.Error())
+			success = false
+		} else {
+			success = true
+			break
+		}
+	}
+	hub <- &ContainerUnmounted{Index: index, Success: success}
+}
+
 func UmountAufsContainer(shareDir, image string, index int, hub chan QemuEvent) {
 	mount := path.Join(shareDir, image)
 	success := true
