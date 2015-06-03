@@ -370,7 +370,11 @@ func qmpHandler(ctx *VmContext) {
     handler = initializing
 
     for handler != nil {
-        msg := <-ctx.qmp
+        msg, ok := <-ctx.qmp
+        if !ok {
+            glog.Info("QMP channel closed, Quit qmp handler")
+            break
+        }
         handler(msg)
     }
 }
