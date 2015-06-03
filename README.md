@@ -57,15 +57,10 @@ Clone hyper in GoPath
     > cd ${GOPATH}/src
 	> git clone https://github.com/hyperhq/hyper.git hyper
 
-Makesure some dependency go packages installed
+And got hyper binaries with `godep go build`
 
-    > cd hyper
-    > ./make_deps.sh
-
-And got hyper binaries with `go build`
-
-    > go build hyperd.go
-    > go build hyper.go
+    > godep go build hyperd.go
+    > godep go build hyper.go
 
 You may also need the kernel and initrd from [HyperStart](https://github.com/hyperhq/hyperstart) to run your own hyper.
 

@@ -18,7 +18,8 @@ import (
 	"hyper/utils"
 	"hyper/lib/term"
 	"hyper/pod"
-	"hyper/lib/yaml"
+
+	"gopkg.in/yaml.v2"
 )
 
 var (

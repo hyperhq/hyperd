@@ -13,11 +13,11 @@ import (
     "hyper/network"
     "hyper/lib/glog"
     "hyper/types"
-    "hyper/lib/goconfig"
     dm "hyper/storage/devicemapper"
 
     "github.com/syndtr/goleveldb/leveldb"
     "github.com/syndtr/goleveldb/leveldb/util"
+    "github.com/Unknwon/goconfig"
 )
 
 type Vm struct {
