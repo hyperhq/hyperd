@@ -129,8 +129,21 @@ func setupIPTables(addr net.Addr) error {
 		}
 	}
 
-	// Accept all non-intercontainer outgoing packets
-	outgoingArgs := []string{"-i", BridgeIface, "!", "-o", BridgeIface, "-j", "ACCEPT"}
+	// Create HYPER iptables Chain
+	iptables.Raw("-N", "HYPER")
+
+	// Goto HYPER chain
+	gotoArgs := []string{"-o", BridgeIface, "-j", "HYPER"}
+	if !iptables.Exists(iptables.Filter, "FORWARD", gotoArgs...) {
+		if output, err := iptables.Raw(append([]string{"-I", "FORWARD"}, gotoArgs...)...); err != nil {
+			return fmt.Errorf("Unable to setup goto HYPER rule %s", err)
+		} else if len(output) != 0 {
+			return &iptables.ChainError{Chain: "FORWARD goto HYPER", Output: output}
+		}
+	}
+
+	// Accept all outgoing packets
+	outgoingArgs := []string{"-i", BridgeIface, "-j", "ACCEPT"}
 	if !iptables.Exists(iptables.Filter, "FORWARD", outgoingArgs...) {
 		if output, err := iptables.Raw(append([]string{"-I", "FORWARD"}, outgoingArgs...)...); err != nil {
 			return fmt.Errorf("Unable to allow outgoing packets: %s", err)
@@ -814,6 +827,14 @@ func SetupPortMaps(containerip string, maps []pod.UserContainerPort) error {
 		if err != nil {
 			return err
 		}
+
+		filterArgs :=[]string{"-d", containerip, "-p", proto, "-m", proto,
+				      "--dport", strconv.Itoa(m.ContainerPort), "-j", "ACCEPT"}
+		if output, err := iptables.Raw(append([]string{"-I", "HYPER"}, filterArgs...)...); err != nil {
+			return fmt.Errorf("Unable to setup forward rule in HYPER chain: %s", err)
+		} else if len(output) != 0 {
+			return &iptables.ChainError{Chain: "HYPER", Output: output}
+		}
 	}
 	/* forbid to map ports twice */
 	maps = nil
@@ -848,6 +869,10 @@ func ReleasePortMaps(containerip string, maps []pod.UserContainerPort) error {
 		if err != nil {
 			return err
 		}
+
+		filterArgs :=[]string{"-d", containerip, "-p", proto, "-m", proto,
+				      "--dport", strconv.Itoa(m.ContainerPort), "-j", "ACCEPT"}
+		iptables.Raw(append([]string{"-D", "HYPER"}, filterArgs...)...)
 	}
 	/* forbid to map ports twice */
 	maps = nil
