@@ -427,7 +427,7 @@ func TestAttachFiles(t *testing.T) {
     }
 
     t.Log("AttachFiles do")
-    err = AttachFiles("3", "/etc/os-release", "/", sharedTempDir, "0755")
+    err = AttachFiles("3", "/etc/os-release", "/", sharedTempDir, "0755", "0", "0")
     if err != nil {
         t.Fatalf(err.Error())
     }

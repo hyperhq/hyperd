@@ -1,12 +1,14 @@
 package daemon
 
 import (
-	"os"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"os/user"
 	"path"
 	"strings"
 	"syscall"
-	"io/ioutil"
+
 
 	"hyper/engine"
 	"hyper/pod"
@@ -257,6 +259,8 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 		podData []byte
 		mypod *Pod
 		err error
+		uid string
+		gid string
 	)
 	if podArgs == "" {
 		mypod = daemon.podList[podId]
@@ -421,20 +425,35 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 					return -1, "", err
 				}
 			}
+			// get the uid and gid for that attached file
+			fileUser := f.User
+			fileGroup := f.Group
+			u, _ := user.Current()
+			if fileUser == "" {
+				uid = u.Uid
+			} else {
+				u, _ = user.Lookup(fileUser)
+				uid = u.Uid
+				gid = u.Gid
+			}
+			if fileGroup == "" {
+				gid = u.Gid
+			}
+
 			if storageDriver == "devicemapper" {
-				err := dm.AttachFiles(c.Id, devPrefix, fromFile, targetPath, rootPath, f.Perm)
+				err := dm.AttachFiles(c.Id, devPrefix, fromFile, targetPath, rootPath, f.Perm, uid, gid)
 				if err != nil {
 					glog.Error("got error when attach files ", err.Error())
 					return -1, "", err
 				}
 			} else if storageDriver == "aufs" {
-				err := aufs.AttachFiles(c.Id, fromFile, targetPath, rootPath, f.Perm)
+				err := aufs.AttachFiles(c.Id, fromFile, targetPath, rootPath, f.Perm, uid, gid)
 				if err != nil {
 					glog.Error("got error when attach files ", err.Error())
 					return -1, "", err
 				}
 			} else if storageDriver == "overlay" {
-				err := overlay.AttachFiles(c.Id, fromFile, targetPath, rootPath, f.Perm)
+				err := overlay.AttachFiles(c.Id, fromFile, targetPath, rootPath, f.Perm, uid, gid)
 				if err != nil {
 					glog.Error("got error when attach files ", err.Error())
 					return -1, "", err

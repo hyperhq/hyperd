@@ -60,7 +60,7 @@ func CreateNewDevice(containerId, devPrefix, rootPath string) error {
 	return nil
 }
 
-func AttachFiles(containerId, devPrefix, fromFile, toDir, rootPath, perm string) error {
+func AttachFiles(containerId, devPrefix, fromFile, toDir, rootPath, perm, uid, gid string) error {
 	if containerId == "" {
 		return fmt.Errorf("Please make sure the arguments are not NULL!\n")
 	}
@@ -143,6 +143,18 @@ func AttachFiles(containerId, devPrefix, fromFile, toDir, rootPath, perm string)
 	err = ioutil.WriteFile(targetFile, buf, os.FileMode(permInt))
 	if err != nil {
 		// we need to unmout the device
+		syscall.Unmount(idMountPath, syscall.MNT_DETACH)
+		return err
+	}
+	user_id, _ := strconv.Atoi(uid)
+	err = syscall.Setuid(user_id)
+	if err != nil {
+		syscall.Unmount(idMountPath, syscall.MNT_DETACH)
+		return err
+	}
+	group_id, _ := strconv.Atoi(gid)
+	err = syscall.Setgid(group_id)
+	if err != nil {
 		syscall.Unmount(idMountPath, syscall.MNT_DETACH)
 		return err
 	}

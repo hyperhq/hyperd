@@ -213,7 +213,7 @@ func TestAttachFiles(t *testing.T) {
         targetDir = path.Join(rootFs, toDir)
         devFullName = "/dev/mapper/"+devPrefix+"-"+containerId
     )
-    if err := AttachFiles(containerId, devPrefix, "/etc/os-release", toDir, dmRootDir, "0755"); err != nil {
+    if err := AttachFiles(containerId, devPrefix, "/etc/os-release", toDir, dmRootDir, "0755", "0", "0"); err != nil {
         t.Fatalf(err.Error())
     }
 

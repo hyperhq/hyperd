@@ -61,7 +61,7 @@ func MountContainerToSharedDir(containerId, rootDir, sharedDir, mountLabel strin
     return mountPoint, nil
 }
 
-func AttachFiles(containerId, fromFile, toDir, rootDir, perm string) error {
+func AttachFiles(containerId, fromFile, toDir, rootDir, perm, uid, gid string) error {
 	if containerId == "" {
 		return fmt.Errorf("Please make sure the arguments are not NULL!\n")
 	}
@@ -95,6 +95,16 @@ func AttachFiles(containerId, fromFile, toDir, rootDir, perm string) error {
 		targetFile = targetDir+"/"+filepath.Base(fromFile)
 	}
 	err = ioutil.WriteFile(targetFile, buf, os.FileMode(permInt))
+	if err != nil {
+		return err
+	}
+	user_id, _ := strconv.Atoi(uid)
+	err = syscall.Setuid(user_id)
+	if err != nil {
+		return err
+	}
+	group_id, _ := strconv.Atoi(gid)
+	err = syscall.Setgid(group_id)
 	if err != nil {
 		return err
 	}
