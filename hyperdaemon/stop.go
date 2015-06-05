@@ -88,10 +88,10 @@ func (daemon *Daemon) StopPod(podId, stopVm string) (int, string, error) {
 		daemon.DeleteQemuChan(vmid)
 	}
 	if qemuResponse.Code == types.E_POD_STOPPED {
-		daemon.podList[podId].Status = types.S_POD_CREATED
 		daemon.podList[podId].Vm = ""
-		daemon.SetContainerStatus(podId, types.S_POD_CREATED)
 		daemon.vmList[vmid].Status = types.S_VM_IDLE
 	}
+	daemon.podList[podId].Status = types.S_POD_FAILED
+	daemon.SetContainerStatus(podId, types.S_POD_FAILED)
 	return qemuResponse.Code, qemuResponse.Cause, nil
 }
