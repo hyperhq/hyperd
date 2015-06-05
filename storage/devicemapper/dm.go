@@ -166,23 +166,17 @@ func AttachFiles(containerId, devPrefix, fromFile, toDir, rootPath, perm, uid, g
 func ProbeFsType(device string) (string, error) {
 	// The daemon will only be run on Linux platform, so 'file -s' command
 	// will be used to test the type of filesystem which the device located.
-	cmd := fmt.Sprintf("file -s %s", device)
+	cmd := fmt.Sprintf("file -sL %s", device)
 	command := exec.Command("/bin/sh", "-c", cmd)
 	fileCmdOutput, err := command.Output()
 	if err != nil {
 		return "", nil
 	}
 
-	if strings.Contains(string(fileCmdOutput), "ext4") {
+	if strings.Contains(strings.ToLower(string(fileCmdOutput)), "ext") {
 		return "ext4", nil
 	}
-	if strings.Contains(string(fileCmdOutput), "ext2") {
-		return "ext4", nil
-	}
-	if strings.Contains(string(fileCmdOutput), "ext3") {
-		return "ext4", nil
-	}
-	if strings.Contains(string(fileCmdOutput), "xfs") {
+	if strings.Contains(strings.ToLower(string(fileCmdOutput)), "xfs") {
 		return "xfs", nil
 	}
 

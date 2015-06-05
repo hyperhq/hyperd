@@ -363,6 +363,10 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 				glog.Error("got error when mount container to share dir ", err.Error())
 				return -1, "", err
 			}
+			fstype, err = dm.ProbeFsType(devFullName)
+			if err != nil {
+				fstype = "ext4"
+			}
 		} else if storageDriver == "aufs" {
 			devFullName, err = aufs.MountContainerToSharedDir(c.Id, rootPath, sharedDir, "")
 			if err != nil {
@@ -507,6 +511,10 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 					}
 				}
 
+				fstype, err = dm.ProbeFsType("/dev/mapper/"+volName)
+				if err != nil {
+					fstype = "ext4"
+				}
 				myVol := &qemu.VolumeInfo {
 					Name: v.Name,
 					Filepath: path.Join("/dev/mapper/", volName),
