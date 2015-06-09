@@ -182,10 +182,10 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
     })
     // Check that the system is supported and we have sufficient privileges
     if runtime.GOOS != "linux" {
-        return nil, fmt.Errorf("The Docker daemon is only supported on linux")
+        return nil, fmt.Errorf("The Hyper daemon is only supported on linux")
     }
     if os.Geteuid() != 0 {
-        return nil, fmt.Errorf("The Docker daemon needs to be run as root")
+        return nil, fmt.Errorf("The Hyper daemon needs to be run as root")
     }
     if err := checkKernel(); err != nil {
         return nil, err
