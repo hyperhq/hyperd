@@ -2,9 +2,9 @@ package client
 
 import (
 	"fmt"
-	"strings"
-	"hyper/engine"
 	gflag "github.com/jessevdk/go-flags"
+	"hyper/engine"
+	"strings"
 )
 
 // we need this *info* function to get the whole status from the docker daemon

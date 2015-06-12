@@ -2,7 +2,7 @@ package client
 
 import (
 	"fmt"
-  "os"
+	"os"
 )
 
 func (cli *HyperClient) HyperCmdHelp(args ...string) error {

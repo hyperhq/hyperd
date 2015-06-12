@@ -18,11 +18,11 @@ func (daemon *Daemon) CmdList(job *engine.Job) error {
 	}
 
 	var (
-		vmJsonResponse = []string{}
-		podJsonResponse = []string{}
+		vmJsonResponse        = []string{}
+		podJsonResponse       = []string{}
 		containerJsonResponse = []string{}
-		status string
-		podId string
+		status                string
+		podId                 string
 	)
 
 	// Prepare the qemu status to client

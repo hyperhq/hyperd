@@ -1,13 +1,13 @@
 package utils
 
 import (
-	"os"
-	"io"
+	"encoding/base64"
 	"fmt"
+	"io"
 	"mime"
 	"net/http"
+	"os"
 	"strconv"
-	"encoding/base64"
 )
 
 var (
@@ -38,8 +38,8 @@ func DownloadFile(uri, target string) error {
 		return err
 	}
 
-	req,_ := http.NewRequest("GET", uri, nil);
-	req.Header.Set("Range", "bytes=" + strconv.FormatInt(stat.Size(), 10) + "-")
+	req, _ := http.NewRequest("GET", uri, nil)
+	req.Header.Set("Range", "bytes="+strconv.FormatInt(stat.Size(), 10)+"-")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
@@ -67,13 +67,13 @@ func Base64Decode(fileContent string) (string, error) {
 // the first parameter.  Second parameter is the label that you wish to apply
 // to all content in the mount point.
 func FormatMountLabel(src, mountLabel string) string {
-        if mountLabel != "" {
-                switch src {
-                case "":
-                        src = fmt.Sprintf("context=%q", mountLabel)
-                default:
-                        src = fmt.Sprintf("%s,context=%q", src, mountLabel)
-                }
-        }
-        return src
+	if mountLabel != "" {
+		switch src {
+		case "":
+			src = fmt.Sprintf("context=%q", mountLabel)
+		default:
+			src = fmt.Sprintf("%s,context=%q", src, mountLabel)
+		}
+	}
+	return src
 }

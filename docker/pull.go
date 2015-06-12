@@ -1,9 +1,9 @@
 package docker
 
 import (
+	"hyper/lib/glog"
 	"net/url"
 	"os"
-	"hyper/lib/glog"
 )
 
 func (cli *DockerCli) SendCmdPull(args ...string) ([]byte, int, error) {
@@ -25,7 +25,7 @@ func (cli *DockerCli) SendCmdPull(args ...string) ([]byte, int, error) {
 	v.Set("tag", tag)
 	glog.V(3).Infof("The Repository is %s, and the tag is %s\n", repos, tag)
 	glog.V(3).Info("pull the image from the repository!\n")
-	err := cli.Stream("POST", "/images/create?"+ v.Encode(), nil, os.Stdout, nil)
+	err := cli.Stream("POST", "/images/create?"+v.Encode(), nil, os.Stdout, nil)
 	if err != nil {
 		return nil, -1, err
 	}

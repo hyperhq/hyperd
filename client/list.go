@@ -2,11 +2,11 @@ package client
 
 import (
 	"fmt"
-	"strings"
+	gflag "github.com/jessevdk/go-flags"
+	"hyper/engine"
 	"net/url"
 	"os"
-	"hyper/engine"
-	gflag "github.com/jessevdk/go-flags"
+	"strings"
 )
 
 func (cli *HyperClient) HyperCmdList(args ...string) error {
@@ -33,7 +33,7 @@ func (cli *HyperClient) HyperCmdList(args ...string) error {
 
 	v := url.Values{}
 	v.Set("item", item)
-	body, _, err := readBody(cli.call("GET", "/list?"+v.Encode(), nil, nil));
+	body, _, err := readBody(cli.call("GET", "/list?"+v.Encode(), nil, nil))
 	if err != nil {
 		return err
 	}
@@ -50,8 +50,8 @@ func (cli *HyperClient) HyperCmdList(args ...string) error {
 	out.Close()
 
 	var (
-		vmResponse = []string{}
-		podResponse = []string{}
+		vmResponse        = []string{}
+		podResponse       = []string{}
 		containerResponse = []string{}
 	)
 	if remoteInfo.Exists("item") {

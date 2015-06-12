@@ -1,11 +1,11 @@
 package daemon
 
 import (
-	"strings"
-	"strconv"
 	"hyper/engine"
-	"hyper/qemu"
 	"hyper/lib/glog"
+	"hyper/qemu"
+	"strconv"
+	"strings"
 )
 
 func (daemon *Daemon) CmdTty(job *engine.Job) (err error) {
@@ -13,12 +13,12 @@ func (daemon *Daemon) CmdTty(job *engine.Job) (err error) {
 		return nil
 	}
 	var (
-		podID = job.Args[0]
-		tag = job.Args[1]
-		h = job.Args[2]
-		w = job.Args[3]
+		podID     = job.Args[0]
+		tag       = job.Args[1]
+		h         = job.Args[2]
+		w         = job.Args[3]
 		container string
-		vmid string
+		vmid      string
 	)
 
 	if strings.Contains(podID, "pod-") {
@@ -31,7 +31,7 @@ func (daemon *Daemon) CmdTty(job *engine.Job) (err error) {
 		vmid = podID
 	} else {
 		container = podID
-		podID , err = daemon.GetPodByContainer(container)
+		podID, err = daemon.GetPodByContainer(container)
 		if err != nil {
 			return err
 		}
@@ -49,16 +49,16 @@ func (daemon *Daemon) CmdTty(job *engine.Job) (err error) {
 	if err != nil {
 		glog.Warning("Success to resize the tty!")
 	}
-	var ttySizeCommand = &qemu.WindowSizeCommand {
-		ClientTag:        tag,
-		Size:             &qemu.WindowSize{Row:uint16(row), Column:uint16(column),},
+	var ttySizeCommand = &qemu.WindowSizeCommand{
+		ClientTag: tag,
+		Size:      &qemu.WindowSize{Row: uint16(row), Column: uint16(column)},
 	}
 
 	qemuEvent, _, _, err := daemon.GetQemuChan(vmid)
 	if err != nil {
 		return err
 	}
-	qemuEvent.(chan qemu.QemuEvent) <-ttySizeCommand
+	qemuEvent.(chan qemu.QemuEvent) <- ttySizeCommand
 	glog.V(1).Infof("Success to resize the tty!")
 	return nil
 }

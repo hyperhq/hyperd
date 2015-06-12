@@ -3,9 +3,9 @@ package daemon
 import (
 	"fmt"
 	"hyper/engine"
+	"hyper/lib/glog"
 	"hyper/qemu"
 	"hyper/types"
-	"hyper/lib/glog"
 )
 
 func (daemon *Daemon) CmdPodStop(job *engine.Job) error {
@@ -56,11 +56,11 @@ func (daemon *Daemon) StopPod(podId, stopVm string) (int, string, error) {
 
 	var qemuResponse *types.QemuResponse
 	if stopVm == "yes" {
-		shutdownPodEvent := &qemu.ShutdownCommand { }
-		qemuPodEvent.(chan qemu.QemuEvent) <-shutdownPodEvent
+		shutdownPodEvent := &qemu.ShutdownCommand{}
+		qemuPodEvent.(chan qemu.QemuEvent) <- shutdownPodEvent
 		// wait for the qemu response
 		for {
-			qemuResponse =<-qemuStatus.(chan *types.QemuResponse)
+			qemuResponse = <-qemuStatus.(chan *types.QemuResponse)
 			glog.V(1).Infof("Got response: %d: %s", qemuResponse.Code, qemuResponse.Cause)
 			if qemuResponse.Code == types.E_VM_SHUTDOWN {
 				break
@@ -68,11 +68,11 @@ func (daemon *Daemon) StopPod(podId, stopVm string) (int, string, error) {
 		}
 		close(qemuStatus.(chan *types.QemuResponse))
 	} else {
-		stopPodEvent := &qemu.StopPodCommand { }
-		qemuPodEvent.(chan qemu.QemuEvent) <-stopPodEvent
+		stopPodEvent := &qemu.StopPodCommand{}
+		qemuPodEvent.(chan qemu.QemuEvent) <- stopPodEvent
 		// wait for the qemu response
 		for {
-			qemuResponse =<-qemuStatus.(chan *types.QemuResponse)
+			qemuResponse = <-qemuStatus.(chan *types.QemuResponse)
 			glog.V(1).Infof("Got response: %d: %s", qemuResponse.Code, qemuResponse.Cause)
 			if qemuResponse.Code == types.E_POD_STOPPED || qemuResponse.Code == types.E_BAD_REQUEST || qemuResponse.Code == types.E_FAILED {
 				break

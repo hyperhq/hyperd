@@ -1,12 +1,12 @@
 package client
 
 import (
-    "fmt"
+	"fmt"
 	"strings"
 
-    "hyper/types"
-    "hyper/engine"
 	gflag "github.com/jessevdk/go-flags"
+	"hyper/engine"
+	"hyper/types"
 )
 
 func (cli *HyperClient) HyperCmdVm(args ...string) error {
@@ -21,8 +21,8 @@ func (cli *HyperClient) HyperCmdVm(args ...string) error {
 		}
 	}
 
-    // Only run a new VM
-	body, _, err := readBody(cli.call("POST", "/vm/create", nil, nil));
+	// Only run a new VM
+	body, _, err := readBody(cli.call("POST", "/vm/create", nil, nil))
 	if err != nil {
 		return err
 	}
@@ -52,5 +52,5 @@ func (cli *HyperClient) HyperCmdVm(args ...string) error {
 		}
 	}
 	fmt.Printf("New VM id is %s\n", remoteInfo.Get("ID"))
-    return nil
+	return nil
 }

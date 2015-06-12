@@ -8,16 +8,16 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"strings"
+	"net/url"
 	"os"
 	"os/signal"
-	"syscall"
-	"net/url"
 	"strconv"
+	"strings"
+	"syscall"
 
-	"hyper/utils"
 	"hyper/lib/term"
 	"hyper/pod"
+	"hyper/utils"
 
 	"gopkg.in/yaml.v2"
 )
@@ -77,11 +77,11 @@ func (cli *HyperClient) clientRequest(method, path string, in io.Reader, headers
 			return nil, "", statusCode, ErrConnectionRefused
 		}
 
-/*
-		if cli.tlsConfig == nil {
-			return nil, "", statusCode, fmt.Errorf("%v. Are you trying to connect to a TLS-enabled daemon without TLS?", err)
-		}
-*/
+		/*
+			if cli.tlsConfig == nil {
+				return nil, "", statusCode, fmt.Errorf("%v. Are you trying to connect to a TLS-enabled daemon without TLS?", err)
+			}
+		*/
 		return nil, "", statusCode, fmt.Errorf("An error occurred trying to connect: %v", err)
 	}
 
@@ -205,13 +205,13 @@ func (cli *HyperClient) getTtySize() (int, int) {
 	return int(ws.Height), int(ws.Width)
 }
 
-func (cli *HyperClient)GetTag() string {
+func (cli *HyperClient) GetTag() string {
 	return pod.RandStr(8, "alphanum")
 }
 
 func (cli *HyperClient) ConvertYamlToJson(yamlBody []byte) ([]byte, error) {
 	var userPod pod.UserPod
-	if err:= yaml.Unmarshal(yamlBody, &userPod); err != nil {
+	if err := yaml.Unmarshal(yamlBody, &userPod); err != nil {
 		return []byte(""), err
 	}
 	jsonBody, err := json.Marshal(&userPod)

@@ -1,10 +1,10 @@
 package client
 
 import (
-	"os"
 	"fmt"
-	"strings"
 	"io/ioutil"
+	"os"
+	"strings"
 
 	gflag "github.com/jessevdk/go-flags"
 )
@@ -14,7 +14,7 @@ func (cli *HyperClient) HyperCmdCreate(args ...string) error {
 		return fmt.Errorf("\"create\" requires a minimum of 1 argument, please provide POD spec file.\n")
 	}
 	var opts struct {
-		Yaml      bool     `short:"y" long:"yaml" default:"false" default-mask:"-" description:"create a pod based on Yaml file"`
+		Yaml bool `short:"y" long:"yaml" default:"false" default-mask:"-" description:"create a pod based on Yaml file"`
 	}
 	var parser = gflag.NewParser(&opts, gflag.Default)
 	parser.Usage = "create [OPTIONS] POD_FILE\n\ncreate a pod, but without running it"

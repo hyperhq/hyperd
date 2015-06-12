@@ -2,14 +2,14 @@ package qemu
 
 import (
 	"fmt"
-	"path"
-	"time"
-	"syscall"
 	"os/exec"
+	"path"
+	"syscall"
+	"time"
 
+	"hyper/lib/glog"
 	"hyper/pod"
 	"hyper/storage/aufs"
-	"hyper/lib/glog"
 )
 
 func CreateContainer(userPod *pod.UserPod, sharedDir string, hub chan QemuEvent) (string, error) {
@@ -19,8 +19,8 @@ func CreateContainer(userPod *pod.UserPod, sharedDir string, hub chan QemuEvent)
 func UmountOverlayContainer(shareDir, image string, index int, hub chan QemuEvent) {
 	mount := path.Join(shareDir, image)
 	success := true
-	for i := 0; i < 10; i ++ {
-		time.Sleep(3*time.Second/1000);
+	for i := 0; i < 10; i++ {
+		time.Sleep(3 * time.Second / 1000)
 		err := syscall.Unmount(mount, 0)
 		if err != nil {
 			glog.Warningf("Cannot umount overlay %s: %s", mount, err.Error())
@@ -36,8 +36,8 @@ func UmountOverlayContainer(shareDir, image string, index int, hub chan QemuEven
 func UmountAufsContainer(shareDir, image string, index int, hub chan QemuEvent) {
 	mount := path.Join(shareDir, image)
 	success := true
-	for i := 0; i < 10; i ++ {
-		time.Sleep(3*time.Second/1000);
+	for i := 0; i < 10; i++ {
+		time.Sleep(3 * time.Second / 1000)
 		err := aufs.Unmount(mount)
 		if err != nil {
 			glog.Warningf("Cannot umount aufs %s: %s", mount, err.Error())
@@ -59,7 +59,7 @@ func UmountVolume(shareDir, volPath string, name string, hub chan QemuEvent) {
 		success = false
 	}
 	// After umount that device, we need to delete it
-	hub <-  &VolumeUnmounted{ Name: name, Success:success,}
+	hub <- &VolumeUnmounted{Name: name, Success: success}
 }
 
 func UmountDMDevice(deviceFullPath, name string, hub chan QemuEvent) {
@@ -79,5 +79,5 @@ func UmountDMDevice(deviceFullPath, name string, hub chan QemuEvent) {
 	}
 
 	// After umount that device, we need to delete it
-	hub <-  &BlockdevRemovedEvent{ Name: name, Success:success,}
+	hub <- &BlockdevRemovedEvent{Name: name, Success: success}
 }

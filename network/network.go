@@ -1,67 +1,67 @@
 package network
 
 import (
+	"crypto/rand"
+	"encoding/binary"
 	"fmt"
-	"net"
+	"hyper/lib/glog"
+	"hyper/network/ipallocator"
+	"hyper/network/iptables"
+	"hyper/network/portmapper"
+	"hyper/pod"
 	"io"
+	"net"
 	"os"
 	"os/exec"
 	"strconv"
-	"syscall"
 	"strings"
 	"sync"
-	"unsafe"
-	"crypto/rand"
-	"encoding/binary"
 	"sync/atomic"
-	"hyper/pod"
-	"hyper/lib/glog"
-	"hyper/network/iptables"
-	"hyper/network/portmapper"
-	"hyper/network/ipallocator"
+	"syscall"
+	"unsafe"
 )
 
 const (
-	defaultBridgeIface	= "hyper0"
-	defaultBridgeIP		= "192.168.123.0/24"
+	defaultBridgeIface = "hyper0"
+	defaultBridgeIP    = "192.168.123.0/24"
 )
 
 const (
-	IFNAMSIZ          = 16
-	DEFAULT_CHANGE    = 0xFFFFFFFF
-	SIOC_BRADDBR      = 0x89a0
-	SIOC_BRDELBR      = 0x89a1
-	SIOC_BRADDIF      = 0x89a2
-	CIFF_TAP	  = 0x0002
-	CIFF_NO_PI	  = 0x1000
-	CIFF_ONE_QUEUE	  = 0x2000
+	IFNAMSIZ       = 16
+	DEFAULT_CHANGE = 0xFFFFFFFF
+	SIOC_BRADDBR   = 0x89a0
+	SIOC_BRDELBR   = 0x89a1
+	SIOC_BRADDIF   = 0x89a2
+	CIFF_TAP       = 0x0002
+	CIFF_NO_PI     = 0x1000
+	CIFF_ONE_QUEUE = 0x2000
 )
 
 var (
-	native		binary.ByteOrder
-	nextSeqNr	uint32
-	ipAllocator	= ipallocator.New()
-	portMapper	= portmapper.New()
-	bridgeIPv4Net	*net.IPNet
-	tapFile		*os.File
-	BridgeIface	string
-	BridgeIP	string
+	native        binary.ByteOrder
+	nextSeqNr     uint32
+	ipAllocator   = ipallocator.New()
+	portMapper    = portmapper.New()
+	bridgeIPv4Net *net.IPNet
+	tapFile       *os.File
+	BridgeIface   string
+	BridgeIP      string
 )
 
 type ifReq struct {
-	Name [IFNAMSIZ] byte
+	Name  [IFNAMSIZ]byte
 	Flags uint16
-	pad [0x28 - 0x10 - 2]byte
+	pad   [0x28 - 0x10 - 2]byte
 }
 
 type Settings struct {
-	Mac			string
-	IPAddress		string
-	IPPrefixLen		int
-	Gateway			string
-	Bridge			string
-	Device			string
-	File			*os.File
+	Mac         string
+	IPAddress   string
+	IPPrefixLen int
+	Gateway     string
+	Bridge      string
+	Device      string
+	File        *os.File
 }
 
 type IfInfomsg struct {
@@ -83,9 +83,9 @@ type NetlinkRequestData interface {
 }
 
 type IfAddr struct {
-	iface	*net.Interface
-	ip	net.IP
-	ipNet	*net.IPNet
+	iface *net.Interface
+	ip    net.IP
+	ipNet *net.IPNet
 }
 
 type RtAttr struct {
@@ -169,7 +169,7 @@ func setupIPTables(addr net.Addr) error {
 	}
 
 	file, err := os.OpenFile("/proc/sys/net/bridge/bridge-nf-call-iptables",
-				 os.O_RDWR, 0)
+		os.O_RDWR, 0)
 	if err != nil {
 		return err
 	}
@@ -183,10 +183,10 @@ func setupIPTables(addr net.Addr) error {
 	iptables.Raw("-t", string(iptables.Nat), "-N", "HYPER")
 	// Goto HYPER chain
 	gotoArgs = []string{"-m", "addrtype", "--dst-type", "LOCAL", "!",
-			    "-d", "127.0.0.1/8", "-j", "HYPER"}
+		"-d", "127.0.0.1/8", "-j", "HYPER"}
 	if !iptables.Exists(iptables.Nat, "OUTPUT", gotoArgs...) {
 		if output, err := iptables.Raw(append([]string{"-t", string(iptables.Nat),
-						"-I", "OUTPUT"}, gotoArgs...)...); err != nil {
+			"-I", "OUTPUT"}, gotoArgs...)...); err != nil {
 			return fmt.Errorf("Unable to setup goto HYPER rule %s", err)
 		} else if len(output) != 0 {
 			return &iptables.ChainError{Chain: "OUTPUT goto HYPER", Output: output}
@@ -194,10 +194,10 @@ func setupIPTables(addr net.Addr) error {
 	}
 
 	gotoArgs = []string{"-m", "addrtype", "--dst-type", "LOCAL",
-			    "-j", "HYPER"}
+		"-j", "HYPER"}
 	if !iptables.Exists(iptables.Nat, "PREROUTING", gotoArgs...) {
 		if output, err := iptables.Raw(append([]string{"-t", string(iptables.Nat),
-						"-I", "PREROUTING"}, gotoArgs...)...); err != nil {
+			"-I", "PREROUTING"}, gotoArgs...)...); err != nil {
 			return fmt.Errorf("Unable to setup goto HYPER rule %s", err)
 		} else if len(output) != 0 {
 			return &iptables.ChainError{Chain: "PREROUTING goto HYPER", Output: output}
@@ -246,11 +246,11 @@ func InitNetwork(bIface, bIP string) error {
 			return err
 		}
 
-		bridgeIPv4Net = addr.(*net.IPNet);
+		bridgeIPv4Net = addr.(*net.IPNet)
 	} else {
 		glog.V(1).Info("bridge exist\n")
 		// Validate that the bridge ip matches the ip specified by BridgeIP
-		bridgeIPv4Net = addr.(*net.IPNet);
+		bridgeIPv4Net = addr.(*net.IPNet)
 
 		if BridgeIP != "" {
 			bip, ipnet, err := net.ParseCIDR(BridgeIP)
@@ -261,8 +261,8 @@ func InitNetwork(bIface, bIP string) error {
 				return fmt.Errorf("Bridge ip (%s) does not match existing bridge configuration %s", addr, BridgeIP)
 			}
 
-			mask1, _ := ipnet.Mask.Size();
-			mask2, _ := bridgeIPv4Net.Mask.Size();
+			mask1, _ := ipnet.Mask.Size()
+			mask2, _ := bridgeIPv4Net.Mask.Size()
 
 			if mask1 != mask2 {
 				return fmt.Errorf("Bridge netmask (%d) does not match existing bridge netmask %d", mask1, mask2)
@@ -270,12 +270,12 @@ func InitNetwork(bIface, bIP string) error {
 		}
 	}
 
-	err = setupIPTables(addr);
+	err = setupIPTables(addr)
 	if err != nil {
 		return err
 	}
 
-	ipAllocator.RequestIP(bridgeIPv4Net, bridgeIPv4Net.IP);
+	ipAllocator.RequestIP(bridgeIPv4Net, bridgeIPv4Net.IP)
 	return nil
 }
 
@@ -338,9 +338,9 @@ func configureBridge(bridgeIP, bridgeIface string) error {
 	}
 
 	if ipAddr.Equal(ipNet.IP) {
-		ipAddr, err = ipAllocator.RequestIP(ipNet, nil);
+		ipAddr, err = ipAllocator.RequestIP(ipNet, nil)
 	} else {
-		ipAddr, err = ipAllocator.RequestIP(ipNet, ipAddr);
+		ipAddr, err = ipAllocator.RequestIP(ipNet, ipAddr)
 	}
 
 	if err != nil {
@@ -807,7 +807,7 @@ func GenRandomMac() (string, error) {
 	}
 
 	for i, b := range bytes {
-		bytes[i] = alphanum[b % byte(len(alphanum))]
+		bytes[i] = alphanum[b%byte(len(alphanum))]
 	}
 
 	tmp := []string{"52:54", string(bytes[0:2]), string(bytes[2:4]), string(bytes[4:6]), string(bytes[6:8])}
@@ -843,8 +843,8 @@ func SetupPortMaps(containerip string, maps []pod.UserContainerPort) error {
 		}
 
 		natArgs := []string{"-p", proto, "-m", proto, "--dport",
-			    strconv.Itoa(m.HostPort), "-j", "DNAT","--to-destination",
-			    net.JoinHostPort(containerip, strconv.Itoa(m.ContainerPort))}
+			strconv.Itoa(m.HostPort), "-j", "DNAT", "--to-destination",
+			net.JoinHostPort(containerip, strconv.Itoa(m.ContainerPort))}
 
 		if iptables.PortMapExists("HYPER", natArgs) {
 			return nil
@@ -854,7 +854,7 @@ func SetupPortMaps(containerip string, maps []pod.UserContainerPort) error {
 			return fmt.Errorf("Host port %d has aleady been used", m.HostPort)
 		}
 
-		err :=iptables.OperatePortMap(iptables.Insert, "HYPER", natArgs)
+		err := iptables.OperatePortMap(iptables.Insert, "HYPER", natArgs)
 		if err != nil {
 			return err
 		}
@@ -864,8 +864,8 @@ func SetupPortMaps(containerip string, maps []pod.UserContainerPort) error {
 			return err
 		}
 
-		filterArgs :=[]string{"-d", containerip, "-p", proto, "-m", proto,
-				      "--dport", strconv.Itoa(m.ContainerPort), "-j", "ACCEPT"}
+		filterArgs := []string{"-d", containerip, "-p", proto, "-m", proto,
+			"--dport", strconv.Itoa(m.ContainerPort), "-j", "ACCEPT"}
 		if output, err := iptables.Raw(append([]string{"-I", "HYPER"}, filterArgs...)...); err != nil {
 			return fmt.Errorf("Unable to setup forward rule in HYPER chain: %s", err)
 		} else if len(output) != 0 {
@@ -897,13 +897,13 @@ func ReleasePortMaps(containerip string, maps []pod.UserContainerPort) error {
 		}
 
 		natArgs := []string{"-p", proto, "-m", proto, "--dport",
-			    strconv.Itoa(m.HostPort), "-j", "DNAT","--to-destination",
-			    net.JoinHostPort(containerip, strconv.Itoa(m.ContainerPort))}
+			strconv.Itoa(m.HostPort), "-j", "DNAT", "--to-destination",
+			net.JoinHostPort(containerip, strconv.Itoa(m.ContainerPort))}
 
 		iptables.OperatePortMap(iptables.Delete, "HYPER", natArgs)
 
-		filterArgs :=[]string{"-d", containerip, "-p", proto, "-m", proto,
-				      "--dport", strconv.Itoa(m.ContainerPort), "-j", "ACCEPT"}
+		filterArgs := []string{"-d", containerip, "-p", proto, "-m", proto,
+			"--dport", strconv.Itoa(m.ContainerPort), "-j", "ACCEPT"}
 		iptables.Raw(append([]string{"-D", "HYPER"}, filterArgs...)...)
 	}
 	/* forbid to map ports twice */
@@ -912,7 +912,7 @@ func ReleasePortMaps(containerip string, maps []pod.UserContainerPort) error {
 
 func Allocate(requestedIP string, maps []pod.UserContainerPort) (*Settings, error) {
 	var (
-		req ifReq
+		req   ifReq
 		errno syscall.Errno
 	)
 
@@ -930,8 +930,8 @@ func Allocate(requestedIP string, maps []pod.UserContainerPort) (*Settings, erro
 
 	req.Flags = CIFF_TAP | CIFF_NO_PI | CIFF_ONE_QUEUE
 	_, _, errno = syscall.Syscall(syscall.SYS_IOCTL, tapFile.Fd(),
-				      uintptr(syscall.TUNSETIFF),
-				      uintptr(unsafe.Pointer(&req)))
+		uintptr(syscall.TUNSETIFF),
+		uintptr(unsafe.Pointer(&req)))
 	if errno != 0 {
 		err = fmt.Errorf("create tap device failed\n")
 		tapFile.Close()
@@ -983,20 +983,20 @@ func Allocate(requestedIP string, maps []pod.UserContainerPort) (*Settings, erro
 	}
 
 	networkSettings := &Settings{
-		Mac:		mac,
-		IPAddress:	ip.String(),
-		Gateway:	bridgeIPv4Net.IP.String(),
-		Bridge:		BridgeIface,
-		IPPrefixLen:	maskSize,
-		Device:		device,
-		File:		tapFile,
+		Mac:         mac,
+		IPAddress:   ip.String(),
+		Gateway:     bridgeIPv4Net.IP.String(),
+		Bridge:      BridgeIface,
+		IPPrefixLen: maskSize,
+		Device:      device,
+		File:        tapFile,
 	}
 
 	return networkSettings, nil
 }
 
 // Release an interface for a select ip
-func Release(releasedIP string, maps[]pod.UserContainerPort, file *os.File) error {
+func Release(releasedIP string, maps []pod.UserContainerPort, file *os.File) error {
 	file.Close()
 	if err := ipAllocator.ReleaseIP(bridgeIPv4Net, net.ParseIP(releasedIP)); err != nil {
 		return err

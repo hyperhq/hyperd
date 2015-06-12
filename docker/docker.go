@@ -2,18 +2,18 @@
 package docker
 
 import (
-	"fmt"
 	"bytes"
-	"encoding/json"
-	"net"
 	"crypto/tls"
-	"net/http"
-	"time"
-	"io/ioutil"
+	"encoding/json"
 	"errors"
-	"io"
-	"strings"
+	"fmt"
 	"hyper/lib/glog"
+	"io"
+	"io/ioutil"
+	"net"
+	"net/http"
+	"strings"
+	"time"
 )
 
 // Now, the Hyper will not support the TLS with docker.
@@ -21,35 +21,36 @@ import (
 // in same machine.
 const (
 	defaultTrustKeyFile = "key.json"
-	defaultCaFile = "ca.pem"
-	defaultKeyFile = "key.pem"
-	defaultCertFile = "cert.pem"
-	defaultHostAddress = "unix:///var/run/docker.sock"
-	defaultProto = "unix"
+	defaultCaFile       = "ca.pem"
+	defaultKeyFile      = "key.pem"
+	defaultCertFile     = "cert.pem"
+	defaultHostAddress  = "unix:///var/run/docker.sock"
+	defaultProto        = "unix"
 	dockerClientVersion = "1.17"
 )
+
 // Define some common configuration of the Docker daemon
 type DockerConfig struct {
-	host string
-	address   string
+	host         string
+	address      string
 	trustKeyFile string
-	caFile string
-	keyFile string
-	certFile string
-	debugMode int
-	tlsConfig *tls.Config
+	caFile       string
+	keyFile      string
+	certFile     string
+	debugMode    int
+	tlsConfig    *tls.Config
 }
 
 type DockerCli struct {
-	proto			string
-	scheme			string
-	dockerConfig	*DockerConfig
-	transport		*http.Transport
+	proto        string
+	scheme       string
+	dockerConfig *DockerConfig
+	transport    *http.Transport
 }
 
-func NewDockerCli (keyFile string, proto, addr string, tlsConfig *tls.Config) *DockerCli {
+func NewDockerCli(keyFile string, proto, addr string, tlsConfig *tls.Config) *DockerCli {
 	var (
-		scheme = "http"
+		scheme       = "http"
 		dockerConfig DockerConfig
 	)
 
@@ -57,7 +58,7 @@ func NewDockerCli (keyFile string, proto, addr string, tlsConfig *tls.Config) *D
 		scheme = "https"
 	}
 
-	tr := &http.Transport {
+	tr := &http.Transport{
 		TLSClientConfig: tlsConfig,
 	}
 
@@ -85,15 +86,15 @@ func NewDockerCli (keyFile string, proto, addr string, tlsConfig *tls.Config) *D
 	dockerConfig.debugMode = 1
 	dockerConfig.tlsConfig = tlsConfig
 
-	return &DockerCli {
-		proto:			proto,
-		scheme:			scheme,
-		dockerConfig:   &dockerConfig,
-		transport:		tr,
+	return &DockerCli{
+		proto:        proto,
+		scheme:       scheme,
+		dockerConfig: &dockerConfig,
+		transport:    tr,
 	}
 }
 
-func (cli *DockerCli) ExecDockerCmd (args ...string) ([]byte, int, error) {
+func (cli *DockerCli) ExecDockerCmd(args ...string) ([]byte, int, error) {
 	command := args[0]
 	switch command {
 	case "info":
@@ -107,7 +108,7 @@ func (cli *DockerCli) ExecDockerCmd (args ...string) ([]byte, int, error) {
 }
 
 func (cli *DockerCli) HTTPClient() *http.Client {
-	return &http.Client{ Transport: cli.transport}
+	return &http.Client{Transport: cli.transport}
 }
 
 func (cli *DockerCli) encodeData(data interface{}) (*bytes.Buffer, error) {
@@ -162,7 +163,7 @@ func (cli *DockerCli) clientRequest(method, path string, in io.Reader, headers m
 		return nil, "", statusCode, fmt.Errorf("An error encountered while connecting: %v", err)
 	}
 
-	if statusCode <200 || statusCode >= 400 {
+	if statusCode < 200 || statusCode >= 400 {
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return nil, "", statusCode, err

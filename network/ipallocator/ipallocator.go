@@ -47,7 +47,6 @@ func NetworkRange(network *net.IPNet) (net.IP, net.IP) {
 	return netIP.Mask(network.Mask), net.IP(lastIP)
 }
 
-
 type networkSet map[string]*allocatedMap
 
 var (

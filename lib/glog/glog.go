@@ -558,27 +558,27 @@ func (l *loggingT) header(s severity) *buffer {
 	buf.tmp[6] = ' '
 	buf.tmp[7] = severityChar[s]
 	switch buf.tmp[7] {
-		case 'I':
-			buf.tmp[8] = 'N'
-			buf.tmp[9] = 'F'
-			buf.tmp[10] = 'O'
-			buf.tmp[11] = ' '
-			buf.tmp[12] = ' '
-			break
-		case 'E':
-			buf.tmp[8] = 'R'
-			buf.tmp[9] = 'R'
-			buf.tmp[10] = 'O'
-			buf.tmp[11] = 'R'
-			buf.tmp[12] = ' '
-			break
-		case 'W':
-			buf.tmp[8] = 'A'
-			buf.tmp[9] = 'R'
-			buf.tmp[10] = 'N'
-			buf.tmp[11] = ' '
-			buf.tmp[12] = ' '
-			break
+	case 'I':
+		buf.tmp[8] = 'N'
+		buf.tmp[9] = 'F'
+		buf.tmp[10] = 'O'
+		buf.tmp[11] = ' '
+		buf.tmp[12] = ' '
+		break
+	case 'E':
+		buf.tmp[8] = 'R'
+		buf.tmp[9] = 'R'
+		buf.tmp[10] = 'O'
+		buf.tmp[11] = 'R'
+		buf.tmp[12] = ' '
+		break
+	case 'W':
+		buf.tmp[8] = 'A'
+		buf.tmp[9] = 'R'
+		buf.tmp[10] = 'N'
+		buf.tmp[11] = ' '
+		buf.tmp[12] = ' '
+		break
 	}
 
 	buf.twoDigits(13, int(month))

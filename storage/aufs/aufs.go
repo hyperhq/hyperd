@@ -1,16 +1,16 @@
 package aufs
 
 import (
+	"bufio"
 	"fmt"
-    "bufio"
-    "io/ioutil"
-    "os"
+	"io/ioutil"
+	"os"
 	"os/exec"
-    "path"
+	"path"
 	"path/filepath"
-    "syscall"
-    "sync"
 	"strconv"
+	"sync"
+	"syscall"
 
 	"hyper/lib/glog"
 	"hyper/utils"
@@ -32,19 +32,19 @@ import (
 */
 
 var (
-    enableDirpermLock sync.Once
-    enableDirperm     bool
+	enableDirpermLock sync.Once
+	enableDirperm     bool
 )
 
 const MsRemount = syscall.MS_REMOUNT
 
 func MountContainerToSharedDir(containerId, rootDir, sharedDir, mountLabel string) (string, error) {
-    var (
-        //mntPath = path.Join(rootDir, "mnt")
-        //layersPath = path.Join(rootDir, "layers")
-        diffPath = path.Join(rootDir, "diff")
-        mountPoint = path.Join(sharedDir, containerId, "rootfs")
-    )
+	var (
+		//mntPath = path.Join(rootDir, "mnt")
+		//layersPath = path.Join(rootDir, "layers")
+		diffPath   = path.Join(rootDir, "diff")
+		mountPoint = path.Join(sharedDir, containerId, "rootfs")
+	)
 
 	diffs, err := getParentDiffPaths(containerId, rootDir)
 	if err != nil {
@@ -58,7 +58,7 @@ func MountContainerToSharedDir(containerId, rootDir, sharedDir, mountLabel strin
 		return "", fmt.Errorf("Fail to mount aufs dir to %s: %v", mountPoint, err)
 	}
 
-    return mountPoint, nil
+	return mountPoint, nil
 }
 
 func AttachFiles(containerId, fromFile, toDir, rootDir, perm, uid, gid string) error {
@@ -90,9 +90,9 @@ func AttachFiles(containerId, fromFile, toDir, rootDir, perm, uid, gid string) e
 		if err := os.MkdirAll(targetDir, os.FileMode(permInt)); err != nil {
 			return err
 		}
-		targetFile = targetDir+"/"+filepath.Base(fromFile)
+		targetFile = targetDir + "/" + filepath.Base(fromFile)
 	} else {
-		targetFile = targetDir+"/"+filepath.Base(fromFile)
+		targetFile = targetDir + "/" + filepath.Base(fromFile)
 	}
 	err = ioutil.WriteFile(targetFile, buf, os.FileMode(permInt))
 	if err != nil {
@@ -220,29 +220,29 @@ func useDirperm() bool {
 func aufsUnmount(target string) error {
 	glog.V(1).Infof("Ready to unmount the target : %s", target)
 	cmdString := fmt.Sprintf("auplink %s flush", target)
-    cmd := exec.Command("/bin/sh", "-c", cmdString)
+	cmd := exec.Command("/bin/sh", "-c", cmdString)
 	if output, err := cmd.CombinedOutput(); err != nil {
-        glog.Warningf("Couldn't run auplink command : %s\n%s\n", err.Error(), output)
-    }
-    if err := syscall.Unmount(target, 0); err != nil {
-        return err
-    }
-    return nil
+		glog.Warningf("Couldn't run auplink command : %s\n%s\n", err.Error(), output)
+	}
+	if err := syscall.Unmount(target, 0); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Return all the directories
 func loadIds(root string) ([]string, error) {
-    dirs, err := ioutil.ReadDir(root)
-    if err != nil {
-        return nil, err
-    }
-    out := []string{}
-    for _, d := range dirs {
-        if !d.IsDir() {
-            out = append(out, d.Name())
-        }
-    }
-    return out, nil
+	dirs, err := ioutil.ReadDir(root)
+	if err != nil {
+		return nil, err
+	}
+	out := []string{}
+	for _, d := range dirs {
+		if !d.IsDir() {
+			out = append(out, d.Name())
+		}
+	}
+	return out, nil
 }
 
 // Read the layers file for the current id and return all the
@@ -251,19 +251,19 @@ func loadIds(root string) ([]string, error) {
 // If there are no lines in the file then the id has no parent
 // and an empty slice is returned.
 func getParentIds(id string) ([]string, error) {
-    f, err := os.Open(id)
-    if err != nil {
-        return nil, err
-    }
-    defer f.Close()
+	f, err := os.Open(id)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
 
-    out := []string{}
-    s := bufio.NewScanner(f)
+	out := []string{}
+	s := bufio.NewScanner(f)
 
-    for s.Scan() {
-        if t := s.Text(); t != "" {
-            out = append(out, s.Text())
-        }
-    }
-    return out, s.Err()
+	for s.Scan() {
+		if t := s.Text(); t != "" {
+			out = append(out, s.Text())
+		}
+	}
+	return out, s.Err()
 }

@@ -2,8 +2,8 @@ package client
 
 import (
 	"fmt"
-	"os"
 	"hyper/utils"
+	"os"
 )
 
 func (cli *HyperClient) HyperCmdVersion(args ...string) error {

@@ -2,10 +2,10 @@ package docker
 
 import (
 	"fmt"
-	"net/url"
-	"strings"
-	"os"
 	"hyper/lib/glog"
+	"net/url"
+	"os"
+	"strings"
 )
 
 type Config struct {
@@ -20,9 +20,9 @@ type Config struct {
 	AttachStdout    bool
 	AttachStderr    bool
 	PortSpecs       []string // Deprecated - Can be in the format of 8080/tcp
-	Tty             bool // Attach standard streams to a tty, including stdin if it is not closed.
-	OpenStdin       bool // Open stdin
-	StdinOnce       bool // If true, close stdin after the 1 attached client disconnects.
+	Tty             bool     // Attach standard streams to a tty, including stdin if it is not closed.
+	OpenStdin       bool     // Open stdin
+	StdinOnce       bool     // If true, close stdin after the 1 attached client disconnects.
 	Env             []string
 	Cmd             []string
 	Image           string // Name of the image as it was passed by the operator (eg. could be symbolic)
@@ -111,7 +111,7 @@ func (cli *DockerCli) SendCmdCreate(args ...string) ([]byte, int, error) {
 	if statusCode == 404 || (err != nil && strings.Contains(err.Error(), repos)) {
 		glog.V(1).Infof("can not find the image %s\n", repos)
 		glog.V(1).Info("pull the image from the repository!\n")
-		err = cli.Stream("POST", "/images/create?"+ v.Encode(), nil, os.Stdout, nil)
+		err = cli.Stream("POST", "/images/create?"+v.Encode(), nil, os.Stdout, nil)
 		if err != nil {
 			return nil, -1, err
 		}
@@ -146,11 +146,11 @@ func parseTheGivenImageName(image string) (string, string) {
 
 func initAndMergeConfigs(args ...string) *ConfigAndHostConfig {
 	imgName := args[0]
-	config := &Config {
+	config := &Config{
 		Image: imgName,
 	}
 
-	hostConfig := &HostConfig {}
+	hostConfig := &HostConfig{}
 
 	return &ConfigAndHostConfig{
 		*config,

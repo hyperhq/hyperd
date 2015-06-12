@@ -14,7 +14,7 @@ import (
 var (
 	cpuInfoProcLinuxFile = "/proc/cpuinfo"
 	memInfoProcLinuxFile = "/proc/meminfo"
-	etcOsRelease = "/etc/os-release"
+	etcOsRelease         = "/etc/os-release"
 )
 
 func getMemInfo() (*MemInfo, error) {
@@ -131,7 +131,7 @@ func getCpuInfo() (*CpuInfo, error) {
 	return nil, nil
 }
 
-func getOSInfo() (*OSInfo,error) {
+func getOSInfo() (*OSInfo, error) {
 	osinfo := &OSInfo{}
 	contents, err := ioutil.ReadFile(etcOsRelease)
 	if err != nil {
@@ -144,31 +144,31 @@ func getOSInfo() (*OSInfo,error) {
 			break
 		}
 		if strings.Contains(string(line), "NAME") {
-			osinfo.Name = string(line[bytes.IndexByte(line, '"')+1:len(line)-1])
+			osinfo.Name = string(line[bytes.IndexByte(line, '"')+1 : len(line)-1])
 		}
 		if strings.Contains(string(line), "VERSION") {
-			osinfo.Version = string(line[bytes.IndexByte(line, '"')+1:len(line)-1])
+			osinfo.Version = string(line[bytes.IndexByte(line, '"')+1 : len(line)-1])
 		}
 		if strings.Contains(string(line), "PRETTY_NAME") {
-			osinfo.PrettyName = string(line[bytes.IndexByte(line, '"')+1:len(line)-1])
+			osinfo.PrettyName = string(line[bytes.IndexByte(line, '"')+1 : len(line)-1])
 		}
 		if strings.Contains(string(line), "ID") {
-			osinfo.Id = string(line[bytes.IndexByte(line, '=')+1:len(line)-1])
+			osinfo.Id = string(line[bytes.IndexByte(line, '=')+1 : len(line)-1])
 		}
 		if strings.Contains(string(line), "ID_LIKE") {
-			osinfo.IdLike = string(line[bytes.IndexByte(line, '=')+1:len(line)-1])
+			osinfo.IdLike = string(line[bytes.IndexByte(line, '=')+1 : len(line)-1])
 		}
 		if strings.Contains(string(line), "VERSION_ID") {
-			osinfo.VersionId = string(line[bytes.IndexByte(line, '"')+1:len(line)-1])
+			osinfo.VersionId = string(line[bytes.IndexByte(line, '"')+1 : len(line)-1])
 		}
 		if strings.Contains(string(line), "HOME_URL") {
-			osinfo.HomeURL = string(line[bytes.IndexByte(line, '"')+1:len(line)-1])
+			osinfo.HomeURL = string(line[bytes.IndexByte(line, '"')+1 : len(line)-1])
 		}
 		if strings.Contains(string(line), "SUPPORT_URL") {
-			osinfo.SupportURL = string(line[bytes.IndexByte(line, '"')+1:len(line)-1])
+			osinfo.SupportURL = string(line[bytes.IndexByte(line, '"')+1 : len(line)-1])
 		}
 		if strings.Contains(string(line), "BUG_REPORT_URL") {
-			osinfo.BugURL = string(line[bytes.IndexByte(line, '"')+1:len(line)-1])
+			osinfo.BugURL = string(line[bytes.IndexByte(line, '"')+1 : len(line)-1])
 		}
 	}
 	return osinfo, nil

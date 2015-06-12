@@ -1,19 +1,19 @@
 package client
 
 import (
-	"io"
-	"fmt"
-	"strings"
-	"os"
-	"net/url"
-	"io/ioutil"
-	"time"
 	"encoding/json"
+	"fmt"
 	gflag "github.com/jessevdk/go-flags"
+	"io"
+	"io/ioutil"
+	"net/url"
+	"os"
+	"strings"
+	"time"
 
 	"hyper/engine"
-	"hyper/pod"
 	"hyper/lib/promise"
+	"hyper/pod"
 )
 
 // hyper run [OPTIONS] image [COMMAND] [ARGS...]
@@ -22,18 +22,18 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 		return fmt.Errorf("%s ERROR: Can not accept the 'run' command without argument!\n", os.Args[0])
 	}
 	var opts struct {
-		PodFile  string   `short:"p" long:"podfile" value-name:"\"\"" description:"Create and Run a pod based on the pod file"`
-		K8s      string   `short:"k" long:"kubernetes" value-name:"\"\"" description:"Create and Run a pod based on the kubernetes pod file"`
-		Yaml     bool     `short:"y" long:"yaml" default:"false" default-mask:"-" description:"Create a pod based on Yaml file"`
-		Name     string   `long:"name" value-name:"\"\"" description:"Assign a name to the container"`
-		Attach   bool     `long:"attach" default:"true" default-mask:"-" description:"Attach the stdin, stdout and stderr to the container"`
-		Workdir  string   `long:"workdir" default:"/" value-name:"\"\"" default-mask:"-" description:"Working directory inside the container"`
-		Tty      bool     `long:"tty" default:"true" default-mask:"-" description:"Allocate a pseudo-TTY"`
-		Cpu      int      `long:"cpu" default:"1" value-name:"1" default-mask:"-" description:"CPU number for the VM"`
-		Memory   int      `long:"memory" default:"128" value-name:"128" default-mask:"-" description:"Memory size (MB) for the VM"`
-		Env      []string `long:"env" value-name:"[]" default-mask:"-" description:"Set environment variables"`
-		EntryPoint      string   `long:"entrypoint" value-name:"\"\"" default-mask:"-" description:"Overwrite the default ENTRYPOINT of the image"`
-		RestartPolicy   string   `long:"restart" default:"never" value-name:"\"\"" default-mask:"-" description:"Restart policy to apply when a container exits (never, onFailure, always)"`
+		PodFile       string   `short:"p" long:"podfile" value-name:"\"\"" description:"Create and Run a pod based on the pod file"`
+		K8s           string   `short:"k" long:"kubernetes" value-name:"\"\"" description:"Create and Run a pod based on the kubernetes pod file"`
+		Yaml          bool     `short:"y" long:"yaml" default:"false" default-mask:"-" description:"Create a pod based on Yaml file"`
+		Name          string   `long:"name" value-name:"\"\"" description:"Assign a name to the container"`
+		Attach        bool     `long:"attach" default:"true" default-mask:"-" description:"Attach the stdin, stdout and stderr to the container"`
+		Workdir       string   `long:"workdir" default:"/" value-name:"\"\"" default-mask:"-" description:"Working directory inside the container"`
+		Tty           bool     `long:"tty" default:"true" default-mask:"-" description:"Allocate a pseudo-TTY"`
+		Cpu           int      `long:"cpu" default:"1" value-name:"1" default-mask:"-" description:"CPU number for the VM"`
+		Memory        int      `long:"memory" default:"128" value-name:"128" default-mask:"-" description:"Memory size (MB) for the VM"`
+		Env           []string `long:"env" value-name:"[]" default-mask:"-" description:"Set environment variables"`
+		EntryPoint    string   `long:"entrypoint" value-name:"\"\"" default-mask:"-" description:"Overwrite the default ENTRYPOINT of the image"`
+		RestartPolicy string   `long:"restart" default:"never" value-name:"\"\"" default-mask:"-" description:"Restart policy to apply when a container exits (never, onFailure, always)"`
 	}
 
 	var parser = gflag.NewParser(&opts, gflag.Default|gflag.IgnoreUnknown)
@@ -69,13 +69,13 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 		}
 		fmt.Printf("POD id is %s\n", podId)
 		t2 := time.Now()
-		fmt.Printf("Time to run a POD is %d ms\n", (t2.UnixNano() - t1.UnixNano())/1000000)
+		fmt.Printf("Time to run a POD is %d ms\n", (t2.UnixNano()-t1.UnixNano())/1000000)
 		return nil
 	}
 	if opts.K8s != "" {
 		var (
 			kpod pod.KPod
-			pod *pod.UserPod
+			pod  *pod.UserPod
 		)
 		if _, err := os.Stat(opts.K8s); err != nil {
 			return err
@@ -109,7 +109,7 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 		}
 		fmt.Printf("POD id is %s\n", podId)
 		t2 := time.Now()
-		fmt.Printf("Time to run a POD is %d ms\n", (t2.UnixNano() - t1.UnixNano())/1000000)
+		fmt.Printf("Time to run a POD is %d ms\n", (t2.UnixNano()-t1.UnixNano())/1000000)
 		return nil
 	}
 
@@ -117,15 +117,15 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 		return fmt.Errorf("%s: \"run\" requires a minimum of 1 argument, please provide the image.", os.Args[0])
 	}
 	var (
-		image = args[1]
+		image   = args[1]
 		command = []string{}
-		env = []pod.UserEnvironmentVar{}
+		env     = []pod.UserEnvironmentVar{}
 	)
 	if len(args) > 2 {
 		command = args[2:]
 	}
 	if opts.Name == "" {
-		opts.Name = image+"-"+pod.RandStr(10, "number")
+		opts.Name = image + "-" + pod.RandStr(10, "number")
 	}
 	if opts.Memory == 0 {
 		opts.Memory = 128
@@ -137,41 +137,41 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 		if v == "" || !strings.Contains(v, "=") {
 			continue
 		}
-		userEnv := pod.UserEnvironmentVar {
-			Env:    v[:strings.Index(v, "=")],
-			Value:  v[strings.Index(v, "=") + 1:],
+		userEnv := pod.UserEnvironmentVar{
+			Env:   v[:strings.Index(v, "=")],
+			Value: v[strings.Index(v, "=")+1:],
 		}
 		env = append(env, userEnv)
 	}
 
 	var containerList = []pod.UserContainer{}
 	var container = pod.UserContainer{
-		Name:           opts.Name,
-		Image:          image,
-		Command:        command,
-		Workdir:        opts.Workdir,
-		Entrypoint:     []string{},
-		Ports:          []pod.UserContainerPort{},
-		Envs:           env,
-		Volumes:        []pod.UserVolumeReference{},
-		Files:          []pod.UserFileReference{},
-		RestartPolicy:  opts.RestartPolicy,
+		Name:          opts.Name,
+		Image:         image,
+		Command:       command,
+		Workdir:       opts.Workdir,
+		Entrypoint:    []string{},
+		Ports:         []pod.UserContainerPort{},
+		Envs:          env,
+		Volumes:       []pod.UserVolumeReference{},
+		Files:         []pod.UserFileReference{},
+		RestartPolicy: opts.RestartPolicy,
 	}
 	containerList = append(containerList, container)
 
 	var userPod = &pod.UserPod{
-		Name:           opts.Name,
-		Containers:     containerList,
-		Resource:       pod.UserResource{Vcpu:opts.Cpu, Memory:opts.Memory,},
-		Files:          []pod.UserFile{},
-		Volumes:        []pod.UserVolume{},
-		Tty:            opts.Tty,
+		Name:       opts.Name,
+		Containers: containerList,
+		Resource:   pod.UserResource{Vcpu: opts.Cpu, Memory: opts.Memory},
+		Files:      []pod.UserFile{},
+		Volumes:    []pod.UserVolume{},
+		Tty:        opts.Tty,
 	}
-/*
-	if err := userPod.Validate(); err != nil {
-		return err
-	}
-*/
+	/*
+		if err := userPod.Validate(); err != nil {
+			return err
+		}
+	*/
 	jsonString, _ := json.Marshal(userPod)
 	podId, err := cli.RunPod(string(jsonString))
 	if err != nil {
@@ -184,9 +184,9 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 		return err
 	}
 	var (
-		tag         = cli.GetTag()
-		hijacked    = make(chan io.Closer)
-		errCh       chan error
+		tag      = cli.GetTag()
+		hijacked = make(chan io.Closer)
+		errCh    chan error
 	)
 	v := url.Values{}
 	v.Set("type", "container")
@@ -232,10 +232,10 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 	return nil
 }
 
-func (cli *HyperClient)GetContainerByPod(podId string) (string ,error) {
+func (cli *HyperClient) GetContainerByPod(podId string) (string, error) {
 	v := url.Values{}
 	v.Set("item", "container")
-	body, _, err := readBody(cli.call("GET", "/list?"+v.Encode(), nil, nil));
+	body, _, err := readBody(cli.call("GET", "/list?"+v.Encode(), nil, nil))
 	if err != nil {
 		return "", err
 	}

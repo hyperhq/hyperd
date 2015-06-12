@@ -5,8 +5,8 @@ import (
 	"net/url"
 	"strings"
 
-	"hyper/engine"
 	gflag "github.com/jessevdk/go-flags"
+	"hyper/engine"
 )
 
 func (cli *HyperClient) HyperCmdKill(args ...string) error {
@@ -24,17 +24,17 @@ func (cli *HyperClient) HyperCmdKill(args ...string) error {
 		return fmt.Errorf("\"kill\" requires a minimum of 1 argument, please provide VM ID.\n")
 	}
 
-    vmId := args[1]
+	vmId := args[1]
 	v := url.Values{}
 	v.Set("vm", vmId)
-	body, _, err := readBody(cli.call("POST", "/vm/kill?"+v.Encode(), nil, nil));
+	body, _, err := readBody(cli.call("POST", "/vm/kill?"+v.Encode(), nil, nil))
 	if err != nil {
 		return err
 	}
 	out := engine.NewOutput()
 	remoteInfo, err := out.AddEnv()
 	if err != nil {
-        return err
+		return err
 	}
 
 	if _, err := out.Write(body); err != nil {

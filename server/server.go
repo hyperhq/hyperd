@@ -2,7 +2,8 @@ package server
 
 import (
 	"bytes"
-	"syscall"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"expvar"
 	"fmt"
@@ -14,15 +15,14 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"crypto/tls"
-	"crypto/x509"
+	"syscall"
 
 	"github.com/gorilla/mux"
-	"hyper/utils"
 	"hyper/engine"
+	"hyper/lib/glog"
 	"hyper/lib/portallocator"
 	"hyper/lib/version"
-	"hyper/lib/glog"
+	"hyper/utils"
 )
 
 var (
@@ -188,9 +188,9 @@ func getList(eng *engine.Engine, version version.Version, w http.ResponseWriter,
 
 	str := engine.Tail(stdoutBuf, 1)
 	type listResponse struct {
-		Item string `json:"item"`
-		PodData  []string `json:"podData"`
-		VmData   []string `json:"vmData"`
+		Item    string   `json:"item"`
+		PodData []string `json:"podData"`
+		VmData  []string `json:"vmData"`
 		CData   []string `json:"cData"`
 	}
 	var res listResponse
@@ -225,8 +225,8 @@ func getPodInfo(eng *engine.Engine, version version.Version, w http.ResponseWrit
 	}
 
 	var (
-		env engine.Env
-		dat map[string] interface{}
+		env             engine.Env
+		dat             map[string]interface{}
 		returnedJSONstr string
 	)
 	returnedJSONstr = engine.Tail(stdoutBuf, 1)
@@ -252,8 +252,8 @@ func postStop(eng *engine.Engine, version version.Version, w http.ResponseWriter
 		return err
 	}
 	var (
-		env engine.Env
-		dat map[string] interface{}
+		env             engine.Env
+		dat             map[string]interface{}
 		returnedJSONstr string
 	)
 	returnedJSONstr = engine.Tail(stdoutBuf, 1)
@@ -274,8 +274,8 @@ func postExec(eng *engine.Engine, version version.Version, w http.ResponseWriter
 	}
 
 	var (
-		job = eng.Job("exec", r.Form.Get("type"), r.Form.Get("value"), r.Form.Get("command"), r.Form.Get("tag"))
-		errOut io.Writer = os.Stderr
+		job                 = eng.Job("exec", r.Form.Get("type"), r.Form.Get("value"), r.Form.Get("command"), r.Form.Get("tag"))
+		errOut    io.Writer = os.Stderr
 		errStream io.Writer
 	)
 
@@ -310,8 +310,8 @@ func postAttach(eng *engine.Engine, version version.Version, w http.ResponseWrit
 	}
 
 	var (
-		job = eng.Job("attach", r.Form.Get("type"), r.Form.Get("value"), r.Form.Get("tag"))
-		errOut io.Writer = os.Stderr
+		job                 = eng.Job("attach", r.Form.Get("type"), r.Form.Get("value"), r.Form.Get("tag"))
+		errOut    io.Writer = os.Stderr
 		errStream io.Writer
 	)
 
@@ -357,8 +357,8 @@ func postContainerCreate(eng *engine.Engine, version version.Version, w http.Res
 	}
 
 	var (
-		env engine.Env
-		dat map[string] interface{}
+		env             engine.Env
+		dat             map[string]interface{}
 		returnedJSONstr string
 	)
 	returnedJSONstr = engine.Tail(stdoutBuf, 1)
@@ -386,8 +386,8 @@ func postPodCreate(eng *engine.Engine, version version.Version, w http.ResponseW
 	}
 
 	var (
-		env engine.Env
-		dat map[string] interface{}
+		env             engine.Env
+		dat             map[string]interface{}
 		returnedJSONstr string
 	)
 	returnedJSONstr = engine.Tail(stdoutBuf, 1)
@@ -416,8 +416,8 @@ func postPodStart(eng *engine.Engine, version version.Version, w http.ResponseWr
 	}
 
 	var (
-		env engine.Env
-		dat map[string] interface{}
+		env             engine.Env
+		dat             map[string]interface{}
 		returnedJSONstr string
 	)
 	returnedJSONstr = engine.Tail(stdoutBuf, 1)
@@ -446,8 +446,8 @@ func postPodRun(eng *engine.Engine, version version.Version, w http.ResponseWrit
 	}
 
 	var (
-		env engine.Env
-		dat map[string] interface{}
+		env             engine.Env
+		dat             map[string]interface{}
 		returnedJSONstr string
 	)
 	returnedJSONstr = engine.Tail(stdoutBuf, 1)
@@ -477,8 +477,8 @@ func postVmCreate(eng *engine.Engine, version version.Version, w http.ResponseWr
 	}
 
 	var (
-		env engine.Env
-		dat map[string] interface{}
+		env             engine.Env
+		dat             map[string]interface{}
 		returnedJSONstr string
 	)
 	returnedJSONstr = engine.Tail(stdoutBuf, 1)
@@ -508,8 +508,8 @@ func postVmKill(eng *engine.Engine, version version.Version, w http.ResponseWrit
 	}
 
 	var (
-		env engine.Env
-		dat map[string] interface{}
+		env             engine.Env
+		dat             map[string]interface{}
 		returnedJSONstr string
 	)
 	returnedJSONstr = engine.Tail(stdoutBuf, 1)
@@ -567,8 +567,8 @@ func postPodRemove(eng *engine.Engine, version version.Version, w http.ResponseW
 	}
 
 	var (
-		env engine.Env
-		dat map[string] interface{}
+		env             engine.Env
+		dat             map[string]interface{}
 		returnedJSONstr string
 	)
 	returnedJSONstr = engine.Tail(stdoutBuf, 1)
@@ -667,27 +667,26 @@ func createRouter(eng *engine.Engine, logging, enableCors bool, corsHeaders stri
 	}
 	m := map[string]map[string]HttpApiFunc{
 		"GET": {
-			"/info":                           getInfo,
-			"/pod/info":                       getPodInfo,
-			"/version":                        getVersion,
-			"/list":						   getList,
+			"/info":     getInfo,
+			"/pod/info": getPodInfo,
+			"/version":  getVersion,
+			"/list":     getList,
 		},
 		"POST": {
-			"/container/create":			   postContainerCreate,
-			"/image/create":				   postImageCreate,
-			"/pod/create":					   postPodCreate,
-			"/pod/start":					   postPodStart,
-			"/pod/remove":					   postPodRemove,
-			"/pod/run":					       postPodRun,
-			"/pod/stop":                       postStop,
-			"/vm/create":					   postVmCreate,
-			"/vm/kill":					       postVmKill,
-			"/exec":                           postExec,
-			"/attach":						   postAttach,
-			"/tty/resize":                     postTtyResize,
+			"/container/create": postContainerCreate,
+			"/image/create":     postImageCreate,
+			"/pod/create":       postPodCreate,
+			"/pod/start":        postPodStart,
+			"/pod/remove":       postPodRemove,
+			"/pod/run":          postPodRun,
+			"/pod/stop":         postStop,
+			"/vm/create":        postVmCreate,
+			"/vm/kill":          postVmKill,
+			"/exec":             postExec,
+			"/attach":           postAttach,
+			"/tty/resize":       postTtyResize,
 		},
-		"DELETE": {
-		},
+		"DELETE": {},
 		"OPTIONS": {
 			"": optionsHandler,
 		},
@@ -765,7 +764,7 @@ func setupTls(cert, key, ca string, l net.Listener) (net.Listener, error) {
 
 func newListener(proto, addr string, bufferRequests bool) (net.Listener, error) {
 	if bufferRequests {
-//		return listenbuffer.NewListenBuffer(proto, addr, activationLock)
+		//		return listenbuffer.NewListenBuffer(proto, addr, activationLock)
 	}
 
 	return net.Listen(proto, addr)

@@ -2,12 +2,12 @@ package client
 
 import (
 	"fmt"
-	"strings"
 	"net/url"
+	"strings"
 
+	gflag "github.com/jessevdk/go-flags"
 	"hyper/engine"
 	"hyper/types"
-	gflag "github.com/jessevdk/go-flags"
 )
 
 func (cli *HyperClient) HyperCmdRm(args ...string) error {
@@ -24,10 +24,10 @@ func (cli *HyperClient) HyperCmdRm(args ...string) error {
 	if len(args) < 2 {
 		return fmt.Errorf("\"rm\" requires a minimum of 1 argument, please provide POD ID.\n")
 	}
-    podId := args[1]
+	podId := args[1]
 	v := url.Values{}
 	v.Set("podId", podId)
-	body, _, err := readBody(cli.call("POST", "/pod/remove?"+v.Encode(), nil, nil));
+	body, _, err := readBody(cli.call("POST", "/pod/remove?"+v.Encode(), nil, nil))
 	if err != nil {
 		return err
 	}
@@ -45,7 +45,7 @@ func (cli *HyperClient) HyperCmdRm(args ...string) error {
 	if errCode == types.E_OK || errCode == types.E_VM_SHUTDOWN {
 		//fmt.Println("VM is successful to start!")
 	} else {
-        return fmt.Errorf("Error code is %d, Cause is %s", remoteInfo.GetInt("Code"), remoteInfo.Get("Cause"))
+		return fmt.Errorf("Error code is %d, Cause is %s", remoteInfo.GetInt("Code"), remoteInfo.Get("Cause"))
 	}
 	fmt.Printf("Pod(%s) is successful to be deleted!\n", podId)
 	return nil

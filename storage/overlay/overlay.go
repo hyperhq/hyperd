@@ -1,40 +1,40 @@
 package overlay
 
 import (
-    "fmt"
-    "io/ioutil"
-    "os"
-    "path"
-    "path/filepath"
-    "strconv"
-    "syscall"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path"
+	"path/filepath"
+	"strconv"
+	"syscall"
 
 	"hyper/utils"
 )
 
 func MountContainerToSharedDir(containerId, rootDir, sharedDir, mountLabel string) (string, error) {
-    var (
-        mountPoint = path.Join(sharedDir, containerId, "rootfs")
-        upperDir   = path.Join(rootDir, containerId, "upper")
-        workDir    = path.Join(rootDir, containerId, "work")
-    )
+	var (
+		mountPoint = path.Join(sharedDir, containerId, "rootfs")
+		upperDir   = path.Join(rootDir, containerId, "upper")
+		workDir    = path.Join(rootDir, containerId, "work")
+	)
 
 	if _, err := os.Stat(mountPoint); err != nil {
 		if err = os.MkdirAll(mountPoint, 0755); err != nil {
 			return "", err
 		}
 	}
-    lowerId, err := ioutil.ReadFile(path.Join(rootDir, containerId) + "/lower-id")
-    if err != nil {
-        return "", err
-    }
-    lowerDir := path.Join(rootDir, string(lowerId), "root")
+	lowerId, err := ioutil.ReadFile(path.Join(rootDir, containerId) + "/lower-id")
+	if err != nil {
+		return "", err
+	}
+	lowerDir := path.Join(rootDir, string(lowerId), "root")
 
-    params := fmt.Sprintf("lowerdir=%s,upperdir=%s,workdir=%s", lowerDir, upperDir, workDir)
-    if err := syscall.Mount("overlay", mountPoint, "overlay", 0, utils.FormatMountLabel(params, mountLabel)); err != nil {
-        return "", fmt.Errorf("error creating overlay mount to %s: %v", mountPoint, err)
-    }
-    return mountPoint, nil
+	params := fmt.Sprintf("lowerdir=%s,upperdir=%s,workdir=%s", lowerDir, upperDir, workDir)
+	if err := syscall.Mount("overlay", mountPoint, "overlay", 0, utils.FormatMountLabel(params, mountLabel)); err != nil {
+		return "", fmt.Errorf("error creating overlay mount to %s: %v", mountPoint, err)
+	}
+	return mountPoint, nil
 }
 
 func AttachFiles(containerId, fromFile, toDir, rootDir, perm, uid, gid string) error {
@@ -66,9 +66,9 @@ func AttachFiles(containerId, fromFile, toDir, rootDir, perm, uid, gid string) e
 		if err := os.MkdirAll(targetDir, os.FileMode(permInt)); err != nil {
 			return err
 		}
-		targetFile = targetDir+"/"+filepath.Base(fromFile)
+		targetFile = targetDir + "/" + filepath.Base(fromFile)
 	} else {
-		targetFile = targetDir+"/"+filepath.Base(fromFile)
+		targetFile = targetDir + "/" + filepath.Base(fromFile)
 	}
 	err = ioutil.WriteFile(targetFile, buf, os.FileMode(permInt))
 	if err != nil {

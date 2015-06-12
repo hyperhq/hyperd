@@ -2,9 +2,9 @@ package client
 
 import (
 	"fmt"
+	gflag "github.com/jessevdk/go-flags"
 	"net/url"
 	"strings"
-	gflag "github.com/jessevdk/go-flags"
 )
 
 func (cli *HyperClient) HyperCmdPull(args ...string) error {

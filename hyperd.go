@@ -1,16 +1,16 @@
 package main
 
 import (
-	"os"
-	"fmt"
 	"flag"
-	"syscall"
+	"fmt"
+	"os"
 	"os/signal"
+	"syscall"
 
 	"hyper/engine"
-	"hyper/utils"
-	"hyper/lib/glog"
 	"hyper/hyperdaemon"
+	"hyper/lib/glog"
+	"hyper/utils"
 )
 
 func main() {
@@ -18,7 +18,7 @@ func main() {
 	flHost := flag.String("host", "", "Host for hyperd")
 	flHelp := flag.Bool("help", false, "Print help message for Hyperd daemon")
 	glog.Init()
-	flag.Usage = func() {printHelp()}
+	flag.Usage = func() { printHelp() }
 	flag.Parse()
 	if *flHelp == true {
 		printHelp()
@@ -87,7 +87,7 @@ func mainDaemon(config, host string) {
 	}
 	defaultHost = append(defaultHost, "unix:///var/run/hyper.sock")
 	if d.Host != "" {
-	  defaultHost = append(defaultHost, d.Host)
+		defaultHost = append(defaultHost, d.Host)
 	}
 
 	job := eng.Job("serveapi", defaultHost...)
@@ -107,10 +107,10 @@ func mainDaemon(config, host string) {
 
 	glog.V(0).Info("Daemon has completed initialization\n")
 
-    if err := d.Restore(); err != nil {
+	if err := d.Restore(); err != nil {
 		glog.Warningf("Fail to restore the previous VM")
-        return
-    }
+		return
+	}
 
 	// Daemon is fully initialized and handling API traffic
 	// Wait for serve API job to complete

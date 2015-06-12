@@ -3,11 +3,11 @@ package engine
 import (
 	"bytes"
 	"fmt"
+	"hyper/lib/glog"
 	"io"
 	"strings"
 	"sync"
 	"time"
-	"hyper/lib/glog"
 )
 
 // A job is the fundamental unit of work in the docker engine.

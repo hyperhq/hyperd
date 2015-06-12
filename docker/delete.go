@@ -2,8 +2,8 @@ package docker
 
 import (
 	"fmt"
-	"net/url"
 	"hyper/lib/glog"
+	"net/url"
 )
 
 func (cli *DockerCli) SendCmdDelete(args ...string) ([]byte, int, error) {

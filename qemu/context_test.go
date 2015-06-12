@@ -1,149 +1,149 @@
 package qemu
 
 import (
-    "testing"
-    "encoding/json"
-    "hyper/pod"
+	"encoding/json"
+	"hyper/pod"
+	"testing"
 )
 
 func TestInitContext(t *testing.T) {
 
-    b := &BootConfig{
-        CPU:    3,
-        Memory: 202,
-        Kernel: "somekernel",
-        Initrd: "someinitrd",
-    }
+	b := &BootConfig{
+		CPU:    3,
+		Memory: 202,
+		Kernel: "somekernel",
+		Initrd: "someinitrd",
+	}
 
-    ctx,_ := initContext("vmid", nil, nil, b)
+	ctx, _ := initContext("vmid", nil, nil, b)
 
-    if ctx.Id != "vmid" {
-        t.Error("id should be vmid, but is ", ctx.Id)
-    }
-    if ctx.Boot.CPU != 3 {
-        t.Error("cpu should be 3, but is ", string(ctx.Boot.CPU))
-    }
-    if ctx.Boot.Memory != 202 {
-        t.Error("memory should be 202, but is ", string(ctx.Boot.Memory))
-    }
+	if ctx.Id != "vmid" {
+		t.Error("id should be vmid, but is ", ctx.Id)
+	}
+	if ctx.Boot.CPU != 3 {
+		t.Error("cpu should be 3, but is ", string(ctx.Boot.CPU))
+	}
+	if ctx.Boot.Memory != 202 {
+		t.Error("memory should be 202, but is ", string(ctx.Boot.Memory))
+	}
 
-    t.Log("id check finished.")
-    ctx.Close()
+	t.Log("id check finished.")
+	ctx.Close()
 }
 
 func TestParseSpec(t *testing.T) {
 
-    b := &BootConfig{
-        CPU:    1,
-        Memory: 128,
-        Kernel: "somekernel",
-        Initrd: "someinitrd",
-    }
+	b := &BootConfig{
+		CPU:    1,
+		Memory: 128,
+		Kernel: "somekernel",
+		Initrd: "someinitrd",
+	}
 
-    cs := []*ContainerInfo{
-        &ContainerInfo{},
-    }
+	cs := []*ContainerInfo{
+		&ContainerInfo{},
+	}
 
-    ctx,_ := initContext("vmmid", nil, nil, b)
+	ctx, _ := initContext("vmmid", nil, nil, b)
 
-    spec := pod.UserPod{}
-    err := json.Unmarshal([]byte(testJson("basic")), &spec)
-    if err != nil {
-        t.Error("parse json failed ", err.Error())
-    }
+	spec := pod.UserPod{}
+	err := json.Unmarshal([]byte(testJson("basic")), &spec)
+	if err != nil {
+		t.Error("parse json failed ", err.Error())
+	}
 
-    ctx.InitDeviceContext(&spec, cs, nil)
+	ctx.InitDeviceContext(&spec, cs, nil)
 
-    if ctx.userSpec != &spec {
-        t.Error("user pod assignment fail")
-    }
+	if ctx.userSpec != &spec {
+		t.Error("user pod assignment fail")
+	}
 
-    if len(ctx.vmSpec.Containers) != 1 {
-        t.Error("wrong containers in vm spec")
-    }
+	if len(ctx.vmSpec.Containers) != 1 {
+		t.Error("wrong containers in vm spec")
+	}
 
-    if ctx.vmSpec.ShareDir != "share_dir" {
-        t.Error("shareDir in vmSpec is ", ctx.vmSpec.ShareDir)
-    }
+	if ctx.vmSpec.ShareDir != "share_dir" {
+		t.Error("shareDir in vmSpec is ", ctx.vmSpec.ShareDir)
+	}
 
-    if ctx.vmSpec.Containers[0].RestartPolicy != "never" {
-        t.Error("Default restartPolicy is ", ctx.vmSpec.Containers[0].RestartPolicy)
-    }
+	if ctx.vmSpec.Containers[0].RestartPolicy != "never" {
+		t.Error("Default restartPolicy is ", ctx.vmSpec.Containers[0].RestartPolicy)
+	}
 
-    if ctx.vmSpec.Containers[0].Envs[1].Env != "JAVA_HOME" {
-        t.Error("second environment should not be ", ctx.vmSpec.Containers[0].Envs[1].Env)
-    }
+	if ctx.vmSpec.Containers[0].Envs[1].Env != "JAVA_HOME" {
+		t.Error("second environment should not be ", ctx.vmSpec.Containers[0].Envs[1].Env)
+	}
 
-    res,err := json.MarshalIndent(*ctx.vmSpec, "    ", "    ")
-    if err != nil {
-        t.Error("vmspec to json failed")
-    }
-    t.Log(string(res))
+	res, err := json.MarshalIndent(*ctx.vmSpec, "    ", "    ")
+	if err != nil {
+		t.Error("vmspec to json failed")
+	}
+	t.Log(string(res))
 }
 
 func TestParseVolumes(t *testing.T) {
-    b := &BootConfig{
-        CPU:    1,
-        Memory: 128,
-        Kernel: "somekernel",
-        Initrd: "someinitrd",
-    }
+	b := &BootConfig{
+		CPU:    1,
+		Memory: 128,
+		Kernel: "somekernel",
+		Initrd: "someinitrd",
+	}
 
-    ctx,_ := initContext("vmmid", nil, nil, b)
+	ctx, _ := initContext("vmmid", nil, nil, b)
 
-    spec := pod.UserPod{}
-    err := json.Unmarshal([]byte(testJson("with_volumes")), &spec)
-    if err != nil {
-        t.Error("parse json failed ", err.Error())
-    }
+	spec := pod.UserPod{}
+	err := json.Unmarshal([]byte(testJson("with_volumes")), &spec)
+	if err != nil {
+		t.Error("parse json failed ", err.Error())
+	}
 
-    cs := []*ContainerInfo{
-        &ContainerInfo{},
-    }
+	cs := []*ContainerInfo{
+		&ContainerInfo{},
+	}
 
-    ctx.InitDeviceContext(&spec, cs, nil)
+	ctx.InitDeviceContext(&spec, cs, nil)
 
-    res,err := json.MarshalIndent(*ctx.vmSpec, "    ", "    ")
-    if err != nil {
-        t.Error("vmspec to json failed")
-    }
-    t.Log(string(res))
+	res, err := json.MarshalIndent(*ctx.vmSpec, "    ", "    ")
+	if err != nil {
+		t.Error("vmspec to json failed")
+	}
+	t.Log(string(res))
 
-    vol1 := ctx.devices.volumeMap["vol1"]
-    if vol1.pos[0] != "/var/dir1" {
-        t.Error("vol1 (/var/dir1) path is ", vol1.pos[0])
-    }
+	vol1 := ctx.devices.volumeMap["vol1"]
+	if vol1.pos[0] != "/var/dir1" {
+		t.Error("vol1 (/var/dir1) path is ", vol1.pos[0])
+	}
 
-    if !vol1.readOnly[0] {
-        t.Error("vol1 on container 0 should be read only")
-    }
+	if !vol1.readOnly[0] {
+		t.Error("vol1 on container 0 should be read only")
+	}
 
-    ref1 := blockDescriptor{ name:"vol1", filename:"", format:"", fstype:"", deviceName:"" }
-    if *vol1.info != ref1 {
-        t.Errorf("info of vol1: %q %q %q %q %q",
-            vol1.info.name, vol1.info.filename, vol1.info.format, vol1.info.fstype,vol1.info.deviceName)
-    }
+	ref1 := blockDescriptor{name: "vol1", filename: "", format: "", fstype: "", deviceName: ""}
+	if *vol1.info != ref1 {
+		t.Errorf("info of vol1: %q %q %q %q %q",
+			vol1.info.name, vol1.info.filename, vol1.info.format, vol1.info.fstype, vol1.info.deviceName)
+	}
 
-    vol2 := ctx.devices.volumeMap["vol2"]
-    if vol2.pos[0] != "/var/dir2" {
-        t.Error("vol1 (/var/dir2) path is ", vol2.pos[0])
-    }
+	vol2 := ctx.devices.volumeMap["vol2"]
+	if vol2.pos[0] != "/var/dir2" {
+		t.Error("vol1 (/var/dir2) path is ", vol2.pos[0])
+	}
 
-    if vol2.readOnly[0] {
-        t.Error("vol2 on container 0 should not be read only")
-    }
+	if vol2.readOnly[0] {
+		t.Error("vol2 on container 0 should not be read only")
+	}
 
-    ref2 := blockDescriptor{ name:"vol2", filename:"/home/whatever", format:"vfs", fstype:"dir", deviceName:""}
-    if *vol2.info != ref2 {
-        t.Errorf("info of vol2: %q %q %q %q %q",
-        vol2.info.name, vol2.info.filename, vol2.info.format, vol2.info.fstype,vol2.info.deviceName)
-    }
+	ref2 := blockDescriptor{name: "vol2", filename: "/home/whatever", format: "vfs", fstype: "dir", deviceName: ""}
+	if *vol2.info != ref2 {
+		t.Errorf("info of vol2: %q %q %q %q %q",
+			vol2.info.name, vol2.info.filename, vol2.info.format, vol2.info.fstype, vol2.info.deviceName)
+	}
 }
 
 func testJson(key string) string {
-    jsons := make(map[string]string)
+	jsons := make(map[string]string)
 
-    jsons["basic"] =`{
+	jsons["basic"] = `{
     "name": "hostname",
     "containers" : [{
         "image": "nginx:latest",
@@ -171,7 +171,7 @@ func testJson(key string) string {
     }],
     "volumes": []}`
 
-    jsons["with_volumes"] = `{
+	jsons["with_volumes"] = `{
     "name": "hostname",
     "containers" : [{
         "image": "nginx:latest",
@@ -237,5 +237,5 @@ func testJson(key string) string {
     }]
     }`
 
-    return jsons[key]
+	return jsons[key]
 }

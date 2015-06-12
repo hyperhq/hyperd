@@ -3,8 +3,9 @@ package client
 import (
 	"crypto/tls"
 	"encoding/json"
-	"io"
 	"fmt"
+	"hyper/lib/term"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -12,21 +13,20 @@ import (
 	"strings"
 	"text/template"
 	"time"
-	"hyper/lib/term"
 )
 
 type HyperClient struct {
-	proto      string
-	addr       string
-	scheme	   string
-	in         io.ReadCloser
-	out        io.Writer
-	err        io.Writer
-	inFd uintptr
-	outFd uintptr
-	isTerminalIn bool
+	proto         string
+	addr          string
+	scheme        string
+	in            io.ReadCloser
+	out           io.Writer
+	err           io.Writer
+	inFd          uintptr
+	outFd         uintptr
+	isTerminalIn  bool
 	isTerminalOut bool
-	tlsConfig	*tls.Config
+	tlsConfig     *tls.Config
 	transport     *http.Transport
 }
 

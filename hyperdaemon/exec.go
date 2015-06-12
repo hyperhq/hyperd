@@ -1,8 +1,8 @@
 package daemon
 
 import (
-	"fmt"
 	"encoding/json"
+	"fmt"
 
 	"hyper/engine"
 	"hyper/lib/glog"
@@ -20,9 +20,9 @@ func (daemon *Daemon) CmdExec(job *engine.Job) (err error) {
 	var (
 		typeKey = job.Args[0]
 		typeVal = job.Args[1]
-		tag = job.Args[3]
-		vmId string
-		podId string
+		tag     = job.Args[3]
+		vmId    string
+		podId   string
 		command = []string{}
 	)
 
@@ -52,10 +52,10 @@ func (daemon *Daemon) CmdExec(job *engine.Job) (err error) {
 	execCmd := &qemu.ExecCommand{
 		Command: command,
 		Streams: &qemu.TtyIO{
-			Stdin: job.Stdin,
-			Stdout: job.Stdout,
+			Stdin:     job.Stdin,
+			Stdout:    job.Stdout,
 			ClientTag: tag,
-			Callback: make(chan *types.QemuResponse, 1),
+			Callback:  make(chan *types.QemuResponse, 1),
 		},
 	}
 
@@ -65,7 +65,7 @@ func (daemon *Daemon) CmdExec(job *engine.Job) (err error) {
 		execCmd.Container = typeVal
 	}
 
-	qemuEvent, _, _,err := daemon.GetQemuChan(vmId)
+	qemuEvent, _, _, err := daemon.GetQemuChan(vmId)
 	if err != nil {
 		return err
 	}
@@ -75,6 +75,6 @@ func (daemon *Daemon) CmdExec(job *engine.Job) (err error) {
 	<-execCmd.Streams.Callback
 	defer func() {
 		glog.V(2).Info("Defer function for exec!")
-	} ()
+	}()
 	return nil
 }

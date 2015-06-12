@@ -1,37 +1,36 @@
 package devicemapper
 
 import (
+	"encoding/json"
 	"fmt"
-	"syscall"
+	"io/ioutil"
+	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
-	"os"
-	"io/ioutil"
-	"encoding/json"
-	"strings"
 	"strconv"
+	"strings"
+	"syscall"
 
 	"hyper/lib/glog"
 )
 
 type jsonMetadata struct {
-	Device_id int      `json:"device_id"`
-	Size      int      `json:"size"`
-	Transaction_id int `json:"transaction_id"`
-	Initialized bool   `json:"initialized"`
+	Device_id      int  `json:"device_id"`
+	Size           int  `json:"size"`
+	Transaction_id int  `json:"transaction_id"`
+	Initialized    bool `json:"initialized"`
 }
 
 // For device mapper, we do not need to mount the container to sharedDir.
 // All of we need to provide the block device name of container.
 func MountContainerToSharedDir(containerId, sharedDir, devPrefix string) (string, error) {
-    devFullName := fmt.Sprintf("/dev/mapper/%s-%s", devPrefix, containerId)
+	devFullName := fmt.Sprintf("/dev/mapper/%s-%s", devPrefix, containerId)
 	return devFullName, nil
 }
 
-
 func CreateNewDevice(containerId, devPrefix, rootPath string) error {
-	var	metadataPath = fmt.Sprintf("%s/metadata/", rootPath)
+	var metadataPath = fmt.Sprintf("%s/metadata/", rootPath)
 	// Get device id from the metadata file
 	idMetadataFile := path.Join(metadataPath, containerId)
 	if _, err := os.Stat(idMetadataFile); err != nil && os.IsNotExist(err) {
@@ -70,7 +69,6 @@ func AttachFiles(containerId, devPrefix, fromFile, toDir, rootPath, perm, uid, g
 	}
 	// Define the basic directory, need to get them via the 'info' command
 	var (
-
 		mntPath = fmt.Sprintf("%s/mnt/", rootPath)
 		devName = fmt.Sprintf("%s-%s", devPrefix, containerId)
 	)
@@ -136,9 +134,9 @@ func AttachFiles(containerId, devPrefix, fromFile, toDir, rootPath, perm, uid, g
 			syscall.Unmount(idMountPath, syscall.MNT_DETACH)
 			return err
 		}
-		targetFile = targetDir+"/"+filepath.Base(fromFile)
+		targetFile = targetDir + "/" + filepath.Base(fromFile)
 	} else {
-		targetFile = targetDir+"/"+filepath.Base(fromFile)
+		targetFile = targetDir + "/" + filepath.Base(fromFile)
 	}
 	err = ioutil.WriteFile(targetFile, buf, os.FileMode(permInt))
 	if err != nil {
@@ -194,29 +192,29 @@ func joinMountOptions(a, b string) string {
 }
 
 type DeviceMapper struct {
-	Datafile             string
-	Metadatafile         string
-	DataLoopFile         string
-	MetadataLoopFile     string
-	Size                 int
-	PoolName             string
+	Datafile         string
+	Metadatafile     string
+	DataLoopFile     string
+	MetadataLoopFile string
+	Size             int
+	PoolName         string
 }
 
 func CreatePool(dm *DeviceMapper) error {
-	if _, err := os.Stat("/dev/mapper/"+dm.PoolName); err == nil {
+	if _, err := os.Stat("/dev/mapper/" + dm.PoolName); err == nil {
 		return nil
 	}
-    // Create data file and metadata file
-    parms := fmt.Sprintf("dd if=/dev/zero of=%s bs=1 seek=%d count=0", dm.Datafile, dm.Size)
-    if res, err := exec.Command("/bin/sh", "-c", parms).CombinedOutput(); err != nil {
+	// Create data file and metadata file
+	parms := fmt.Sprintf("dd if=/dev/zero of=%s bs=1 seek=%d count=0", dm.Datafile, dm.Size)
+	if res, err := exec.Command("/bin/sh", "-c", parms).CombinedOutput(); err != nil {
 		glog.Error(string(res))
-        return fmt.Errorf(string(res))
-    }
-    parms = fmt.Sprintf("fallocate -l 128M %s", dm.Metadatafile)
-    if res, err := exec.Command("/bin/sh", "-c", parms).CombinedOutput(); err != nil {
+		return fmt.Errorf(string(res))
+	}
+	parms = fmt.Sprintf("fallocate -l 128M %s", dm.Metadatafile)
+	if res, err := exec.Command("/bin/sh", "-c", parms).CombinedOutput(); err != nil {
 		glog.Error(string(res))
-        return fmt.Errorf(string(res))
-    }
+		return fmt.Errorf(string(res))
+	}
 
 	if _, err := os.Stat(dm.DataLoopFile); err != nil {
 		l := len(dm.DataLoopFile)
@@ -234,37 +232,37 @@ func CreatePool(dm *DeviceMapper) error {
 			return fmt.Errorf(string(res))
 		}
 	}
-    // Setup the loop device for data and metadata files
-    parms = fmt.Sprintf("losetup %s %s", dm.DataLoopFile, dm.Datafile)
+	// Setup the loop device for data and metadata files
+	parms = fmt.Sprintf("losetup %s %s", dm.DataLoopFile, dm.Datafile)
 	if res, err := exec.Command("/bin/sh", "-c", parms).CombinedOutput(); err != nil {
 		glog.Error(string(res))
 		return fmt.Errorf(string(res))
 	}
 
-    parms = fmt.Sprintf("losetup %s %s", dm.MetadataLoopFile, dm.Metadatafile)
+	parms = fmt.Sprintf("losetup %s %s", dm.MetadataLoopFile, dm.Metadatafile)
 	if res, err := exec.Command("/bin/sh", "-c", parms).CombinedOutput(); err != nil {
 		glog.Error(string(res))
 		return fmt.Errorf(string(res))
 	}
 
-    // Make filesystem for data loop device and metadata loop device
-    parms = fmt.Sprintf("mkfs.ext4 %s", dm.DataLoopFile)
+	// Make filesystem for data loop device and metadata loop device
+	parms = fmt.Sprintf("mkfs.ext4 %s", dm.DataLoopFile)
 	if res, err := exec.Command("/bin/sh", "-c", parms).CombinedOutput(); err != nil {
 		glog.Error(string(res))
 		return fmt.Errorf(string(res))
 	}
-    parms = fmt.Sprintf("mkfs.ext4 %s", dm.MetadataLoopFile)
+	parms = fmt.Sprintf("mkfs.ext4 %s", dm.MetadataLoopFile)
 	if res, err := exec.Command("/bin/sh", "-c", parms).CombinedOutput(); err != nil {
 		glog.Error(string(res))
 		return fmt.Errorf(string(res))
 	}
-    parms = fmt.Sprintf("dd if=/dev/zero of=%s bs=4096 count=1", dm.MetadataLoopFile)
+	parms = fmt.Sprintf("dd if=/dev/zero of=%s bs=4096 count=1", dm.MetadataLoopFile)
 	if res, err := exec.Command("/bin/sh", "-c", parms).CombinedOutput(); err != nil {
 		glog.Error(string(res))
 		return fmt.Errorf(string(res))
 	}
 
-    parms = fmt.Sprintf("dmsetup create %s --table '0 %d thin-pool %s %s 128 0'", dm.PoolName, dm.Size/512, dm.MetadataLoopFile, dm.DataLoopFile)
+	parms = fmt.Sprintf("dmsetup create %s --table '0 %d thin-pool %s %s 128 0'", dm.PoolName, dm.Size/512, dm.MetadataLoopFile, dm.DataLoopFile)
 	if res, err := exec.Command("/bin/sh", "-c", parms).CombinedOutput(); err != nil {
 		glog.Error(string(res))
 		return fmt.Errorf(string(res))
@@ -274,7 +272,7 @@ func CreatePool(dm *DeviceMapper) error {
 
 func CreateVolume(poolName, volName, dev_id string, size int, restore bool) error {
 	glog.Infof("/dev/mapper/%s", volName)
-	if _, err := os.Stat("/dev/mapper/"+volName); err == nil {
+	if _, err := os.Stat("/dev/mapper/" + volName); err == nil {
 		return nil
 	}
 	if restore == false {
@@ -301,34 +299,35 @@ func CreateVolume(poolName, volName, dev_id string, size int, restore bool) erro
 }
 
 func DeleteVolume(dm *DeviceMapper, dev_id int) error {
-    var parms string
-    // Delete the thin pool for test
-    parms = fmt.Sprintf("dmsetup message /dev/mapper/%s 0 \"delete %d\"", dm.PoolName, dev_id)
+	var parms string
+	// Delete the thin pool for test
+	parms = fmt.Sprintf("dmsetup message /dev/mapper/%s 0 \"delete %d\"", dm.PoolName, dev_id)
 	if res, err := exec.Command("/bin/sh", "-c", parms).CombinedOutput(); err != nil {
 		glog.Error(string(res))
 		return fmt.Errorf(string(res))
 	}
-    return nil
+	return nil
 }
+
 // Delete the pool which is created in 'Init' function
 func DMCleanup(dm *DeviceMapper) error {
-    var parms string
-    // Delete the thin pool for test
-    parms = fmt.Sprintf("dmsetup remove \"/dev/mapper/%s\"", dm.PoolName)
+	var parms string
+	// Delete the thin pool for test
+	parms = fmt.Sprintf("dmsetup remove \"/dev/mapper/%s\"", dm.PoolName)
 	if res, err := exec.Command("/bin/sh", "-c", parms).CombinedOutput(); err != nil {
 		glog.Error(string(res))
 		return fmt.Errorf(string(res))
 	}
-    // Delete the loop device
-    parms = fmt.Sprintf("losetup -d %s", dm.MetadataLoopFile)
+	// Delete the loop device
+	parms = fmt.Sprintf("losetup -d %s", dm.MetadataLoopFile)
 	if res, err := exec.Command("/bin/sh", "-c", parms).CombinedOutput(); err != nil {
 		glog.Error(string(res))
 		return fmt.Errorf(string(res))
 	}
-    parms = fmt.Sprintf("losetup -d %s", dm.DataLoopFile)
+	parms = fmt.Sprintf("losetup -d %s", dm.DataLoopFile)
 	if res, err := exec.Command("/bin/sh", "-c", parms).CombinedOutput(); err != nil {
 		glog.Error(string(res))
 		return fmt.Errorf(string(res))
 	}
-    return nil
+	return nil
 }

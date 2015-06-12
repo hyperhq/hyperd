@@ -2,29 +2,29 @@ package portmapper
 
 import (
 	"fmt"
-	"sync"
-	"strings"
 	"hyper/lib/glog"
+	"strings"
+	"sync"
 )
 
 type PortMap struct {
-	containerIP	string
-	containerPort	int
+	containerIP   string
+	containerPort int
 }
 
 func newPortMap(containerip string, containerport int) *PortMap {
-	return &PortMap {
-		containerIP:	containerip,
-		containerPort:	containerport,
+	return &PortMap{
+		containerIP:   containerip,
+		containerPort: containerport,
 	}
 }
 
 type PortSet map[int]*PortMap
 
 type PortMapper struct {
-	tcpMap		PortSet
-	udpMap		PortSet
-	mutex		sync.Mutex
+	tcpMap PortSet
+	udpMap PortSet
+	mutex  sync.Mutex
 }
 
 func New() *PortMapper {
@@ -32,7 +32,7 @@ func New() *PortMapper {
 }
 
 func (p *PortMapper) AllocateMap(protocol string, hostPort int,
-				 containerIP string, ContainerPort int) error {
+	containerIP string, ContainerPort int) error {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
@@ -47,7 +47,7 @@ func (p *PortMapper) AllocateMap(protocol string, hostPort int,
 	e, ok := pset[hostPort]
 	if ok {
 		return fmt.Errorf("Host port %d had already been used, %s %d",
-				  hostPort, e.containerIP, e.containerPort)
+			hostPort, e.containerIP, e.containerPort)
 	}
 
 	allocated := newPortMap(containerIP, ContainerPort)

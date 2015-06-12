@@ -1,12 +1,12 @@
 package daemon
 
 import (
-	"os"
 	"fmt"
+	"os"
 
-	"hyper/utils"
 	"hyper/engine"
 	"hyper/lib/sysinfo"
+	"hyper/utils"
 )
 
 func (daemon *Daemon) CmdInfo(job *engine.Job) error {

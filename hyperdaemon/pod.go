@@ -9,16 +9,15 @@ import (
 	"strings"
 	"syscall"
 
-
+	"hyper/docker"
 	"hyper/engine"
+	"hyper/lib/glog"
 	"hyper/pod"
 	"hyper/qemu"
-	"hyper/lib/glog"
-	"hyper/types"
-	dm "hyper/storage/devicemapper"
 	"hyper/storage/aufs"
+	dm "hyper/storage/devicemapper"
 	"hyper/storage/overlay"
-	"hyper/docker"
+	"hyper/types"
 	"hyper/utils"
 )
 
@@ -98,12 +97,12 @@ func (daemon *Daemon) CmdPodStart(job *engine.Job) error {
 		return err
 	}
 
-	vm := &Vm {
-		Id:		   vmId,
-		Pod:	   daemon.podList[podId],
-		Status:    types.S_VM_ASSOCIATED,
-		Cpu:       userPod.Resource.Vcpu,
-		Mem:       userPod.Resource.Memory,
+	vm := &Vm{
+		Id:     vmId,
+		Pod:    daemon.podList[podId],
+		Status: types.S_VM_ASSOCIATED,
+		Cpu:    userPod.Resource.Vcpu,
+		Mem:    userPod.Resource.Memory,
 	}
 	daemon.podList[podId].Vm = vmId
 	daemon.AddVm(vm)
@@ -151,12 +150,12 @@ func (daemon *Daemon) CmdPodRun(job *engine.Job) error {
 		return err
 	}
 
-	vm := &Vm {
-		Id:		   vmId,
-		Pod:	   daemon.podList[podId],
-		Status:    types.S_VM_ASSOCIATED,
-		Cpu:       userPod.Resource.Vcpu,
-		Mem:       userPod.Resource.Memory,
+	vm := &Vm{
+		Id:     vmId,
+		Pod:    daemon.podList[podId],
+		Status: types.S_VM_ASSOCIATED,
+		Cpu:    userPod.Resource.Vcpu,
+		Mem:    userPod.Resource.Memory,
 	}
 	daemon.podList[podId].Vm = vmId
 	daemon.AddVm(vm)
@@ -180,7 +179,7 @@ func (daemon *Daemon) CreatePod(podArgs, podId string) error {
 		return err
 	}
 	// store the UserPod into the db
-	if err:= daemon.WritePodToDB(podId, []byte(podArgs)); err != nil {
+	if err := daemon.WritePodToDB(podId, []byte(podArgs)); err != nil {
 		glog.V(1).Info("Found an error while saveing the POD file")
 		return err
 	}
@@ -225,14 +224,14 @@ func (daemon *Daemon) CreatePod(podArgs, podId string) error {
 			containers = append(containers, v)
 		}
 	}
-	mypod := &Pod {
-		Id:			  podId,
-		Name:		  userPod.Name,
-		Vm:			  "",
-		Containers:   containers,
-		Status:		  types.S_POD_CREATED,
-		Type:         userPod.Type,
-		RestartPolicy:userPod.Containers[0].RestartPolicy,
+	mypod := &Pod{
+		Id:            podId,
+		Name:          userPod.Name,
+		Vm:            "",
+		Containers:    containers,
+		Status:        types.S_POD_CREATED,
+		Type:          userPod.Type,
+		RestartPolicy: userPod.Containers[0].RestartPolicy,
 	}
 	daemon.AddPod(mypod)
 
@@ -241,26 +240,26 @@ func (daemon *Daemon) CreatePod(podArgs, podId string) error {
 
 func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error) {
 	var (
-		fstype string
-		poolName string
-		volPoolName string
-		devPrefix string
-		storageDriver string
-		rootPath string
-		devFullName string
-		rootfs string
+		fstype            string
+		poolName          string
+		volPoolName       string
+		devPrefix         string
+		storageDriver     string
+		rootPath          string
+		devFullName       string
+		rootfs            string
 		containerInfoList = []*qemu.ContainerInfo{}
-		volumuInfoList = []*qemu.VolumeInfo{}
-		cli = daemon.dockerCli
-		qemuPodEvent = make(chan qemu.QemuEvent, 128)
-		qemuStatus = make(chan *types.QemuResponse, 128)
-		subQemuStatus = make(chan *types.QemuResponse, 128)
-		sharedDir = path.Join(qemu.BaseDir, vmId, qemu.ShareDirTag)
-		podData []byte
-		mypod *Pod
-		err error
-		uid string
-		gid string
+		volumuInfoList    = []*qemu.VolumeInfo{}
+		cli               = daemon.dockerCli
+		qemuPodEvent      = make(chan qemu.QemuEvent, 128)
+		qemuStatus        = make(chan *types.QemuResponse, 128)
+		subQemuStatus     = make(chan *types.QemuResponse, 128)
+		sharedDir         = path.Join(qemu.BaseDir, vmId, qemu.ShareDirTag)
+		podData           []byte
+		mypod             *Pod
+		err               error
+		uid               string
+		gid               string
 	)
 	if podArgs == "" {
 		mypod = daemon.podList[podId]
@@ -373,14 +372,14 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 				glog.Error("got error when mount container to share dir ", err.Error())
 				return -1, "", err
 			}
-			devFullName = "/"+c.Id+"/rootfs"
+			devFullName = "/" + c.Id + "/rootfs"
 		} else if storageDriver == "overlay" {
 			devFullName, err = overlay.MountContainerToSharedDir(c.Id, rootPath, sharedDir, "")
 			if err != nil {
 				glog.Error("got error when mount container to share dir ", err.Error())
 				return -1, "", err
 			}
-			devFullName = "/"+c.Id+"/rootfs"
+			devFullName = "/" + c.Id + "/rootfs"
 		}
 
 		for _, f := range userPod.Containers[i].Files {
@@ -389,7 +388,7 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 			if !ok {
 				continue
 			}
-			var fromFile = "/tmp/"+file.Name
+			var fromFile = "/tmp/" + file.Name
 			defer os.RemoveAll(fromFile)
 			if file.Uri != "" {
 				err = utils.DownloadFile(file.Uri, fromFile)
@@ -476,15 +475,15 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 		glog.V(1).Infof("The fs type is %s", fstype)
 		glog.V(1).Infof("WorkingDir is %s", string(jsonResponse.Config.WorkingDir))
 		glog.V(1).Infof("Image is %s", string(devFullName))
-		containerInfo := &qemu.ContainerInfo {
-			Id: c.Id,
-			Rootfs: rootfs,
-			Image: devFullName,
-			Fstype: fstype,
-			Workdir: jsonResponse.Config.WorkingDir,
+		containerInfo := &qemu.ContainerInfo{
+			Id:         c.Id,
+			Rootfs:     rootfs,
+			Image:      devFullName,
+			Fstype:     fstype,
+			Workdir:    jsonResponse.Config.WorkingDir,
 			Entrypoint: jsonResponse.Config.Entrypoint,
-			Cmd: jsonResponse.Config.Cmd,
-			Envs: env,
+			Cmd:        jsonResponse.Config.Cmd,
+			Envs:       env,
 		}
 		glog.V(1).Infof("Container Info is \n%v", containerInfo)
 		containerInfoList = append(containerInfoList, containerInfo)
@@ -511,15 +510,15 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 					}
 				}
 
-				fstype, err = dm.ProbeFsType("/dev/mapper/"+volName)
+				fstype, err = dm.ProbeFsType("/dev/mapper/" + volName)
 				if err != nil {
 					fstype = "ext4"
 				}
-				myVol := &qemu.VolumeInfo {
-					Name: v.Name,
+				myVol := &qemu.VolumeInfo{
+					Name:     v.Name,
 					Filepath: path.Join("/dev/mapper/", volName),
-					Fstype: fstype,
-					Format: "raw",
+					Fstype:   fstype,
+					Format:   "raw",
 				}
 				volumuInfoList = append(volumuInfoList, myVol)
 				glog.V(1).Infof("volume %s created with dm as %s", v.Name, volName)
@@ -558,11 +557,11 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 			glog.Errorf("bind dir %s failed: %s", v.Source, err.Error())
 			return -1, "", err
 		}
-		myVol := &qemu.VolumeInfo {
-			Name: v.Name,
+		myVol := &qemu.VolumeInfo{
+			Name:     v.Name,
 			Filepath: mountSharedDir,
-			Fstype: "dir",
-			Format: "",
+			Fstype:   "dir",
+			Format:   "",
 		}
 		glog.V(1).Infof("dir %s is bound to %s", v.Source, targetDir)
 		volumuInfoList = append(volumuInfoList, myVol)
@@ -570,7 +569,7 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 
 	go func(interface{}) {
 		for {
-			qemuResponse :=<-qemuStatus
+			qemuResponse := <-qemuStatus
 			subQemuStatus <- qemuResponse
 			if qemuResponse.Code == types.E_POD_FINISHED {
 				data := qemuResponse.Data.([]uint32)
@@ -598,7 +597,7 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 									glog.V(1).Infof("Error to rm container: %s", err.Error())
 								}
 							}
-//							daemon.RemovePod(podId)
+							//							daemon.RemovePod(podId)
 							daemon.DeletePodContainerFromDB(podId)
 							daemon.DeleteVolumeId(podId)
 						}
@@ -614,7 +613,7 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 									glog.V(1).Infof("Error to rm container: %s", err.Error())
 								}
 							}
-//							daemon.RemovePod(podId)
+							//							daemon.RemovePod(podId)
 							daemon.DeletePodContainerFromDB(podId)
 							daemon.DeleteVolumeId(podId)
 						}
@@ -635,10 +634,10 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 	}
 
 	fmt.Printf("POD id is %s\n", podId)
-	runPodEvent := &qemu.RunPodCommand {
-		Spec: userPod,
+	runPodEvent := &qemu.RunPodCommand{
+		Spec:       userPod,
 		Containers: containerInfoList,
-		Volumes: volumuInfoList,
+		Volumes:    volumuInfoList,
 	}
 	qemuPodEvent <- runPodEvent
 	daemon.podList[podId].Status = types.S_POD_RUNNING
@@ -648,7 +647,7 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 	// wait for the qemu response
 	var qemuResponse *types.QemuResponse
 	for {
-		qemuResponse =<-subQemuStatus
+		qemuResponse = <-subQemuStatus
 		glog.V(1).Infof("Get the response from QEMU, VM id is %s!", qemuResponse.VmId)
 		if qemuResponse.Code == types.E_VM_RUNNING {
 			continue
@@ -702,12 +701,12 @@ func (daemon *Daemon) RestartPod(mypod *Pod) error {
 		return err
 	}
 
-	vm := &Vm {
-		Id:		   vmId,
-		Pod:	   daemon.podList[mypod.Id],
-		Status:    types.S_VM_ASSOCIATED,
-		Cpu:       userPod.Resource.Vcpu,
-		Mem:       userPod.Resource.Memory,
+	vm := &Vm{
+		Id:     vmId,
+		Pod:    daemon.podList[mypod.Id],
+		Status: types.S_VM_ASSOCIATED,
+		Cpu:    userPod.Resource.Vcpu,
+		Mem:    userPod.Resource.Memory,
 	}
 	daemon.podList[mypod.Id].Vm = vmId
 	daemon.AddVm(vm)
@@ -722,7 +721,7 @@ func (daemon *Daemon) CmdPodInfo(job *engine.Job) error {
 	podName := job.Args[0]
 	vmId := ""
 	// We need to find the VM which running the POD
-	pod, ok:= daemon.podList[podName]
+	pod, ok := daemon.podList[podName]
 	if ok {
 		vmId = pod.Vm
 	}

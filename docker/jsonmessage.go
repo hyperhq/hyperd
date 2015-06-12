@@ -25,9 +25,9 @@ type JSONProgress struct {
 
 func (p *JSONProgress) String() string {
 	var (
-		width       = 200
-		pbBox       string
-		current     = 19
+		width   = 200
+		pbBox   string
+		current = 19
 	)
 
 	if p.Current <= 0 && p.Total <= 0 {

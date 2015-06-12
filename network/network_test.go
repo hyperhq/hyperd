@@ -25,7 +25,7 @@ func TestAllocate(t *testing.T) {
 		t.Error("allocate tap device and ip failed")
 	} else {
 		t.Log("alocate tap device finished. bridge %s, device %s, ip %s, gateway %s",
-		      setting.Bridge, setting.Device, setting.IPAddress, setting.Gateway)
+			setting.Bridge, setting.Device, setting.IPAddress, setting.Gateway)
 
 		if err := Release("192.168.138.2", setting.File); err != nil {
 			t.Error("release ip failed")
