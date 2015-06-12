@@ -56,35 +56,35 @@ func initCheck() error {
 }
 
 // Check if a dnat rule exists
-func OperatePortMap(action Action, rule []string) error {
+func OperatePortMap(action Action, chain string, rule []string) error {
 	if output, err := Raw(append([]string{
-		"-t", string(Nat), string(action), "PREROUTING"}, rule...)...); err != nil {
+		"-t", string(Nat), string(action), chain}, rule...)...); err != nil {
 		return fmt.Errorf("Unable to setup network port map: %s", err)
 	} else if len(output) != 0 {
-		return &ChainError{Chain: "PREROUTING", Output: output}
+		return &ChainError{Chain: chain, Output: output}
 	}
 
 	return nil
 }
 
-func PortMapExists(rule []string) bool {
+func PortMapExists(chain string, rule []string) bool {
 	// iptables -C, --check option was added in v.1.4.11
 	// http://ftp.netfilter.org/pub/iptables/changes-iptables-1.4.11.txt
 
 	// try -C
 	// if exit status is 0 then return true, the rule exists
 	if _, err := Raw(append([]string{
-		"-t", "nat", "-C", "PREROUTING"}, rule...)...); err == nil {
+		"-t", "nat", "-C", chain}, rule...)...); err == nil {
 		return true
 	}
 
 	return false
 }
 
-func PortMapUsed(rule []string) bool {
+func PortMapUsed(chain string, rule []string) bool {
 	// parse "iptables -S" for the rule (this checks rules in a specific chain
 	// in a specific table)
-	existingRules, _ := exec.Command("iptables", "-t", "nat", "-S", "PREROUTING").Output()
+	existingRules, _ := exec.Command("iptables", "-t", "nat", "-S", chain).Output()
 	ruleString := strings.Join(rule, " ")
 
 	glog.V(3).Infof("MapUsed %s", ruleString)

@@ -442,14 +442,25 @@ func (ctx *VmContext) releaseNetwork() {
         glog.V(1).Infof("remove network card %d: %s", idx, nic.IpAddr)
         ctx.progress.deleting.networks[idx] = true
         go ReleaseInterface(idx, nic.IpAddr, nic.Fd, maps, ctx.hub)
+        maps = nil
     }
 }
 
 func (ctx *VmContext) removeInterface() {
+    var maps []pod.UserContainerPort
+
+    for _, c := range ctx.userSpec.Containers {
+        for _, m := range c.Ports {
+            maps = append(maps, m)
+        }
+    }
+
     for idx,nic := range ctx.devices.networkMap {
         glog.V(1).Infof("remove network card %d: %s", idx, nic.IpAddr)
         ctx.progress.deleting.networks[idx] = true
+        go ReleaseInterface(idx, nic.IpAddr, nic.Fd, maps, ctx.hub)
         newNetworkDelSession(ctx, nic.DeviceName, &NetDevRemovedEvent{Index:idx,})
+        maps = nil
     }
 }
 

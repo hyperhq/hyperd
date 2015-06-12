@@ -162,6 +162,48 @@ func setupIPTables(addr net.Addr) error {
 			return &iptables.ChainError{Chain: "FORWARD incoming", Output: output}
 		}
 	}
+
+	err := Modprobe("br_netfilter")
+	if err != nil {
+		glog.V(1).Infof("modprobe br_netfilter failed %s", err)
+	}
+
+	file, err := os.OpenFile("/proc/sys/net/bridge/bridge-nf-call-iptables",
+				 os.O_RDWR, 0)
+	if err != nil {
+		return err
+	}
+
+	_, err = file.WriteString("1")
+	if err != nil {
+		return err
+	}
+
+	// Create HYPER iptables Chain
+	iptables.Raw("-t", string(iptables.Nat), "-N", "HYPER")
+	// Goto HYPER chain
+	gotoArgs = []string{"-m", "addrtype", "--dst-type", "LOCAL", "!",
+			    "-d", "127.0.0.1/8", "-j", "HYPER"}
+	if !iptables.Exists(iptables.Nat, "OUTPUT", gotoArgs...) {
+		if output, err := iptables.Raw(append([]string{"-t", string(iptables.Nat),
+						"-I", "OUTPUT"}, gotoArgs...)...); err != nil {
+			return fmt.Errorf("Unable to setup goto HYPER rule %s", err)
+		} else if len(output) != 0 {
+			return &iptables.ChainError{Chain: "OUTPUT goto HYPER", Output: output}
+		}
+	}
+
+	gotoArgs = []string{"-m", "addrtype", "--dst-type", "LOCAL",
+			    "-j", "HYPER"}
+	if !iptables.Exists(iptables.Nat, "PREROUTING", gotoArgs...) {
+		if output, err := iptables.Raw(append([]string{"-t", string(iptables.Nat),
+						"-I", "PREROUTING"}, gotoArgs...)...); err != nil {
+			return fmt.Errorf("Unable to setup goto HYPER rule %s", err)
+		} else if len(output) != 0 {
+			return &iptables.ChainError{Chain: "PREROUTING goto HYPER", Output: output}
+		}
+	}
+
 	return nil
 }
 
@@ -791,22 +833,6 @@ func SetupPortMaps(containerip string, maps []pod.UserContainerPort) error {
 		return nil
 	}
 
-	err := Modprobe("br_netfilter")
-	if err != nil {
-		glog.V(1).Infof("modprobe br_netfilter failed %s", err)
-	}
-
-	file, err := os.OpenFile("/proc/sys/net/bridge/bridge-nf-call-iptables",
-				 os.O_RDWR, 0)
-	if err != nil {
-		return err
-	}
-
-	_, err = file.WriteString("1")
-	if err != nil {
-		return err
-	}
-
 	for _, m := range maps {
 		var proto string
 
@@ -816,20 +842,19 @@ func SetupPortMaps(containerip string, maps []pod.UserContainerPort) error {
 			proto = "tcp"
 		}
 
-		natArgs := []string{"-p", proto, "-m", "addrtype",
-			    "--dst-type", "LOCAL", "-m", proto, "--dport",
+		natArgs := []string{"-p", proto, "-m", proto, "--dport",
 			    strconv.Itoa(m.HostPort), "-j", "DNAT","--to-destination",
 			    net.JoinHostPort(containerip, strconv.Itoa(m.ContainerPort))}
 
-		if iptables.PortMapExists(natArgs) {
+		if iptables.PortMapExists("HYPER", natArgs) {
 			return nil
 		}
 
-		if iptables.PortMapUsed(natArgs) {
+		if iptables.PortMapUsed("HYPER", natArgs) {
 			return fmt.Errorf("Host port %d has aleady been used", m.HostPort)
 		}
 
-		err = iptables.OperatePortMap(iptables.Insert, natArgs)
+		err :=iptables.OperatePortMap(iptables.Insert, "HYPER", natArgs)
 		if err != nil {
 			return err
 		}
@@ -848,7 +873,6 @@ func SetupPortMaps(containerip string, maps []pod.UserContainerPort) error {
 		}
 	}
 	/* forbid to map ports twice */
-	maps = nil
 	return nil
 }
 
@@ -872,22 +896,17 @@ func ReleasePortMaps(containerip string, maps []pod.UserContainerPort) error {
 			proto = "tcp"
 		}
 
-		natArgs := []string{"-p", proto, "-m", "addrtype",
-			    "--dst-type", "LOCAL", "-m", proto, "--dport",
+		natArgs := []string{"-p", proto, "-m", proto, "--dport",
 			    strconv.Itoa(m.HostPort), "-j", "DNAT","--to-destination",
 			    net.JoinHostPort(containerip, strconv.Itoa(m.ContainerPort))}
 
-		err = iptables.OperatePortMap(iptables.Delete, natArgs)
-		if err != nil {
-			continue
-		}
+		iptables.OperatePortMap(iptables.Delete, "HYPER", natArgs)
 
 		filterArgs :=[]string{"-d", containerip, "-p", proto, "-m", proto,
 				      "--dport", strconv.Itoa(m.ContainerPort), "-j", "ACCEPT"}
 		iptables.Raw(append([]string{"-D", "HYPER"}, filterArgs...)...)
 	}
 	/* forbid to map ports twice */
-	maps = nil
 	return nil
 }
 
