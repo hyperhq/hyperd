@@ -793,7 +793,18 @@ func SetupPortMaps(containerip string, maps []pod.UserContainerPort) error {
 
 	err := Modprobe("br_netfilter")
 	if err != nil {
-		return nil
+		glog.V(1).Infof("modprobe br_netfilter failed %s", err)
+	}
+
+	file, err := os.OpenFile("/proc/sys/net/bridge/bridge-nf-call-iptables",
+				 os.O_RDWR, 0)
+	if err != nil {
+		return err
+	}
+
+	_, err = file.WriteString("1")
+	if err != nil {
+		return err
 	}
 
 	for _, m := range maps {
@@ -847,9 +858,10 @@ func ReleasePortMaps(containerip string, maps []pod.UserContainerPort) error {
 	}
 
 	for _, m := range maps {
+		glog.V(1).Infof("release port map %d", m.HostPort)
 		err := portMapper.ReleaseMap(m.Protocol, m.HostPort)
 		if err != nil {
-			return err
+			continue
 		}
 
 		var proto string
@@ -867,7 +879,7 @@ func ReleasePortMaps(containerip string, maps []pod.UserContainerPort) error {
 
 		err = iptables.OperatePortMap(iptables.Delete, natArgs)
 		if err != nil {
-			return err
+			continue
 		}
 
 		filterArgs :=[]string{"-d", containerip, "-p", proto, "-m", proto,
@@ -946,7 +958,7 @@ func Allocate(requestedIP string, maps []pod.UserContainerPort) (*Settings, erro
 
 	err = SetupPortMaps(ip.String(), maps)
 	if err != nil {
-		glog.Errorf("Setup Port Map failed")
+		glog.Errorf("Setup Port Map failed %s", err)
 		tapFile.Close()
 		return nil, err
 	}
@@ -972,6 +984,7 @@ func Release(releasedIP string, maps[]pod.UserContainerPort, file *os.File) erro
 	}
 
 	if err := ReleasePortMaps(releasedIP, maps); err != nil {
+		glog.Errorf("fail to release port map %s", err)
 		return err
 	}
 	return nil

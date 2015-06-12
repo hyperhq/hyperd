@@ -28,7 +28,7 @@ func ReleaseInterface(index int, ipAddr string, file *os.File,
     success := true
     err := network.Release(ipAddr, maps, file)
     if err != nil {
-        glog.Warning("Unable to release network interface, address: ", ipAddr)
+        glog.Warning("Unable to release network interface, address: ", ipAddr, err)
         success = false
     }
     callback <- &InterfaceReleased{ Index: index, Success:success,}
