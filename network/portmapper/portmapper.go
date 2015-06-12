@@ -36,27 +36,22 @@ func (p *PortMapper) AllocateMap(protocol string, hostPort int,
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
-	if strings.EqualFold(protocol, "udp") {
-		e, ok := p.udpMap[hostPort]
-		if ok {
-			return fmt.Errorf("Host port %d had already been used, %s %d",
-					  hostPort, e.containerIP, e.containerPort)
-		}
+	var pset PortSet
 
-		allocated := newPortMap(containerIP, ContainerPort)
-		p.udpMap[hostPort] = allocated
-		return nil;
+	if strings.EqualFold(protocol, "udp") {
+		pset = p.udpMap
+	} else {
+		pset = p.tcpMap
 	}
 
-
-	e, ok := p.tcpMap[hostPort]
+	e, ok := pset[hostPort]
 	if ok {
 		return fmt.Errorf("Host port %d had already been used, %s %d",
 				  hostPort, e.containerIP, e.containerPort)
 	}
 
 	allocated := newPortMap(containerIP, ContainerPort)
-	p.tcpMap[hostPort] = allocated
+	pset[hostPort] = allocated
 
 	return nil
 }
@@ -65,22 +60,19 @@ func (p *PortMapper) ReleaseMap(protocol string, hostPort int) error {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
+	var pset PortSet
+
 	if strings.EqualFold(protocol, "udp") {
-		_, ok := p.udpMap[hostPort]
-		if !ok {
-			glog.Errorf("Host port %d has not been used", hostPort)
-		}
-
-		delete(p.udpMap, hostPort)
-
+		pset = p.udpMap
 	} else {
-		_, ok := p.tcpMap[hostPort]
-		if !ok {
-			glog.Errorf("Host port %d has not been used", hostPort)
-		}
-
-		delete(p.tcpMap, hostPort)
+		pset = p.tcpMap
 	}
 
+	_, ok := pset[hostPort]
+	if !ok {
+		glog.Errorf("Host port %d has not been used", hostPort)
+	}
+
+	delete(pset, hostPort)
 	return nil
 }
