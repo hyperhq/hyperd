@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path"
+	"strings"
 	"syscall"
 	"time"
 
@@ -23,6 +24,9 @@ func UmountOverlayContainer(shareDir, image string, index int, hub chan QemuEven
 		time.Sleep(3 * time.Second / 1000)
 		err := syscall.Unmount(mount, 0)
 		if err != nil {
+			if strings.Contains(err.Error(), "no such file or directory") {
+				break
+			}
 			glog.Warningf("Cannot umount overlay %s: %s", mount, err.Error())
 			success = false
 		} else {
@@ -40,6 +44,9 @@ func UmountAufsContainer(shareDir, image string, index int, hub chan QemuEvent) 
 		time.Sleep(3 * time.Second / 1000)
 		err := aufs.Unmount(mount)
 		if err != nil {
+			if strings.Contains(err.Error(), "no such file or directory") {
+				break
+			}
 			glog.Warningf("Cannot umount aufs %s: %s", mount, err.Error())
 			success = false
 		} else {
@@ -56,7 +63,13 @@ func UmountVolume(shareDir, volPath string, name string, hub chan QemuEvent) {
 	err := syscall.Unmount(mount, 0)
 	if err != nil {
 		glog.Warningf("Cannot umount volume %s: %s", mount, err.Error())
-		success = false
+		err = syscall.Unmount(mount, syscall.MNT_DETACH)
+		if err != nil {
+			glog.Warningf("Cannot lazy umount volume %s: %s", mount, err.Error())
+			success = false
+		} else {
+			success = true
+		}
 	}
 	// After umount that device, we need to delete it
 	hub <- &VolumeUnmounted{Name: name, Success: success}
