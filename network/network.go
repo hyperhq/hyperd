@@ -829,10 +829,13 @@ func Modprobe(module string) error {
 }
 
 func SetupPortMaps(containerip string, maps []pod.UserContainerPort) error {
+	var err error
+
 	if len(maps) == 0 {
 		return nil
 	}
 
+	err = nil
 	for _, m := range maps {
 		var proto string
 
@@ -847,33 +850,40 @@ func SetupPortMaps(containerip string, maps []pod.UserContainerPort) error {
 			net.JoinHostPort(containerip, strconv.Itoa(m.ContainerPort))}
 
 		if iptables.PortMapExists("HYPER", natArgs) {
-			return nil
+			continue
 		}
 
 		if iptables.PortMapUsed("HYPER", natArgs) {
-			return fmt.Errorf("Host port %d has aleady been used", m.HostPort)
+			err = fmt.Errorf("Host port %d has aleady been used", m.HostPort)
+			break
 		}
 
-		err := iptables.OperatePortMap(iptables.Insert, "HYPER", natArgs)
+		err = iptables.OperatePortMap(iptables.Insert, "HYPER", natArgs)
 		if err != nil {
-			return err
+			break
 		}
 
 		err = portMapper.AllocateMap(m.Protocol, m.HostPort, containerip, m.ContainerPort)
 		if err != nil {
-			return err
+			break
 		}
 
 		filterArgs := []string{"-d", containerip, "-p", proto, "-m", proto,
 			"--dport", strconv.Itoa(m.ContainerPort), "-j", "ACCEPT"}
 		if output, err := iptables.Raw(append([]string{"-I", "HYPER"}, filterArgs...)...); err != nil {
-			return fmt.Errorf("Unable to setup forward rule in HYPER chain: %s", err)
+			err = fmt.Errorf("Unable to setup forward rule in HYPER chain: %s", err)
+			break
 		} else if len(output) != 0 {
-			return &iptables.ChainError{Chain: "HYPER", Output: output}
+			err = &iptables.ChainError{Chain: "HYPER", Output: output}
+			break
 		}
 	}
-	/* forbid to map ports twice */
-	return nil
+
+	if err != nil {
+		ReleasePortMaps(containerip, maps)
+	}
+
+	return err
 }
 
 func ReleasePortMaps(containerip string, maps []pod.UserContainerPort) error {
