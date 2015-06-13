@@ -829,7 +829,10 @@ func Modprobe(module string) error {
 }
 
 func SetupPortMaps(containerip string, maps []pod.UserContainerPort) error {
-	var err error
+	var (
+		err error = nil
+		i int = 0
+	)
 
 	if len(maps) == 0 {
 		return nil
@@ -845,44 +848,75 @@ func SetupPortMaps(containerip string, maps []pod.UserContainerPort) error {
 			proto = "tcp"
 		}
 
+		err = portMapper.AllocateMap(m.Protocol, m.HostPort, containerip, m.ContainerPort)
+		if err != nil {
+			break
+		}
+
 		natArgs := []string{"-p", proto, "-m", proto, "--dport",
 			strconv.Itoa(m.HostPort), "-j", "DNAT", "--to-destination",
 			net.JoinHostPort(containerip, strconv.Itoa(m.ContainerPort))}
 
-		if iptables.PortMapExists("HYPER", natArgs) {
-			continue
-		}
+		if !iptables.PortMapExists("HYPER", natArgs) {
+			if iptables.PortMapUsed("HYPER", natArgs) {
+				err = fmt.Errorf("Host port %d has aleady been used", m.HostPort)
+				portMapper.ReleaseMap(m.Protocol, m.HostPort)
+				break
+			}
 
-		if iptables.PortMapUsed("HYPER", natArgs) {
-			err = fmt.Errorf("Host port %d has aleady been used", m.HostPort)
-			break
-		}
-
-		err = iptables.OperatePortMap(iptables.Insert, "HYPER", natArgs)
-		if err != nil {
-			break
-		}
-
-		err = portMapper.AllocateMap(m.Protocol, m.HostPort, containerip, m.ContainerPort)
-		if err != nil {
-			break
+			err = iptables.OperatePortMap(iptables.Insert, "HYPER", natArgs)
+			if err != nil {
+				portMapper.ReleaseMap(m.Protocol, m.HostPort)
+				break
+			}
 		}
 
 		filterArgs := []string{"-d", containerip, "-p", proto, "-m", proto,
 			"--dport", strconv.Itoa(m.ContainerPort), "-j", "ACCEPT"}
 		if output, err := iptables.Raw(append([]string{"-I", "HYPER"}, filterArgs...)...); err != nil {
 			err = fmt.Errorf("Unable to setup forward rule in HYPER chain: %s", err)
-			break
 		} else if len(output) != 0 {
 			err = &iptables.ChainError{Chain: "HYPER", Output: output}
+		}
+
+		if err != nil {
+			portMapper.ReleaseMap(m.Protocol, m.HostPort)
+			iptables.OperatePortMap(iptables.Delete, "HYPER", natArgs)
 			break
 		}
+
+		i++
 	}
 
-	if err != nil {
-		ReleasePortMaps(containerip, maps)
+	if err == nil {
+		return nil
 	}
 
+	for _, m := range maps {
+		var proto string
+		i--
+		if i < 0 {
+			break
+		}
+
+		if strings.EqualFold(m.Protocol, "udp") {
+			proto = "udp"
+		} else {
+			proto = "tcp"
+		}
+
+		portMapper.ReleaseMap(m.Protocol, m.HostPort)
+
+		natArgs := []string{"-p", proto, "-m", proto, "--dport",
+			strconv.Itoa(m.HostPort), "-j", "DNAT", "--to-destination",
+			net.JoinHostPort(containerip, strconv.Itoa(m.ContainerPort))}
+
+		iptables.OperatePortMap(iptables.Delete, "HYPER", natArgs)
+
+		filterArgs := []string{"-d", containerip, "-p", proto, "-m", proto,
+			"--dport", strconv.Itoa(m.ContainerPort), "-j", "ACCEPT"}
+		iptables.Raw(append([]string{"-D", "HYPER"}, filterArgs...)...)
+	}
 	return err
 }
 
@@ -892,13 +926,10 @@ func ReleasePortMaps(containerip string, maps []pod.UserContainerPort) error {
 	}
 
 	for _, m := range maps {
-		glog.V(1).Infof("release port map %d", m.HostPort)
-		err := portMapper.ReleaseMap(m.Protocol, m.HostPort)
-		if err != nil {
-			continue
-		}
-
 		var proto string
+
+		glog.V(1).Infof("release port map %d", m.HostPort)
+		portMapper.ReleaseMap(m.Protocol, m.HostPort)
 
 		if strings.EqualFold(m.Protocol, "udp") {
 			proto = "udp"
