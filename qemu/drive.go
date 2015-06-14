@@ -2,6 +2,7 @@ package qemu
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"path"
 	"strings"
@@ -70,6 +71,9 @@ func UmountVolume(shareDir, volPath string, name string, hub chan QemuEvent) {
 		} else {
 			success = true
 		}
+	}
+	if success == true {
+		os.Remove(mount)
 	}
 	// After umount that device, we need to delete it
 	hub <- &VolumeUnmounted{Name: name, Success: success}

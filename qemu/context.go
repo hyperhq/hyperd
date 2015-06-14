@@ -65,8 +65,8 @@ type VmContext struct {
 	timer   *time.Timer
 	process *os.Process
 	lock    *sync.Mutex //protect update of context
-	wg	*sync.WaitGroup
-	wait	bool
+	wg      *sync.WaitGroup
+	wait    bool
 }
 
 type stateHandler func(ctx *VmContext, event QemuEvent)
@@ -99,7 +99,7 @@ func initContext(id string, hub chan QemuEvent, client chan *types.QemuResponse,
 	}
 	defer func() {
 		if err != nil {
-			os.RemoveAll(homeDir)
+			os.Remove(homeDir)
 		}
 	}()
 
@@ -129,7 +129,7 @@ func initContext(id string, hub chan QemuEvent, client chan *types.QemuResponse,
 		devices:         newDeviceMap(),
 		progress:        newProcessingList(),
 		lock:            &sync.Mutex{},
-		wait:		 false,
+		wait:            false,
 	}, nil
 }
 
@@ -226,7 +226,7 @@ func (ctx *VmContext) Close() {
 	close(ctx.qmp)
 	close(ctx.vm)
 	close(ctx.wdt)
-	os.RemoveAll(ctx.shareDir)
+	os.Remove(ctx.shareDir)
 	ctx.handler = nil
 	ctx.current = "None"
 }
@@ -300,7 +300,7 @@ func (ctx *VmContext) QemuArguments() []string {
 
 // InitDeviceContext will init device info in context
 func (ctx *VmContext) InitDeviceContext(spec *pod.UserPod, wg *sync.WaitGroup,
-					cInfo []*ContainerInfo, vInfo []*VolumeInfo) {
+	cInfo []*ContainerInfo, vInfo []*VolumeInfo) {
 
 	ctx.lock.Lock()
 	defer ctx.lock.Unlock()
