@@ -11,6 +11,7 @@ import (
 	dm "hyper/storage/devicemapper"
 	"hyper/types"
 	"os"
+	"sync"
 	"runtime"
 	"strconv"
 	"strings"
@@ -35,6 +36,7 @@ type Pod struct {
 	Id            string
 	Name          string
 	Vm            string
+	Wg            *sync.WaitGroup
 	Containers    []*Container
 	Status        uint
 	Type          string
@@ -138,7 +140,8 @@ func (daemon *Daemon) Restore() error {
 		return err
 	}
 	for k, v := range podList {
-		err = daemon.CreatePod(v, k)
+		wg := new(sync.WaitGroup)
+		err = daemon.CreatePod(v, k, wg)
 		if err != nil {
 			glog.Warning("Got a unexpected error, %s", err.Error())
 			continue
@@ -763,7 +766,6 @@ func (daemon *Daemon) DestroyAllVm() error {
 	}
 	iter.Release()
 	err := iter.Error()
-
 	return err
 }
 

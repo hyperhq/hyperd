@@ -1,6 +1,7 @@
 package qemu
 
 import (
+	"sync"
 	"hyper/lib/glog"
 	"hyper/types"
 )
@@ -50,7 +51,8 @@ func QemuLoop(vmId string, hub chan QemuEvent, client chan *types.QemuResponse, 
 	context.loop()
 }
 
-func QemuAssociate(vmId string, hub chan QemuEvent, client chan *types.QemuResponse, pack []byte) {
+func QemuAssociate(vmId string, hub chan QemuEvent, client chan *types.QemuResponse,
+		   wg *sync.WaitGroup, pack []byte) {
 
 	if glog.V(1) {
 		glog.Infof("VM %s trying to reload with serialized data: %s", vmId, string(pack))
@@ -75,7 +77,7 @@ func QemuAssociate(vmId string, hub chan QemuEvent, client chan *types.QemuRespo
 		return
 	}
 
-	context, err := pinfo.vmContext(hub, client)
+	context, err := pinfo.vmContext(hub, client, wg)
 	if err != nil {
 		client <- &types.QemuResponse{
 			VmId:  vmId,

@@ -2,6 +2,7 @@ package qemu
 
 import (
 	"hyper/pod"
+	"sync"
 	"net"
 	"os"
 )
@@ -36,6 +37,7 @@ type RunPodCommand struct {
 	Spec       *pod.UserPod
 	Containers []*ContainerInfo
 	Volumes    []*VolumeInfo
+	Wg         *sync.WaitGroup
 }
 
 type ReplacePodCommand RunPodCommand

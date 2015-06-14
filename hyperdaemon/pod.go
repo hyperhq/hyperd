@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/user"
 	"path"
+	"sync"
 	"strings"
 	"syscall"
 
@@ -28,8 +29,9 @@ func (daemon *Daemon) CmdPodCreate(job *engine.Job) error {
 	}
 	podArgs := job.Args[0]
 
+	wg := new(sync.WaitGroup)
 	podId := fmt.Sprintf("pod-%s", pod.RandStr(10, "alpha"))
-	err := daemon.CreatePod(podArgs, podId)
+	err := daemon.CreatePod(podArgs, podId, wg)
 	if err != nil {
 		return err
 	}
@@ -172,7 +174,7 @@ func (daemon *Daemon) CmdPodRun(job *engine.Job) error {
 	return nil
 }
 
-func (daemon *Daemon) CreatePod(podArgs, podId string) error {
+func (daemon *Daemon) CreatePod(podArgs, podId string, wg *sync.WaitGroup) error {
 	userPod, err := pod.ProcessPodBytes([]byte(podArgs))
 	if err != nil {
 		glog.V(1).Infof("Process POD file error: %s", err.Error())
@@ -228,6 +230,7 @@ func (daemon *Daemon) CreatePod(podArgs, podId string) error {
 		Id:            podId,
 		Name:          userPod.Name,
 		Vm:            "",
+		Wg:	       wg,
 		Containers:    containers,
 		Status:        types.S_POD_CREATED,
 		Type:          userPod.Type,
@@ -257,6 +260,7 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 		sharedDir         = path.Join(qemu.BaseDir, vmId, qemu.ShareDirTag)
 		podData           []byte
 		mypod             *Pod
+		wg		  *sync.WaitGroup
 		err               error
 		uid               string
 		gid               string
@@ -270,6 +274,7 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 		if err != nil {
 			return -1, "", err
 		}
+		wg = mypod.Wg
 	} else {
 		podData = []byte(podArgs)
 	}
@@ -299,6 +304,7 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 			Bios:   daemon.bios,
 			Cbfs:   daemon.cbfs,
 		}
+
 		go qemu.QemuLoop(vmId, qemuPodEvent, qemuStatus, b)
 		if err := daemon.SetQemuChan(vmId, qemuPodEvent, qemuStatus, subQemuStatus); err != nil {
 			glog.V(1).Infof("SetQemuChan error: %s", err.Error())
@@ -315,7 +321,8 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 		subQemuStatus = ret3.(chan *types.QemuResponse)
 	}
 	if podArgs != "" {
-		if err := daemon.CreatePod(podArgs, podId); err != nil {
+		wg = new(sync.WaitGroup)
+		if err := daemon.CreatePod(podArgs, podId, wg); err != nil {
 			glog.Error(err.Error())
 			return -1, "", err
 		}
@@ -638,6 +645,7 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 		Spec:       userPod,
 		Containers: containerInfoList,
 		Volumes:    volumuInfoList,
+		Wg:	    wg,
 	}
 	qemuPodEvent <- runPodEvent
 	daemon.podList[podId].Status = types.S_POD_RUNNING

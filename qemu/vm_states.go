@@ -22,16 +22,15 @@ func (ctx *VmContext) onQemuExit(reclaim bool) bool {
 }
 
 func (ctx *VmContext) reclaimDevice() {
-
 	ctx.releaseVolumeDir()
 	ctx.releaseOverlayDir()
 	ctx.releaseAufsDir()
 	ctx.removeDMDevice()
 	ctx.releaseNetwork()
+	ctx.wg.Done()
 }
 
 func (ctx *VmContext) detatchDevice() {
-
 	ctx.releaseVolumeDir()
 	ctx.releaseOverlayDir()
 	ctx.releaseAufsDir()
@@ -47,7 +46,7 @@ func (ctx *VmContext) prepareDevice(cmd *RunPodCommand) bool {
 		return false
 	}
 
-	ctx.InitDeviceContext(cmd.Spec, cmd.Containers, cmd.Volumes)
+	ctx.InitDeviceContext(cmd.Spec, cmd.Wg, cmd.Containers, cmd.Volumes)
 
 	if glog.V(2) {
 		res, _ := json.MarshalIndent(*ctx.vmSpec, "    ", "    ")

@@ -441,7 +441,7 @@ func (ctx *VmContext) releaseNetwork() {
 	for idx, nic := range ctx.devices.networkMap {
 		glog.V(1).Infof("remove network card %d: %s", idx, nic.IpAddr)
 		ctx.progress.deleting.networks[idx] = true
-		go ReleaseInterface(idx, nic.IpAddr, nic.Fd, maps, ctx.hub)
+		ReleaseInterface(idx, nic.IpAddr, nic.Fd, maps, ctx.hub)
 		maps = nil
 	}
 }
@@ -458,7 +458,7 @@ func (ctx *VmContext) removeInterface() {
 	for idx, nic := range ctx.devices.networkMap {
 		glog.V(1).Infof("remove network card %d: %s", idx, nic.IpAddr)
 		ctx.progress.deleting.networks[idx] = true
-		go ReleaseInterface(idx, nic.IpAddr, nic.Fd, maps, ctx.hub)
+		ReleaseInterface(idx, nic.IpAddr, nic.Fd, maps, ctx.hub)
 		newNetworkDelSession(ctx, nic.DeviceName, &NetDevRemovedEvent{Index: idx})
 		maps = nil
 	}

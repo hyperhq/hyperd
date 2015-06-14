@@ -149,7 +149,7 @@ func (daemon *Daemon) AssociateAllVms() error {
 			continue
 		}
 		glog.V(1).Infof("The data for vm(%s) is %v", mypod.Vm, data)
-		go qemu.QemuAssociate(mypod.Vm, qemuPodEvent, qemuStatus, data)
+		go qemu.QemuAssociate(mypod.Vm, qemuPodEvent, qemuStatus, mypod.Wg, data)
 		if err := daemon.SetQemuChan(mypod.Vm, qemuPodEvent, qemuStatus, subQemuStatus); err != nil {
 			glog.V(1).Infof("SetQemuChan error: %s", err.Error())
 			return err

@@ -3,6 +3,7 @@ package qemu
 import (
 	"encoding/json"
 	"errors"
+	"sync"
 	"hyper/pod"
 	"hyper/types"
 	"os"
@@ -161,7 +162,9 @@ func (pinfo *PersistInfo) serialize() ([]byte, error) {
 	return json.Marshal(pinfo)
 }
 
-func (pinfo *PersistInfo) vmContext(hub chan QemuEvent, client chan *types.QemuResponse) (*VmContext, error) {
+func (pinfo *PersistInfo) vmContext(hub chan QemuEvent,
+				    client chan *types.QemuResponse,
+				    wg *sync.WaitGroup) (*VmContext, error) {
 
 	proc, err := os.FindProcess(pinfo.Pid)
 	if err != nil {
@@ -176,6 +179,7 @@ func (pinfo *PersistInfo) vmContext(hub chan QemuEvent, client chan *types.QemuR
 	ctx.process = proc
 	ctx.vmSpec = pinfo.VmSpec
 	ctx.userSpec = pinfo.UserSpec
+	ctx.wg = wg
 
 	ctx.loadHwStatus(pinfo)
 

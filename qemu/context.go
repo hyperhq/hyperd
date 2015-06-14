@@ -65,6 +65,7 @@ type VmContext struct {
 	timer   *time.Timer
 	process *os.Process
 	lock    *sync.Mutex //protect update of context
+	wg	*sync.WaitGroup
 }
 
 type stateHandler func(ctx *VmContext, event QemuEvent)
@@ -296,7 +297,8 @@ func (ctx *VmContext) QemuArguments() []string {
 }
 
 // InitDeviceContext will init device info in context
-func (ctx *VmContext) InitDeviceContext(spec *pod.UserPod, cInfo []*ContainerInfo, vInfo []*VolumeInfo) {
+func (ctx *VmContext) InitDeviceContext(spec *pod.UserPod, wg *sync.WaitGroup,
+					cInfo []*ContainerInfo, vInfo []*VolumeInfo) {
 
 	ctx.lock.Lock()
 	defer ctx.lock.Unlock()
@@ -352,4 +354,5 @@ func (ctx *VmContext) InitDeviceContext(spec *pod.UserPod, cInfo []*ContainerInf
 	}
 
 	ctx.userSpec = spec
+	ctx.wg = wg
 }
