@@ -27,7 +27,11 @@ func (ctx *VmContext) reclaimDevice() {
 	ctx.releaseAufsDir()
 	ctx.removeDMDevice()
 	ctx.releaseNetwork()
-	ctx.wg.Done()
+	if ctx.wait {
+		glog.V(1).Info("reclaimDevice someone is waiting for us...")
+		ctx.wg.Done()
+		ctx.wait = false
+	}
 }
 
 func (ctx *VmContext) detatchDevice() {
@@ -143,7 +147,9 @@ func (ctx *VmContext) stopPod() {
 	}
 }
 
-func (ctx *VmContext) exitVM(err bool, msg string, hasPod bool) {
+func (ctx *VmContext) exitVM(err bool, msg string, hasPod, wait bool) {
+	ctx.wait = wait
+	glog.V(1).Infof("exitVM need to notify waiter %d", ctx.wait)
 	if hasPod {
 		ctx.shutdownVM(err, msg)
 		ctx.Become(stateTerminating, "TERMINATING")
@@ -187,10 +193,10 @@ func commonStateHandler(ctx *VmContext, ev QemuEvent, hasPod bool) bool {
 		}
 	case ERROR_INTERRUPTED:
 		glog.Info("Connection interrupted, quit...")
-		ctx.exitVM(true, "connection to VM broken", hasPod)
+		ctx.exitVM(true, "connection to VM broken", hasPod, false)
 	case COMMAND_SHUTDOWN:
 		glog.Info("got shutdown command, shutting down")
-		ctx.exitVM(false, "", hasPod)
+		ctx.exitVM(false, "", hasPod, ev.(*ShutdownCommand).Wait)
 	default:
 		processed = false
 	}

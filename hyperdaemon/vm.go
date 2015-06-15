@@ -95,7 +95,7 @@ func (daemon *Daemon) KillVm(vmId string) (int, string, error) {
 		return -1, "", err
 	}
 	var qemuResponse *types.QemuResponse
-	shutdownPodEvent := &qemu.ShutdownCommand{}
+	shutdownPodEvent := &qemu.ShutdownCommand{Wait: false}
 	qemuPodEvent.(chan qemu.QemuEvent) <- shutdownPodEvent
 	// wait for the qemu response
 	for {
@@ -234,7 +234,7 @@ func (daemon *Daemon) ReleaseAllVms() (int, error) {
 			return -1, err
 		}
 		if vm.Status == types.S_VM_IDLE {
-			shutdownPodEvent := &qemu.ShutdownCommand{}
+			shutdownPodEvent := &qemu.ShutdownCommand{Wait: false}
 			qemuPodEvent.(chan qemu.QemuEvent) <- shutdownPodEvent
 			for {
 				qemuResponse = <-qemuStatus.(chan *types.QemuResponse)

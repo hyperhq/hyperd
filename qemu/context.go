@@ -66,6 +66,7 @@ type VmContext struct {
 	process *os.Process
 	lock    *sync.Mutex //protect update of context
 	wg	*sync.WaitGroup
+	wait	bool
 }
 
 type stateHandler func(ctx *VmContext, event QemuEvent)
@@ -128,6 +129,7 @@ func initContext(id string, hub chan QemuEvent, client chan *types.QemuResponse,
 		devices:         newDeviceMap(),
 		progress:        newProcessingList(),
 		lock:            &sync.Mutex{},
+		wait:		 false,
 	}, nil
 }
 

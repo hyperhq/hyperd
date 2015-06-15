@@ -50,7 +50,11 @@ type ExecCommand struct {
 }
 
 type StopPodCommand struct{}
-type ShutdownCommand struct{}
+
+type ShutdownCommand struct{
+	Wait	bool
+}
+
 type ReleaseVMCommand struct{}
 
 type AttachCommand struct {

@@ -54,10 +54,10 @@ func (daemon *Daemon) StopPod(podId, stopVm string) (int, string, error) {
 		return -1, "", err
 	}
 
-	daemon.podList[podId].Wg.Add(1)
 	var qemuResponse *types.QemuResponse
 	if stopVm == "yes" {
-		shutdownPodEvent := &qemu.ShutdownCommand{}
+		daemon.podList[podId].Wg.Add(1)
+		shutdownPodEvent := &qemu.ShutdownCommand{Wait: true}
 		qemuPodEvent.(chan qemu.QemuEvent) <- shutdownPodEvent
 		// wait for the qemu response
 		for {
@@ -68,6 +68,8 @@ func (daemon *Daemon) StopPod(podId, stopVm string) (int, string, error) {
 			}
 		}
 		close(qemuStatus.(chan *types.QemuResponse))
+		// wait for goroutines exit
+		daemon.podList[podId].Wg.Wait()
 	} else {
 		stopPodEvent := &qemu.StopPodCommand{}
 		qemuPodEvent.(chan qemu.QemuEvent) <- stopPodEvent
@@ -80,8 +82,6 @@ func (daemon *Daemon) StopPod(podId, stopVm string) (int, string, error) {
 			}
 		}
 	}
-	// wait for goroutines exit
-	daemon.podList[podId].Wg.Wait()
 
 	// Delete the Vm info for POD
 	daemon.DeleteVmByPod(podId)
