@@ -7,15 +7,33 @@
 _obj
 _test
 
+# Autoconf/Automake generated files
+aclocal.m4
+.deps
+autom4te.cache
+Makefile
+Makefile.in
+ar-lib
+compile
+config.log
+config.status
+configure
+depcomp
+install-sh
+missing
+hypervisor/xen/config.h
+hypervisor/xen/config.h.in
+hypervisor/xen/stamp-h1
+
 # Architecture specific extensions/prefixes
 *.[568vq]
+[568vq].out
 
 *.cgo1.go
 *.cgo2.c
 _cgo_defun.c
 _cgo_gotypes.go
 _cgo_export.*
-*.out
 
 _testmain.go
 
@@ -25,7 +43,6 @@ _testmain.go
 
 # intellij idea configure
 .idea
-
-# binary
 /hyper
 /hyperd
+*.out
