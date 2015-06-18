@@ -125,7 +125,12 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 		command = args[2:]
 	}
 	if opts.Name == "" {
-		opts.Name = image + "-" + pod.RandStr(10, "number")
+		fields := strings.Split(image, ":")
+		if fields == nil {
+			opts.Name = image + "-" + pod.RandStr(10, "number")
+		} else {
+			opts.Name = fields[0] + "-" + fields[1] + "-" + pod.RandStr(10, "number")
+		}
 	}
 	if opts.Memory == 0 {
 		opts.Memory = 128
