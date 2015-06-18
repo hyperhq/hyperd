@@ -8,6 +8,7 @@ import (
 	"hyper/engine"
 	"hyper/hypervisor"
 	"hyper/hypervisor/qemu"
+	"hyper/hypervisor/xen"
 	"hyper/lib/glog"
 	"hyper/pod"
 	"hyper/types"
@@ -16,6 +17,14 @@ import (
 var hypervisorDriver hypervisor.HypervisorDriver = DriversProbe()
 
 func DriversProbe() hypervisor.HypervisorDriver {
+	xd := &xen.XenDriver{}
+	if err := xd.Initialize(); err == nil {
+		glog.Info("Xen Driver Loaded.")
+		return xd
+	} else {
+		glog.Info("Xen Driver Load failed: ", err.Error())
+	}
+
 	qd := &qemu.QemuDriver{}
 	if err := qd.Initialize(); err == nil {
 		glog.Info("Qemu Driver Loaded")
