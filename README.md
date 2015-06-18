@@ -31,6 +31,7 @@ Hyper - Hypervisor-agnostic Docker Runtime
 
 - Docker 1.5 or later
 - QEMU 2.0 or later
+- Xen 4.5 and VT enabled host (for Xen support)
 
 ## Installation
 
@@ -57,10 +58,13 @@ Clone hyper in GoPath
     > cd ${GOPATH}/src
 	> git clone https://github.com/hyperhq/hyper.git hyper
 
-And got hyper binaries with `godep go build`
+And make sure you have `go` (>= 1.4), `godep`, and `autotools`, go into the `hyper` dir
 
-    > godep go build hyperd.go
-    > godep go build hyper.go
+    > ./autogen.sh
+    > ./configure
+    > make
+
+Then you can get the binaries `hyperd` daemon and `hyper` cmdline tool.
 
 You may also need the kernel and initrd from [HyperStart](https://github.com/hyperhq/hyperstart) to run your own hyper.
 
