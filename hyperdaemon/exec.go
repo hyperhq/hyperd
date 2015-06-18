@@ -6,7 +6,7 @@ import (
 
 	"hyper/engine"
 	"hyper/lib/glog"
-	"hyper/qemu"
+	"hyper/hypervisor"
 	"hyper/types"
 )
 
@@ -49,9 +49,9 @@ func (daemon *Daemon) CmdExec(job *engine.Job) (err error) {
 		return err
 	}
 
-	execCmd := &qemu.ExecCommand{
+	execCmd := &hypervisor.ExecCommand{
 		Command: command,
-		Streams: &qemu.TtyIO{
+		Streams: &hypervisor.TtyIO{
 			Stdin:     job.Stdin,
 			Stdout:    job.Stdout,
 			ClientTag: tag,
@@ -70,7 +70,7 @@ func (daemon *Daemon) CmdExec(job *engine.Job) (err error) {
 		return err
 	}
 
-	qemuEvent.(chan qemu.QemuEvent) <- execCmd
+	qemuEvent.(chan hypervisor.QemuEvent) <- execCmd
 
 	<-execCmd.Streams.Callback
 	defer func() {

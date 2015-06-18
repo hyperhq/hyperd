@@ -14,7 +14,7 @@ import (
 	"hyper/engine"
 	"hyper/lib/glog"
 	"hyper/pod"
-	"hyper/qemu"
+	"hyper/hypervisor"
 	"hyper/storage/aufs"
 	dm "hyper/storage/devicemapper"
 	"hyper/storage/overlay"
@@ -251,13 +251,13 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 		rootPath          string
 		devFullName       string
 		rootfs            string
-		containerInfoList = []*qemu.ContainerInfo{}
-		volumuInfoList    = []*qemu.VolumeInfo{}
+		containerInfoList = []*hypervisor.ContainerInfo{}
+		volumuInfoList    = []*hypervisor.VolumeInfo{}
 		cli               = daemon.dockerCli
-		qemuPodEvent      = make(chan qemu.QemuEvent, 128)
+		qemuPodEvent      = make(chan hypervisor.QemuEvent, 128)
 		qemuStatus        = make(chan *types.QemuResponse, 128)
 		subQemuStatus     = make(chan *types.QemuResponse, 128)
-		sharedDir         = path.Join(qemu.BaseDir, vmId, qemu.ShareDirTag)
+		sharedDir         = path.Join(hypervisor.BaseDir, vmId, hypervisor.ShareDirTag)
 		podData           []byte
 		mypod             *Pod
 		wg		  *sync.WaitGroup
@@ -296,7 +296,7 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 		if userPod.Resource.Memory > 0 {
 			mem = userPod.Resource.Memory
 		}
-		b := &qemu.BootConfig{
+		b := &hypervisor.BootConfig{
 			CPU:    cpu,
 			Memory: mem,
 			Kernel: daemon.kernel,
@@ -305,7 +305,7 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 			Cbfs:   daemon.cbfs,
 		}
 
-		go qemu.QemuLoop(vmId, qemuPodEvent, qemuStatus, b)
+		go hypervisor.QemuLoop(vmId, qemuPodEvent, qemuStatus, b)
 		if err := daemon.SetQemuChan(vmId, qemuPodEvent, qemuStatus, subQemuStatus); err != nil {
 			glog.V(1).Infof("SetQemuChan error: %s", err.Error())
 			return -1, "", err
@@ -316,7 +316,7 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 		if err != nil {
 			return -1, "", err
 		}
-		qemuPodEvent = ret1.(chan qemu.QemuEvent)
+		qemuPodEvent = ret1.(chan hypervisor.QemuEvent)
 		qemuStatus = ret2.(chan *types.QemuResponse)
 		subQemuStatus = ret3.(chan *types.QemuResponse)
 	}
@@ -482,7 +482,7 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 		glog.V(1).Infof("The fs type is %s", fstype)
 		glog.V(1).Infof("WorkingDir is %s", string(jsonResponse.Config.WorkingDir))
 		glog.V(1).Infof("Image is %s", string(devFullName))
-		containerInfo := &qemu.ContainerInfo{
+		containerInfo := &hypervisor.ContainerInfo{
 			Id:         c.Id,
 			Rootfs:     rootfs,
 			Image:      devFullName,
@@ -521,7 +521,7 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 				if err != nil {
 					fstype = "ext4"
 				}
-				myVol := &qemu.VolumeInfo{
+				myVol := &hypervisor.VolumeInfo{
 					Name:     v.Name,
 					Filepath: path.Join("/dev/mapper/", volName),
 					Fstype:   fstype,
@@ -564,7 +564,7 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 			glog.Errorf("bind dir %s failed: %s", v.Source, err.Error())
 			return -1, "", err
 		}
-		myVol := &qemu.VolumeInfo{
+		myVol := &hypervisor.VolumeInfo{
 			Name:     v.Name,
 			Filepath: mountSharedDir,
 			Fstype:   "dir",
@@ -641,7 +641,7 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 	}
 
 	fmt.Printf("POD id is %s\n", podId)
-	runPodEvent := &qemu.RunPodCommand{
+	runPodEvent := &hypervisor.RunPodCommand{
 		Spec:       userPod,
 		Containers: containerInfoList,
 		Volumes:    volumuInfoList,

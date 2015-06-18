@@ -1,4 +1,4 @@
-package qemu
+package hypervisor
 
 const (
 	BaseDir         = "/var/run/hyper"

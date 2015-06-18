@@ -3,7 +3,7 @@ package daemon
 import (
 	"hyper/engine"
 	"hyper/lib/glog"
-	"hyper/qemu"
+	"hyper/hypervisor"
 	"strconv"
 	"strings"
 )
@@ -49,16 +49,16 @@ func (daemon *Daemon) CmdTty(job *engine.Job) (err error) {
 	if err != nil {
 		glog.Warning("Success to resize the tty!")
 	}
-	var ttySizeCommand = &qemu.WindowSizeCommand{
+	var ttySizeCommand = &hypervisor.WindowSizeCommand{
 		ClientTag: tag,
-		Size:      &qemu.WindowSize{Row: uint16(row), Column: uint16(column)},
+		Size:      &hypervisor.WindowSize{Row: uint16(row), Column: uint16(column)},
 	}
 
 	qemuEvent, _, _, err := daemon.GetQemuChan(vmid)
 	if err != nil {
 		return err
 	}
-	qemuEvent.(chan qemu.QemuEvent) <- ttySizeCommand
+	qemuEvent.(chan hypervisor.QemuEvent) <- ttySizeCommand
 	glog.V(1).Infof("Success to resize the tty!")
 	return nil
 }

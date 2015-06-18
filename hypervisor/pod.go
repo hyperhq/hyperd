@@ -1,4 +1,4 @@
-package qemu
+package hypervisor
 
 //change first letter to uppercase and add json tag (thanks GNU sed):
 //  gsed -ie 's/^    \([a-z]\)\([a-zA-Z]*\)\( \{1,\}[^ ]\{1,\}.*\)$/    \U\1\E\2\3 `json:"\1\2"`/' pod.go

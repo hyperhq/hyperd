@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"hyper/engine"
 	"hyper/lib/glog"
-	"hyper/qemu"
+	"hyper/hypervisor"
 	"hyper/types"
 )
 
@@ -57,8 +57,8 @@ func (daemon *Daemon) StopPod(podId, stopVm string) (int, string, error) {
 	var qemuResponse *types.QemuResponse
 	if stopVm == "yes" {
 		daemon.podList[podId].Wg.Add(1)
-		shutdownPodEvent := &qemu.ShutdownCommand{Wait: true}
-		qemuPodEvent.(chan qemu.QemuEvent) <- shutdownPodEvent
+		shutdownPodEvent := &hypervisor.ShutdownCommand{Wait: true}
+		qemuPodEvent.(chan hypervisor.QemuEvent) <- shutdownPodEvent
 		// wait for the qemu response
 		for {
 			qemuResponse = <-qemuStatus.(chan *types.QemuResponse)
@@ -71,8 +71,8 @@ func (daemon *Daemon) StopPod(podId, stopVm string) (int, string, error) {
 		// wait for goroutines exit
 		daemon.podList[podId].Wg.Wait()
 	} else {
-		stopPodEvent := &qemu.StopPodCommand{}
-		qemuPodEvent.(chan qemu.QemuEvent) <- stopPodEvent
+		stopPodEvent := &hypervisor.StopPodCommand{}
+		qemuPodEvent.(chan hypervisor.QemuEvent) <- stopPodEvent
 		// wait for the qemu response
 		for {
 			qemuResponse = <-qemuStatus.(chan *types.QemuResponse)

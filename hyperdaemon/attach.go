@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"hyper/engine"
 	"hyper/lib/glog"
-	"hyper/qemu"
+	"hyper/hypervisor"
 	"hyper/types"
 )
 
@@ -35,7 +35,7 @@ func (daemon *Daemon) CmdAttach(job *engine.Job) (err error) {
 		return err
 	}
 	var (
-		ttyIO        qemu.TtyIO
+		ttyIO        hypervisor.TtyIO
 		qemuCallback = make(chan *types.QemuResponse, 1)
 	)
 
@@ -44,7 +44,7 @@ func (daemon *Daemon) CmdAttach(job *engine.Job) (err error) {
 	ttyIO.ClientTag = tag
 	ttyIO.Callback = qemuCallback
 
-	var attachCommand = &qemu.AttachCommand{
+	var attachCommand = &hypervisor.AttachCommand{
 		Streams: &ttyIO,
 		Size:    nil,
 	}
@@ -57,7 +57,7 @@ func (daemon *Daemon) CmdAttach(job *engine.Job) (err error) {
 	if err != nil {
 		return err
 	}
-	qemuEvent.(chan qemu.QemuEvent) <- attachCommand
+	qemuEvent.(chan hypervisor.QemuEvent) <- attachCommand
 
 	<-qemuCallback
 	defer func() {
