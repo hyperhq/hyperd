@@ -58,7 +58,7 @@ func (daemon *Daemon) CmdTty(job *engine.Job) (err error) {
 	if err != nil {
 		return err
 	}
-	qemuEvent.(chan hypervisor.QemuEvent) <- ttySizeCommand
+	qemuEvent.(chan hypervisor.VmEvent) <- ttySizeCommand
 	glog.V(1).Infof("Success to resize the tty!")
 	return nil
 }

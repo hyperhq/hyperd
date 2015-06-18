@@ -254,7 +254,7 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 		containerInfoList = []*hypervisor.ContainerInfo{}
 		volumuInfoList    = []*hypervisor.VolumeInfo{}
 		cli               = daemon.dockerCli
-		qemuPodEvent      = make(chan hypervisor.QemuEvent, 128)
+		qemuPodEvent      = make(chan hypervisor.VmEvent, 128)
 		qemuStatus        = make(chan *types.QemuResponse, 128)
 		subQemuStatus     = make(chan *types.QemuResponse, 128)
 		sharedDir         = path.Join(hypervisor.BaseDir, vmId, hypervisor.ShareDirTag)
@@ -305,7 +305,7 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 			Cbfs:   daemon.cbfs,
 		}
 
-		go hypervisor.QemuLoop(vmId, qemuPodEvent, qemuStatus, b)
+		go hypervisor.VmLoop(vmId, qemuPodEvent, qemuStatus, b)
 		if err := daemon.SetQemuChan(vmId, qemuPodEvent, qemuStatus, subQemuStatus); err != nil {
 			glog.V(1).Infof("SetQemuChan error: %s", err.Error())
 			return -1, "", err
@@ -316,7 +316,7 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 		if err != nil {
 			return -1, "", err
 		}
-		qemuPodEvent = ret1.(chan hypervisor.QemuEvent)
+		qemuPodEvent = ret1.(chan hypervisor.VmEvent)
 		qemuStatus = ret2.(chan *types.QemuResponse)
 		subQemuStatus = ret3.(chan *types.QemuResponse)
 	}

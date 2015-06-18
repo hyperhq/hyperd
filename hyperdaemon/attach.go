@@ -57,7 +57,7 @@ func (daemon *Daemon) CmdAttach(job *engine.Job) (err error) {
 	if err != nil {
 		return err
 	}
-	qemuEvent.(chan hypervisor.QemuEvent) <- attachCommand
+	qemuEvent.(chan hypervisor.VmEvent) <- attachCommand
 
 	<-qemuCallback
 	defer func() {

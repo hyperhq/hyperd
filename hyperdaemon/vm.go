@@ -14,7 +14,7 @@ import (
 func (daemon *Daemon) CmdVmCreate(job *engine.Job) (err error) {
 	var (
 		vmId          = fmt.Sprintf("vm-%s", pod.RandStr(10, "alpha"))
-		qemuPodEvent  = make(chan hypervisor.QemuEvent, 128)
+		qemuPodEvent  = make(chan hypervisor.VmEvent, 128)
 		qemuStatus    = make(chan *types.QemuResponse, 128)
 		subQemuStatus = make(chan *types.QemuResponse, 128)
 		cpu           = 1
@@ -40,7 +40,7 @@ func (daemon *Daemon) CmdVmCreate(job *engine.Job) (err error) {
 		Bios:   daemon.bios,
 		Cbfs:   daemon.cbfs,
 	}
-	go hypervisor.QemuLoop(vmId, qemuPodEvent, qemuStatus, b)
+	go hypervisor.VmLoop(vmId, qemuPodEvent, qemuStatus, b)
 	if err := daemon.SetQemuChan(vmId, qemuPodEvent, qemuStatus, subQemuStatus); err != nil {
 		glog.V(1).Infof("SetQemuChan error: %s", err.Error())
 		return err
@@ -96,7 +96,7 @@ func (daemon *Daemon) KillVm(vmId string) (int, string, error) {
 	}
 	var qemuResponse *types.QemuResponse
 	shutdownPodEvent := &hypervisor.ShutdownCommand{Wait: false}
-	qemuPodEvent.(chan hypervisor.QemuEvent) <- shutdownPodEvent
+	qemuPodEvent.(chan hypervisor.VmEvent) <- shutdownPodEvent
 	// wait for the qemu response
 	for {
 		stop := 0
@@ -140,7 +140,7 @@ func (daemon *Daemon) AssociateAllVms() error {
 		}
 		glog.V(1).Infof("Associate the POD(%s) with VM(%s)", mypod.Id, mypod.Vm)
 		var (
-			qemuPodEvent  = make(chan hypervisor.QemuEvent, 128)
+			qemuPodEvent  = make(chan hypervisor.VmEvent, 128)
 			qemuStatus    = make(chan *types.QemuResponse, 128)
 			subQemuStatus = make(chan *types.QemuResponse, 128)
 		)
@@ -149,7 +149,7 @@ func (daemon *Daemon) AssociateAllVms() error {
 			continue
 		}
 		glog.V(1).Infof("The data for vm(%s) is %v", mypod.Vm, data)
-		go hypervisor.QemuAssociate(mypod.Vm, qemuPodEvent, qemuStatus, mypod.Wg, data)
+		go hypervisor.VmAssociate(mypod.Vm, qemuPodEvent, qemuStatus, mypod.Wg, data)
 		if err := daemon.SetQemuChan(mypod.Vm, qemuPodEvent, qemuStatus, subQemuStatus); err != nil {
 			glog.V(1).Infof("SetQemuChan error: %s", err.Error())
 			return err
@@ -235,7 +235,7 @@ func (daemon *Daemon) ReleaseAllVms() (int, error) {
 		}
 		if vm.Status == types.S_VM_IDLE {
 			shutdownPodEvent := &hypervisor.ShutdownCommand{Wait: false}
-			qemuPodEvent.(chan hypervisor.QemuEvent) <- shutdownPodEvent
+			qemuPodEvent.(chan hypervisor.VmEvent) <- shutdownPodEvent
 			for {
 				qemuResponse = <-qemuStatus.(chan *types.QemuResponse)
 				if qemuResponse.Code == types.E_VM_SHUTDOWN {
@@ -245,7 +245,7 @@ func (daemon *Daemon) ReleaseAllVms() (int, error) {
 			close(qemuStatus.(chan *types.QemuResponse))
 		} else {
 			releasePodEvent := &hypervisor.ReleaseVMCommand{}
-			qemuPodEvent.(chan hypervisor.QemuEvent) <- releasePodEvent
+			qemuPodEvent.(chan hypervisor.VmEvent) <- releasePodEvent
 			for {
 				qemuResponse = <-qemuStatus.(chan *types.QemuResponse)
 				if qemuResponse.Code == types.E_VM_SHUTDOWN ||

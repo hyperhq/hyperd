@@ -32,7 +32,7 @@ type VmContext struct {
 	Boot *BootConfig
 
 	// Communication Context
-	hub    chan QemuEvent
+	hub    chan VmEvent
 	client chan *types.QemuResponse
 	vm     chan *DecodedMessage
 
@@ -69,9 +69,9 @@ type VmContext struct {
 	wait    bool
 }
 
-type stateHandler func(ctx *VmContext, event QemuEvent)
+type stateHandler func(ctx *VmContext, event VmEvent)
 
-func initContext(id string, hub chan QemuEvent, client chan *types.QemuResponse, boot *BootConfig) (*VmContext, error) {
+func initContext(id string, hub chan VmEvent, client chan *types.QemuResponse, boot *BootConfig) (*VmContext, error) {
 
 	var err error = nil
 

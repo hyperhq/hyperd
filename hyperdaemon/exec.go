@@ -70,7 +70,7 @@ func (daemon *Daemon) CmdExec(job *engine.Job) (err error) {
 		return err
 	}
 
-	qemuEvent.(chan hypervisor.QemuEvent) <- execCmd
+	qemuEvent.(chan hypervisor.VmEvent) <- execCmd
 
 	<-execCmd.Streams.Callback
 	defer func() {

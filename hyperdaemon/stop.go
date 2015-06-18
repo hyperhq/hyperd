@@ -58,7 +58,7 @@ func (daemon *Daemon) StopPod(podId, stopVm string) (int, string, error) {
 	if stopVm == "yes" {
 		daemon.podList[podId].Wg.Add(1)
 		shutdownPodEvent := &hypervisor.ShutdownCommand{Wait: true}
-		qemuPodEvent.(chan hypervisor.QemuEvent) <- shutdownPodEvent
+		qemuPodEvent.(chan hypervisor.VmEvent) <- shutdownPodEvent
 		// wait for the qemu response
 		for {
 			qemuResponse = <-qemuStatus.(chan *types.QemuResponse)
@@ -72,7 +72,7 @@ func (daemon *Daemon) StopPod(podId, stopVm string) (int, string, error) {
 		daemon.podList[podId].Wg.Wait()
 	} else {
 		stopPodEvent := &hypervisor.StopPodCommand{}
-		qemuPodEvent.(chan hypervisor.QemuEvent) <- stopPodEvent
+		qemuPodEvent.(chan hypervisor.VmEvent) <- stopPodEvent
 		// wait for the qemu response
 		for {
 			qemuResponse = <-qemuStatus.(chan *types.QemuResponse)

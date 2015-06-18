@@ -178,7 +178,7 @@ func (ctx *VmContext) poweroffVM(err bool, msg string) {
 }
 
 // state machine
-func commonStateHandler(ctx *VmContext, ev QemuEvent, hasPod bool) bool {
+func commonStateHandler(ctx *VmContext, ev VmEvent, hasPod bool) bool {
 	processed := true
 	switch ev.Event() {
 	case EVENT_QMP_EVENT:
@@ -203,7 +203,7 @@ func commonStateHandler(ctx *VmContext, ev QemuEvent, hasPod bool) bool {
 	return processed
 }
 
-func deviceInitHandler(ctx *VmContext, ev QemuEvent) bool {
+func deviceInitHandler(ctx *VmContext, ev VmEvent) bool {
 	processed := true
 	switch ev.Event() {
 	case EVENT_BLOCK_INSERTED:
@@ -222,7 +222,7 @@ func deviceInitHandler(ctx *VmContext, ev QemuEvent) bool {
 	return processed
 }
 
-func deviceRemoveHandler(ctx *VmContext, ev QemuEvent) (bool, bool) {
+func deviceRemoveHandler(ctx *VmContext, ev VmEvent) (bool, bool) {
 	processed := true
 	success := true
 	switch ev.Event() {
@@ -257,7 +257,7 @@ func deviceRemoveHandler(ctx *VmContext, ev QemuEvent) (bool, bool) {
 	return processed, success
 }
 
-func initFailureHandler(ctx *VmContext, ev QemuEvent) bool {
+func initFailureHandler(ctx *VmContext, ev VmEvent) bool {
 	processed := true
 	switch ev.Event() {
 	case ERROR_INIT_FAIL: // Qemu connection Failure
@@ -275,7 +275,7 @@ func initFailureHandler(ctx *VmContext, ev QemuEvent) bool {
 	return processed
 }
 
-func stateInit(ctx *VmContext, ev QemuEvent) {
+func stateInit(ctx *VmContext, ev VmEvent) {
 	if processed := commonStateHandler(ctx, ev, false); processed {
 		//processed by common
 	} else if processed := initFailureHandler(ctx, ev); processed {
@@ -312,7 +312,7 @@ func stateInit(ctx *VmContext, ev QemuEvent) {
 	}
 }
 
-func stateStarting(ctx *VmContext, ev QemuEvent) {
+func stateStarting(ctx *VmContext, ev VmEvent) {
 	if processed := commonStateHandler(ctx, ev, true); processed {
 		//processed by common
 	} else if processed := deviceInitHandler(ctx, ev); processed {
@@ -379,7 +379,7 @@ func stateStarting(ctx *VmContext, ev QemuEvent) {
 	}
 }
 
-func stateRunning(ctx *VmContext, ev QemuEvent) {
+func stateRunning(ctx *VmContext, ev VmEvent) {
 	if processed := commonStateHandler(ctx, ev, true); processed {
 	} else if processed := initFailureHandler(ctx, ev); processed {
 		ctx.shutdownVM(true, "Fail during reconnect to a running pod")
@@ -424,7 +424,7 @@ func stateRunning(ctx *VmContext, ev QemuEvent) {
 	}
 }
 
-func statePodStopping(ctx *VmContext, ev QemuEvent) {
+func statePodStopping(ctx *VmContext, ev VmEvent) {
 	if processed := commonStateHandler(ctx, ev, true); processed {
 	} else {
 		switch ev.Event() {
@@ -461,7 +461,7 @@ func statePodStopping(ctx *VmContext, ev QemuEvent) {
 	}
 }
 
-func stateTerminating(ctx *VmContext, ev QemuEvent) {
+func stateTerminating(ctx *VmContext, ev VmEvent) {
 	switch ev.Event() {
 	case EVENT_QMP_EVENT:
 		if ev.(*QmpEvent).Type == QMP_EVENT_SHUTDOWN {
@@ -503,7 +503,7 @@ func stateTerminating(ctx *VmContext, ev QemuEvent) {
 	}
 }
 
-func stateCleaning(ctx *VmContext, ev QemuEvent) {
+func stateCleaning(ctx *VmContext, ev VmEvent) {
 	if processed := commonStateHandler(ctx, ev, false); processed {
 	} else if processed, success := deviceRemoveHandler(ctx, ev); processed {
 		if !success {
@@ -551,7 +551,7 @@ func stateCleaning(ctx *VmContext, ev QemuEvent) {
 	}
 }
 
-func stateDestroying(ctx *VmContext, ev QemuEvent) {
+func stateDestroying(ctx *VmContext, ev VmEvent) {
 	if processed, _ := deviceRemoveHandler(ctx, ev); processed {
 		if closed := ctx.tryClose(); closed {
 			glog.Info("resources reclaimed, quit...")

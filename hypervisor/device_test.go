@@ -22,7 +22,7 @@ func TestCreateIf(t *testing.T) {
 		File:        file,
 	}
 
-	res := make(chan QemuEvent, 2)
+	res := make(chan VmEvent, 2)
 	interfaceGot(0, 3, "eth0", true, res, nw)
 
 	rsp := <-res

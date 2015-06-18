@@ -26,13 +26,13 @@ type QmpInternalError struct{ cause string }
 
 type QmpSession struct {
 	commands []*QmpCommand
-	callback QemuEvent
+	callback VmEvent
 }
 
 type QmpFinish struct {
 	success  bool
 	reason   map[string]interface{}
-	callback QemuEvent
+	callback VmEvent
 }
 
 type QmpCommand struct {
@@ -80,7 +80,7 @@ func (qmp *QmpFinish) MessageType() int { return QMP_FINISH }
 func (qmp *QmpResult) MessageType() int { return QMP_RESULT }
 
 func (qmp *QmpError) MessageType() int { return QMP_ERROR }
-func (qmp *QmpError) Finish(callback QemuEvent) *QmpFinish {
+func (qmp *QmpError) Finish(callback VmEvent) *QmpFinish {
 	return &QmpFinish{
 		success:  false,
 		reason:   qmp.Cause,
@@ -123,7 +123,7 @@ func (qmp *QmpResponse) UnmarshalJSON(raw []byte) error {
 	return err
 }
 
-func qmpFail(err string, callback QemuEvent) *QmpFinish {
+func qmpFail(err string, callback VmEvent) *QmpFinish {
 	return &QmpFinish{
 		success:  false,
 		reason:   map[string]interface{}{"error": err},

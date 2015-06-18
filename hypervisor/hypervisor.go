@@ -30,7 +30,7 @@ func (ctx *VmContext) loop() {
 	}
 }
 
-func QemuLoop(vmId string, hub chan QemuEvent, client chan *types.QemuResponse, boot *BootConfig) {
+func VmLoop(vmId string, hub chan VmEvent, client chan *types.QemuResponse, boot *BootConfig) {
 
 	context, err := initContext(vmId, hub, client, boot)
 	if err != nil {
@@ -51,7 +51,7 @@ func QemuLoop(vmId string, hub chan QemuEvent, client chan *types.QemuResponse, 
 	context.loop()
 }
 
-func QemuAssociate(vmId string, hub chan QemuEvent, client chan *types.QemuResponse,
+func VmAssociate(vmId string, hub chan VmEvent, client chan *types.QemuResponse,
 	wg *sync.WaitGroup, pack []byte) {
 
 	if glog.V(1) {

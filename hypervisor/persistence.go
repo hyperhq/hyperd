@@ -162,7 +162,7 @@ func (pinfo *PersistInfo) serialize() ([]byte, error) {
 	return json.Marshal(pinfo)
 }
 
-func (pinfo *PersistInfo) vmContext(hub chan QemuEvent,
+func (pinfo *PersistInfo) vmContext(hub chan VmEvent,
 	client chan *types.QemuResponse,
 	wg *sync.WaitGroup) (*VmContext, error) {
 

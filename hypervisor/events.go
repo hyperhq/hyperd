@@ -7,7 +7,7 @@ import (
 	"sync"
 )
 
-type QemuEvent interface {
+type VmEvent interface {
 	Event() int
 }
 
@@ -172,7 +172,7 @@ type NetDevRemovedEvent struct {
 }
 
 type DeviceFailed struct {
-	session QemuEvent
+	session VmEvent
 }
 
 type Interrupted struct {

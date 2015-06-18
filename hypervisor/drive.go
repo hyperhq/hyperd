@@ -14,11 +14,11 @@ import (
 	"hyper/storage/aufs"
 )
 
-func CreateContainer(userPod *pod.UserPod, sharedDir string, hub chan QemuEvent) (string, error) {
+func CreateContainer(userPod *pod.UserPod, sharedDir string, hub chan VmEvent) (string, error) {
 	return "", nil
 }
 
-func UmountOverlayContainer(shareDir, image string, index int, hub chan QemuEvent) {
+func UmountOverlayContainer(shareDir, image string, index int, hub chan VmEvent) {
 	mount := path.Join(shareDir, image)
 	success := true
 	for i := 0; i < 10; i++ {
@@ -38,7 +38,7 @@ func UmountOverlayContainer(shareDir, image string, index int, hub chan QemuEven
 	hub <- &ContainerUnmounted{Index: index, Success: success}
 }
 
-func UmountAufsContainer(shareDir, image string, index int, hub chan QemuEvent) {
+func UmountAufsContainer(shareDir, image string, index int, hub chan VmEvent) {
 	mount := path.Join(shareDir, image)
 	success := true
 	for i := 0; i < 10; i++ {
@@ -58,7 +58,7 @@ func UmountAufsContainer(shareDir, image string, index int, hub chan QemuEvent) 
 	hub <- &ContainerUnmounted{Index: index, Success: success}
 }
 
-func UmountVolume(shareDir, volPath string, name string, hub chan QemuEvent) {
+func UmountVolume(shareDir, volPath string, name string, hub chan VmEvent) {
 	mount := path.Join(shareDir, volPath)
 	success := true
 	err := syscall.Unmount(mount, 0)
@@ -79,7 +79,7 @@ func UmountVolume(shareDir, volPath string, name string, hub chan QemuEvent) {
 	hub <- &VolumeUnmounted{Name: name, Success: success}
 }
 
-func UmountDMDevice(deviceFullPath, name string, hub chan QemuEvent) {
+func UmountDMDevice(deviceFullPath, name string, hub chan VmEvent) {
 	args := fmt.Sprintf("dmsetup remove -f %s", deviceFullPath)
 	cmd := exec.Command("/bin/sh", "-c", args)
 	success := true

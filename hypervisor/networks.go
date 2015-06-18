@@ -10,7 +10,7 @@ import (
 )
 
 func CreateInterface(index int, pciAddr int, name string, isDefault bool,
-	maps []pod.UserContainerPort, callback chan QemuEvent) {
+	maps []pod.UserContainerPort, callback chan VmEvent) {
 	inf, err := network.Allocate("", maps)
 	if err != nil {
 		glog.Error("interface creating failed: ", err.Error())
@@ -24,7 +24,7 @@ func CreateInterface(index int, pciAddr int, name string, isDefault bool,
 }
 
 func ReleaseInterface(index int, ipAddr string, file *os.File,
-	maps []pod.UserContainerPort, callback chan QemuEvent) {
+	maps []pod.UserContainerPort, callback chan VmEvent) {
 	success := true
 	err := network.Release(ipAddr, maps, file)
 	if err != nil {
@@ -34,7 +34,7 @@ func ReleaseInterface(index int, ipAddr string, file *os.File,
 	callback <- &InterfaceReleased{Index: index, Success: success}
 }
 
-func interfaceGot(index int, pciAddr int, name string, isDefault bool, callback chan QemuEvent, inf *network.Settings) {
+func interfaceGot(index int, pciAddr int, name string, isDefault bool, callback chan VmEvent, inf *network.Settings) {
 
 	ip, nw, err := net.ParseCIDR(fmt.Sprintf("%s/%d", inf.IPAddress, inf.IPPrefixLen))
 	if err != nil {

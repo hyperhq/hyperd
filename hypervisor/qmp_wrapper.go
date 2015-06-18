@@ -50,7 +50,7 @@ func newDiskAddSession(ctx *VmContext, name, sourceType, filename, format string
 	}
 }
 
-func newDiskDelSession(ctx *VmContext, id int, callback QemuEvent) {
+func newDiskDelSession(ctx *VmContext, id int, callback VmEvent) {
 	commands := make([]*QmpCommand, 2)
 	commands[1] = &QmpCommand{
 		Execute: "device_del",
@@ -110,7 +110,7 @@ func newNetworkAddSession(ctx *VmContext, fd uint64, device, mac string, index, 
 	}
 }
 
-func newNetworkDelSession(ctx *VmContext, device string, callback QemuEvent) {
+func newNetworkDelSession(ctx *VmContext, device string, callback VmEvent) {
 	commands := make([]*QmpCommand, 2)
 	commands[0] = &QmpCommand{
 		Execute: "device_del",
