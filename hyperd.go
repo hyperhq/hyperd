@@ -8,7 +8,7 @@ import (
 	"syscall"
 
 	"hyper/engine"
-	"hyper/hyperdaemon"
+	"hyper/daemon"
 	"hyper/lib/glog"
 	"hyper/utils"
 )

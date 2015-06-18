@@ -119,7 +119,7 @@ func (daemon *Daemon) Restore() error {
 
 	podList := map[string]string{}
 
-	iter := (daemon.db).NewIterator(util.BytesPrefix([]byte("pod-")), nil)
+	iter := daemon.db.NewIterator(util.BytesPrefix([]byte("pod-")), nil)
 	for iter.Next() {
 		key := iter.Key()
 		value := iter.Value()
@@ -128,7 +128,7 @@ func (daemon *Daemon) Restore() error {
 			continue
 		}
 		glog.V(1).Infof("Get the pod item, pod is %s!", key)
-		err := (daemon.db).Delete(key, nil)
+		err := daemon.db.Delete(key, nil)
 		if err != nil {
 			return err
 		}
@@ -362,7 +362,7 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 }
 
 func (daemon *Daemon) GetPodNum() int64 {
-	iter := (daemon.db).NewIterator(util.BytesPrefix([]byte("pod-")), nil)
+	iter := daemon.db.NewIterator(util.BytesPrefix([]byte("pod-")), nil)
 	var i int64 = 0
 	for iter.Next() {
 		key := iter.Key()
@@ -391,18 +391,18 @@ func (daemon *Daemon) GetRunningPodNum() int64 {
 
 func (daemon *Daemon) WritePodToDB(podName string, podData []byte) error {
 	key := fmt.Sprintf("pod-%s", podName)
-	_, err := (daemon.db).Get([]byte(key), nil)
+	_, err := daemon.db.Get([]byte(key), nil)
 	if err != nil {
-		err = (daemon.db).Put([]byte(key), podData, nil)
+		err = daemon.db.Put([]byte(key), podData, nil)
 		if err != nil {
 			return err
 		}
 	} else {
-		err = (daemon.db).Delete([]byte(key), nil)
+		err = daemon.db.Delete([]byte(key), nil)
 		if err != nil {
 			return err
 		}
-		err = (daemon.db).Put([]byte(key), podData, nil)
+		err = daemon.db.Put([]byte(key), podData, nil)
 		if err != nil {
 			return err
 		}
@@ -412,7 +412,7 @@ func (daemon *Daemon) WritePodToDB(podName string, podData []byte) error {
 
 func (daemon *Daemon) GetPodByName(podName string) ([]byte, error) {
 	key := fmt.Sprintf("pod-%s", podName)
-	data, err := (daemon.db).Get([]byte(key), nil)
+	data, err := daemon.db.Get([]byte(key), nil)
 	if err != nil {
 		return []byte(""), err
 	}
@@ -421,7 +421,7 @@ func (daemon *Daemon) GetPodByName(podName string) ([]byte, error) {
 
 func (daemon *Daemon) DeletePodFromDB(podName string) error {
 	key := fmt.Sprintf("pod-%s", podName)
-	err := (daemon.db).Delete([]byte(key), nil)
+	err := daemon.db.Delete([]byte(key), nil)
 	if err != nil {
 		return err
 	}
@@ -430,7 +430,7 @@ func (daemon *Daemon) DeletePodFromDB(podName string) error {
 
 func (daemon *Daemon) SetVolumeId(podId, volName, dev_id string) error {
 	key := fmt.Sprintf("vol-%s-%s", podId, dev_id)
-	err := (daemon.db).Put([]byte(key), []byte(fmt.Sprintf("%s:%s", volName, dev_id)), nil)
+	err := daemon.db.Put([]byte(key), []byte(fmt.Sprintf("%s:%s", volName, dev_id)), nil)
 	if err != nil {
 		return err
 	}
@@ -438,7 +438,7 @@ func (daemon *Daemon) SetVolumeId(podId, volName, dev_id string) error {
 }
 
 func (daemon *Daemon) GetMaxDeviceId() (int, error) {
-	iter := (daemon.db).NewIterator(util.BytesPrefix([]byte("vol-")), nil)
+	iter := daemon.db.NewIterator(util.BytesPrefix([]byte("vol-")), nil)
 	maxId := 1
 	for iter.Next() {
 		value := iter.Value()
@@ -459,7 +459,7 @@ func (daemon *Daemon) GetMaxDeviceId() (int, error) {
 func (daemon *Daemon) GetVolumeId(podId, volName string) (int, error) {
 	dev_id := 0
 	key := fmt.Sprintf("vol-%s", podId)
-	iter := (daemon.db).NewIterator(util.BytesPrefix([]byte(key)), nil)
+	iter := daemon.db.NewIterator(util.BytesPrefix([]byte(key)), nil)
 	for iter.Next() {
 		value := iter.Value()
 		fields := strings.Split(string(value), ":")
@@ -477,7 +477,7 @@ func (daemon *Daemon) GetVolumeId(podId, volName string) (int, error) {
 
 func (daemon *Daemon) DeleteVolumeId(podId string) error {
 	key := fmt.Sprintf("vol-%s", podId)
-	iter := (daemon.db).NewIterator(util.BytesPrefix([]byte(key)), nil)
+	iter := daemon.db.NewIterator(util.BytesPrefix([]byte(key)), nil)
 	for iter.Next() {
 		value := iter.Key()
 		if string(value)[4:18] == podId {
@@ -488,7 +488,7 @@ func (daemon *Daemon) DeleteVolumeId(podId string) error {
 				return err
 			}
 		}
-		err := (daemon.db).Delete(value, nil)
+		err := daemon.db.Delete(value, nil)
 		if err != nil {
 			return err
 		}
@@ -510,7 +510,7 @@ func (daemon *Daemon) WritePodAndContainers(podName string) error {
 			value = value + ":" + c.Id
 		}
 	}
-	err := (daemon.db).Put([]byte(key), []byte(value), nil)
+	err := daemon.db.Put([]byte(key), []byte(value), nil)
 	if err != nil {
 		return err
 	}
@@ -519,7 +519,7 @@ func (daemon *Daemon) WritePodAndContainers(podName string) error {
 
 func (daemon *Daemon) GetPodContainersByName(podName string) ([]string, error) {
 	key := fmt.Sprintf("pod-container-%s", podName)
-	data, err := (daemon.db).Get([]byte(key), nil)
+	data, err := daemon.db.Get([]byte(key), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -529,7 +529,7 @@ func (daemon *Daemon) GetPodContainersByName(podName string) ([]string, error) {
 
 func (daemon *Daemon) DeletePodContainerFromDB(podName string) error {
 	key := fmt.Sprintf("pod-container-%s", podName)
-	err := (daemon.db).Delete([]byte(key), nil)
+	err := daemon.db.Delete([]byte(key), nil)
 	if err != nil {
 		return err
 	}
@@ -538,7 +538,7 @@ func (daemon *Daemon) DeletePodContainerFromDB(podName string) error {
 
 func (daemon *Daemon) GetVmByPod(podId string) (string, error) {
 	key := fmt.Sprintf("vm-%s", podId)
-	data, err := (daemon.db).Get([]byte(key), nil)
+	data, err := daemon.db.Get([]byte(key), nil)
 	if err != nil {
 		return "", err
 	}
@@ -548,18 +548,18 @@ func (daemon *Daemon) GetVmByPod(podId string) (string, error) {
 func (daemon *Daemon) UpdateVmByPod(podId, vmId string) error {
 	glog.V(1).Infof("Add or Update the VM info for pod(%s)", podId)
 	key := fmt.Sprintf("vm-%s", podId)
-	_, err := (daemon.db).Get([]byte(key), nil)
+	_, err := daemon.db.Get([]byte(key), nil)
 	if err == nil {
-		err = (daemon.db).Delete([]byte(key), nil)
+		err = daemon.db.Delete([]byte(key), nil)
 		if err != nil {
 			return err
 		}
-		err = (daemon.db).Put([]byte(key), []byte(vmId), nil)
+		err = daemon.db.Put([]byte(key), []byte(vmId), nil)
 		if err != nil {
 			return err
 		}
 	} else {
-		err = (daemon.db).Put([]byte(key), []byte(vmId), nil)
+		err = daemon.db.Put([]byte(key), []byte(vmId), nil)
 		if err != nil {
 			return err
 		}
@@ -570,11 +570,11 @@ func (daemon *Daemon) UpdateVmByPod(podId, vmId string) error {
 
 func (daemon *Daemon) DeleteVmByPod(podId string) error {
 	key := fmt.Sprintf("vm-%s", podId)
-	vmId, err := (daemon.db).Get([]byte(key), nil)
+	vmId, err := daemon.db.Get([]byte(key), nil)
 	if err != nil {
 		return err
 	}
-	err = (daemon.db).Delete([]byte(key), nil)
+	err = daemon.db.Delete([]byte(key), nil)
 	if err != nil {
 		return err
 	}
@@ -706,19 +706,19 @@ func (daemon *Daemon) SetPodContainerStatus(podId string, data []uint32) {
 
 func (daemon *Daemon) UpdateVmData(vmId string, data []byte) error {
 	key := fmt.Sprintf("vmdata-%s", vmId)
-	_, err := (daemon.db).Get([]byte(key), nil)
+	_, err := daemon.db.Get([]byte(key), nil)
 	if err == nil {
-		err = (daemon.db).Delete([]byte(key), nil)
+		err = daemon.db.Delete([]byte(key), nil)
 		if err != nil {
 			return err
 		}
-		err = (daemon.db).Put([]byte(key), data, nil)
+		err = daemon.db.Put([]byte(key), data, nil)
 		if err != nil {
 			return err
 		}
 	}
 	if err != nil && strings.Contains(err.Error(), "not found") {
-		err = (daemon.db).Put([]byte(key), data, nil)
+		err = daemon.db.Put([]byte(key), data, nil)
 		if err != nil {
 			return err
 		}
@@ -728,7 +728,7 @@ func (daemon *Daemon) UpdateVmData(vmId string, data []byte) error {
 
 func (daemon *Daemon) GetVmData(vmId string) ([]byte, error) {
 	key := fmt.Sprintf("vmdata-%s", vmId)
-	data, err := (daemon.db).Get([]byte(key), nil)
+	data, err := daemon.db.Get([]byte(key), nil)
 	if err != nil {
 		return []byte(""), err
 	}
@@ -737,7 +737,7 @@ func (daemon *Daemon) GetVmData(vmId string) ([]byte, error) {
 
 func (daemon *Daemon) DeleteVmData(vmId string) error {
 	key := fmt.Sprintf("vmdata-%s", vmId)
-	err := (daemon.db).Delete([]byte(key), nil)
+	err := daemon.db.Delete([]byte(key), nil)
 	if err != nil {
 		return err
 	}
@@ -759,10 +759,10 @@ func (daemon *Daemon) DestroyAllVm() error {
 	for _, pod := range daemon.podList {
 		daemon.StopPod(pod.Id, "yes")
 	}
-	iter := (daemon.db).NewIterator(util.BytesPrefix([]byte("vm-")), nil)
+	iter := daemon.db.NewIterator(util.BytesPrefix([]byte("vm-")), nil)
 	for iter.Next() {
 		key := iter.Key()
-		(daemon.db).Delete(key, nil)
+		daemon.db.Delete(key, nil)
 	}
 	iter.Release()
 	err := iter.Error()
@@ -787,7 +787,7 @@ func (daemon *Daemon) shutdown() error {
 	for vm, _ := range daemon.vmList {
 		daemon.KillVm(vm)
 	}
-	(daemon.db).Close()
+	daemon.db.Close()
 	glog.Flush()
 	return nil
 }
