@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"hyper/lib/glog"
+	"hyper/lib/telnet"
 	"net"
 	"time"
 )
@@ -16,6 +17,37 @@ type DecodedMessage struct {
 
 type FinishCmd struct {
 	Seq uint64 `json:"seq"`
+}
+
+func waitConsoleOutput(ctx *VmContext) {
+
+	conn, err := UnixSocketConnect(ctx.ConsoleSockName)
+	if err != nil {
+		glog.Error("failed to connected to ", ctx.ConsoleSockName, " ", err.Error())
+		return
+	}
+
+	glog.V(1).Info("connected to ", ctx.ConsoleSockName)
+
+	tc, err := telnet.NewConn(conn)
+	if err != nil {
+		glog.Error("fail to init telnet connection to ", ctx.ConsoleSockName, ": ", err.Error())
+		return
+	}
+	glog.V(1).Infof("connected %s as telnet mode.", ctx.ConsoleSockName)
+
+	cout := make(chan string, 128)
+	go TtyLiner(tc, cout)
+
+	for {
+		line, ok := <-cout
+		if ok {
+			glog.V(1).Info("[console] ", line)
+		} else {
+			glog.Info("console output end")
+			break
+		}
+	}
 }
 
 func newVmMessage(m *DecodedMessage) []byte {
@@ -66,11 +98,11 @@ func readVmMessage(conn *net.UnixConn) (*DecodedMessage, error) {
 }
 
 func waitInitReady(ctx *VmContext) {
-	conn, err := unixSocketConnect(ctx.hyperSockName)
+	conn, err := UnixSocketConnect(ctx.HyperSockName)
 	if err != nil {
 		glog.Error("Cannot connect to hyper socket ", err.Error())
-		ctx.hub <- &InitFailedEvent{
-			reason: "Cannot connect to hyper socket " + err.Error(),
+		ctx.Hub <- &InitFailedEvent{
+			Reason: "Cannot connect to hyper socket " + err.Error(),
 		}
 		return
 	}
@@ -80,29 +112,29 @@ func waitInitReady(ctx *VmContext) {
 	msg, err := readVmMessage(conn.(*net.UnixConn))
 	if err != nil {
 		glog.Error("read init message failed... ", err.Error())
-		ctx.hub <- &InitFailedEvent{
-			reason: "read init message failed... " + err.Error(),
+		ctx.Hub <- &InitFailedEvent{
+			Reason: "read init message failed... " + err.Error(),
 		}
 		conn.Close()
 	} else if msg.code == INIT_READY {
 		glog.Info("Get init ready message")
-		ctx.hub <- &InitConnectedEvent{conn: conn.(*net.UnixConn)}
+		ctx.Hub <- &InitConnectedEvent{conn: conn.(*net.UnixConn)}
 		go waitCmdToInit(ctx, conn.(*net.UnixConn))
 	} else {
 		glog.Warningf("Get init message %d", msg.code)
-		ctx.hub <- &InitFailedEvent{
-			reason: fmt.Sprintf("Get init message %d", msg.code),
+		ctx.Hub <- &InitFailedEvent{
+			Reason: fmt.Sprintf("Get init message %d", msg.code),
 		}
 		conn.Close()
 	}
 }
 
 func connectToInit(ctx *VmContext) {
-	conn, err := unixSocketConnect(ctx.hyperSockName)
+	conn, err := UnixSocketConnect(ctx.HyperSockName)
 	if err != nil {
 		glog.Error("Cannot re-connect to hyper socket ", err.Error())
-		ctx.hub <- &InitFailedEvent{
-			reason: "Cannot re-connect to hyper socket " + err.Error(),
+		ctx.Hub <- &InitFailedEvent{
+			Reason: "Cannot re-connect to hyper socket " + err.Error(),
 		}
 		return
 	}
@@ -129,13 +161,13 @@ func waitCmdToInit(ctx *VmContext, init *net.UnixConn) {
 			if len(cmds) > 0 {
 				if cmd.code == INIT_ACK {
 					if cmds[0].code != INIT_PING {
-						ctx.hub <- &CommandAck{
+						ctx.Hub <- &CommandAck{
 							reply: cmds[0].code,
 							msg:   cmd.message,
 						}
 					}
 				} else {
-					ctx.hub <- &CommandError{
+					ctx.Hub <- &CommandError{
 						context: cmds[0],
 						msg:     cmd.message,
 					}
@@ -172,7 +204,7 @@ func waitCmdToInit(ctx *VmContext, init *net.UnixConn) {
 
 			glog.V(1).Infof("Pod finished, returned %d values", num)
 
-			ctx.hub <- &PodFinished{
+			ctx.Hub <- &PodFinished{
 				result: results,
 			}
 		} else {
@@ -188,7 +220,7 @@ func waitCmdToInit(ctx *VmContext, init *net.UnixConn) {
 			if pongTimer == nil {
 				glog.V(1).Info("message sent, set pong timer")
 				pongTimer = time.AfterFunc(30*time.Second, func() {
-					ctx.hub <- &Interrupted{reason: "init not reply ping mesg"}
+					ctx.Hub <- &Interrupted{Reason: "init not reply ping mesg"}
 				})
 			}
 		}
@@ -199,7 +231,7 @@ func waitInitAck(ctx *VmContext, init *net.UnixConn) {
 	for {
 		res, err := readVmMessage(init)
 		if err != nil {
-			ctx.hub <- &Interrupted{reason: "init socket failed " + err.Error()}
+			ctx.Hub <- &Interrupted{Reason: "init socket failed " + err.Error()}
 			return
 		} else if res.code == INIT_ACK || res.code == INIT_ERROR || res.code == INIT_FINISHPOD {
 			ctx.vm <- res

@@ -8,6 +8,9 @@ import (
 
 func TestInitContext(t *testing.T) {
 
+	dr := &EmptyDriver{}
+	dr.Initialize()
+
 	b := &BootConfig{
 		CPU:    3,
 		Memory: 202,
@@ -15,7 +18,7 @@ func TestInitContext(t *testing.T) {
 		Initrd: "someinitrd",
 	}
 
-	ctx, _ := initContext("vmid", nil, nil, b)
+	ctx, _ := InitContext(dr, "vmid", nil, nil, nil, b)
 
 	if ctx.Id != "vmid" {
 		t.Error("id should be vmid, but is ", ctx.Id)
@@ -33,6 +36,9 @@ func TestInitContext(t *testing.T) {
 
 func TestParseSpec(t *testing.T) {
 
+	dr := &EmptyDriver{}
+	dr.Initialize()
+
 	b := &BootConfig{
 		CPU:    1,
 		Memory: 128,
@@ -44,7 +50,7 @@ func TestParseSpec(t *testing.T) {
 		&ContainerInfo{},
 	}
 
-	ctx, _ := initContext("vmmid", nil, nil, b)
+	ctx, _ := InitContext(dr, "vmid", nil, nil, nil, b)
 
 	spec := pod.UserPod{}
 	err := json.Unmarshal([]byte(testJson("basic")), &spec)
@@ -82,6 +88,9 @@ func TestParseSpec(t *testing.T) {
 }
 
 func TestParseVolumes(t *testing.T) {
+	dr := &EmptyDriver{}
+	dr.Initialize()
+
 	b := &BootConfig{
 		CPU:    1,
 		Memory: 128,
@@ -89,7 +98,7 @@ func TestParseVolumes(t *testing.T) {
 		Initrd: "someinitrd",
 	}
 
-	ctx, _ := initContext("vmmid", nil, nil, b)
+	ctx, _ := InitContext(dr, "vmid", nil, nil, nil, b)
 
 	spec := pod.UserPod{}
 	err := json.Unmarshal([]byte(testJson("with_volumes")), &spec)

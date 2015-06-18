@@ -114,11 +114,11 @@ func waitTtyMessage(ctx *VmContext, conn *net.UnixConn) {
 }
 
 func waitPts(ctx *VmContext) {
-	conn, err := unixSocketConnect(ctx.ttySockName)
+	conn, err := UnixSocketConnect(ctx.TtySockName)
 	if err != nil {
 		glog.Error("Cannot connect to tty socket ", err.Error())
-		ctx.hub <- &InitFailedEvent{
-			reason: "Cannot connect to tty socket " + err.Error(),
+		ctx.Hub <- &InitFailedEvent{
+			Reason: "Cannot connect to tty socket " + err.Error(),
 		}
 		return
 	}
@@ -131,7 +131,7 @@ func waitPts(ctx *VmContext) {
 		res, err := readTtyMessage(conn.(*net.UnixConn))
 		if err != nil {
 			glog.V(1).Info("tty socket closed, quit the reading goroutine ", err.Error())
-			ctx.hub <- &Interrupted{reason: "tty socket failed " + err.Error()}
+			ctx.Hub <- &Interrupted{Reason: "tty socket failed " + err.Error()}
 			close(ctx.ptys.channel)
 			return
 		}
@@ -284,7 +284,7 @@ func (pts *pseudoTtys) ptyConnect(ctx *VmContext, container int, session uint64,
 
 func LinerTty(output chan string) *TtyIO {
 	r, w := io.Pipe()
-	go ttyLiner(r, output)
+	go TtyLiner(r, output)
 	return &TtyIO{
 		Stdin:    nil,
 		Stdout:   w,
@@ -292,7 +292,7 @@ func LinerTty(output chan string) *TtyIO {
 	}
 }
 
-func ttyLiner(conn io.Reader, output chan string) {
+func TtyLiner(conn io.Reader, output chan string) {
 	buf := make([]byte, 1)
 	line := []byte{}
 	cr := false

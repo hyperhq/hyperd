@@ -3,9 +3,9 @@ package hypervisor
 import (
 	"encoding/json"
 	"errors"
+	"hyper/lib/glog"
 	"hyper/pod"
 	"hyper/types"
-	"os"
 	"sync"
 )
 
@@ -29,7 +29,7 @@ type PersistNetworkInfo struct {
 
 type PersistInfo struct {
 	Id          string
-	Pid         int
+	DriverInfo  map[string]interface{}
 	UserSpec    *pod.UserPod
 	VmSpec      *VmPod
 	HwStat      *VmHwStatus
@@ -38,19 +38,20 @@ type PersistInfo struct {
 }
 
 func (ctx *VmContext) dump() (*PersistInfo, error) {
+	dr, err := ctx.DCtx.Dump()
+	if err != nil {
+		return nil, err
+	}
+
 	info := &PersistInfo{
 		Id:          ctx.Id,
+		DriverInfo:  dr,
 		UserSpec:    ctx.userSpec,
 		VmSpec:      ctx.vmSpec,
 		HwStat:      ctx.dumpHwInfo(),
 		VolumeList:  make([]*PersistVolumeInfo, len(ctx.devices.imageMap)+len(ctx.devices.volumeMap)),
 		NetworkList: make([]*PersistNetworkInfo, len(ctx.devices.networkMap)),
 	}
-
-	if ctx.process == nil {
-		return nil, errors.New("No process id available")
-	}
-	info.Pid = ctx.process.Pid
 
 	vid := 0
 	for _, image := range ctx.devices.imageMap {
@@ -162,21 +163,22 @@ func (pinfo *PersistInfo) serialize() ([]byte, error) {
 	return json.Marshal(pinfo)
 }
 
-func (pinfo *PersistInfo) vmContext(hub chan VmEvent,
+func (pinfo *PersistInfo) vmContext(driver HypervisorDriver,
+	hub chan VmEvent,
 	client chan *types.QemuResponse,
 	wg *sync.WaitGroup) (*VmContext, error) {
 
-	proc, err := os.FindProcess(pinfo.Pid)
+	dc, err := driver.LoadContext(pinfo.DriverInfo)
+	if err != nil {
+		glog.Error("cannot load driver context: ", err.Error())
+		return nil, err
+	}
+
+	ctx, err := InitContext(driver, pinfo.Id, hub, client, dc, &BootConfig{})
 	if err != nil {
 		return nil, err
 	}
 
-	ctx, err := initContext(pinfo.Id, hub, client, &BootConfig{})
-	if err != nil {
-		return nil, err
-	}
-
-	ctx.process = proc
 	ctx.vmSpec = pinfo.VmSpec
 	ctx.userSpec = pinfo.UserSpec
 	ctx.wg = wg

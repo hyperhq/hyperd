@@ -6,14 +6,23 @@ import (
 	"hyper/lib/glog"
 	"hyper/pod"
 	"hyper/types"
+	"time"
 )
+
+func (ctx *VmContext) timedKill(seconds int) {
+	ctx.timer = time.AfterFunc(time.Duration(seconds)*time.Second, func() {
+		if ctx != nil && ctx.handler != nil {
+			ctx.DCtx.Kill(ctx)
+		}
+	})
+}
 
 func (ctx *VmContext) onQemuExit(reclaim bool) bool {
 	glog.V(1).Info("qemu has exit...")
 	ctx.reportVmShutdown()
 	ctx.setTimeout(60)
 
-	ctx.wdt <- "quit"
+	ctx.DCtx.Kill(ctx)
 	if reclaim {
 		ctx.reclaimDevice()
 	}
@@ -27,11 +36,6 @@ func (ctx *VmContext) reclaimDevice() {
 	ctx.releaseAufsDir()
 	ctx.removeDMDevice()
 	ctx.releaseNetwork()
-	if ctx.wait {
-		glog.V(1).Info("reclaimDevice someone is waiting for us...")
-		ctx.wg.Done()
-		ctx.wait = false
-	}
 }
 
 func (ctx *VmContext) detatchDevice() {
@@ -128,8 +132,8 @@ func (ctx *VmContext) attachCmd(cmd *AttachCommand) {
 func (ctx *VmContext) startPod() {
 	pod, err := json.Marshal(*ctx.vmSpec)
 	if err != nil {
-		ctx.hub <- &InitFailedEvent{
-			reason: "Generated wrong run profile " + err.Error(),
+		ctx.Hub <- &InitFailedEvent{
+			Reason: "Generated wrong run profile " + err.Error(),
 		}
 		return
 	}
@@ -147,9 +151,8 @@ func (ctx *VmContext) stopPod() {
 	}
 }
 
-func (ctx *VmContext) exitVM(err bool, msg string, hasPod, wait bool) {
+func (ctx *VmContext) exitVM(err bool, msg string, hasPod bool, wait bool) {
 	ctx.wait = wait
-	glog.V(1).Infof("exitVM need to notify waiter %d", ctx.wait)
 	if hasPod {
 		ctx.shutdownVM(err, msg)
 		ctx.Become(stateTerminating, "TERMINATING")
@@ -173,7 +176,7 @@ func (ctx *VmContext) poweroffVM(err bool, msg string) {
 		ctx.reportVmFault(msg)
 		glog.Error("Shutting down because of an exception: ", msg)
 	}
-	qmpQemuQuit(ctx)
+	ctx.DCtx.Shutdown(ctx)
 	ctx.timedKill(10)
 }
 
@@ -181,15 +184,11 @@ func (ctx *VmContext) poweroffVM(err bool, msg string) {
 func commonStateHandler(ctx *VmContext, ev VmEvent, hasPod bool) bool {
 	processed := true
 	switch ev.Event() {
-	case EVENT_QMP_EVENT:
-		if ev.(*QmpEvent).Type == QMP_EVENT_SHUTDOWN {
-			glog.Info("Got QMP shutdown event, go to cleaning up")
-			ctx.unsetTimeout()
-			if closed := ctx.onQemuExit(hasPod); !closed {
-				ctx.Become(stateDestroying, "DESTROYING")
-			}
-		} else {
-			processed = false
+	case EVENT_VM_EXIT:
+		glog.Info("Got VM shutdown event, go to cleaning up")
+		ctx.unsetTimeout()
+		if closed := ctx.onQemuExit(hasPod); !closed {
+			ctx.Become(stateDestroying, "DESTROYING")
 		}
 	case ERROR_INTERRUPTED:
 		glog.Info("Connection interrupted, quit...")
@@ -212,7 +211,20 @@ func deviceInitHandler(ctx *VmContext, ev VmEvent) bool {
 	case EVENT_INTERFACE_ADD:
 		info := ev.(*InterfaceCreated)
 		ctx.interfaceCreated(info)
-		newNetworkAddSession(ctx, uint64(info.Fd.Fd()), info.DeviceName, info.MacAddr, info.Index, info.PCIAddr)
+		h := &HostNicInfo{
+			Fd:      uint64(info.Fd.Fd()),
+			Device:  info.HostDevice,
+			Mac:     info.MacAddr,
+			Bridge:  info.Bridge,
+			Gateway: info.Bridge,
+		}
+		g := &GuestNicInfo{
+			Device:  info.DeviceName,
+			Ipaddr:  info.IpAddr,
+			Index:   info.Index,
+			Busaddr: info.PCIAddr,
+		}
+		ctx.DCtx.AddNic(ctx, h, g)
 	case EVENT_INTERFACE_INSERTED:
 		info := ev.(*NetDevInsertedEvent)
 		ctx.netdevInserted(info)
@@ -250,7 +262,7 @@ func deviceRemoveHandler(ctx *VmContext, ev VmEvent) (bool, bool) {
 		}
 
 		glog.V(1).Infof("release %d interface: %s", n.Index, nic.IpAddr)
-		go ReleaseInterface(n.Index, nic.IpAddr, nic.Fd, maps, ctx.hub)
+		go ReleaseInterface(n.Index, nic.IpAddr, nic.Fd, maps, ctx.Hub)
 	default:
 		processed = false
 	}
@@ -261,12 +273,12 @@ func initFailureHandler(ctx *VmContext, ev VmEvent) bool {
 	processed := true
 	switch ev.Event() {
 	case ERROR_INIT_FAIL: // Qemu connection Failure
-		reason := ev.(*InitFailedEvent).reason
+		reason := ev.(*InitFailedEvent).Reason
 		glog.Error(reason)
 	case ERROR_QMP_FAIL: // Device allocate and insert Failure
 		reason := "QMP protocol exception"
-		if ev.(*DeviceFailed).session != nil {
-			reason = "QMP protocol exception: failed while waiting " + EventString(ev.(*DeviceFailed).session.Event())
+		if ev.(*DeviceFailed).Session != nil {
+			reason = "QMP protocol exception: failed while waiting " + EventString(ev.(*DeviceFailed).Session.Event())
 		}
 		glog.Error(reason)
 	default:
@@ -283,7 +295,7 @@ func stateInit(ctx *VmContext, ev VmEvent) {
 		ctx.Become(stateDestroying, "DESTROYING")
 	} else {
 		switch ev.Event() {
-		case EVENT_QEMU_EXIT:
+		case EVENT_VM_START_FAILED:
 			glog.Error("Qemu did not start up properly, go to cleaning up")
 			ctx.reportVmFault("Qemu did not start up properly, go to cleaning up")
 			ctx.Close()
@@ -325,7 +337,7 @@ func stateStarting(ctx *VmContext, ev VmEvent) {
 		ctx.Become(stateTerminating, "TERMINATING")
 	} else {
 		switch ev.Event() {
-		case EVENT_QEMU_EXIT:
+		case EVENT_VM_START_FAILED:
 			glog.Info("Qemu did not start up properly, go to cleaning up")
 			if closed := ctx.onQemuExit(true); !closed {
 				ctx.Become(stateDestroying, "DESTROYING")
@@ -368,7 +380,7 @@ func stateStarting(ctx *VmContext, ev VmEvent) {
 				ctx.Become(stateTerminating, "TERMINATING")
 				glog.Error(reason)
 			}
-		case EVENT_QEMU_TIMEOUT:
+		case EVENT_VM_TIMEOUT:
 			reason := "Start POD timeout"
 			ctx.shutdownVM(true, reason)
 			ctx.Become(stateTerminating, "TERMINATING")
@@ -450,7 +462,7 @@ func statePodStopping(ctx *VmContext, ev VmEvent) {
 				ctx.Become(stateTerminating, "TERMINATING")
 				glog.Error("Stop pod failed as init report")
 			}
-		case EVENT_QEMU_TIMEOUT:
+		case EVENT_VM_TIMEOUT:
 			reason := "stopping POD timeout"
 			ctx.shutdownVM(true, reason)
 			ctx.Become(stateTerminating, "TERMINATING")
@@ -463,15 +475,13 @@ func statePodStopping(ctx *VmContext, ev VmEvent) {
 
 func stateTerminating(ctx *VmContext, ev VmEvent) {
 	switch ev.Event() {
-	case EVENT_QMP_EVENT:
-		if ev.(*QmpEvent).Type == QMP_EVENT_SHUTDOWN {
-			glog.Info("Got QMP shutdown event while terminating, go to cleaning up")
-			ctx.unsetTimeout()
-			if closed := ctx.onQemuExit(true); !closed {
-				ctx.Become(stateDestroying, "DESTROYING")
-			}
+	case EVENT_VM_EXIT:
+		glog.Info("Got VM shutdown event while terminating, go to cleaning up")
+		ctx.unsetTimeout()
+		if closed := ctx.onQemuExit(true); !closed {
+			ctx.Become(stateDestroying, "DESTROYING")
 		}
-	case EVENT_QEMU_KILL:
+	case EVENT_VM_KILL:
 		glog.Info("Got Qemu force killed message, go to cleaning up")
 		ctx.unsetTimeout()
 		if closed := ctx.onQemuExit(true); !closed {
@@ -493,7 +503,7 @@ func stateTerminating(ctx *VmContext, ev VmEvent) {
 			glog.Warning("Destroy pod failed")
 			ctx.poweroffVM(true, "Destroy pod failed")
 		}
-	case EVENT_QEMU_TIMEOUT:
+	case EVENT_VM_TIMEOUT:
 		glog.Warning("Qemu did not exit in time, try to stop it")
 		ctx.poweroffVM(true, "vm terminating timeout")
 	case ERROR_INTERRUPTED:
@@ -531,7 +541,7 @@ func stateCleaning(ctx *VmContext, ev VmEvent) {
 			glog.Info("vm cleaning to idle, got release, quit")
 			ctx.reportVmShutdown()
 			ctx.Become(stateDestroying, "DESTROYING")
-		case EVENT_QEMU_TIMEOUT:
+		case EVENT_VM_TIMEOUT:
 			glog.Warning("Qemu did not exit in time, try to stop it")
 			ctx.poweroffVM(true, "pod stopp/unplug timeout")
 			ctx.Become(stateDestroying, "DESTROYING")
@@ -558,15 +568,13 @@ func stateDestroying(ctx *VmContext, ev VmEvent) {
 		}
 	} else {
 		switch ev.Event() {
-		case EVENT_QMP_EVENT:
-			if ev.(*QmpEvent).Type == QMP_EVENT_SHUTDOWN {
-				glog.Info("Got QMP shutdown event")
-				ctx.unsetTimeout()
-				if closed := ctx.onQemuExit(false); closed {
-					glog.Info("VM Context closed.")
-				}
+		case EVENT_VM_EXIT:
+			glog.Info("Got VM shutdown event")
+			ctx.unsetTimeout()
+			if closed := ctx.onQemuExit(false); closed {
+				glog.Info("VM Context closed.")
 			}
-		case EVENT_QEMU_KILL:
+		case EVENT_VM_KILL:
 			glog.Info("Got Qemu force killed message")
 			ctx.unsetTimeout()
 			if closed := ctx.onQemuExit(true); closed {
@@ -577,7 +585,7 @@ func stateDestroying(ctx *VmContext, ev VmEvent) {
 		case COMMAND_RELEASE:
 			glog.Info("vm destroying, got release")
 			ctx.reportVmShutdown()
-		case EVENT_QEMU_TIMEOUT:
+		case EVENT_VM_TIMEOUT:
 			glog.Info("Device removing timeout")
 			ctx.Close()
 		default:

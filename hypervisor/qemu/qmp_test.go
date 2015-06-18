@@ -1,7 +1,8 @@
-package hypervisor
+package qemu
 
 import (
 	"encoding/json"
+	"hyper/hypervisor"
 	"net"
 	"testing"
 	"time"
@@ -34,7 +35,7 @@ func TestMessageParse(t *testing.T) {
 	}
 }
 
-func testQmpInitHelper(t *testing.T, ctx *VmContext) (*net.UnixListener, net.Conn) {
+func testQmpInitHelper(t *testing.T, ctx *QemuContext) (*net.UnixListener, net.Conn) {
 	t.Log("setup ", ctx.qmpSockName)
 
 	ss, err := net.ListenUnix("unix", &net.UnixAddr{ctx.qmpSockName, "unix"})
@@ -82,52 +83,51 @@ func testQmpInitHelper(t *testing.T, ctx *VmContext) (*net.UnixListener, net.Con
 	return ss, c
 }
 
-func TestQmpHello(t *testing.T) {
-
-	b := &BootConfig{
+func testQmpEnvironment() (*hypervisor.VmContext, *QemuContext) {
+	b := &hypervisor.BootConfig{
 		CPU:    1,
 		Memory: 128,
-		Kernel: DefaultKernel,
-		Initrd: DefaultInitrd,
+		Kernel: hypervisor.DefaultKernel,
+		Initrd: hypervisor.DefaultInitrd,
 	}
-	qemuChan := make(chan VmEvent, 128)
-	ctx, _ := initContext("vmid", qemuChan, nil, b)
+
+	qemuChan := make(chan hypervisor.VmEvent, 128)
+	dr := &QemuDriver{}
+	dr.Initialize()
+	ctx, _ := hypervisor.InitContext(dr, "vmid", qemuChan, nil, nil, b)
+
+	return ctx, ctx.DCtx.(*QemuContext)
+}
+
+func TestQmpHello(t *testing.T) {
+
+	ctx, qc := testQmpEnvironment()
 
 	go qmpHandler(ctx)
 
-	s, c := testQmpInitHelper(t, ctx)
+	s, c := testQmpInitHelper(t, qc)
 	defer s.Close()
 	defer c.Close()
 
 	c.Write([]byte(`{ "event": "SHUTDOWN", "timestamp": { "seconds": 1265044230, "microseconds": 450486 } }`))
 
-	ev := <-qemuChan
-	if ev.Event() != EVENT_QMP_EVENT {
-		t.Error("should got an event")
-	}
-	event := ev.(*QmpEvent)
-	if event.Type != "SHUTDOWN" {
-		t.Error("message is not shutdown, is ", event.Event)
+	ev := <-ctx.Hub
+	if ev.Event() != hypervisor.EVENT_VM_EXIT {
+		t.Error("should got an exit event")
 	}
 
 	t.Log("qmp finished")
 }
 
 func TestInitFail(t *testing.T) {
-	b := &BootConfig{
-		CPU:    1,
-		Memory: 128,
-		Kernel: DefaultKernel,
-		Initrd: DefaultInitrd,
-	}
-	qemuChan := make(chan VmEvent, 128)
-	ctx, _ := initContext("vmid", qemuChan, nil, b)
+
+	ctx, qc := testQmpEnvironment()
 
 	go qmpHandler(ctx)
 
-	t.Log("setup ", ctx.qmpSockName)
+	t.Log("setup ", qc.qmpSockName)
 
-	ss, err := net.ListenUnix("unix", &net.UnixAddr{ctx.qmpSockName, "unix"})
+	ss, err := net.ListenUnix("unix", &net.UnixAddr{qc.qmpSockName, "unix"})
 	if err != nil {
 		t.Error("fail to setup connect to qmp socket", err.Error())
 	}
@@ -171,8 +171,8 @@ func TestInitFail(t *testing.T) {
 
 	c.Write([]byte(`{ "error": {}}`))
 
-	ev := <-qemuChan
-	if ev.Event() != ERROR_INIT_FAIL {
+	ev := <-ctx.Hub
+	if ev.Event() != hypervisor.ERROR_INIT_FAIL {
 		t.Error("should got an event")
 	}
 
@@ -180,21 +180,15 @@ func TestInitFail(t *testing.T) {
 }
 
 func TestQmpConnTimeout(t *testing.T) {
-	b := &BootConfig{
-		CPU:    1,
-		Memory: 128,
-		Kernel: DefaultKernel,
-		Initrd: DefaultInitrd,
-	}
-	qemuChan := make(chan VmEvent, 128)
-	ctx, _ := initContext("vmid", qemuChan, nil, b)
+
+	ctx, _ := testQmpEnvironment()
 
 	go qmpHandler(ctx)
 
 	time.Sleep(6 * time.Second)
 
-	ev := <-qemuChan
-	if ev.Event() != ERROR_INIT_FAIL {
+	ev := <-ctx.Hub
+	if ev.Event() != hypervisor.ERROR_INIT_FAIL {
 		t.Error("should got an fail event")
 	}
 
@@ -202,20 +196,13 @@ func TestQmpConnTimeout(t *testing.T) {
 }
 
 func TestQmpInitTimeout(t *testing.T) {
-	b := &BootConfig{
-		CPU:    1,
-		Memory: 128,
-		Kernel: DefaultKernel,
-		Initrd: DefaultInitrd,
-	}
-	qemuChan := make(chan VmEvent, 128)
-	ctx, _ := initContext("vmid", qemuChan, nil, b)
+	ctx, qc := testQmpEnvironment()
 
 	go qmpHandler(ctx)
 
-	t.Log("connecting to ", ctx.qmpSockName)
+	t.Log("connecting to ", qc.qmpSockName)
 
-	ss, err := net.ListenUnix("unix", &net.UnixAddr{ctx.qmpSockName, "unix"})
+	ss, err := net.ListenUnix("unix", &net.UnixAddr{qc.qmpSockName, "unix"})
 	if err != nil {
 		t.Error("fail to setup connect to qmp socket", err.Error())
 	}
@@ -231,8 +218,8 @@ func TestQmpInitTimeout(t *testing.T) {
 
 	time.Sleep(11 * time.Second)
 
-	ev := <-qemuChan
-	if ev.Event() != ERROR_INIT_FAIL {
+	ev := <-ctx.Hub
+	if ev.Event() != hypervisor.ERROR_INIT_FAIL {
 		t.Error("should got an fail event")
 	}
 
@@ -241,22 +228,15 @@ func TestQmpInitTimeout(t *testing.T) {
 
 func TestQmpDiskSession(t *testing.T) {
 
-	b := &BootConfig{
-		CPU:    1,
-		Memory: 128,
-		Kernel: DefaultKernel,
-		Initrd: DefaultInitrd,
-	}
-	qemuChan := make(chan VmEvent, 128)
-	ctx, _ := initContext("vmid", qemuChan, nil, b)
+	ctx, qc := testQmpEnvironment()
 
 	go qmpHandler(ctx)
 
-	s, c := testQmpInitHelper(t, ctx)
+	s, c := testQmpInitHelper(t, qc)
 	defer s.Close()
 	defer c.Close()
 
-	newDiskAddSession(ctx, "vol1", "volume", "/dev/dm7", "raw", 5)
+	newDiskAddSession(qc, "vol1", "volume", "/dev/dm7", "raw", 5)
 
 	buf := make([]byte, 1024)
 	nr, err := c.Read(buf)
@@ -275,33 +255,26 @@ func TestQmpDiskSession(t *testing.T) {
 
 	c.Write([]byte(`{ "return": {}}`))
 
-	msg := <-qemuChan
-	if msg.Event() != EVENT_BLOCK_INSERTED {
+	msg := <-ctx.Hub
+	if msg.Event() != hypervisor.EVENT_BLOCK_INSERTED {
 		t.Error("wrong type of message", msg.Event())
 	}
 
-	info := msg.(*BlockdevInsertedEvent)
+	info := msg.(*hypervisor.BlockdevInsertedEvent)
 	t.Log("got block device", info.Name, info.SourceType, info.DeviceName)
 }
 
 func TestQmpFailOnce(t *testing.T) {
 
-	b := &BootConfig{
-		CPU:    1,
-		Memory: 128,
-		Kernel: DefaultKernel,
-		Initrd: DefaultInitrd,
-	}
-	qemuChan := make(chan VmEvent, 128)
-	ctx, _ := initContext("vmid", qemuChan, nil, b)
+	ctx, qc := testQmpEnvironment()
 
 	go qmpHandler(ctx)
 
-	s, c := testQmpInitHelper(t, ctx)
+	s, c := testQmpInitHelper(t, qc)
 	defer s.Close()
 	defer c.Close()
 
-	newDiskAddSession(ctx, "vol1", "volume", "/dev/dm7", "raw", 5)
+	newDiskAddSession(qc, "vol1", "volume", "/dev/dm7", "raw", 5)
 
 	buf := make([]byte, 1024)
 	nr, err := c.Read(buf)
@@ -327,32 +300,25 @@ func TestQmpFailOnce(t *testing.T) {
 
 	c.Write([]byte(`{ "return": {}}`))
 
-	msg := <-qemuChan
-	if msg.Event() != EVENT_BLOCK_INSERTED {
+	msg := <-ctx.Hub
+	if msg.Event() != hypervisor.EVENT_BLOCK_INSERTED {
 		t.Error("wrong type of message", msg.Event())
 	}
 
-	info := msg.(*BlockdevInsertedEvent)
+	info := msg.(*hypervisor.BlockdevInsertedEvent)
 	t.Log("got block device", info.Name, info.SourceType, info.DeviceName)
 }
 
 func TestQmpKeepFail(t *testing.T) {
-	b := &BootConfig{
-		CPU:    1,
-		Memory: 128,
-		Kernel: DefaultKernel,
-		Initrd: DefaultInitrd,
-	}
-	qemuChan := make(chan VmEvent, 128)
-	ctx, _ := initContext("vmid", qemuChan, nil, b)
+	ctx, qc := testQmpEnvironment()
 
 	go qmpHandler(ctx)
 
-	s, c := testQmpInitHelper(t, ctx)
+	s, c := testQmpInitHelper(t, qc)
 	defer s.Close()
 	defer c.Close()
 
-	newDiskAddSession(ctx, "vol1", "volume", "/dev/dm7", "raw", 5)
+	newDiskAddSession(qc, "vol1", "volume", "/dev/dm7", "raw", 5)
 
 	buf := make([]byte, 1024)
 	nr, err := c.Read(buf)
@@ -377,33 +343,26 @@ func TestQmpKeepFail(t *testing.T) {
 
 	c.Write([]byte(`{"error": {"class": "GenericError", "desc": "QMP input object member 'server' is unexpected"}}`))
 
-	msg := <-qemuChan
-	if msg.Event() != ERROR_QMP_FAIL {
+	msg := <-ctx.Hub
+	if msg.Event() != hypervisor.ERROR_QMP_FAIL {
 		t.Error("wrong type of message", msg.Event())
 	}
 
-	info := msg.(*DeviceFailed)
-	t.Log("got block device", EventString(info.session.Event()))
+	info := msg.(*hypervisor.DeviceFailed)
+	t.Log("got block device", hypervisor.EventString(info.Session.Event()))
 }
 
 func TestQmpNetSession(t *testing.T) {
 
-	b := &BootConfig{
-		CPU:    1,
-		Memory: 128,
-		Kernel: DefaultKernel,
-		Initrd: DefaultInitrd,
-	}
-	qemuChan := make(chan VmEvent, 128)
-	ctx, _ := initContext("vmid", qemuChan, nil, b)
+	ctx, qc := testQmpEnvironment()
 
 	go qmpHandler(ctx)
 
-	s, c := testQmpInitHelper(t, ctx)
+	s, c := testQmpInitHelper(t, qc)
 	defer s.Close()
 	defer c.Close()
 
-	newNetworkAddSession(ctx, 12, "eth0", "mac", 0, 3)
+	newNetworkAddSession(qc, 12, "eth0", "mac", 0, 3)
 
 	buf := make([]byte, 1024)
 	nr, err := c.Read(buf)
@@ -429,33 +388,26 @@ func TestQmpNetSession(t *testing.T) {
 	t.Log("received ", string(buf[:nr]))
 
 	c.Write([]byte(`{ "return": {}}`))
-	msg := <-qemuChan
-	if msg.Event() != EVENT_INTERFACE_INSERTED {
+	msg := <-ctx.Hub
+	if msg.Event() != hypervisor.EVENT_INTERFACE_INSERTED {
 		t.Error("wrong type of message", msg.Event())
 	}
 
-	info := msg.(*NetDevInsertedEvent)
+	info := msg.(*hypervisor.NetDevInsertedEvent)
 	t.Log("got net device", info.Address, info.Index, info.DeviceName)
 }
 
 func TestSessionQueue(t *testing.T) {
-	b := &BootConfig{
-		CPU:    1,
-		Memory: 128,
-		Kernel: DefaultKernel,
-		Initrd: DefaultInitrd,
-	}
-	qemuChan := make(chan VmEvent, 128)
-	ctx, _ := initContext("vmid", qemuChan, nil, b)
+	ctx, qc := testQmpEnvironment()
 
 	go qmpHandler(ctx)
 
-	s, c := testQmpInitHelper(t, ctx)
+	s, c := testQmpInitHelper(t, qc)
 	defer s.Close()
 	defer c.Close()
 
-	newNetworkAddSession(ctx, 12, "eth0", "mac", 0, 3)
-	newNetworkAddSession(ctx, 13, "eth1", "mac", 1, 4)
+	newNetworkAddSession(qc, 12, "eth0", "mac", 0, 3)
+	newNetworkAddSession(qc, 13, "eth1", "mac", 1, 4)
 
 	buf := make([]byte, 1024)
 	nr, err := c.Read(buf)
@@ -482,12 +434,12 @@ func TestSessionQueue(t *testing.T) {
 
 	c.Write([]byte(`{ "return": {}}`))
 
-	msg := <-qemuChan
-	if msg.Event() != EVENT_INTERFACE_INSERTED {
+	msg := <-ctx.Hub
+	if msg.Event() != hypervisor.EVENT_INTERFACE_INSERTED {
 		t.Error("wrong type of message", msg.Event())
 	}
 
-	info := msg.(*NetDevInsertedEvent)
+	info := msg.(*hypervisor.NetDevInsertedEvent)
 	t.Log("got block device", info.Address, info.Index, info.DeviceName)
 	if info.Address != 0x03 || info.Index != 0 || info.DeviceName != "eth0" {
 		t.Error("net dev 0 creation failed")
@@ -517,13 +469,13 @@ func TestSessionQueue(t *testing.T) {
 
 	c.Write([]byte(`{ "return": {}}`))
 
-	msg = <-qemuChan
-	if msg.Event() != EVENT_INTERFACE_INSERTED {
+	msg = <-ctx.Hub
+	if msg.Event() != hypervisor.EVENT_INTERFACE_INSERTED {
 		t.Error("wrong type of message", msg.Event())
 	}
 
-	info = msg.(*NetDevInsertedEvent)
-	t.Log("got block device", info.Address, info.Index, info.DeviceName)
+	info = msg.(*hypervisor.NetDevInsertedEvent)
+	t.Log("got network device", info.Address, info.Index, info.DeviceName)
 	if info.Address != 0x04 || info.Index != 1 || info.DeviceName != "eth1" {
 		t.Error("net dev 1 creation failed")
 	}

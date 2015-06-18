@@ -11,22 +11,24 @@ type VmEvent interface {
 	Event() int
 }
 
-type QemuExitEvent struct {
-	message string
+type VmExit struct{}
+
+type VmStartFailEvent struct {
+	Message string
 }
 
-type QemuKilledEvent struct {
-	success bool
+type VmKilledEvent struct {
+	Success bool
 }
 
 type PodFinished struct {
 	result []uint32
 }
 
-type QemuTimeout struct{}
+type VmTimeout struct{}
 
 type InitFailedEvent struct {
-	reason string
+	Reason string
 }
 
 type InitConnectedEvent struct {
@@ -50,11 +52,9 @@ type ExecCommand struct {
 }
 
 type StopPodCommand struct{}
-
 type ShutdownCommand struct {
 	Wait bool
 }
-
 type ReleaseVMCommand struct{}
 
 type AttachCommand struct {
@@ -143,6 +143,8 @@ type InterfaceCreated struct {
 	Index      int
 	PCIAddr    int
 	Fd         *os.File
+	Bridge     string
+	HostDevice string
 	DeviceName string
 	MacAddr    string
 	IpAddr     string
@@ -172,16 +174,17 @@ type NetDevRemovedEvent struct {
 }
 
 type DeviceFailed struct {
-	session VmEvent
+	Session VmEvent
 }
 
 type Interrupted struct {
-	reason string
+	Reason string
 }
 
-func (qe *QemuExitEvent) Event() int         { return EVENT_QEMU_EXIT }
-func (qe *QemuKilledEvent) Event() int       { return EVENT_QEMU_KILL }
-func (qe *QemuTimeout) Event() int           { return EVENT_QEMU_TIMEOUT }
+func (qe *VmStartFailEvent) Event() int      { return EVENT_VM_START_FAILED }
+func (qe *VmExit) Event() int                { return EVENT_VM_EXIT }
+func (qe *VmKilledEvent) Event() int         { return EVENT_VM_KILL }
+func (qe *VmTimeout) Event() int             { return EVENT_VM_TIMEOUT }
 func (qe *PodFinished) Event() int           { return EVENT_POD_FINISH }
 func (qe *InitConnectedEvent) Event() int    { return EVENT_INIT_CONNECTED }
 func (qe *ContainerCreatedEvent) Event() int { return EVENT_CONTAINER_ADD }

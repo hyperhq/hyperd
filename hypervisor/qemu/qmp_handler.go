@@ -1,7 +1,8 @@
-package hypervisor
+package qemu
 
 import (
 	"encoding/json"
+	"hyper/hypervisor"
 	"hyper/lib/glog"
 	"io"
 	"net"
@@ -26,13 +27,13 @@ type QmpInternalError struct{ cause string }
 
 type QmpSession struct {
 	commands []*QmpCommand
-	callback VmEvent
+	callback hypervisor.VmEvent
 }
 
 type QmpFinish struct {
 	success  bool
 	reason   map[string]interface{}
-	callback VmEvent
+	callback hypervisor.VmEvent
 }
 
 type QmpCommand struct {
@@ -80,7 +81,7 @@ func (qmp *QmpFinish) MessageType() int { return QMP_FINISH }
 func (qmp *QmpResult) MessageType() int { return QMP_RESULT }
 
 func (qmp *QmpError) MessageType() int { return QMP_ERROR }
-func (qmp *QmpError) Finish(callback VmEvent) *QmpFinish {
+func (qmp *QmpError) Finish(callback hypervisor.VmEvent) *QmpFinish {
 	return &QmpFinish{
 		success:  false,
 		reason:   qmp.Cause,
@@ -89,7 +90,6 @@ func (qmp *QmpError) Finish(callback VmEvent) *QmpFinish {
 }
 
 func (qmp *QmpEvent) MessageType() int { return QMP_EVENT }
-func (qmp *QmpEvent) Event() int       { return EVENT_QMP_EVENT }
 func (qmp *QmpEvent) timestamp() uint64 {
 	return qmp.Timestamp.Microseconds + qmp.Timestamp.Seconds*1000000
 }
@@ -123,7 +123,7 @@ func (qmp *QmpResponse) UnmarshalJSON(raw []byte) error {
 	return err
 }
 
-func qmpFail(err string, callback VmEvent) *QmpFinish {
+func qmpFail(err string, callback hypervisor.VmEvent) *QmpFinish {
 	return &QmpFinish{
 		success:  false,
 		reason:   map[string]interface{}{"error": err},
@@ -154,15 +154,16 @@ func qmpReceiver(ch chan QmpInteraction, decoder *json.Decoder) {
 	}
 }
 
-func qmpInitializer(ctx *VmContext) {
-	conn, err := unixSocketConnect(ctx.qmpSockName)
+func qmpInitializer(ctx *hypervisor.VmContext) {
+	qc := qemuContext(ctx)
+	conn, err := hypervisor.UnixSocketConnect(qc.qmpSockName)
 	if err != nil {
-		glog.Error("failed to connected to ", ctx.qmpSockName, " ", err.Error())
-		ctx.qmp <- qmpFail(err.Error(), nil)
+		glog.Error("failed to connected to ", qc.qmpSockName, " ", err.Error())
+		qc.qmp <- qmpFail(err.Error(), nil)
 		return
 	}
 
-	glog.V(1).Info("connected to ", ctx.qmpSockName)
+	glog.V(1).Info("connected to ", qc.qmpSockName)
 
 	var msg map[string]interface{}
 	decoder := json.NewDecoder(conn)
@@ -177,7 +178,7 @@ func qmpInitializer(ctx *VmContext) {
 	err = decoder.Decode(&msg)
 	if err != nil {
 		glog.Error("get qmp welcome failed: ", err.Error())
-		ctx.qmp <- qmpFail(err.Error(), nil)
+		qc.qmp <- qmpFail(err.Error(), nil)
 		return
 	}
 
@@ -186,13 +187,13 @@ func qmpInitializer(ctx *VmContext) {
 	cmd, err := json.Marshal(QmpCommand{Execute: "qmp_capabilities"})
 	if err != nil {
 		glog.Error("qmp_capabilities marshal failed ", err.Error())
-		ctx.qmp <- qmpFail(err.Error(), nil)
+		qc.qmp <- qmpFail(err.Error(), nil)
 		return
 	}
 	_, err = conn.Write(cmd)
 	if err != nil {
 		glog.Error("qmp_capabilities send failed ", err.Error())
-		ctx.qmp <- qmpFail(err.Error(), nil)
+		qc.qmp <- qmpFail(err.Error(), nil)
 		return
 	}
 
@@ -201,7 +202,7 @@ func qmpInitializer(ctx *VmContext) {
 	err = decoder.Decode(rsp)
 	if err != nil {
 		glog.Error("response receive failed ", err.Error())
-		ctx.qmp <- qmpFail(err.Error(), nil)
+		qc.qmp <- qmpFail(err.Error(), nil)
 		return
 	}
 
@@ -209,14 +210,14 @@ func qmpInitializer(ctx *VmContext) {
 
 	if rsp.msg.MessageType() == QMP_RESULT {
 		glog.Info("QMP connection initialized")
-		ctx.qmp <- &QmpInit{
+		qc.qmp <- &QmpInit{
 			conn:    conn.(*net.UnixConn),
 			decoder: decoder,
 		}
 		return
 	}
 
-	ctx.qmp <- qmpFail("handshake failed", nil)
+	qc.qmp <- qmpFail("handshake failed", nil)
 }
 
 func qmpCommander(handler chan QmpInteraction, conn *net.UnixConn, session *QmpSession, feedback chan QmpInteraction) {
@@ -271,13 +272,14 @@ func qmpCommander(handler chan QmpInteraction, conn *net.UnixConn, session *QmpS
 	return
 }
 
-func qmpHandler(ctx *VmContext) {
+func qmpHandler(ctx *hypervisor.VmContext) {
 
 	go qmpInitializer(ctx)
 
+	qc := ctx.DCtx.(*QemuContext)
 	timer := time.AfterFunc(10*time.Second, func() {
 		glog.Warning("Initializer Timeout.")
-		ctx.qmp <- &QmpTimeout{}
+		qc.qmp <- &QmpTimeout{}
 	})
 
 	type msgHandler func(QmpInteraction)
@@ -293,7 +295,7 @@ func qmpHandler(ctx *VmContext) {
 			glog.Info("got new session")
 			buf = append(buf, msg.(*QmpSession))
 			if len(buf) == 1 {
-				go qmpCommander(ctx.qmp, conn, msg.(*QmpSession), res)
+				go qmpCommander(qc.qmp, conn, msg.(*QmpSession), res)
 			}
 		case QMP_FINISH:
 			glog.Infof("session finished, buffer size %d", len(buf))
@@ -301,7 +303,7 @@ func qmpHandler(ctx *VmContext) {
 			if r.success {
 				glog.V(1).Info("success ")
 				if r.callback != nil {
-					ctx.hub <- r.callback
+					ctx.Hub <- r.callback
 				}
 			} else {
 				reason := "unknown"
@@ -309,28 +311,29 @@ func qmpHandler(ctx *VmContext) {
 					reason = c.(string)
 				}
 				glog.Error("QMP command failed ", reason)
-				ctx.hub <- &DeviceFailed{
-					session: r.callback,
+				ctx.Hub <- &hypervisor.DeviceFailed{
+					Session: r.callback,
 				}
 			}
 			buf = buf[1:]
 			if len(buf) > 0 {
-				go qmpCommander(ctx.qmp, conn, buf[0], res)
+				go qmpCommander(qc.qmp, conn, buf[0], res)
 			}
 		case QMP_RESULT, QMP_ERROR:
 			res <- msg
 		case QMP_EVENT:
 			ev := msg.(*QmpEvent)
-			ctx.hub <- ev
+			glog.V(1).Info("got QMP event ", ev.Type)
 			if ev.Type == QMP_EVENT_SHUTDOWN {
 				glog.Info("got QMP shutdown event, quit...")
 				handler = nil
+				ctx.Hub <- &hypervisor.VmExit{}
 			}
 		case QMP_INTERNAL_ERROR:
 			res <- msg
 			handler = nil
 			glog.Info("QMP handler quit as received ", msg.(*QmpInternalError).cause)
-			ctx.hub <- &Interrupted{reason: msg.(*QmpInternalError).cause}
+			ctx.Hub <- &hypervisor.Interrupted{Reason: msg.(*QmpInternalError).cause}
 		case QMP_QUIT:
 			handler = nil
 		}
@@ -346,23 +349,23 @@ func qmpHandler(ctx *VmContext) {
 			glog.Info("QMP initialzed, go into main QMP loop")
 
 			//routine for get message
-			go qmpReceiver(ctx.qmp, init.decoder)
+			go qmpReceiver(qc.qmp, init.decoder)
 			if len(buf) > 0 {
-				go qmpCommander(ctx.qmp, conn, buf[0], res)
+				go qmpCommander(qc.qmp, conn, buf[0], res)
 			}
 		case QMP_FINISH:
 			finish := msg.(*QmpFinish)
 			if !finish.success {
 				timer.Stop()
-				ctx.hub <- &InitFailedEvent{
-					reason: finish.reason["error"].(string),
+				ctx.Hub <- &hypervisor.InitFailedEvent{
+					Reason: finish.reason["error"].(string),
 				}
 				handler = nil
 				glog.Error("QMP initialize failed")
 			}
 		case QMP_TIMEOUT:
-			ctx.hub <- &InitFailedEvent{
-				reason: "QMP Init timeout",
+			ctx.Hub <- &hypervisor.InitFailedEvent{
+				Reason: "QMP Init timeout",
 			}
 			handler = nil
 			glog.Error("QMP initialize timeout")
@@ -375,7 +378,7 @@ func qmpHandler(ctx *VmContext) {
 	handler = initializing
 
 	for handler != nil {
-		msg, ok := <-ctx.qmp
+		msg, ok := <-qc.qmp
 		if !ok {
 			glog.Info("QMP channel closed, Quit qmp handler")
 			break

@@ -25,7 +25,8 @@ func UmountOverlayContainer(shareDir, image string, index int, hub chan VmEvent)
 		time.Sleep(3 * time.Second / 1000)
 		err := syscall.Unmount(mount, 0)
 		if err != nil {
-			if strings.Contains(err.Error(), "no such file or directory") {
+			if !strings.Contains(strings.ToLower(err.Error()), "device or resource busy") {
+				success = true
 				break
 			}
 			glog.Warningf("Cannot umount overlay %s: %s", mount, err.Error())
@@ -45,7 +46,8 @@ func UmountAufsContainer(shareDir, image string, index int, hub chan VmEvent) {
 		time.Sleep(3 * time.Second / 1000)
 		err := aufs.Unmount(mount)
 		if err != nil {
-			if strings.Contains(err.Error(), "no such file or directory") {
+			if !strings.Contains(strings.ToLower(err.Error()), "device or resource busy") {
+				success = true
 				break
 			}
 			glog.Warningf("Cannot umount aufs %s: %s", mount, err.Error())
@@ -75,6 +77,7 @@ func UmountVolume(shareDir, volPath string, name string, hub chan VmEvent) {
 	if success == true {
 		os.Remove(mount)
 	}
+
 	// After umount that device, we need to delete it
 	hub <- &VolumeUnmounted{Name: name, Success: success}
 }

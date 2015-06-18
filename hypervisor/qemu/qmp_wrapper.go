@@ -1,28 +1,25 @@
-package hypervisor
+package qemu
 
 import (
 	"fmt"
+	"hyper/hypervisor"
 	"hyper/lib/glog"
 	"strconv"
 	"syscall"
 )
 
-func qmpQemuQuit(ctx *VmContext) {
+func qmpQemuQuit(qc *QemuContext) {
 	commands := []*QmpCommand{
 		&QmpCommand{Execute: "quit", Arguments: map[string]interface{}{}},
 	}
-	ctx.qmp <- &QmpSession{commands: commands, callback: nil}
+	qc.qmp <- &QmpSession{commands: commands, callback: nil}
 }
 
 func scsiId2Name(id int) string {
-	var ch byte = 'a' + byte(id%26)
-	if id >= 26 {
-		return scsiId2Name(id/26-1) + string(ch)
-	}
-	return "sd" + string(ch)
+	return "sd" + hypervisor.DiskId2Name(id)
 }
 
-func newDiskAddSession(ctx *VmContext, name, sourceType, filename, format string, id int) {
+func newDiskAddSession(qc *QemuContext, name, sourceType, filename, format string, id int) {
 	commands := make([]*QmpCommand, 2)
 	commands[0] = &QmpCommand{
 		Execute: "human-monitor-command",
@@ -39,9 +36,9 @@ func newDiskAddSession(ctx *VmContext, name, sourceType, filename, format string
 		},
 	}
 	devName := scsiId2Name(id)
-	ctx.qmp <- &QmpSession{
+	qc.qmp <- &QmpSession{
 		commands: commands,
-		callback: &BlockdevInsertedEvent{
+		callback: &hypervisor.BlockdevInsertedEvent{
 			Name:       name,
 			SourceType: sourceType,
 			DeviceName: devName,
@@ -50,7 +47,7 @@ func newDiskAddSession(ctx *VmContext, name, sourceType, filename, format string
 	}
 }
 
-func newDiskDelSession(ctx *VmContext, id int, callback VmEvent) {
+func newDiskDelSession(qc *QemuContext, id int, callback hypervisor.VmEvent) {
 	commands := make([]*QmpCommand, 2)
 	commands[1] = &QmpCommand{
 		Execute: "device_del",
@@ -64,13 +61,13 @@ func newDiskDelSession(ctx *VmContext, id int, callback VmEvent) {
 			"command-line": fmt.Sprintf("drive_del drive%d", id),
 		},
 	}
-	ctx.qmp <- &QmpSession{
+	qc.qmp <- &QmpSession{
 		commands: commands,
 		callback: callback,
 	}
 }
 
-func newNetworkAddSession(ctx *VmContext, fd uint64, device, mac string, index, addr int) {
+func newNetworkAddSession(qc *QemuContext, fd uint64, device, mac string, index, addr int) {
 	busAddr := fmt.Sprintf("0x%x", addr)
 	commands := make([]*QmpCommand, 3)
 	scm := syscall.UnixRights(int(fd))
@@ -100,9 +97,9 @@ func newNetworkAddSession(ctx *VmContext, fd uint64, device, mac string, index, 
 		},
 	}
 
-	ctx.qmp <- &QmpSession{
+	qc.qmp <- &QmpSession{
 		commands: commands,
-		callback: &NetDevInsertedEvent{
+		callback: &hypervisor.NetDevInsertedEvent{
 			Index:      index,
 			DeviceName: device,
 			Address:    addr,
@@ -110,7 +107,7 @@ func newNetworkAddSession(ctx *VmContext, fd uint64, device, mac string, index, 
 	}
 }
 
-func newNetworkDelSession(ctx *VmContext, device string, callback VmEvent) {
+func newNetworkDelSession(qc *QemuContext, device string, callback hypervisor.VmEvent) {
 	commands := make([]*QmpCommand, 2)
 	commands[0] = &QmpCommand{
 		Execute: "device_del",
@@ -125,7 +122,7 @@ func newNetworkDelSession(ctx *VmContext, device string, callback VmEvent) {
 		},
 	}
 
-	ctx.qmp <- &QmpSession{
+	qc.qmp <- &QmpSession{
 		commands: commands,
 		callback: callback,
 	}

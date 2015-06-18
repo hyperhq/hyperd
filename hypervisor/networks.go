@@ -9,13 +9,13 @@ import (
 	"os"
 )
 
-func CreateInterface(index int, pciAddr int, name string, isDefault bool,
+func CreateInterface(index int, pciAddr int, name string, isDefault bool, addrOnly bool,
 	maps []pod.UserContainerPort, callback chan VmEvent) {
-	inf, err := network.Allocate("", maps)
+	inf, err := network.Allocate("", addrOnly, maps)
 	if err != nil {
 		glog.Error("interface creating failed: ", err.Error())
 		callback <- &DeviceFailed{
-			session: &InterfaceCreated{Index: index, PCIAddr: pciAddr, DeviceName: name},
+			Session: &InterfaceCreated{Index: index, PCIAddr: pciAddr, DeviceName: name},
 		}
 		return
 	}
@@ -40,7 +40,7 @@ func interfaceGot(index int, pciAddr int, name string, isDefault bool, callback 
 	if err != nil {
 		glog.Error("can not parse cidr")
 		callback <- &DeviceFailed{
-			session: &InterfaceCreated{Index: index, PCIAddr: pciAddr, DeviceName: name},
+			Session: &InterfaceCreated{Index: index, PCIAddr: pciAddr, DeviceName: name},
 		}
 		return
 	}
@@ -63,6 +63,8 @@ func interfaceGot(index int, pciAddr int, name string, isDefault bool, callback 
 	event := &InterfaceCreated{
 		Index:      index,
 		PCIAddr:    pciAddr,
+		Bridge:     inf.Bridge,
+		HostDevice: inf.Device,
 		DeviceName: name,
 		Fd:         inf.File,
 		MacAddr:    inf.Mac,

@@ -6,18 +6,9 @@ import (
 	"sync"
 )
 
-type BootConfig struct {
-	CPU    int
-	Memory int
-	Kernel string
-	Initrd string
-	Bios   string
-	Cbfs   string
-}
-
 func (ctx *VmContext) loop() {
 	for ctx.handler != nil {
-		ev, ok := <-ctx.hub
+		ev, ok := <-ctx.Hub
 		if !ok {
 			glog.Error("hub chan has already been closed")
 			break
@@ -30,9 +21,9 @@ func (ctx *VmContext) loop() {
 	}
 }
 
-func VmLoop(vmId string, hub chan VmEvent, client chan *types.QemuResponse, boot *BootConfig) {
+func VmLoop(driver HypervisorDriver, vmId string, hub chan VmEvent, client chan *types.QemuResponse, boot *BootConfig) {
 
-	context, err := initContext(vmId, hub, client, boot)
+	context, err := InitContext(driver, vmId, hub, client, nil, boot)
 	if err != nil {
 		client <- &types.QemuResponse{
 			VmId:  vmId,
@@ -43,15 +34,18 @@ func VmLoop(vmId string, hub chan VmEvent, client chan *types.QemuResponse, boot
 	}
 
 	//launch routines
-	go qmpHandler(context)
 	go waitInitReady(context)
-	go launchQemu(context)
 	go waitPts(context)
+	if glog.V(1) {
+		go waitConsoleOutput(context)
+	}
+	context.DCtx.Launch(context)
 
 	context.loop()
 }
 
-func VmAssociate(vmId string, hub chan VmEvent, client chan *types.QemuResponse,
+func VmAssociate(driver HypervisorDriver, vmId string,
+	hub chan VmEvent, client chan *types.QemuResponse,
 	wg *sync.WaitGroup, pack []byte) {
 
 	if glog.V(1) {
@@ -77,7 +71,7 @@ func VmAssociate(vmId string, hub chan VmEvent, client chan *types.QemuResponse,
 		return
 	}
 
-	context, err := pinfo.vmContext(hub, client, wg)
+	context, err := pinfo.vmContext(driver, hub, client, wg)
 	if err != nil {
 		client <- &types.QemuResponse{
 			VmId:  vmId,
@@ -87,10 +81,18 @@ func VmAssociate(vmId string, hub chan VmEvent, client chan *types.QemuResponse,
 		return
 	}
 
-	go qmpHandler(context)
-	go associateQemu(context)
+	client <- &types.QemuResponse{
+		VmId: vmId,
+		Code: types.E_OK,
+	}
+
+	context.DCtx.Associate(context)
+
 	go waitPts(context)
 	go connectToInit(context)
+	if glog.V(1) {
+		go waitConsoleOutput(context)
+	}
 
 	context.Become(stateRunning, "RUNNING")
 

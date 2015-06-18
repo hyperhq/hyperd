@@ -304,8 +304,7 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 			Bios:   daemon.bios,
 			Cbfs:   daemon.cbfs,
 		}
-
-		go hypervisor.VmLoop(vmId, qemuPodEvent, qemuStatus, b)
+		go hypervisor.VmLoop(hypervisorDriver, vmId, qemuPodEvent, qemuStatus, b)
 		if err := daemon.SetQemuChan(vmId, qemuPodEvent, qemuStatus, subQemuStatus); err != nil {
 			glog.V(1).Infof("SetQemuChan error: %s", err.Error())
 			return -1, "", err

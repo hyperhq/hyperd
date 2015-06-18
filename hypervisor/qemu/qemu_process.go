@@ -1,74 +1,22 @@
-package hypervisor
+package qemu
 
 import (
+	"hyper/hypervisor"
+	"hyper/lib/glog"
+
 	"encoding/binary"
 	"fmt"
-	"hyper/lib/glog"
-	"hyper/lib/telnet"
 	"io/ioutil"
-	"net"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"syscall"
-	"time"
 )
 
-func unixSocketConnect(name string) (conn net.Conn, err error) {
-	for i := 0; i < 50; i++ {
-		time.Sleep(20 * time.Millisecond)
-		conn, err = net.Dial("unix", name)
-		if err == nil {
-			return
-		}
-	}
-
-	return
-}
-
-func waitConsoleOutput(ctx *VmContext) {
-
-	conn, err := unixSocketConnect(ctx.consoleSockName)
-	if err != nil {
-		glog.Error("failed to connected to ", ctx.consoleSockName, " ", err.Error())
-		return
-	}
-
-	glog.V(1).Info("connected to ", ctx.consoleSockName)
-
-	tc, err := telnet.NewConn(conn)
-	if err != nil {
-		glog.Error("fail to init telnet connection to ", ctx.consoleSockName, ": ", err.Error())
-		return
-	}
-	glog.V(1).Infof("connected %s as telnet mode.", ctx.consoleSockName)
-
-	cout := make(chan string, 128)
-	go ttyLiner(tc, cout)
-
+func watchDog(qc *QemuContext, hub chan hypervisor.VmEvent) {
+	wdt := qc.wdt
 	for {
-		line, ok := <-cout
-		if ok {
-			glog.V(1).Info("[console] ", line)
-		} else {
-			glog.Info("console output end")
-			break
-		}
-	}
-}
-
-func (ctx *VmContext) timedKill(seconds int) {
-	ctx.timer = time.AfterFunc(time.Duration(seconds)*time.Second, func() {
-		if ctx != nil && ctx.handler != nil {
-			ctx.wdt <- "kill"
-		}
-	})
-}
-
-func watchDog(ctx *VmContext) {
-	for {
-		msg, ok := <-ctx.wdt
+		msg, ok := <-wdt
 		if ok {
 			switch msg {
 			case "quit":
@@ -76,15 +24,15 @@ func watchDog(ctx *VmContext) {
 				return
 			case "kill":
 				success := false
-				if ctx.process != nil {
-					glog.V(0).Infof("kill Qemu... %d", ctx.process.Pid)
-					if err := ctx.process.Kill(); err == nil {
+				if qc.process != nil {
+					glog.V(0).Infof("kill Qemu... %d", qc.process.Pid)
+					if err := qc.process.Kill(); err == nil {
 						success = true
 					}
 				} else {
 					glog.Warning("no process to be killed")
 				}
-				ctx.hub <- &QemuKilledEvent{success: success}
+				hub <- &hypervisor.VmKilledEvent{Success: success}
 				return
 			}
 		} else {
@@ -203,38 +151,36 @@ func daemon(cmd string, argv []string, pipe int) error {
 	return nil
 }
 
-func (ctx *VmContext) watchPid(pid int) error {
+func (qc *QemuContext) watchPid(pid int, hub chan hypervisor.VmEvent) error {
 	proc, err := os.FindProcess(pid)
 	if err != nil {
 		return err
 	}
-	ctx.process = proc
-	go watchDog(ctx)
+	qc.process = proc
+	go watchDog(qc, hub)
 
 	return nil
 }
 
 // launchQemu run qemu and wait it's quit, includes
-func launchQemu(ctx *VmContext) {
-	qemu, err := exec.LookPath("qemu-system-x86_64")
-	if err != nil {
-		ctx.hub <- &QemuExitEvent{message: "can not find qemu executable"}
+func launchQemu(qc *QemuContext, ctx *hypervisor.VmContext) {
+	qemu := qc.driver.executable
+	if qemu == "" {
+		ctx.Hub <- &hypervisor.VmStartFailEvent{Message: "can not find qemu executable"}
 		return
 	}
 
-	args := ctx.QemuArguments()
+	args := qc.arguments(ctx)
 
 	if glog.V(1) {
 		glog.Info("cmdline arguments: ", strings.Join(args, " "))
 	}
 
-	go waitConsoleOutput(ctx)
-
 	pipe := make([]int, 2)
-	err = syscall.Pipe(pipe)
+	err := syscall.Pipe(pipe)
 	if err != nil {
 		glog.Error("fail to create pipe")
-		ctx.hub <- &QemuExitEvent{message: "fail to create pipe"}
+		ctx.Hub <- &hypervisor.VmStartFailEvent{Message: "fail to create pipe"}
 		return
 	}
 
@@ -242,7 +188,7 @@ func launchQemu(ctx *VmContext) {
 	if err != nil {
 		//fail to daemonize
 		glog.Error("try to start qemu failed")
-		ctx.hub <- &QemuExitEvent{message: "try to start qemu failed"}
+		ctx.Hub <- &hypervisor.VmStartFailEvent{Message: "try to start qemu failed"}
 		return
 	}
 
@@ -250,7 +196,7 @@ func launchQemu(ctx *VmContext) {
 	nr, err := syscall.Read(pipe[0], buf)
 	if err != nil || nr != 4 {
 		glog.Error("try to start qemu failed")
-		ctx.hub <- &QemuExitEvent{message: "try to start qemu failed"}
+		ctx.Hub <- &hypervisor.VmStartFailEvent{Message: "try to start qemu failed"}
 		return
 	}
 	syscall.Close(pipe[1])
@@ -259,15 +205,14 @@ func launchQemu(ctx *VmContext) {
 	pid := binary.BigEndian.Uint32(buf[:nr])
 	glog.V(1).Infof("starting daemon with pid: %d", pid)
 
-	err = ctx.watchPid(int(pid))
+	err = ctx.DCtx.(*QemuContext).watchPid(int(pid), ctx.Hub)
 	if err != nil {
 		glog.Error("watch qemu process failed")
-		ctx.hub <- &QemuExitEvent{message: "watch qemu process failed"}
+		ctx.Hub <- &hypervisor.VmStartFailEvent{Message: "watch qemu process failed"}
 		return
 	}
 }
 
-func associateQemu(ctx *VmContext) {
-	go waitConsoleOutput(ctx)
-	go watchDog(ctx)
+func associateQemu(ctx *hypervisor.VmContext) {
+	go watchDog(ctx.DCtx.(*QemuContext), ctx.Hub)
 }

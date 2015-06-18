@@ -3,7 +3,6 @@ package hypervisor
 const (
 	BaseDir         = "/var/run/hyper"
 	HyperSockName   = "hyper.sock"
-	QmpSockName     = "qmp.sock"
 	TtySockName     = "tty.sock"
 	ConsoleSockName = "console.sock"
 	ShareDirTag     = "share_dir"
@@ -15,12 +14,12 @@ const (
 )
 
 const (
-	EVENT_QEMU_EXIT = iota
-	EVENT_QEMU_KILL
-	EVENT_QEMU_TIMEOUT
+	EVENT_VM_START_FAILED = iota
+	EVENT_VM_EXIT
+	EVENT_VM_KILL
+	EVENT_VM_TIMEOUT
 	EVENT_POD_FINISH
 	EVENT_INIT_CONNECTED
-	EVENT_QMP_EVENT
 	EVENT_CONTAINER_ADD
 	EVENT_CONTAINER_DELETE
 	EVENT_VOLUME_ADD
@@ -52,18 +51,6 @@ const (
 )
 
 const (
-	QMP_INIT = iota
-	QMP_SESSION
-	QMP_FINISH
-	QMP_EVENT
-	QMP_INTERNAL_ERROR
-	QMP_QUIT
-	QMP_TIMEOUT
-	QMP_RESULT
-	QMP_ERROR
-)
-
-const (
 	INIT_RESERVED = iota
 	INIT_STARTPOD
 	INIT_GETPOD
@@ -81,10 +68,6 @@ const (
 )
 
 const (
-	QMP_EVENT_SHUTDOWN = "SHUTDOWN"
-)
-
-const (
 	PREPARING_CONTAINER = iota
 	PREPARING_VOLUME
 	PREPARING_BLOCK
@@ -93,18 +76,18 @@ const (
 
 func EventString(ev int) string {
 	switch ev {
-	case EVENT_QEMU_EXIT:
-		return "EVENT_QEMU_EXIT"
-	case EVENT_QEMU_KILL:
-		return "EVENT_QEMU_KILL"
-	case EVENT_QEMU_TIMEOUT:
-		return "EVENT_QEMU_TIMEOUT"
+	case EVENT_VM_START_FAILED:
+		return "EVENT_VM_START_FAILED"
+	case EVENT_VM_EXIT:
+		return "EVENT_VM_EXIT"
+	case EVENT_VM_KILL:
+		return "EVENT_VM_KILL"
+	case EVENT_VM_TIMEOUT:
+		return "EVENT_VM_TIMEOUT"
 	case EVENT_POD_FINISH:
 		return "EVENT_POD_FINISH"
 	case EVENT_INIT_CONNECTED:
 		return "EVENT_INIT_CONNECTED"
-	case EVENT_QMP_EVENT:
-		return "EVENT_QMP_EVENT"
 	case EVENT_CONTAINER_ADD:
 		return "EVENT_CONTAINER_ADD"
 	case EVENT_CONTAINER_DELETE:

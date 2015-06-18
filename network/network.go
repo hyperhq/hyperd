@@ -829,16 +829,10 @@ func Modprobe(module string) error {
 }
 
 func SetupPortMaps(containerip string, maps []pod.UserContainerPort) error {
-	var (
-		err error = nil
-		i   int   = 0
-	)
-
 	if len(maps) == 0 {
 		return nil
 	}
 
-	err = nil
 	for _, m := range maps {
 		var proto string
 
@@ -848,76 +842,38 @@ func SetupPortMaps(containerip string, maps []pod.UserContainerPort) error {
 			proto = "tcp"
 		}
 
-		err = portMapper.AllocateMap(m.Protocol, m.HostPort, containerip, m.ContainerPort)
-		if err != nil {
-			break
-		}
-
 		natArgs := []string{"-p", proto, "-m", proto, "--dport",
 			strconv.Itoa(m.HostPort), "-j", "DNAT", "--to-destination",
 			net.JoinHostPort(containerip, strconv.Itoa(m.ContainerPort))}
 
-		if !iptables.PortMapExists("HYPER", natArgs) {
-			if iptables.PortMapUsed("HYPER", natArgs) {
-				err = fmt.Errorf("Host port %d has aleady been used", m.HostPort)
-				portMapper.ReleaseMap(m.Protocol, m.HostPort)
-				break
-			}
+		if iptables.PortMapExists("HYPER", natArgs) {
+			return nil
+		}
 
-			err = iptables.OperatePortMap(iptables.Insert, "HYPER", natArgs)
-			if err != nil {
-				portMapper.ReleaseMap(m.Protocol, m.HostPort)
-				break
-			}
+		if iptables.PortMapUsed("HYPER", natArgs) {
+			return fmt.Errorf("Host port %d has aleady been used", m.HostPort)
+		}
+
+		err := iptables.OperatePortMap(iptables.Insert, "HYPER", natArgs)
+		if err != nil {
+			return err
+		}
+
+		err = portMapper.AllocateMap(m.Protocol, m.HostPort, containerip, m.ContainerPort)
+		if err != nil {
+			return err
 		}
 
 		filterArgs := []string{"-d", containerip, "-p", proto, "-m", proto,
 			"--dport", strconv.Itoa(m.ContainerPort), "-j", "ACCEPT"}
 		if output, err := iptables.Raw(append([]string{"-I", "HYPER"}, filterArgs...)...); err != nil {
-			err = fmt.Errorf("Unable to setup forward rule in HYPER chain: %s", err)
+			return fmt.Errorf("Unable to setup forward rule in HYPER chain: %s", err)
 		} else if len(output) != 0 {
-			err = &iptables.ChainError{Chain: "HYPER", Output: output}
+			return &iptables.ChainError{Chain: "HYPER", Output: output}
 		}
-
-		if err != nil {
-			portMapper.ReleaseMap(m.Protocol, m.HostPort)
-			iptables.OperatePortMap(iptables.Delete, "HYPER", natArgs)
-			break
-		}
-
-		i++
 	}
-
-	if err == nil {
-		return nil
-	}
-
-	for _, m := range maps {
-		var proto string
-		i--
-		if i < 0 {
-			break
-		}
-
-		if strings.EqualFold(m.Protocol, "udp") {
-			proto = "udp"
-		} else {
-			proto = "tcp"
-		}
-
-		portMapper.ReleaseMap(m.Protocol, m.HostPort)
-
-		natArgs := []string{"-p", proto, "-m", proto, "--dport",
-			strconv.Itoa(m.HostPort), "-j", "DNAT", "--to-destination",
-			net.JoinHostPort(containerip, strconv.Itoa(m.ContainerPort))}
-
-		iptables.OperatePortMap(iptables.Delete, "HYPER", natArgs)
-
-		filterArgs := []string{"-d", containerip, "-p", proto, "-m", proto,
-			"--dport", strconv.Itoa(m.ContainerPort), "-j", "ACCEPT"}
-		iptables.Raw(append([]string{"-D", "HYPER"}, filterArgs...)...)
-	}
-	return err
+	/* forbid to map ports twice */
+	return nil
 }
 
 func ReleasePortMaps(containerip string, maps []pod.UserContainerPort) error {
@@ -926,10 +882,13 @@ func ReleasePortMaps(containerip string, maps []pod.UserContainerPort) error {
 	}
 
 	for _, m := range maps {
-		var proto string
-
 		glog.V(1).Infof("release port map %d", m.HostPort)
-		portMapper.ReleaseMap(m.Protocol, m.HostPort)
+		err := portMapper.ReleaseMap(m.Protocol, m.HostPort)
+		if err != nil {
+			continue
+		}
+
+		var proto string
 
 		if strings.EqualFold(m.Protocol, "udp") {
 			proto = "udp"
@@ -951,7 +910,32 @@ func ReleasePortMaps(containerip string, maps []pod.UserContainerPort) error {
 	return nil
 }
 
-func Allocate(requestedIP string, maps []pod.UserContainerPort) (*Settings, error) {
+func UpAndAddToBridge(name string) error {
+	inf, err := net.InterfaceByName(name)
+	if err != nil {
+		glog.Error("cannot find network interface ", name)
+		return err
+	}
+	brg, err := net.InterfaceByName(BridgeIface)
+	if err != nil {
+		glog.Error("cannot find bridge interface ", BridgeIface)
+		return err
+	}
+	err = AddToBridge(inf, brg)
+	if err != nil {
+		glog.Errorf("cannot add %s to %s ", name, BridgeIface)
+		return err
+	}
+	err = NetworkLinkUp(inf)
+	if err != nil {
+		glog.Error("cannot up interface ", name)
+		return err
+	}
+
+	return nil
+}
+
+func Allocate(requestedIP string, addrOnly bool, maps []pod.UserContainerPort) (*Settings, error) {
 	var (
 		req   ifReq
 		errno syscall.Errno
@@ -963,6 +947,26 @@ func Allocate(requestedIP string, maps []pod.UserContainerPort) (*Settings, erro
 	}
 
 	maskSize, _ := bridgeIPv4Net.Mask.Size()
+
+	mac, err := GenRandomMac()
+	if err != nil {
+		glog.Errorf("Generate Random Mac address failed")
+		tapFile.Close()
+		return nil, err
+	}
+
+	if addrOnly {
+		return &Settings{
+			Mac:         mac,
+			IPAddress:   ip.String(),
+			Gateway:     bridgeIPv4Net.IP.String(),
+			Bridge:      BridgeIface,
+			IPPrefixLen: maskSize,
+			Device:      "",
+			File:        nil,
+		}, nil
+
+	}
 
 	tapFile, err = os.OpenFile("/dev/net/tun", os.O_RDWR, 0)
 	if err != nil {
@@ -1009,13 +1013,6 @@ func Allocate(requestedIP string, maps []pod.UserContainerPort) (*Settings, erro
 		return nil, err
 	}
 
-	mac, err := GenRandomMac()
-	if err != nil {
-		glog.Errorf("Generate Random Mac address failed")
-		tapFile.Close()
-		return nil, err
-	}
-
 	err = SetupPortMaps(ip.String(), maps)
 	if err != nil {
 		glog.Errorf("Setup Port Map failed %s", err)
@@ -1023,7 +1020,7 @@ func Allocate(requestedIP string, maps []pod.UserContainerPort) (*Settings, erro
 		return nil, err
 	}
 
-	networkSettings := &Settings{
+	return &Settings{
 		Mac:         mac,
 		IPAddress:   ip.String(),
 		Gateway:     bridgeIPv4Net.IP.String(),
@@ -1031,14 +1028,16 @@ func Allocate(requestedIP string, maps []pod.UserContainerPort) (*Settings, erro
 		IPPrefixLen: maskSize,
 		Device:      device,
 		File:        tapFile,
-	}
-
-	return networkSettings, nil
+	}, nil
 }
 
 // Release an interface for a select ip
 func Release(releasedIP string, maps []pod.UserContainerPort, file *os.File) error {
-	file.Close()
+
+	if file != nil {
+		file.Close()
+	}
+
 	if err := ipAllocator.ReleaseIP(bridgeIPv4Net, net.ParseIP(releasedIP)); err != nil {
 		return err
 	}

@@ -1,15 +1,32 @@
 package daemon
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 
 	"hyper/engine"
 	"hyper/hypervisor"
+	"hyper/hypervisor/qemu"
 	"hyper/lib/glog"
 	"hyper/pod"
 	"hyper/types"
 )
+
+var hypervisorDriver hypervisor.HypervisorDriver = DriversProbe()
+
+func DriversProbe() hypervisor.HypervisorDriver {
+	qd := &qemu.QemuDriver{}
+	if err := qd.Initialize(); err == nil {
+		glog.Info("Qemu Driver Loaded")
+		return qd
+	} else {
+		glog.Info("Qemu Driver Load failed: ", err.Error())
+	}
+
+	glog.Error("No driver available")
+	return nil
+}
 
 func (daemon *Daemon) CmdVmCreate(job *engine.Job) (err error) {
 	var (
@@ -40,7 +57,7 @@ func (daemon *Daemon) CmdVmCreate(job *engine.Job) (err error) {
 		Bios:   daemon.bios,
 		Cbfs:   daemon.cbfs,
 	}
-	go hypervisor.VmLoop(vmId, qemuPodEvent, qemuStatus, b)
+	go hypervisor.VmLoop(hypervisorDriver, vmId, qemuPodEvent, qemuStatus, b)
 	if err := daemon.SetQemuChan(vmId, qemuPodEvent, qemuStatus, subQemuStatus); err != nil {
 		glog.V(1).Infof("SetQemuChan error: %s", err.Error())
 		return err
@@ -149,7 +166,13 @@ func (daemon *Daemon) AssociateAllVms() error {
 			continue
 		}
 		glog.V(1).Infof("The data for vm(%s) is %v", mypod.Vm, data)
-		go hypervisor.VmAssociate(mypod.Vm, qemuPodEvent, qemuStatus, mypod.Wg, data)
+		go hypervisor.VmAssociate(hypervisorDriver, mypod.Vm, qemuPodEvent,
+			qemuStatus, mypod.Wg, data)
+		ass := <-qemuStatus
+		if ass.Code != types.E_OK {
+			glog.Errorf("cannot associate with vm: %s, error status %d (%s)", mypod.Vm, ass.Code, ass.Cause)
+			return errors.New("load vm status failed")
+		}
 		if err := daemon.SetQemuChan(mypod.Vm, qemuPodEvent, qemuStatus, subQemuStatus); err != nil {
 			glog.V(1).Infof("SetQemuChan error: %s", err.Error())
 			return err

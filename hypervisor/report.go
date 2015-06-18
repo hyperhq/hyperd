@@ -1,6 +1,7 @@
 package hypervisor
 
 import (
+	"hyper/lib/glog"
 	"hyper/types"
 )
 
@@ -18,6 +19,12 @@ func (ctx *VmContext) reportVmRun() {
 // reportVmShutdown() send report to daemon, notify about that:
 //    1. Vm has been shutdown
 func (ctx *VmContext) reportVmShutdown() {
+	defer func() {
+		err := recover()
+		if err != nil {
+			glog.Warning("panic during send shutdown message to channel")
+		}
+	}()
 	ctx.client <- &types.QemuResponse{
 		VmId:  ctx.Id,
 		Code:  types.E_VM_SHUTDOWN,

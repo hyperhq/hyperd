@@ -80,7 +80,14 @@ func (pm *processingMap) isEmpty() bool {
 }
 
 func (ctx *VmContext) deviceReady() bool {
-	return ctx.progress.adding.isEmpty() && ctx.progress.deleting.isEmpty()
+	ready := ctx.progress.adding.isEmpty() && ctx.progress.deleting.isEmpty()
+	if ready && ctx.wait {
+		glog.V(1).Info("All resource being released, someone is waiting for us...")
+		ctx.wg.Done()
+		ctx.wait = false
+	}
+
+	return ready
 }
 
 func (ctx *VmContext) initContainerInfo(index int, target *VmContainer, spec *pod.UserContainer) {
@@ -223,7 +230,7 @@ func (ctx *VmContext) allocateNetworks() {
 	for i, _ := range ctx.progress.adding.networks {
 		name := fmt.Sprintf("eth%d", i)
 		addr := ctx.nextPciAddr()
-		go CreateInterface(i, addr, name, i == 0, maps, ctx.hub)
+		go CreateInterface(i, addr, name, i == 0, ctx.DCtx.BuildinNetwork(), maps, ctx.Hub)
 	}
 }
 
@@ -231,10 +238,10 @@ func (ctx *VmContext) addBlockDevices() {
 	for blk, _ := range ctx.progress.adding.blockdevs {
 		if info, ok := ctx.devices.volumeMap[blk]; ok {
 			sid := ctx.nextScsiId()
-			newDiskAddSession(ctx, info.info.name, "volume", info.info.filename, info.info.format, sid)
+			ctx.DCtx.AddDisk(ctx, info.info.name, "volume", info.info.filename, info.info.format, sid)
 		} else if info, ok := ctx.devices.imageMap[blk]; ok {
 			sid := ctx.nextScsiId()
-			newDiskAddSession(ctx, info.info.name, "image", info.info.filename, info.info.format, sid)
+			ctx.DCtx.AddDisk(ctx, info.info.name, "image", info.info.filename, info.info.format, sid)
 		} else {
 			continue
 		}
@@ -323,7 +330,7 @@ func (ctx *VmContext) onContainerRemoved(c *ContainerUnmounted) bool {
 			if image.pos == c.Index {
 				glog.V(1).Info("need remove image dm file", image.info.filename)
 				ctx.progress.deleting.blockdevs[name] = true
-				go UmountDMDevice(image.info.filename, name, ctx.hub)
+				go UmountDMDevice(image.info.filename, name, ctx.Hub)
 			}
 		}
 	}
@@ -349,7 +356,7 @@ func (ctx *VmContext) onVolumeRemoved(v *VolumeUnmounted) bool {
 	if vol.info.fstype != "" {
 		glog.V(1).Info("need remove dm file ", vol.info.filename)
 		ctx.progress.deleting.blockdevs[vol.info.name] = true
-		go UmountDMDevice(vol.info.filename, vol.info.name, ctx.hub)
+		go UmountDMDevice(vol.info.filename, vol.info.name, ctx.Hub)
 	}
 	return v.Success
 }
@@ -367,7 +374,7 @@ func (ctx *VmContext) releaseVolumeDir() {
 		if vol.info.fstype == "" {
 			glog.V(1).Info("need umount dir ", vol.info.filename)
 			ctx.progress.deleting.volumes[name] = true
-			go UmountVolume(ctx.shareDir, vol.info.filename, name, ctx.hub)
+			go UmountVolume(ctx.ShareDir, vol.info.filename, name, ctx.Hub)
 		}
 	}
 }
@@ -377,14 +384,14 @@ func (ctx *VmContext) removeDMDevice() {
 		if container.info.fstype != "dir" {
 			glog.V(1).Info("need remove dm file", container.info.filename)
 			ctx.progress.deleting.blockdevs[name] = true
-			go UmountDMDevice(container.info.filename, name, ctx.hub)
+			go UmountDMDevice(container.info.filename, name, ctx.Hub)
 		}
 	}
 	for name, vol := range ctx.devices.volumeMap {
 		if vol.info.fstype != "" {
 			glog.V(1).Info("need remove dm file ", vol.info.filename)
 			ctx.progress.deleting.blockdevs[name] = true
-			go UmountDMDevice(vol.info.filename, name, ctx.hub)
+			go UmountDMDevice(vol.info.filename, name, ctx.Hub)
 		}
 	}
 }
@@ -394,7 +401,7 @@ func (ctx *VmContext) releaseOverlayDir() {
 		if container.Fstype == "" {
 			glog.V(1).Info("need unmount overlay dir ", container.Image)
 			ctx.progress.deleting.containers[idx] = true
-			go UmountOverlayContainer(ctx.shareDir, container.Image, idx, ctx.hub)
+			go UmountOverlayContainer(ctx.ShareDir, container.Image, idx, ctx.Hub)
 		}
 	}
 }
@@ -404,7 +411,7 @@ func (ctx *VmContext) releaseAufsDir() {
 		if container.Fstype == "" {
 			glog.V(1).Info("need unmount aufs ", container.Image)
 			ctx.progress.deleting.containers[idx] = true
-			go UmountAufsContainer(ctx.shareDir, container.Image, idx, ctx.hub)
+			go UmountAufsContainer(ctx.ShareDir, container.Image, idx, ctx.Hub)
 		}
 	}
 }
@@ -413,7 +420,7 @@ func (ctx *VmContext) removeVolumeDrive() {
 	for name, vol := range ctx.devices.volumeMap {
 		if vol.info.format == "raw" || vol.info.format == "qcow2" {
 			glog.V(1).Infof("need detach volume %s (%s) ", name, vol.info.deviceName)
-			newDiskDelSession(ctx, vol.info.scsiId, &VolumeUnmounted{Name: name, Success: true})
+			ctx.DCtx.RemoveDisk(ctx, vol.info.filename, vol.info.format, vol.info.scsiId, &VolumeUnmounted{Name: name, Success: true})
 			ctx.progress.deleting.volumes[name] = true
 		}
 	}
@@ -424,7 +431,7 @@ func (ctx *VmContext) removeImageDrive() {
 		if image.info.fstype != "dir" {
 			glog.V(1).Infof("need eject no.%d image block device: %s", image.pos, image.info.deviceName)
 			ctx.progress.deleting.containers[image.pos] = true
-			newDiskDelSession(ctx, image.info.scsiId, &ContainerUnmounted{Index: image.pos, Success: true})
+			ctx.DCtx.RemoveDisk(ctx, image.info.filename, image.info.format, image.info.scsiId, &ContainerUnmounted{Index: image.pos, Success: true})
 		}
 	}
 }
@@ -441,7 +448,7 @@ func (ctx *VmContext) releaseNetwork() {
 	for idx, nic := range ctx.devices.networkMap {
 		glog.V(1).Infof("remove network card %d: %s", idx, nic.IpAddr)
 		ctx.progress.deleting.networks[idx] = true
-		ReleaseInterface(idx, nic.IpAddr, nic.Fd, maps, ctx.hub)
+		go ReleaseInterface(idx, nic.IpAddr, nic.Fd, maps, ctx.Hub)
 		maps = nil
 	}
 }
@@ -458,8 +465,8 @@ func (ctx *VmContext) removeInterface() {
 	for idx, nic := range ctx.devices.networkMap {
 		glog.V(1).Infof("remove network card %d: %s", idx, nic.IpAddr)
 		ctx.progress.deleting.networks[idx] = true
-		ReleaseInterface(idx, nic.IpAddr, nic.Fd, maps, ctx.hub)
-		newNetworkDelSession(ctx, nic.DeviceName, &NetDevRemovedEvent{Index: idx})
+		go ReleaseInterface(idx, nic.IpAddr, nic.Fd, maps, ctx.Hub)
+		ctx.DCtx.RemoveNic(ctx, nic.DeviceName, nic.MacAddr, &NetDevRemovedEvent{Index: idx})
 		maps = nil
 	}
 }

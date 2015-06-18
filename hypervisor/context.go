@@ -2,12 +2,10 @@ package hypervisor
 
 import (
 	"encoding/json"
-	"fmt"
 	"hyper/lib/glog"
 	"hyper/pod"
 	"hyper/types"
 	"os"
-	"strconv"
 	"sync"
 	"time"
 )
@@ -32,18 +30,17 @@ type VmContext struct {
 	Boot *BootConfig
 
 	// Communication Context
-	hub    chan VmEvent
+	Hub    chan VmEvent
 	client chan *types.QemuResponse
 	vm     chan *DecodedMessage
 
-	qmp chan QmpInteraction
-	wdt chan string
+	DCtx DriverContext
 
-	qmpSockName     string
-	hyperSockName   string
-	ttySockName     string
-	consoleSockName string
-	shareDir        string
+	HomeDir         string
+	HyperSockName   string
+	TtySockName     string
+	ConsoleSockName string
+	ShareDir        string
 
 	pciAddr  int    //next available pci addr for pci hotplug
 	scsiId   int    //next available scsi id for scsi hotplug
@@ -63,34 +60,30 @@ type VmContext struct {
 	handler stateHandler
 	current string
 	timer   *time.Timer
-	process *os.Process
-	lock    *sync.Mutex //protect update of context
-	wg      *sync.WaitGroup
-	wait    bool
+
+	lock *sync.Mutex //protect update of context
+	wg   *sync.WaitGroup
+	wait bool
 }
 
 type stateHandler func(ctx *VmContext, event VmEvent)
 
-func initContext(id string, hub chan VmEvent, client chan *types.QemuResponse, boot *BootConfig) (*VmContext, error) {
+func InitContext(dr HypervisorDriver, id string, hub chan VmEvent, client chan *types.QemuResponse, dc DriverContext, boot *BootConfig) (*VmContext, error) {
 
 	var err error = nil
 
-	qmpChannel := make(chan QmpInteraction, 128)
 	vmChannel := make(chan *DecodedMessage, 128)
-	defer func() {
-		if err != nil {
-			close(qmpChannel)
-			close(vmChannel)
-		}
-	}()
 
 	//dir and sockets:
 	homeDir := BaseDir + "/" + id + "/"
-	qmpSockName := homeDir + QmpSockName
 	hyperSockName := homeDir + HyperSockName
 	ttySockName := homeDir + TtySockName
 	consoleSockName := homeDir + ConsoleSockName
 	shareDir := homeDir + ShareDirTag
+
+	if dc == nil {
+		dc = dr.InitContext(homeDir)
+	}
 
 	err = os.MkdirAll(shareDir, 0755)
 	if err != nil {
@@ -109,20 +102,18 @@ func initContext(id string, hub chan VmEvent, client chan *types.QemuResponse, b
 		pciAddr:         PciAddrFrom,
 		scsiId:          0,
 		attachId:        1,
-		hub:             hub,
+		Hub:             hub,
 		client:          client,
-		qmp:             qmpChannel,
+		DCtx:            dc,
 		vm:              vmChannel,
-		wdt:             make(chan string, 16),
 		ptys:            newPts(),
 		ttySessions:     make(map[string]uint64),
-		qmpSockName:     qmpSockName,
-		hyperSockName:   hyperSockName,
-		ttySockName:     ttySockName,
-		consoleSockName: consoleSockName,
-		shareDir:        shareDir,
+		HomeDir:         homeDir,
+		HyperSockName:   hyperSockName,
+		TtySockName:     ttySockName,
+		ConsoleSockName: consoleSockName,
+		ShareDir:        shareDir,
 		timer:           nil,
-		process:         nil,
 		handler:         stateInit,
 		userSpec:        nil,
 		vmSpec:          nil,
@@ -138,7 +129,7 @@ func (ctx *VmContext) setTimeout(seconds int) {
 		ctx.unsetTimeout()
 	}
 	ctx.timer = time.AfterFunc(time.Duration(seconds)*time.Second, func() {
-		ctx.hub <- &QemuTimeout{}
+		ctx.Hub <- &VmTimeout{}
 	})
 }
 
@@ -223,10 +214,9 @@ func (ctx *VmContext) Close() {
 	ctx.lock.Lock()
 	defer ctx.lock.Unlock()
 	ctx.unsetTimeout()
-	close(ctx.qmp)
+	ctx.DCtx.Close()
 	close(ctx.vm)
-	close(ctx.wdt)
-	os.Remove(ctx.shareDir)
+	os.Remove(ctx.ShareDir)
 	ctx.handler = nil
 	ctx.current = "None"
 }
@@ -247,55 +237,6 @@ func (ctx *VmContext) Become(handler stateHandler, desc string) {
 	ctx.current = desc
 	ctx.lock.Unlock()
 	glog.V(1).Infof("VM %s: state change from %s to '%s'", ctx.Id, orig, desc)
-}
-
-func (ctx *VmContext) QemuArguments() []string {
-	if ctx.Boot == nil {
-		ctx.Boot = &BootConfig{
-			CPU:    1,
-			Memory: 128,
-			Kernel: DefaultKernel,
-			Initrd: DefaultInitrd,
-		}
-	}
-	boot := ctx.Boot
-
-	params := []string{
-		"-machine", "pc-i440fx-2.0,accel=kvm,usb=off", "-global", "kvm-pit.lost_tick_policy=discard", "-cpu", "host"}
-	if _, err := os.Stat("/dev/kvm"); os.IsNotExist(err) {
-		glog.V(1).Info("kvm not exist change to no kvm mode")
-		params = []string{"-machine", "pc-i440fx-2.0,usb=off", "-cpu", "core2duo"}
-	}
-
-	if boot.Bios != "" && boot.Cbfs != "" {
-		params = append(params,
-			"-drive", fmt.Sprintf("if=pflash,file=%s,readonly=on", boot.Bios),
-			"-drive", fmt.Sprintf("if=pflash,file=%s,readonly=on", boot.Cbfs))
-	} else if boot.Bios != "" {
-		params = append(params,
-			"-bios", boot.Bios,
-			"-kernel", boot.Kernel, "-initrd", boot.Initrd, "-append", "\"console=ttyS0 panic=1\"")
-	} else if boot.Cbfs != "" {
-		params = append(params,
-			"-drive", fmt.Sprintf("if=pflash,file=%s,readonly=on", boot.Cbfs))
-	} else {
-		params = append(params,
-			"-kernel", boot.Kernel, "-initrd", boot.Initrd, "-append", "\"console=ttyS0 panic=1\"")
-	}
-
-	return append(params,
-		"-realtime", "mlock=off", "-no-user-config", "-nodefaults", "-no-hpet",
-		"-rtc", "base=utc,driftfix=slew", "-no-reboot", "-display", "none", "-boot", "strict=on",
-		"-m", strconv.Itoa(ctx.Boot.Memory), "-smp", strconv.Itoa(ctx.Boot.CPU),
-		"-qmp", fmt.Sprintf("unix:%s,server,nowait", ctx.qmpSockName), "-serial", fmt.Sprintf("unix:%s,server,nowait", ctx.consoleSockName),
-		"-device", "virtio-serial-pci,id=virtio-serial0,bus=pci.0,addr=0x2", "-device", "virtio-scsi-pci,id=scsi0,bus=pci.0,addr=0x3",
-		"-chardev", fmt.Sprintf("socket,id=charch0,path=%s,server,nowait", ctx.hyperSockName),
-		"-device", "virtserialport,bus=virtio-serial0.0,nr=1,chardev=charch0,id=channel0,name=sh.hyper.channel.0",
-		"-chardev", fmt.Sprintf("socket,id=charch1,path=%s,server,nowait", ctx.ttySockName),
-		"-device", "virtserialport,bus=virtio-serial0.0,nr=2,chardev=charch1,id=channel1,name=sh.hyper.channel.1",
-		"-fsdev", fmt.Sprintf("local,id=virtio9p,path=%s,security_model=none", ctx.shareDir),
-		"-device", fmt.Sprintf("virtio-9p-pci,fsdev=virtio9p,mount_tag=%s", ShareDirTag),
-	)
 }
 
 // InitDeviceContext will init device info in context
