@@ -6,15 +6,15 @@ import (
 	"os"
 	"os/user"
 	"path"
-	"sync"
 	"strings"
+	"sync"
 	"syscall"
 
 	"hyper/docker"
 	"hyper/engine"
+	"hyper/hypervisor"
 	"hyper/lib/glog"
 	"hyper/pod"
-	"hyper/hypervisor"
 	"hyper/storage/aufs"
 	dm "hyper/storage/devicemapper"
 	"hyper/storage/overlay"
@@ -230,7 +230,7 @@ func (daemon *Daemon) CreatePod(podArgs, podId string, wg *sync.WaitGroup) error
 		Id:            podId,
 		Name:          userPod.Name,
 		Vm:            "",
-		Wg:	       wg,
+		Wg:            wg,
 		Containers:    containers,
 		Status:        types.S_POD_CREATED,
 		Type:          userPod.Type,
@@ -260,7 +260,7 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 		sharedDir         = path.Join(hypervisor.BaseDir, vmId, hypervisor.ShareDirTag)
 		podData           []byte
 		mypod             *Pod
-		wg		  *sync.WaitGroup
+		wg                *sync.WaitGroup
 		err               error
 		uid               string
 		gid               string
@@ -645,7 +645,7 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 		Spec:       userPod,
 		Containers: containerInfoList,
 		Volumes:    volumuInfoList,
-		Wg:	    wg,
+		Wg:         wg,
 	}
 	qemuPodEvent <- runPodEvent
 	daemon.podList[podId].Status = types.S_POD_RUNNING

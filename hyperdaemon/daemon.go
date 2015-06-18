@@ -11,10 +11,10 @@ import (
 	dm "hyper/storage/devicemapper"
 	"hyper/types"
 	"os"
-	"sync"
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/Unknwon/goconfig"
 	"github.com/syndtr/goleveldb/leveldb"

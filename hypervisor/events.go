@@ -2,9 +2,9 @@ package hypervisor
 
 import (
 	"hyper/pod"
-	"sync"
 	"net"
 	"os"
+	"sync"
 )
 
 type QemuEvent interface {
@@ -51,8 +51,8 @@ type ExecCommand struct {
 
 type StopPodCommand struct{}
 
-type ShutdownCommand struct{
-	Wait	bool
+type ShutdownCommand struct {
+	Wait bool
 }
 
 type ReleaseVMCommand struct{}

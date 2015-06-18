@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"hyper/engine"
-	"hyper/lib/glog"
 	"hyper/hypervisor"
+	"hyper/lib/glog"
 	"hyper/types"
 )
 

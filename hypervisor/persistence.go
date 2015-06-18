@@ -3,10 +3,10 @@ package hypervisor
 import (
 	"encoding/json"
 	"errors"
-	"sync"
 	"hyper/pod"
 	"hyper/types"
 	"os"
+	"sync"
 )
 
 type PersistVolumeInfo struct {
@@ -163,8 +163,8 @@ func (pinfo *PersistInfo) serialize() ([]byte, error) {
 }
 
 func (pinfo *PersistInfo) vmContext(hub chan QemuEvent,
-				    client chan *types.QemuResponse,
-				    wg *sync.WaitGroup) (*VmContext, error) {
+	client chan *types.QemuResponse,
+	wg *sync.WaitGroup) (*VmContext, error) {
 
 	proc, err := os.FindProcess(pinfo.Pid)
 	if err != nil {

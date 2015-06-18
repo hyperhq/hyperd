@@ -2,8 +2,8 @@ package daemon
 
 import (
 	"hyper/engine"
-	"hyper/lib/glog"
 	"hyper/hypervisor"
+	"hyper/lib/glog"
 	"strconv"
 	"strings"
 )

@@ -1,9 +1,9 @@
 package hypervisor
 
 import (
-	"sync"
 	"hyper/lib/glog"
 	"hyper/types"
+	"sync"
 )
 
 type BootConfig struct {
@@ -52,7 +52,7 @@ func QemuLoop(vmId string, hub chan QemuEvent, client chan *types.QemuResponse, 
 }
 
 func QemuAssociate(vmId string, hub chan QemuEvent, client chan *types.QemuResponse,
-		   wg *sync.WaitGroup, pack []byte) {
+	wg *sync.WaitGroup, pack []byte) {
 
 	if glog.V(1) {
 		glog.Infof("VM %s trying to reload with serialized data: %s", vmId, string(pack))

@@ -831,7 +831,7 @@ func Modprobe(module string) error {
 func SetupPortMaps(containerip string, maps []pod.UserContainerPort) error {
 	var (
 		err error = nil
-		i int = 0
+		i   int   = 0
 	)
 
 	if len(maps) == 0 {
