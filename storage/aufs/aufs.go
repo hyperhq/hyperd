@@ -219,10 +219,13 @@ func useDirperm() bool {
 
 func aufsUnmount(target string) error {
 	glog.V(1).Infof("Ready to unmount the target : %s", target)
+	if _, err := os.Stat(target); err != nil && os.IsNotExist(err) {
+		return nil
+	}
 	cmdString := fmt.Sprintf("auplink %s flush", target)
 	cmd := exec.Command("/bin/sh", "-c", cmdString)
-	if output, err := cmd.CombinedOutput(); err != nil {
-		glog.Warningf("Couldn't run auplink command : %s\n%s\n", err.Error(), output)
+	if err := cmd.Run(); err != nil {
+		glog.Warningf("Couldn't run auplink command : %s\n", err.Error())
 	}
 	if err := syscall.Unmount(target, 0); err != nil {
 		return err

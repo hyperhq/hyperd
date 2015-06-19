@@ -397,6 +397,9 @@ func (ctx *VmContext) removeDMDevice() {
 }
 
 func (ctx *VmContext) releaseOverlayDir() {
+	if !supportOverlay() {
+		return
+	}
 	for idx, container := range ctx.vmSpec.Containers {
 		if container.Fstype == "" {
 			glog.V(1).Info("need unmount overlay dir ", container.Image)
@@ -407,6 +410,9 @@ func (ctx *VmContext) releaseOverlayDir() {
 }
 
 func (ctx *VmContext) releaseAufsDir() {
+	if !supportAufs() {
+		return
+	}
 	for idx, container := range ctx.vmSpec.Containers {
 		if container.Fstype == "" {
 			glog.V(1).Info("need unmount aufs ", container.Image)

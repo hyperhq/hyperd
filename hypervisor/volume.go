@@ -1,6 +1,7 @@
 package hypervisor
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
@@ -100,4 +101,36 @@ func UmountDMDevice(deviceFullPath, name string, hub chan VmEvent) {
 
 	// After umount that device, we need to delete it
 	hub <- &BlockdevRemovedEvent{Name: name, Success: success}
+}
+
+func supportAufs() bool {
+	f, err := os.Open("/proc/filesystems")
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+
+	s := bufio.NewScanner(f)
+	for s.Scan() {
+		if strings.Contains(s.Text(), "aufs") {
+			return true
+		}
+	}
+	return false
+}
+
+func supportOverlay() bool {
+	f, err := os.Open("/proc/filesystems")
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+
+	s := bufio.NewScanner(f)
+	for s.Scan() {
+		if strings.Contains(s.Text(), "overlay") {
+			return true
+		}
+	}
+	return false
 }
