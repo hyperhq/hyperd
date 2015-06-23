@@ -195,7 +195,7 @@ void hyperxl_domain_event_handler(void *data, HYPERXL_EVENT_CONST libxl_event *e
     if (xl_reason == LIBXL_SHUTDOWN_REASON_SUSPEND)
         goto ignore;
 
-    DomainDeath_cgo(driver->ctx, (libxl_event *)event);
+    DomainDeath_cgo((uint32_t)event->domid);
 
 ignore:
     libxl_event_free(driver->ctx, (libxl_event *)event);

@@ -7,13 +7,14 @@ package xen
 
 #cgo LDFLAGS: -L.
 
-void DomainDeath_cgo(libxl_ctx* ctx, libxl_event *event);
+void DomainDeath_cgo(uint32_t domid);
 */
 import "C"
 
 import (
 	"hyper/lib/glog"
 	"unsafe"
+	"hyper/hypervisor"
 )
 
 type (
@@ -159,8 +160,15 @@ func LibxlCtxFree(ctx LibxlCtxPtr) int {
  ******************************************************************************/
 
 //export DomainDeath_cgo
-func DomainDeath_cgo(ctx *C.struct_libxl__ctx, event *C.struct_libxl_event) {
-	C.libxl_event_free(ctx, event)
+func DomainDeath_cgo(domid C.uint32_t) {
+	defer func(){ recover() }() //in case the vmContext or channel has been released
+	dom := (uint32)(domid)
+	glog.Infof("got xen hypervisor message: domain %d quit")
+	if vm,ok := globalDriver.domains[dom]; ok {
+		glog.V(1).Infof("Domain %d managed by xen driver, try close it")
+		delete(globalDriver.domains, dom)
+		vm.Hub <- &hypervisor.VmExit{}
+	}
 }
 
 //export hyperxl_log_cgo

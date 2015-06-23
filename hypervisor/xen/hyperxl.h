@@ -140,7 +140,7 @@ void hyperxl_sigchld_handler(libxl_ctx* ctx);
 
 void hyperxl_domain_event_handler(void *data, HYPERXL_EVENT_CONST libxl_event *event);
 
-extern void DomainDeath_cgo(libxl_ctx* ctx, libxl_event *event);
+extern void DomainDeath_cgo(uint32_t domid);
 extern void hyperxl_log_cgo(char* buf, int len);
 
 int hyperxl_nic_add(libxl_ctx* ctx, uint32_t domid, hyperxl_nic_config* config);

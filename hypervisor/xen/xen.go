@@ -20,6 +20,7 @@ type XenDriver struct {
 	Version      uint32
 	Capabilities string
 	Logger       *XentoollogLogger
+	domains      map[uint32]*hypervisor.VmContext
 }
 
 type XenContext struct {
@@ -37,6 +38,20 @@ type DomainConfig struct {
 	MaxMemory   int
 	ConsoleSock string
 	Extra       []string
+}
+
+var globalDriver *XenDriver = nil
+
+func InitDriver() *XenDriver {
+	xd := &XenDriver{}
+	if err := xd.Initialize(); err == nil {
+		glog.Info("Xen Driver Loaded.")
+		globalDriver = xd
+		return globalDriver
+	} else {
+		glog.Info("Xen Driver Load failed: ", err.Error())
+		return nil
+	}
 }
 
 //judge if the xl is available and if the version and cap is acceptable
@@ -83,6 +98,8 @@ func (xd *XenDriver) Initialize() error {
 	xd.Ctx = ctx.Ctx
 	xd.Logger = ctx.Logger
 	xd.Version = ctx.Version
+	xd.Capabilities = ctx.Capabilities
+	xd.domains = make(map[uint32]*hypervisor.VmContext)
 
 	return nil
 }
@@ -137,10 +154,13 @@ func (xc *XenContext) Launch(ctx *hypervisor.VmContext) {
 	}
 	xc.domId = domid
 	glog.Infof("Start VM as domain %d", domid)
+	xc.driver.domains[(uint32)(domid)] = ctx
 	//    }()
 }
 
-func (xc *XenContext) Associate(ctx *hypervisor.VmContext) {}
+func (xc *XenContext) Associate(ctx *hypervisor.VmContext) {
+	xc.driver.domains[(uint32)(xc.domId)] = ctx
+}
 
 func (xc *XenContext) Dump() (map[string]interface{}, error) {
 	if xc.domId <= 0 {

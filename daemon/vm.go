@@ -17,12 +17,10 @@ import (
 var hypervisorDriver hypervisor.HypervisorDriver = DriversProbe()
 
 func DriversProbe() hypervisor.HypervisorDriver {
-	xd := &xen.XenDriver{}
-	if err := xd.Initialize(); err == nil {
+	xd := xen.InitDriver()
+	if xd != nil {
 		glog.Info("Xen Driver Loaded.")
 		return xd
-	} else {
-		glog.Info("Xen Driver Load failed: ", err.Error())
 	}
 
 	qd := &qemu.QemuDriver{}
