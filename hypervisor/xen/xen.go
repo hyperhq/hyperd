@@ -16,9 +16,10 @@ import (
 )
 
 type XenDriver struct {
-	Ctx     LibxlCtxPtr
-	Version uint32
-	Logger  *XentoollogLogger
+	Ctx          LibxlCtxPtr
+	Version      uint32
+	Capabilities string
+	Logger       *XentoollogLogger
 }
 
 type XenContext struct {
@@ -51,6 +52,19 @@ func (xd *XenDriver) Initialize() error {
 		return errors.New("failed to initialize xen context")
 	} else if ctx.Version < REQUIRED_VERSION {
 		return fmt.Errorf("Xen version is not new enough (%d), need 4.5 or higher", ctx.Version)
+	} else {
+		glog.V(1).Info("Xen capabilities: ", ctx.Capabilities)
+		hvm := false
+		caps := strings.Split(ctx.Capabilities, " ")
+		for _, cap := range caps {
+			if strings.HasPrefix(cap, "hvm-") {
+				hvm = true
+				break
+			}
+		}
+		if !hvm {
+			return fmt.Errorf("Xen installation does not support HVM, current capabilities: %s", ctx.Capabilities)
+		}
 	}
 
 	sigchan := make(chan os.Signal, 1)

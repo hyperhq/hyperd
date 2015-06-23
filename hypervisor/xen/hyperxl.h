@@ -58,6 +58,7 @@ int libxl_event_free(libxl_ctx *ctx, libxl_event *event);
 typedef struct hyperxl_driver {
 	libxl_ctx*			ctx;
 	uint32_t 			version;
+	char*               capabilities;
 	xentoollog_logger* 	logger;
 } hyperxl_driver;
 

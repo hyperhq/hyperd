@@ -52,6 +52,7 @@ int  hyperxl_initialize_driver(hyperxl_driver** pdriver) {
     }
 
     driver->version = version->xen_version_major * 1000000 + version->xen_version_minor * 1000;
+    driver->capabilities = strdup(version->capabilities);
 
     if(libxl_get_free_memory(driver->ctx, &mem)) {
         goto free_ctx;

@@ -76,9 +76,10 @@ func HyperxlInitializeDriver() (*XenDriver, int) {
 		defer C.free(unsafe.Pointer(driver))
 
 		return &XenDriver{
-			Ctx:     driver.ctx,
-			Version: (uint32)(driver.version),
-			Logger:  (*XentoollogLogger)(driver.logger),
+			Ctx:          driver.ctx,
+			Version:      (uint32)(driver.version),
+			Capabilities: C.GoString(driver.capabilities),
+			Logger:       (*XentoollogLogger)(driver.logger),
 		}, 0
 	}
 	return nil, res
