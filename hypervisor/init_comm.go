@@ -159,6 +159,10 @@ func waitCmdToInit(ctx *VmContext, init *net.UnixConn) {
 		}
 		if cmd.code == INIT_ACK || cmd.code == INIT_ERROR {
 			if len(cmds) > 0 {
+				if cmds[0].code == INIT_DESTROYPOD {
+					glog.Info("got response of shutdown command, last round of command to init")
+					looping = false
+				}
 				if cmd.code == INIT_ACK {
 					if cmds[0].code != INIT_PING {
 						ctx.Hub <- &CommandAck{
@@ -202,6 +206,17 @@ func waitCmdToInit(ctx *VmContext, init *net.UnixConn) {
 				results[i] = binary.BigEndian.Uint32(cmd.message[i*4 : i*4+4])
 			}
 
+			for _,c := range cmds {
+				if c.code == INIT_DESTROYPOD {
+					glog.Info("got pod finish message after having send destroy message")
+					looping = false
+					ctx.Hub <- &CommandAck {
+						reply: c.code,
+					}
+					break
+				}
+			}
+
 			glog.V(1).Infof("Pod finished, returned %d values", num)
 
 			ctx.Hub <- &PodFinished{
@@ -210,10 +225,6 @@ func waitCmdToInit(ctx *VmContext, init *net.UnixConn) {
 		} else {
 			if glog.V(1) {
 				glog.Infof("send command %d to init, payload: '%s'.", cmd.code, string(cmd.message))
-			}
-			if cmd.code == INIT_DESTROYPOD {
-				glog.Info("Sending shutdown command, last round of command to init")
-				looping = false
 			}
 			init.Write(newVmMessage(cmd))
 			cmds = append(cmds, cmd)
@@ -224,6 +235,13 @@ func waitCmdToInit(ctx *VmContext, init *net.UnixConn) {
 				})
 			}
 		}
+	}
+
+	if pingTimer != nil {
+		pingTimer.Stop()
+	}
+	if pongTimer != nil {
+		pongTimer.Stop()
 	}
 }
 
