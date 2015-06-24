@@ -158,11 +158,10 @@ int  hyperxl_domain_start(libxl_ctx* ctx, hyperxl_domain_config* config) {
     	goto cleanup;
     }
 
-    //collect it latter
-//    libxl_evgen_domain_death* e_death = NULL;
-//    if (libxl_evenable_domain_death(ctx, domid, 0, &e_death)) {
-//    	goto cleanup;
-//    }
+    libxl_evgen_domain_death* e_death = NULL;
+    if (libxl_evenable_domain_death(ctx, domid, 0, &e_death)) {
+    	goto cleanup;
+    }
 
     libxl_domain_unpause(ctx, domid);
     config->domid = domid;
