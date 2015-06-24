@@ -133,6 +133,7 @@ func (qc *QemuContext) Kill(ctx *hypervisor.VmContext) {
 func (qc *QemuContext) BuildinNetwork() bool { return false }
 
 func (qc *QemuContext) Close() {
+	qc.wdt <- "quit"
 	close(qc.qmp)
 	close(qc.wdt)
 }

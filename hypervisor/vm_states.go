@@ -22,7 +22,6 @@ func (ctx *VmContext) onQemuExit(reclaim bool) bool {
 	ctx.reportVmShutdown()
 	ctx.setTimeout(60)
 
-	ctx.DCtx.Kill(ctx)
 	if reclaim {
 		ctx.reclaimDevice()
 	}
