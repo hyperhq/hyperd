@@ -123,7 +123,7 @@ typedef struct hyperxl_nic_config {
     const char* ip;
     const char* bridge;
     const char* gatewaydev;
-    uint8_t*    mac;
+    char*    mac;
     const char* ifname;
 } hyperxl_nic_config;
 

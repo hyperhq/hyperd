@@ -118,7 +118,7 @@ func HyperxlNicAdd(ctx LibxlCtxPtr, domid uint32, ip, bridge, gatewaydev, ifname
 		ip:         C.CString(ip),
 		bridge:     C.CString(bridge),
 		gatewaydev: C.CString(gatewaydev),
-		mac:        (*C.uint8_t)(&mac[0]),
+		mac:        (*C.char)(unsafe.Pointer(&mac[0])),
 		ifname:     C.CString(ifname),
 	}
 	return (int)(C.hyperxl_nic_add((*C.struct_libxl__ctx)(ctx), (C.uint32_t)(domid), (*C.struct_hyperxl_nic_config)(nic)))

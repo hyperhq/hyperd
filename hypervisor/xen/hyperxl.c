@@ -219,7 +219,8 @@ int  hyperxl_domaim_check(libxl_ctx* ctx, uint32_t domid)
 int hyperxl_nic_add(libxl_ctx* ctx, uint32_t domid, hyperxl_nic_config* config) {
 
     libxl_device_nic nic;
-    int ret = -1;
+    libxl_mac mac;
+    int i, ret = -1;
 
     libxl_device_nic_init(&nic);
     nic.backend_domid = 0;
@@ -230,7 +231,12 @@ int hyperxl_nic_add(libxl_ctx* ctx, uint32_t domid, hyperxl_nic_config* config) 
     nic.nictype = LIBXL_NIC_TYPE_VIF_IOEMU;
     nic.ifname = strdup(config->ifname);
     nic.gatewaydev = strdup(config->gatewaydev);
-    libxl_mac_copy(ctx, &nic.mac, (libxl_mac*)&config->mac);
+    if (config->mac != NULL) {
+        for (i=0; i<6; i++) {
+            mac[i] = (uint8_t)(*(config->mac + i));
+        }
+        libxl_mac_copy(ctx, &nic.mac, &mac);
+    }
 
     if( libxl_device_nic_add(ctx, domid, &nic, 0) ) {
         goto cleanup;
@@ -249,10 +255,14 @@ int hyperxl_nic_remove(libxl_ctx* ctx, uint32_t domid, const char* mac) {
 
     libxl_device_nic_init(&nic);
     if(libxl_mac_to_device_nic(ctx, domid, mac, &nic)) {
+        char* msg = "failed to get device from mac";
+        hyperxl_log_cgo(msg, strlen(msg));
         goto cleanup;
     }
 
     if(libxl_device_nic_remove(ctx, domid, &nic, 0)) {
+        char* msg = "failed to remove nic from domain";
+        hyperxl_log_cgo(msg, strlen(msg));
         goto cleanup;
     }
     ret = 0;
