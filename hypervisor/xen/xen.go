@@ -122,8 +122,8 @@ func (xd *XenDriver) LoadContext(persisted map[string]interface{}) (hypervisor.D
 		return nil, errors.New("cannot read the dom id info from persist info")
 	} else {
 		switch d.(type) {
-		case string:
-			domid = d.(int)
+		case float64:
+			domid = (int)(d.(float64))
 			if domid <= 0 {
 				return nil, fmt.Errorf("loaded wrong domid %d", domid)
 			}
@@ -171,7 +171,7 @@ func (xc *XenContext) Dump() (map[string]interface{}, error) {
 	}
 
 	return map[string]interface{}{
-		"hypervisor": "qemu",
+		"hypervisor": "xen",
 		"domid":      xc.domId,
 	}, nil
 }
