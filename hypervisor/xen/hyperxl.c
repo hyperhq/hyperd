@@ -165,12 +165,18 @@ int  hyperxl_domain_start(libxl_ctx* ctx, hyperxl_domain_config* config) {
 
     libxl_domain_unpause(ctx, domid);
     config->domid = domid;
+    config->ev    = e_death;
 
 	ret = 0;
 
 cleanup:
 	libxl_domain_config_dispose(&d_config);
 	return ret;
+}
+
+void hyperxl_domain_cleanup(libxl_ctx *ctx, void* ev) {
+    if (ev != NULL)
+        libxl_evdisable_domain_death(ctx, (libxl_evgen_domain_death*)ev);
 }
 
 void hyperxl_sigchld_handler(libxl_ctx* ctx) {
@@ -411,11 +417,13 @@ int  hyperxl_initialize_driver(hyperxl_driver** pdriver) {
     return -1;
 }
 
-void hyperxl_destroy_driver(hyperxl_driver* driver);
+void hyperxl_destroy_driver(hyperxl_driver* driver) {}
 
 int  hyperxl_domain_start(libxl_ctx* ctx, hyperxl_domain_config* config){
     return -1;
 }
+
+void hyperxl_domain_cleanup(libxl_ctx *ctx, void* ev) {}
 
 int  hyperxl_domain_destroy(libxl_ctx* ctx, uint32_t domid){
    return -1;

@@ -13,6 +13,7 @@ import (
 	"hyper/network"
 	"net"
 	"strings"
+	"unsafe"
 )
 
 type XenDriver struct {
@@ -26,6 +27,7 @@ type XenDriver struct {
 type XenContext struct {
 	driver *XenDriver
 	domId  int
+	ev     unsafe.Pointer
 }
 
 type DomainConfig struct {
@@ -147,12 +149,13 @@ func (xc *XenContext) Launch(ctx *hypervisor.VmContext) {
 		"-fsdev", fmt.Sprintf("local,id=virtio9p,path=%s,security_model=none", ctx.ShareDir),
 		"-device", fmt.Sprintf("virtio-9p-pci,fsdev=virtio9p,mount_tag=%s", hypervisor.ShareDirTag),
 	}
-	domid, err := XlStartDomain(xc.driver.Ctx, ctx.Id, ctx.Boot, ctx.ConsoleSockName, extra)
+	domid, ev, err := XlStartDomain(xc.driver.Ctx, ctx.Id, ctx.Boot, ctx.HyperSockName+".test", ctx.TtySockName+".test", ctx.ConsoleSockName, extra)
 	if err != nil {
 		ctx.Hub <- &hypervisor.VmStartFailEvent{Message: err.Error()}
 		return
 	}
 	xc.domId = domid
+	xc.ev = ev
 	glog.Infof("Start VM as domain %d", domid)
 	xc.driver.domains[(uint32)(domid)] = ctx
 	//    }()
@@ -178,6 +181,9 @@ func (xc *XenContext) Shutdown(ctx *hypervisor.VmContext) {
 		res := HyperxlDomainDestroy(xc.driver.Ctx, (uint32)(xc.domId))
 		if res == 0 {
 			ctx.Hub <- &hypervisor.VmExit{}
+		}
+		if xc.ev != unsafe.Pointer(nil) {
+			HyperDomainCleanup(xc.driver.Ctx, xc.ev)
 		}
 	}()
 }
@@ -300,7 +306,7 @@ func diskRoutine(add bool, xc *XenContext, ctx *hypervisor.VmContext,
 	}
 }
 
-func XlStartDomain(ctx LibxlCtxPtr, id string, boot *hypervisor.BootConfig, consoleSock string, extra []string) (int, error) {
+func XlStartDomain(ctx LibxlCtxPtr, id string, boot *hypervisor.BootConfig, hyperSock, ttySock, consoleSock string, extra []string) (int, unsafe.Pointer, error) {
 
 	config := &DomainConfig{
 		Hvm:         true,
@@ -314,12 +320,12 @@ func XlStartDomain(ctx LibxlCtxPtr, id string, boot *hypervisor.BootConfig, cons
 		Extra:       extra,
 	}
 
-	domid, err := HyperxlDomainStart(ctx, config)
+	domid, ev, err := HyperxlDomainStart(ctx, config)
 	if err != 0 {
-		return -1, errors.New("failed to start a xen domain.")
+		return -1, nil, errors.New("failed to start a xen domain.")
 	}
 
-	return domid, nil
+	return domid, ev, nil
 }
 
 func probeXend() bool {

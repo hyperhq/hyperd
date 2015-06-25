@@ -66,6 +66,7 @@ typedef struct hyperxl_domain_config {
 	bool 	hvm;
 
     int     domid;
+    void*   ev;
 	const char* name;
 
 	const char* kernel;
@@ -131,6 +132,8 @@ int  hyperxl_initialize_driver(hyperxl_driver** pdriver);
 void hyperxl_destroy_driver(hyperxl_driver* driver);
 
 int  hyperxl_domain_start(libxl_ctx* ctx, hyperxl_domain_config* config);
+
+void hyperxl_domain_cleanup(libxl_ctx *ctx, void* ev);
 
 int  hyperxl_domain_destroy(libxl_ctx* ctx, uint32_t domid);
 

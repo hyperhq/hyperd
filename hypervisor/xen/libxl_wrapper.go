@@ -57,6 +57,7 @@ func (dc *DomainConfig) toC() *C.struct_hyperxl_domain_config {
 	return &C.struct_hyperxl_domain_config{
 		hvm:           (C.bool)(dc.Hvm),
 		domid:         0,
+		ev:			   unsafe.Pointer(nil),
 		name:          C.CString(dc.Name),
 		kernel:        C.CString(dc.Kernel),
 		initrd:        C.CString(dc.Initrd),
@@ -87,10 +88,14 @@ func HyperxlInitializeDriver() (*XenDriver, int) {
 }
 
 //int  hyperxl_domain_start(libxl_ctx* ctx, hyperxl_domain_config* config);
-func HyperxlDomainStart(ctx LibxlCtxPtr, config *DomainConfig) (int, int) {
+func HyperxlDomainStart(ctx LibxlCtxPtr, config *DomainConfig) (int, unsafe.Pointer, int) {
 	cc := config.toC()
 	res := (int)(C.hyperxl_domain_start((*C.struct_libxl__ctx)(ctx), cc))
-	return (int)(cc.domid), res
+	return (int)(cc.domid), cc.ev, res
+}
+
+func HyperDomainCleanup(ctx LibxlCtxPtr, ev unsafe.Pointer) {
+	C.hyperxl_domain_cleanup((*C.struct_libxl__ctx)(ctx), ev)
 }
 
 //void hyperxl_sigchld_handler(libxl_ctx* ctx)
@@ -163,11 +168,12 @@ func LibxlCtxFree(ctx LibxlCtxPtr) int {
 func DomainDeath_cgo(domid C.uint32_t) {
 	defer func(){ recover() }() //in case the vmContext or channel has been released
 	dom := (uint32)(domid)
-	glog.Infof("got xen hypervisor message: domain %d quit")
+	glog.Infof("got xen hypervisor message: domain %d quit", dom)
 	if vm,ok := globalDriver.domains[dom]; ok {
 		glog.V(1).Infof("Domain %d managed by xen driver, try close it")
 		delete(globalDriver.domains, dom)
 		vm.Hub <- &hypervisor.VmExit{}
+		HyperDomainCleanup(globalDriver.Ctx, vm.DCtx.(*XenContext).ev)
 	}
 }
 
