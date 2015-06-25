@@ -127,7 +127,7 @@ typedef struct hyperxl_nic_config {
     const char* ifname;
 } hyperxl_nic_config;
 
-int  hyperxl_initialize_driver(hyperxl_driver** pdriver);
+int  hyperxl_initialize_driver(hyperxl_driver** pdriver, bool verbose);
 
 void hyperxl_destroy_driver(hyperxl_driver* driver);
 

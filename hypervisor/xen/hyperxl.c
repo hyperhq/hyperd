@@ -16,7 +16,7 @@ typedef struct xentoollog_logger_hyperxl xentoollog_logger_hyperxl;
 xentoollog_logger_hyperxl* xtl_createlogger_hyperxl
         (xentoollog_level min_level, unsigned flags);
 
-int  hyperxl_initialize_driver(hyperxl_driver** pdriver) {
+int  hyperxl_initialize_driver(hyperxl_driver** pdriver, bool verbose) {
 
 #ifndef LIBXL_HAVE_BUILDINFO_KERNEL
 
@@ -27,6 +27,7 @@ int  hyperxl_initialize_driver(hyperxl_driver** pdriver) {
     hyperxl_driver *driver;
     const libxl_version_info* version = NULL;
     uint32_t mem = 0;
+    xentoollog_level log_level = XTL_INFO;
 
     *pdriver = (hyperxl_driver*)malloc(sizeof(hyperxl_driver));
     if ( *pdriver == NULL ) {
@@ -35,7 +36,10 @@ int  hyperxl_initialize_driver(hyperxl_driver** pdriver) {
 
     driver = *pdriver;
 
-    driver->logger = (xentoollog_logger*)xtl_createlogger_hyperxl(XTL_DEBUG, 0);
+    if (verbose) {
+        log_level = XTL_DEBUG;
+    }
+    driver->logger = (xentoollog_logger*)xtl_createlogger_hyperxl(log_level, 0);
     if (driver->logger == NULL) {
         goto release_driver;
     }
@@ -423,7 +427,7 @@ xentoollog_logger_hyperxl* xtl_createlogger_hyperxl
 
 #else //WITH_XEN
 
-int  hyperxl_initialize_driver(hyperxl_driver** pdriver) {
+int  hyperxl_initialize_driver(hyperxl_driver** pdriver, bool verbose) {
     return -1;
 }
 

@@ -73,7 +73,7 @@ func (dc *DomainConfig) toC() *C.struct_hyperxl_domain_config {
 func HyperxlInitializeDriver() (*XenDriver, int) {
 
 	var driver *C.struct_hyperxl_driver = nil
-	res := (int)(C.hyperxl_initialize_driver(&driver))
+	res := (int)(C.hyperxl_initialize_driver(&driver, (C.bool)(glog.V(1))))
 	if res == 0 {
 		defer C.free(unsafe.Pointer(driver))
 
