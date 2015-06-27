@@ -84,6 +84,9 @@ func (daemon *Daemon) CmdPodStart(job *engine.Job) error {
 	if vmId == "" {
 		vmId = fmt.Sprintf("vm-%s", pod.RandStr(10, "alpha"))
 	} else {
+		if _, ok := daemon.vmList[vmId]; !ok {
+			return fmt.Errorf("The VM %s doesn't exist", vmId)
+		}
 		if userPod.Resource.Vcpu != daemon.vmList[vmId].Cpu {
 			return fmt.Errorf("The new pod's cpu setting is different the current VM's cpu")
 		}
