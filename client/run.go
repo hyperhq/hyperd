@@ -62,6 +62,7 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 				return err
 			}
 		}
+
 		t1 := time.Now()
 		podId, err := cli.RunPod(string(jsonbody))
 		if err != nil {
@@ -75,7 +76,7 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 	if opts.K8s != "" {
 		var (
 			kpod pod.KPod
-			pod  *pod.UserPod
+			userpod  *pod.UserPod
 		)
 		if _, err := os.Stat(opts.K8s); err != nil {
 			return err
@@ -94,14 +95,15 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 		if err := json.Unmarshal(jsonbody, &kpod); err != nil {
 			return err
 		}
-		pod, err = kpod.Convert()
+		userpod, err = kpod.Convert()
 		if err != nil {
 			return err
 		}
-		jsonbody, err = json.Marshal(*pod)
+		jsonbody, err = json.Marshal(*userpod)
 		if err != nil {
 			return err
 		}
+
 		t1 := time.Now()
 		podId, err := cli.RunPod(string(jsonbody))
 		if err != nil {
@@ -172,11 +174,7 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 		Volumes:    []pod.UserVolume{},
 		Tty:        opts.Tty,
 	}
-	/*
-		if err := userPod.Validate(); err != nil {
-			return err
-		}
-	*/
+
 	jsonString, _ := json.Marshal(userPod)
 	podId, err := cli.RunPod(string(jsonString))
 	if err != nil {

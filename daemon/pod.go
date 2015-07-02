@@ -183,6 +183,9 @@ func (daemon *Daemon) CreatePod(podArgs, podId string, wg *sync.WaitGroup) error
 		glog.V(1).Infof("Process POD file error: %s", err.Error())
 		return err
 	}
+	if err := userPod.Validate(); err != nil {
+		return err
+	}
 	// store the UserPod into the db
 	if err := daemon.WritePodToDB(podId, []byte(podArgs)); err != nil {
 		glog.V(1).Info("Found an error while saveing the POD file")

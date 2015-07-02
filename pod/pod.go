@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"reflect"
 )
 
 // Pod Data Structure
@@ -160,12 +161,16 @@ func RandStr(strSize int, randType string) string {
 func (pod *UserPod) Validate() error {
 	uniq, vset := keySet(pod.Volumes)
 	if !uniq {
-		return errors.New("Volumes name does not unique")
+		if len(vset) > 0 {
+			return errors.New("Volumes name does not unique")
+		}
 	}
 
 	uniq, fset := keySet(pod.Files)
 	if !uniq {
-		return errors.New("Files name does not unique")
+		if len(fset) > 0 {
+			return errors.New("Files name does not unique")
+		}
 	}
 
 	for idx, container := range pod.Containers {
@@ -186,7 +191,7 @@ func (pod *UserPod) Validate() error {
 
 		for _, v := range container.Volumes {
 			if _, ok := vset[v.Volume]; !ok {
-				return fmt.Errorf("in container %d, volume %s does not exist in file list.", idx, v.Volume)
+				return fmt.Errorf("in container %d, volume %s does not exist in volume list.", idx, v.Volume)
 			}
 		}
 	}
@@ -199,28 +204,43 @@ type item interface {
 }
 
 func keySet(ilist interface{}) (bool, map[string]bool) {
+	tmp, err := InterfaceSlice(ilist)
+	if err != nil {
+		return false, nil
+	}
 	iset := make(map[string]bool)
-	switch ilist.(type) {
-	case []interface{}:
-		for _, x := range ilist.([]interface{}) {
-			switch x.(type) {
-			case item:
-				kx := x.(item).key()
-				if _, ok := iset[kx]; ok {
-					return false, iset
-				}
-				iset[kx] = true
-			default:
+	for _, x := range tmp {
+		switch x.(type) {
+		case item:
+			kx := x.(item).key()
+			if _, ok := iset[kx]; ok {
 				return false, iset
 			}
+			iset[kx] = true
+			break
+		default:
+			return false, iset
 		}
-		return true, iset
-	default:
-		return false, iset
 	}
+	return true, iset
 }
 
 func (vol UserVolume) key() string          { return vol.Name }
 func (vol UserVolumeReference) key() string { return vol.Volume }
 func (f UserFile) key() string              { return f.Name }
 func (env UserEnvironmentVar) key() string  { return env.Env }
+
+func InterfaceSlice(slice interface{}) ([]interface{}, error) {
+	s := reflect.ValueOf(slice)
+	if s.Kind() != reflect.Slice {
+		return nil, fmt.Errorf("InterfaceSlice() given a non-slice type")
+	}
+
+	ret := make([]interface{}, s.Len())
+
+	for i := 0; i < s.Len(); i++ {
+		ret[i] = s.Index(i).Interface()
+	}
+
+	return ret, nil
+}
