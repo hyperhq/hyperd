@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"reflect"
+	"regexp"
 )
 
 // Pod Data Structure
@@ -172,7 +173,7 @@ func (pod *UserPod) Validate() error {
 			return errors.New("Files name does not unique")
 		}
 	}
-
+	var permReg = regexp.MustCompile("0[0-7]{3}")
 	for idx, container := range pod.Containers {
 
 		if uniq, _ := keySet(container.Volumes); !uniq {
@@ -186,6 +187,14 @@ func (pod *UserPod) Validate() error {
 		for _, f := range container.Files {
 			if _, ok := fset[f.Filename]; !ok {
 				return fmt.Errorf("in container %d, file %s does not exist in file list.", idx, f.Filename)
+			}
+			if f.Perm == "" {
+				f.Perm = "0755"
+			}
+			if f.Perm != "0" {
+				if !permReg.Match([]byte(f.Perm)) {
+					return fmt.Errorf("in container %d, the permission %s only accept Octal digital in string")
+				}
 			}
 		}
 

@@ -41,10 +41,7 @@ func AttachFiles(containerId, fromFile, toDir, rootDir, perm, uid, gid string) e
 	if containerId == "" {
 		return fmt.Errorf("Please make sure the arguments are not NULL!\n")
 	}
-	permInt, err := strconv.Atoi(perm)
-	if err != nil {
-		return err
-	}
+	permInt := utils.ConvertPermStrToInt(perm)
 	// It just need the block device without copying any files
 	// FIXME whether we need to return an error if the target directory is null
 	if toDir == "" {
@@ -75,13 +72,8 @@ func AttachFiles(containerId, fromFile, toDir, rootDir, perm, uid, gid string) e
 		return err
 	}
 	user_id, _ := strconv.Atoi(uid)
-	err = syscall.Setuid(user_id)
-	if err != nil {
-		return err
-	}
 	group_id, _ := strconv.Atoi(gid)
-	err = syscall.Setgid(group_id)
-	if err != nil {
+	if err = syscall.Chown(targetFile, user_id, group_id); err != nil {
 		return err
 	}
 

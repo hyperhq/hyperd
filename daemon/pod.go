@@ -462,13 +462,13 @@ func (daemon *Daemon) StartPod(podId, vmId, podArgs string) (int, string, error)
 					return -1, "", err
 				}
 			} else if storageDriver == "aufs" {
-				err := aufs.AttachFiles(c.Id, fromFile, targetPath, rootPath, f.Perm, uid, gid)
+				err := aufs.AttachFiles(c.Id, fromFile, targetPath, sharedDir, f.Perm, uid, gid)
 				if err != nil {
 					glog.Error("got error when attach files ", err.Error())
 					return -1, "", err
 				}
 			} else if storageDriver == "overlay" {
-				err := overlay.AttachFiles(c.Id, fromFile, targetPath, rootPath, f.Perm, uid, gid)
+				err := overlay.AttachFiles(c.Id, fromFile, targetPath, sharedDir, f.Perm, uid, gid)
 				if err != nil {
 					glog.Error("got error when attach files ", err.Error())
 					return -1, "", err

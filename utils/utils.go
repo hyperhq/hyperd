@@ -77,3 +77,28 @@ func FormatMountLabel(src, mountLabel string) string {
 	}
 	return src
 }
+
+func ConvertPermStrToInt(str string) int {
+	var res = 0
+	if str[0] == '0' {
+		if len(str) == 1 {
+			res = 0
+		} else if str[1] == 'x' {
+			// this is hex number
+			for i := 2; i < len(str); i++ {
+				res = res*16 + int(str[i]-'0')
+			}
+		} else {
+			// this is a octal number
+			for i := 1; i < len(str); i++ {
+				res = res*8 + int(str[i]-'0')
+			}
+		}
+	} else {
+		res, _ = strconv.Atoi(str)
+	}
+	if res > 511 {
+		res = 511
+	}
+	return res
+}

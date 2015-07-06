@@ -145,14 +145,8 @@ func AttachFiles(containerId, devPrefix, fromFile, toDir, rootPath, perm, uid, g
 		return err
 	}
 	user_id, _ := strconv.Atoi(uid)
-	err = syscall.Setuid(user_id)
-	if err != nil {
-		syscall.Unmount(idMountPath, syscall.MNT_DETACH)
-		return err
-	}
 	group_id, _ := strconv.Atoi(gid)
-	err = syscall.Setgid(group_id)
-	if err != nil {
+	if err = syscall.Chown(targetFile, user_id, group_id); err != nil {
 		syscall.Unmount(idMountPath, syscall.MNT_DETACH)
 		return err
 	}
