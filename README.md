@@ -55,7 +55,8 @@ For information on using the command line, just type `hyper`. You may use
 
 Clone hyper in GoPath
 
-    > cd ${GOPATH}/src
+    > mkdir -p ${GOPATH}/src/github.com/hyperhq
+    > cd ${GOPATH}/src/github.com/hyperhq
 	> git clone https://github.com/hyperhq/hyper.git hyper
 
 And make sure you have `go` (>= 1.4), `godep`, and `autotools`, go into the `hyper` dir
