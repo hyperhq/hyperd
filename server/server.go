@@ -18,11 +18,11 @@ import (
 	"syscall"
 
 	"github.com/gorilla/mux"
-	"hyper/engine"
-	"hyper/lib/glog"
-	"hyper/lib/portallocator"
-	"hyper/lib/version"
-	"hyper/utils"
+	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/hyper/lib/glog"
+	"github.com/hyperhq/hyper/lib/portallocator"
+	"github.com/hyperhq/hyper/lib/version"
+	"github.com/hyperhq/hyper/utils"
 )
 
 var (

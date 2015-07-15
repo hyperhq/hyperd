@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"hyper/engine"
-	"hyper/lib/sysinfo"
-	"hyper/utils"
+	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/hyper/lib/sysinfo"
+	"github.com/hyperhq/hyper/utils"
 )
 
 func (daemon *Daemon) CmdInfo(job *engine.Job) error {

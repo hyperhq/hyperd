@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"hyper/types"
+	"github.com/hyperhq/hyper/types"
 
 	gflag "github.com/jessevdk/go-flags"
 )

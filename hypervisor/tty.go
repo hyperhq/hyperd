@@ -2,8 +2,8 @@ package hypervisor
 
 import (
 	"encoding/binary"
-	"hyper/lib/glog"
-	"hyper/types"
+	"github.com/hyperhq/hyper/lib/glog"
+	"github.com/hyperhq/hyper/types"
 	"io"
 	"net"
 	"sync"

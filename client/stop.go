@@ -5,8 +5,8 @@ import (
 	"net/url"
 	"strings"
 
-	"hyper/engine"
-	"hyper/types"
+	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/hyper/types"
 
 	gflag "github.com/jessevdk/go-flags"
 )

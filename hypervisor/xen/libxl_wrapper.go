@@ -12,9 +12,9 @@ void DomainDeath_cgo(uint32_t domid);
 import "C"
 
 import (
-	"hyper/lib/glog"
+	"github.com/hyperhq/hyper/hypervisor"
+	"github.com/hyperhq/hyper/lib/glog"
 	"unsafe"
-	"hyper/hypervisor"
 )
 
 type (
@@ -57,7 +57,7 @@ func (dc *DomainConfig) toC() *C.struct_hyperxl_domain_config {
 	return &C.struct_hyperxl_domain_config{
 		hvm:           (C.bool)(dc.Hvm),
 		domid:         0,
-		ev:			   unsafe.Pointer(nil),
+		ev:            unsafe.Pointer(nil),
 		name:          C.CString(dc.Name),
 		kernel:        C.CString(dc.Kernel),
 		initrd:        C.CString(dc.Initrd),
@@ -166,10 +166,10 @@ func LibxlCtxFree(ctx LibxlCtxPtr) int {
 
 //export DomainDeath_cgo
 func DomainDeath_cgo(domid C.uint32_t) {
-	defer func(){ recover() }() //in case the vmContext or channel has been released
+	defer func() { recover() }() //in case the vmContext or channel has been released
 	dom := (uint32)(domid)
 	glog.Infof("got xen hypervisor message: domain %d quit", dom)
-	if vm,ok := globalDriver.domains[dom]; ok {
+	if vm, ok := globalDriver.domains[dom]; ok {
 		glog.V(1).Infof("Domain %d managed by xen driver, try close it")
 		delete(globalDriver.domains, dom)
 		vm.Hub <- &hypervisor.VmExit{}

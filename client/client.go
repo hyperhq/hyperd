@@ -4,7 +4,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"hyper/lib/term"
+	"github.com/hyperhq/hyper/lib/term"
 	"io"
 	"net"
 	"net/http"

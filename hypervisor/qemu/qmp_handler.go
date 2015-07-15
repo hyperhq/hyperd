@@ -2,8 +2,8 @@ package qemu
 
 import (
 	"encoding/json"
-	"hyper/hypervisor"
-	"hyper/lib/glog"
+	"github.com/hyperhq/hyper/hypervisor"
+	"github.com/hyperhq/hyper/lib/glog"
 	"io"
 	"net"
 	"syscall"

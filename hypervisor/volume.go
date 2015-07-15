@@ -10,9 +10,9 @@ import (
 	"syscall"
 	"time"
 
-	"hyper/lib/glog"
-	"hyper/pod"
-	"hyper/storage/aufs"
+	"github.com/hyperhq/hyper/lib/glog"
+	"github.com/hyperhq/hyper/pod"
+	"github.com/hyperhq/hyper/storage/aufs"
 )
 
 func CreateContainer(userPod *pod.UserPod, sharedDir string, hub chan VmEvent) (string, error) {

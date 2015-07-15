@@ -2,7 +2,7 @@ package hypervisor
 
 import (
 	"encoding/json"
-	"hyper/pod"
+	"github.com/hyperhq/hyper/pod"
 	"testing"
 )
 

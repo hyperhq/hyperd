@@ -2,7 +2,7 @@ package qemu
 
 import (
 	"encoding/json"
-	"hyper/hypervisor"
+	"github.com/hyperhq/hyper/hypervisor"
 	"net"
 	"testing"
 	"time"

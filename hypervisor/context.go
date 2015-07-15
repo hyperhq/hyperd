@@ -2,9 +2,9 @@ package hypervisor
 
 import (
 	"encoding/json"
-	"hyper/lib/glog"
-	"hyper/pod"
-	"hyper/types"
+	"github.com/hyperhq/hyper/lib/glog"
+	"github.com/hyperhq/hyper/pod"
+	"github.com/hyperhq/hyper/types"
 	"os"
 	"sync"
 	"time"

@@ -5,9 +5,9 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/hyper/types"
 	gflag "github.com/jessevdk/go-flags"
-	"hyper/engine"
-	"hyper/types"
 )
 
 func (cli *HyperClient) HyperCmdRm(args ...string) error {

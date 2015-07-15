@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/hyper/types"
 	gflag "github.com/jessevdk/go-flags"
-	"hyper/engine"
-	"hyper/types"
 )
 
 func (cli *HyperClient) HyperCmdVm(args ...string) error {

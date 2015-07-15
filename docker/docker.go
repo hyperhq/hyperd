@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"hyper/lib/glog"
+	"github.com/hyperhq/hyper/lib/glog"
 	"io"
 	"io/ioutil"
 	"net"

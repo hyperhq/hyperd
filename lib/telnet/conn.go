@@ -9,7 +9,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"hyper/lib/glog"
+	"github.com/hyperhq/hyper/lib/glog"
 	"net"
 	"time"
 	"unicode"

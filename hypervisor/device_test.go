@@ -1,7 +1,7 @@
 package hypervisor
 
 import (
-	"hyper/network"
+	"github.com/hyperhq/hyper/network"
 	"os"
 	"strconv"
 	"testing"

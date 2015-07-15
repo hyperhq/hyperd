@@ -12,7 +12,7 @@ import (
 	"strings"
 	"syscall"
 
-	"hyper/lib/glog"
+	"github.com/hyperhq/hyper/lib/glog"
 )
 
 type jsonMetadata struct {

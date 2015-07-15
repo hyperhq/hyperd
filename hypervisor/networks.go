@@ -2,9 +2,9 @@ package hypervisor
 
 import (
 	"fmt"
-	"hyper/lib/glog"
-	"hyper/network"
-	"hyper/pod"
+	"github.com/hyperhq/hyper/lib/glog"
+	"github.com/hyperhq/hyper/network"
+	"github.com/hyperhq/hyper/pod"
 	"net"
 	"os"
 )

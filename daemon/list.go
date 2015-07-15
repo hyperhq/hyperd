@@ -2,8 +2,8 @@ package daemon
 
 import (
 	"fmt"
-	"hyper/engine"
-	"hyper/types"
+	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/hyper/types"
 )
 
 func (daemon *Daemon) CmdList(job *engine.Job) error {

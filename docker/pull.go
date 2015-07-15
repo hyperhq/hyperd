@@ -1,7 +1,7 @@
 package docker
 
 import (
-	"hyper/lib/glog"
+	"github.com/hyperhq/hyper/lib/glog"
 	"net/url"
 	"os"
 )

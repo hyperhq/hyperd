@@ -1,8 +1,8 @@
 package hypervisor
 
 import (
-	"hyper/lib/glog"
-	"hyper/types"
+	"github.com/hyperhq/hyper/lib/glog"
+	"github.com/hyperhq/hyper/types"
 	"sync"
 )
 

@@ -3,7 +3,7 @@ package engine
 import (
 	"bytes"
 	"fmt"
-	"hyper/lib/glog"
+	"github.com/hyperhq/hyper/lib/glog"
 	"io"
 	"strings"
 	"sync"

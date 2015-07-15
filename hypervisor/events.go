@@ -1,7 +1,7 @@
 package hypervisor
 
 import (
-	"hyper/pod"
+	"github.com/hyperhq/hyper/pod"
 	"net"
 	"os"
 	"sync"

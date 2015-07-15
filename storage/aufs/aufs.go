@@ -12,8 +12,8 @@ import (
 	"sync"
 	"syscall"
 
-	"hyper/lib/glog"
-	"hyper/utils"
+	"github.com/hyperhq/hyper/lib/glog"
+	"github.com/hyperhq/hyper/utils"
 )
 
 /*

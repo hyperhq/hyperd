@@ -7,10 +7,10 @@ import (
 	"os/signal"
 	"syscall"
 
-	"hyper/engine"
-	"hyper/daemon"
-	"hyper/lib/glog"
-	"hyper/utils"
+	"github.com/hyperhq/hyper/daemon"
+	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/hyper/lib/glog"
+	"github.com/hyperhq/hyper/utils"
 )
 
 func main() {

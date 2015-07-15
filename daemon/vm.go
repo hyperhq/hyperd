@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"strconv"
 
-	"hyper/engine"
-	"hyper/hypervisor"
-	"hyper/hypervisor/qemu"
-	"hyper/hypervisor/xen"
-	"hyper/lib/glog"
-	"hyper/pod"
-	"hyper/types"
+	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/hyper/hypervisor"
+	"github.com/hyperhq/hyper/hypervisor/qemu"
+	"github.com/hyperhq/hyper/hypervisor/xen"
+	"github.com/hyperhq/hyper/lib/glog"
+	"github.com/hyperhq/hyper/pod"
+	"github.com/hyperhq/hyper/types"
 )
 
 var hypervisorDriver hypervisor.HypervisorDriver = DriversProbe()

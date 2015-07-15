@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"hyper/engine"
-	"hyper/lib/promise"
-	"hyper/pod"
+	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/hyper/lib/promise"
+	"github.com/hyperhq/hyper/pod"
 )
 
 // hyper run [OPTIONS] image [COMMAND] [ARGS...]
@@ -75,8 +75,8 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 	}
 	if opts.K8s != "" {
 		var (
-			kpod pod.KPod
-			userpod  *pod.UserPod
+			kpod    pod.KPod
+			userpod *pod.UserPod
 		)
 		if _, err := os.Stat(opts.K8s); err != nil {
 			return err

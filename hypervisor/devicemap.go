@@ -2,8 +2,8 @@ package hypervisor
 
 import (
 	"fmt"
-	"hyper/lib/glog"
-	"hyper/pod"
+	"github.com/hyperhq/hyper/lib/glog"
+	"github.com/hyperhq/hyper/pod"
 )
 
 type deviceMap struct {

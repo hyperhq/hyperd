@@ -10,16 +10,16 @@ import (
 	"sync"
 	"syscall"
 
-	"hyper/docker"
-	"hyper/engine"
-	"hyper/hypervisor"
-	"hyper/lib/glog"
-	"hyper/pod"
-	"hyper/storage/aufs"
-	dm "hyper/storage/devicemapper"
-	"hyper/storage/overlay"
-	"hyper/types"
-	"hyper/utils"
+	"github.com/hyperhq/hyper/docker"
+	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/hyper/hypervisor"
+	"github.com/hyperhq/hyper/lib/glog"
+	"github.com/hyperhq/hyper/pod"
+	"github.com/hyperhq/hyper/storage/aufs"
+	dm "github.com/hyperhq/hyper/storage/devicemapper"
+	"github.com/hyperhq/hyper/storage/overlay"
+	"github.com/hyperhq/hyper/types"
+	"github.com/hyperhq/hyper/utils"
 )
 
 func (daemon *Daemon) CmdPodCreate(job *engine.Job) error {

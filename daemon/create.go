@@ -2,8 +2,8 @@ package daemon
 
 import (
 	"fmt"
-	"hyper/engine"
-	"hyper/lib/glog"
+	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/hyper/lib/glog"
 )
 
 func (daemon *Daemon) CmdCreate(job *engine.Job) error {

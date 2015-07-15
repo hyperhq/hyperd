@@ -7,8 +7,8 @@ import (
 	"os/exec"
 	"strconv"
 
-	"hyper/hypervisor"
-	"hyper/lib/glog"
+	"github.com/hyperhq/hyper/hypervisor"
+	"github.com/hyperhq/hyper/lib/glog"
 )
 
 //implement the hypervisor.HypervisorDriver interface

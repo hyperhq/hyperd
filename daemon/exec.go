@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"hyper/engine"
-	"hyper/hypervisor"
-	"hyper/lib/glog"
-	"hyper/types"
+	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/hyper/hypervisor"
+	"github.com/hyperhq/hyper/lib/glog"
+	"github.com/hyperhq/hyper/types"
 )
 
 func (daemon *Daemon) CmdExec(job *engine.Job) (err error) {

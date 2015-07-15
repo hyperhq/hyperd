@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"hyper/engine"
-	"hyper/types"
+	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/hyper/types"
 
 	gflag "github.com/jessevdk/go-flags"
 )

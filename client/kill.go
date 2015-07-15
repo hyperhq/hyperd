@@ -5,8 +5,8 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/hyperhq/hyper/engine"
 	gflag "github.com/jessevdk/go-flags"
-	"hyper/engine"
 )
 
 func (cli *HyperClient) HyperCmdKill(args ...string) error {

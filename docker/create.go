@@ -2,7 +2,7 @@ package docker
 
 import (
 	"fmt"
-	"hyper/lib/glog"
+	"github.com/hyperhq/hyper/lib/glog"
 	"net/url"
 	"os"
 	"strings"

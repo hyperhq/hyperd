@@ -2,7 +2,7 @@ package client
 
 import (
 	"fmt"
-	"hyper/utils"
+	"github.com/hyperhq/hyper/utils"
 	"os"
 )
 

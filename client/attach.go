@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"strings"
 
-	"hyper/lib/promise"
+	"github.com/hyperhq/hyper/lib/promise"
 
 	gflag "github.com/jessevdk/go-flags"
 )

@@ -8,9 +8,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"hyper/hypervisor"
-	"hyper/lib/glog"
-	"hyper/network"
+	"github.com/hyperhq/hyper/hypervisor"
+	"github.com/hyperhq/hyper/lib/glog"
+	"github.com/hyperhq/hyper/network"
 	"net"
 	"strings"
 	"unsafe"

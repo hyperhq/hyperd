@@ -1,9 +1,9 @@
 package daemon
 
 import (
-	"hyper/engine"
-	"hyper/hypervisor"
-	"hyper/lib/glog"
+	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/hyper/hypervisor"
+	"github.com/hyperhq/hyper/lib/glog"
 	"strconv"
 	"strings"
 )

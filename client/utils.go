@@ -15,9 +15,9 @@ import (
 	"strings"
 	"syscall"
 
-	"hyper/lib/term"
-	"hyper/pod"
-	"hyper/utils"
+	"github.com/hyperhq/hyper/lib/term"
+	"github.com/hyperhq/hyper/pod"
+	"github.com/hyperhq/hyper/utils"
 
 	"gopkg.in/yaml.v2"
 )

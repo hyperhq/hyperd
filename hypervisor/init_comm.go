@@ -3,8 +3,8 @@ package hypervisor
 import (
 	"encoding/binary"
 	"fmt"
-	"hyper/lib/glog"
-	"hyper/lib/telnet"
+	"github.com/hyperhq/hyper/lib/glog"
+	"github.com/hyperhq/hyper/lib/telnet"
 	"net"
 	"time"
 )
@@ -206,11 +206,11 @@ func waitCmdToInit(ctx *VmContext, init *net.UnixConn) {
 				results[i] = binary.BigEndian.Uint32(cmd.message[i*4 : i*4+4])
 			}
 
-			for _,c := range cmds {
+			for _, c := range cmds {
 				if c.code == INIT_DESTROYPOD {
 					glog.Info("got pod finish message after having send destroy message")
 					looping = false
-					ctx.Hub <- &CommandAck {
+					ctx.Hub <- &CommandAck{
 						reply: c.code,
 					}
 					break

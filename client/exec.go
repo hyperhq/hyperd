@@ -3,8 +3,8 @@ package client
 import (
 	"encoding/json"
 	"fmt"
-	"hyper/engine"
-	"hyper/lib/promise"
+	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/hyper/lib/promise"
 	"io"
 	"net/url"
 	"strings"
