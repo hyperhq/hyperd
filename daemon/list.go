@@ -3,7 +3,7 @@ package daemon
 import (
 	"fmt"
 	"github.com/hyperhq/hyper/engine"
-	"github.com/hyperhq/hyper/types"
+	"github.com/hyperhq/runv/hypervisor/types"
 )
 
 func (daemon *Daemon) CmdList(job *engine.Job) error {
@@ -80,24 +80,26 @@ func (daemon *Daemon) CmdList(job *engine.Job) error {
 	}
 
 	if item == "container" {
-		for _, c := range daemon.containerList {
-			switch c.Status {
-			case types.S_POD_RUNNING:
-				status = "running"
-				break
-			case types.S_POD_CREATED:
-				status = "pending"
-				break
-			case types.S_POD_FAILED:
-				status = "failed"
-				break
-			case types.S_POD_SUCCEEDED:
-				status = "succeeded"
-				break
-			default:
-				status = ""
+		for _, p := range daemon.podList {
+			for _, c := range p.Containers {
+				switch c.Status {
+				case types.S_POD_RUNNING:
+					status = "running"
+					break
+				case types.S_POD_CREATED:
+					status = "pending"
+					break
+				case types.S_POD_FAILED:
+					status = "failed"
+					break
+				case types.S_POD_SUCCEEDED:
+					status = "succeeded"
+					break
+				default:
+					status = ""
+				}
+				containerJsonResponse = append(containerJsonResponse, c.Id+":"+c.PodId+":"+status)
 			}
-			containerJsonResponse = append(containerJsonResponse, c.Id+":"+c.PodId+":"+status)
 		}
 		v.SetList("cData", containerJsonResponse)
 	}

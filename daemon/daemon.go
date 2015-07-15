@@ -4,53 +4,25 @@ import (
 	"fmt"
 	"github.com/hyperhq/hyper/docker"
 	"github.com/hyperhq/hyper/engine"
-	"github.com/hyperhq/hyper/lib/glog"
 	"github.com/hyperhq/hyper/lib/portallocator"
-	"github.com/hyperhq/hyper/network"
+	"github.com/hyperhq/runv/lib/glog"
+
 	apiserver "github.com/hyperhq/hyper/server"
 	dm "github.com/hyperhq/hyper/storage/devicemapper"
-	"github.com/hyperhq/hyper/types"
+
+	"github.com/hyperhq/runv/hypervisor"
+	"github.com/hyperhq/runv/hypervisor/network"
+	"github.com/hyperhq/runv/hypervisor/types"
+
 	"os"
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/Unknwon/goconfig"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
-
-type Vm struct {
-	Id                 string
-	Pod                *Pod
-	Status             uint
-	Cpu                int
-	Mem                int
-	qemuChan           interface{}
-	mainQemuClientChan interface{}
-	qemuClientChan     interface{}
-}
-
-type Pod struct {
-	Id            string
-	Name          string
-	Vm            string
-	Wg            *sync.WaitGroup
-	Containers    []*Container
-	Status        uint
-	Type          string
-	RestartPolicy string
-}
-
-type Container struct {
-	Id     string
-	Name   string
-	PodId  string
-	Image  string
-	Cmds   []string
-	Status uint
-}
 
 type Storage struct {
 	StorageType string
@@ -61,24 +33,20 @@ type Storage struct {
 }
 
 type Daemon struct {
-	ID                string
-	db                *leveldb.DB
-	eng               *engine.Engine
-	dockerCli         *docker.DockerCli
-	containerList     []*Container
-	podList           map[string]*Pod
-	vmList            map[string]*Vm
-	qemuChan          map[string]interface{}
-	qemuClientChan    map[string]interface{}
-	subQemuClientChan map[string]interface{}
-	kernel            string
-	initrd            string
-	bios              string
-	cbfs              string
-	BridgeIface       string
-	BridgeIP          string
-	Host              string
-	Storage           *Storage
+	ID          string
+	db          *leveldb.DB
+	eng         *engine.Engine
+	dockerCli   *docker.DockerCli
+	podList     map[string]*hypervisor.Pod
+	vmList      map[string]*hypervisor.Vm
+	kernel      string
+	initrd      string
+	bios        string
+	cbfs        string
+	BridgeIface string
+	BridgeIP    string
+	Host        string
+	Storage     *Storage
 }
 
 // Install installs daemon capabilities to eng.
@@ -140,8 +108,7 @@ func (daemon *Daemon) Restore() error {
 		return err
 	}
 	for k, v := range podList {
-		wg := new(sync.WaitGroup)
-		err = daemon.CreatePod(v, k, wg)
+		err = daemon.CreatePod(k, v)
 		if err != nil {
 			glog.Warning("Got a unexpected error, %s", err.Error())
 			continue
@@ -194,6 +161,8 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 		return nil, err
 	}
 
+	hypervisor.HDriver = DriversProbe()
+
 	cfg, err := goconfig.LoadConfigFile(eng.Config)
 	if err != nil {
 		glog.Errorf("Read config file (%s) failed, %s", eng.Config, err.Error())
@@ -238,28 +207,20 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 		return nil, err
 	}
 	dockerCli := docker.NewDockerCli("", proto, addr, nil)
-	qemuchan := map[string]interface{}{}
-	qemuclient := map[string]interface{}{}
-	subQemuClient := map[string]interface{}{}
-	cList := []*Container{}
-	pList := map[string]*Pod{}
-	vList := map[string]*Vm{}
+	pList := map[string]*hypervisor.Pod{}
+	vList := map[string]*hypervisor.Vm{}
 	daemon := &Daemon{
-		ID:                fmt.Sprintf("%d", os.Getpid()),
-		db:                db,
-		eng:               eng,
-		kernel:            kernel,
-		initrd:            initrd,
-		bios:              bios,
-		cbfs:              cbfs,
-		dockerCli:         dockerCli,
-		containerList:     cList,
-		podList:           pList,
-		vmList:            vList,
-		qemuChan:          qemuchan,
-		qemuClientChan:    qemuclient,
-		subQemuClientChan: subQemuClient,
-		Host:              host,
+		ID:        fmt.Sprintf("%d", os.Getpid()),
+		db:        db,
+		eng:       eng,
+		kernel:    kernel,
+		initrd:    initrd,
+		bios:      bios,
+		cbfs:      cbfs,
+		dockerCli: dockerCli,
+		podList:   pList,
+		vmList:    vList,
+		Host:      host,
 	}
 
 	stor := &Storage{}
@@ -500,10 +461,10 @@ func (daemon *Daemon) DeleteVolumeId(podId string) error {
 	}
 	return nil
 }
-func (daemon *Daemon) WritePodAndContainers(podName string) error {
-	key := fmt.Sprintf("pod-container-%s", podName)
+func (daemon *Daemon) WritePodAndContainers(podId string) error {
+	key := fmt.Sprintf("pod-container-%s", podId)
 	value := ""
-	for _, c := range daemon.podList[podName].Containers {
+	for _, c := range daemon.podList[podId].Containers {
 		if value == "" {
 			value = c.Id
 		} else {
@@ -593,115 +554,34 @@ func (daemon *Daemon) GetPodVmByName(podName string) (string, error) {
 	return pod.Vm, nil
 }
 
-func (daemon *Daemon) GetQemuChan(vmid string) (interface{}, interface{}, interface{}, error) {
-	if daemon.qemuChan[vmid] != nil && daemon.qemuClientChan[vmid] != nil {
-		return daemon.qemuChan[vmid], daemon.qemuClientChan[vmid], daemon.subQemuClientChan[vmid], nil
-	}
-	return nil, nil, nil, fmt.Errorf("Can not find the Qemu chan for pod: %s!", vmid)
-}
-
-func (daemon *Daemon) DeleteQemuChan(vmid string) error {
-	if daemon.qemuChan[vmid] != nil {
-		delete(daemon.qemuChan, vmid)
-	}
-	if daemon.qemuClientChan[vmid] != nil {
-		delete(daemon.qemuClientChan, vmid)
-	}
-	if daemon.subQemuClientChan[vmid] != nil {
-		delete(daemon.subQemuClientChan, vmid)
-	}
-
-	return nil
-}
-
-func (daemon *Daemon) SetQemuChan(vmid string, qemuchan, qemuclient, subQemuClient interface{}) error {
-	if daemon.qemuChan[vmid] == nil {
-		if qemuchan != nil {
-			daemon.qemuChan[vmid] = qemuchan
-		}
-		if qemuclient != nil {
-			daemon.qemuClientChan[vmid] = qemuclient
-		}
-		if subQemuClient != nil {
-			daemon.subQemuClientChan[vmid] = subQemuClient
-		}
-		return nil
-	}
-	return fmt.Errorf("Already find a Qemu chan for vm: %s!", vmid)
-}
-
-func (daemon *Daemon) SetPodByContainer(containerId, podId, name, image string, cmds []string, status uint) error {
-	container := &Container{
-		Id:     containerId,
-		Name:   name,
-		PodId:  podId,
-		Image:  image,
-		Cmds:   cmds,
-		Status: status,
-	}
-	daemon.containerList = append(daemon.containerList, container)
-
-	return nil
-}
-
 func (daemon *Daemon) GetPodByContainer(containerId string) (string, error) {
-	var c *Container
-	for _, c = range daemon.containerList {
-		if c.Id == containerId {
-			break
+	var c *hypervisor.Container = nil
+
+	for _, p := range daemon.podList {
+		for _, c = range p.Containers {
+			if c.Id == containerId {
+				return p.Id, nil
+			}
 		}
 	}
-	if c.Id != containerId {
-		return "", fmt.Errorf("Can not find that container!")
-	}
 
-	return c.PodId, nil
+	return "", fmt.Errorf("Can not find that container!")
 }
 
-func (daemon *Daemon) AddPod(pod *Pod) {
+func (daemon *Daemon) AddPod(pod *hypervisor.Pod) {
 	daemon.podList[pod.Id] = pod
 }
 
 func (daemon *Daemon) RemovePod(podId string) {
-	for _, c := range daemon.podList[podId].Containers {
-		for i, cl := range daemon.containerList {
-			if cl.Id == c.Id {
-				daemon.containerList = append(daemon.containerList[:i], daemon.containerList[i+1:]...)
-			}
-		}
-	}
 	delete(daemon.podList, podId)
 }
 
-func (daemon *Daemon) AddVm(vm *Vm) {
+func (daemon *Daemon) AddVm(vm *hypervisor.Vm) {
 	daemon.vmList[vm.Id] = vm
 }
 
 func (daemon *Daemon) RemoveVm(vmId string) {
 	delete(daemon.vmList, vmId)
-}
-
-func (daemon *Daemon) SetContainerStatus(podId string, status uint) {
-	for _, c := range daemon.podList[podId].Containers {
-		c.Status = status
-	}
-}
-
-func (daemon *Daemon) SetPodContainerStatus(podId string, data []uint32) {
-	failure := 0
-	for i, c := range daemon.podList[podId].Containers {
-		if data[i] != 0 {
-			failure++
-			c.Status = types.S_POD_FAILED
-		} else {
-			c.Status = types.S_POD_SUCCEEDED
-		}
-	}
-	if failure == 0 {
-		daemon.podList[podId].Status = types.S_POD_SUCCEEDED
-	} else {
-		daemon.podList[podId].Status = types.S_POD_FAILED
-	}
 }
 
 func (daemon *Daemon) UpdateVmData(vmId string, data []byte) error {

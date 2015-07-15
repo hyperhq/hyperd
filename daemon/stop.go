@@ -3,9 +3,8 @@ package daemon
 import (
 	"fmt"
 	"github.com/hyperhq/hyper/engine"
-	"github.com/hyperhq/hyper/hypervisor"
-	"github.com/hyperhq/hyper/lib/glog"
-	"github.com/hyperhq/hyper/types"
+	"github.com/hyperhq/runv/hypervisor/types"
+	"github.com/hyperhq/runv/lib/glog"
 )
 
 func (daemon *Daemon) CmdPodStop(job *engine.Job) error {
@@ -49,53 +48,18 @@ func (daemon *Daemon) StopPod(podId, stopVm string) (int, string, error) {
 			return types.E_VM_SHUTDOWN, "", nil
 		}
 	}
-	qemuPodEvent, _, qemuStatus, err := daemon.GetQemuChan(vmid)
-	if err != nil {
-		return -1, "", err
-	}
 
-	var qemuResponse *types.QemuResponse
-	if stopVm == "yes" {
-		daemon.podList[podId].Wg.Add(1)
-		shutdownPodEvent := &hypervisor.ShutdownCommand{Wait: true}
-		qemuPodEvent.(chan hypervisor.VmEvent) <- shutdownPodEvent
-		// wait for the qemu response
-		for {
-			qemuResponse = <-qemuStatus.(chan *types.QemuResponse)
-			glog.V(1).Infof("Got response: %d: %s", qemuResponse.Code, qemuResponse.Cause)
-			if qemuResponse.Code == types.E_VM_SHUTDOWN {
-				break
-			}
-		}
-		close(qemuStatus.(chan *types.QemuResponse))
-		// wait for goroutines exit
-		daemon.podList[podId].Wg.Wait()
-	} else {
-		stopPodEvent := &hypervisor.StopPodCommand{}
-		qemuPodEvent.(chan hypervisor.VmEvent) <- stopPodEvent
-		// wait for the qemu response
-		for {
-			qemuResponse = <-qemuStatus.(chan *types.QemuResponse)
-			glog.V(1).Infof("Got response: %d: %s", qemuResponse.Code, qemuResponse.Cause)
-			if qemuResponse.Code == types.E_POD_STOPPED || qemuResponse.Code == types.E_BAD_REQUEST || qemuResponse.Code == types.E_FAILED {
-				break
-			}
-		}
-	}
+	vm, _ := daemon.vmList[vmid]
+	mypod, _ := daemon.podList[podId]
+
+	qemuResponse := vm.StopPod(mypod, stopVm)
 
 	// Delete the Vm info for POD
 	daemon.DeleteVmByPod(podId)
 
 	if qemuResponse.Code == types.E_VM_SHUTDOWN {
-		daemon.podList[podId].Vm = ""
 		daemon.RemoveVm(vmid)
-		daemon.DeleteQemuChan(vmid)
 	}
-	if qemuResponse.Code == types.E_POD_STOPPED {
-		daemon.podList[podId].Vm = ""
-		daemon.vmList[vmid].Status = types.S_VM_IDLE
-	}
-	daemon.podList[podId].Status = types.S_POD_FAILED
-	daemon.SetContainerStatus(podId, types.S_POD_FAILED)
+
 	return qemuResponse.Code, qemuResponse.Cause, nil
 }

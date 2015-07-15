@@ -13,7 +13,7 @@ import (
 
 	"github.com/hyperhq/hyper/engine"
 	"github.com/hyperhq/hyper/lib/promise"
-	"github.com/hyperhq/hyper/pod"
+	"github.com/hyperhq/runv/hypervisor/pod"
 )
 
 // hyper run [OPTIONS] image [COMMAND] [ARGS...]

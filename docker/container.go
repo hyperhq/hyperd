@@ -2,7 +2,7 @@ package docker
 
 import (
 	"encoding/json"
-	"github.com/hyperhq/hyper/lib/glog"
+	"github.com/hyperhq/runv/lib/glog"
 )
 
 type TypeConfig struct {

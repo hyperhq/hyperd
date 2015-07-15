@@ -3,7 +3,7 @@ package daemon
 import (
 	"fmt"
 	"github.com/hyperhq/hyper/engine"
-	"github.com/hyperhq/hyper/lib/glog"
+	"github.com/hyperhq/runv/lib/glog"
 )
 
 func (daemon *Daemon) CmdCreate(job *engine.Job) error {

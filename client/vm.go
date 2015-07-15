@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/hyperhq/hyper/engine"
-	"github.com/hyperhq/hyper/types"
+	"github.com/hyperhq/runv/hypervisor/types"
 	gflag "github.com/jessevdk/go-flags"
 )
 

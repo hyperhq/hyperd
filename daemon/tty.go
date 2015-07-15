@@ -1,9 +1,9 @@
 package daemon
 
 import (
+	"fmt"
 	"github.com/hyperhq/hyper/engine"
-	"github.com/hyperhq/hyper/hypervisor"
-	"github.com/hyperhq/hyper/lib/glog"
+	"github.com/hyperhq/runv/lib/glog"
 	"strconv"
 	"strings"
 )
@@ -41,24 +41,25 @@ func (daemon *Daemon) CmdTty(job *engine.Job) (err error) {
 		}
 	}
 
+	vm, ok := daemon.vmList[vmid]
+	if !ok {
+		return fmt.Errorf("vm %s doesn't exist!")
+	}
+
 	row, err := strconv.Atoi(h)
 	if err != nil {
-		glog.Warning("Success to resize the tty!")
+		glog.Warning("Window row %s incorrect!", h)
 	}
 	column, err := strconv.Atoi(w)
 	if err != nil {
-		glog.Warning("Success to resize the tty!")
-	}
-	var ttySizeCommand = &hypervisor.WindowSizeCommand{
-		ClientTag: tag,
-		Size:      &hypervisor.WindowSize{Row: uint16(row), Column: uint16(column)},
+		glog.Warning("Window column %s incorrect!", h)
 	}
 
-	qemuEvent, _, _, err := daemon.GetQemuChan(vmid)
+	err = vm.Tty(tag, row, column)
 	if err != nil {
 		return err
 	}
-	qemuEvent.(chan hypervisor.VmEvent) <- ttySizeCommand
+
 	glog.V(1).Infof("Success to resize the tty!")
 	return nil
 }

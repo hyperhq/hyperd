@@ -4,8 +4,6 @@
 AC_PREREQ([2.69])
 AC_INIT([hyper], [0.2], [hyper.sh])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign subdir-objects])
-AC_CONFIG_SRCDIR([hypervisor/xen/hyperxl.c])
-AC_CONFIG_HEADERS([hypervisor/xen/config.h])
 
 # Checks for programs.
 AC_PROG_CC
@@ -57,9 +55,7 @@ fi
 
 AM_CONDITIONAL([WITH_XEN], [test "x$with_xen" == "xyes"])
 
-AC_CONFIG_FILES([Makefile
-                 hypervisor/Makefile
-                 hypervisor/xen/Makefile])
+AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
 
 AC_MSG_RESULT([

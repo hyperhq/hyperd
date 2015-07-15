@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/hyperhq/hyper/engine"
-	"github.com/hyperhq/hyper/lib/glog"
-	"github.com/hyperhq/hyper/types"
+	"github.com/hyperhq/runv/hypervisor/types"
+	"github.com/hyperhq/runv/lib/glog"
 )
 
 func (daemon *Daemon) CmdPodRm(job *engine.Job) (err error) {
