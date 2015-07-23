@@ -41,7 +41,7 @@ func (daemon *Daemon) CmdAttach(job *engine.Job) (err error) {
 		return fmt.Errorf("Can find VM whose Id is %s!", vmId)
 	}
 
-	err = vm.Attach(job.Stdin, job.Stdout, tag, container)
+	err = vm.Attach(job.Stdin, job.Stdout, tag, container, nil)
 	if err != nil {
 		return err
 	}
