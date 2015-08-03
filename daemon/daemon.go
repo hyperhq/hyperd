@@ -10,6 +10,7 @@ import (
 	apiserver "github.com/hyperhq/hyper/server"
 	dm "github.com/hyperhq/hyper/storage/devicemapper"
 
+	"github.com/hyperhq/runv/driverloader"
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/network"
 	"github.com/hyperhq/runv/hypervisor/types"
@@ -33,20 +34,20 @@ type Storage struct {
 }
 
 type Daemon struct {
-	ID          string
-	db          *leveldb.DB
-	eng         *engine.Engine
-	dockerCli   *docker.DockerCli
-	podList     map[string]*hypervisor.Pod
-	vmList      map[string]*hypervisor.Vm
-	kernel      string
-	initrd      string
-	bios        string
-	cbfs        string
-	BridgeIface string
-	BridgeIP    string
-	Host        string
-	Storage     *Storage
+	ID		string
+	db		*leveldb.DB
+	eng		*engine.Engine
+	dockerCli	*docker.DockerCli
+	podList		map[string]*hypervisor.Pod
+	vmList		map[string]*hypervisor.Vm
+	kernel		string
+	initrd		string
+	bios		string
+	cbfs		string
+	BridgeIface	string
+	BridgeIP	string
+	Host		string
+	Storage		*Storage
 }
 
 // Install installs daemon capabilities to eng.
@@ -161,8 +162,6 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 		return nil, err
 	}
 
-	hypervisor.HDriver = DriversProbe()
-
 	cfg, err := goconfig.LoadConfigFile(eng.Config)
 	if err != nil {
 		glog.Errorf("Read config file (%s) failed, %s", eng.Config, err.Error())
@@ -178,6 +177,11 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 	cbfs, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Cbfs")
 	glog.V(0).Infof("The config: bios=%s, cbfs=%s", bios, cbfs)
 	host, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Host")
+	driver, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Hypervisor")
+
+	if hypervisor.HDriver, err = driverloader.Probe(driver); err != nil {
+		return nil, err
+	}
 
 	var tempdir = "/var/run/hyper/"
 	os.Setenv("TMPDIR", tempdir)
@@ -209,18 +213,18 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 	dockerCli := docker.NewDockerCli("", proto, addr, nil)
 	pList := map[string]*hypervisor.Pod{}
 	vList := map[string]*hypervisor.Vm{}
-	daemon := &Daemon{
-		ID:        fmt.Sprintf("%d", os.Getpid()),
-		db:        db,
-		eng:       eng,
-		kernel:    kernel,
-		initrd:    initrd,
-		bios:      bios,
-		cbfs:      cbfs,
-		dockerCli: dockerCli,
-		podList:   pList,
-		vmList:    vList,
-		Host:      host,
+	daemon := &Daemon {
+		ID:		fmt.Sprintf("%d", os.Getpid()),
+		db:		db,
+		eng:		eng,
+		kernel:		kernel,
+		initrd:		initrd,
+		bios:		bios,
+		cbfs:		cbfs,
+		dockerCli:	dockerCli,
+		podList:	pList,
+		vmList:		vList,
+		Host:		host,
 	}
 
 	stor := &Storage{}

@@ -7,30 +7,9 @@ import (
 	"github.com/hyperhq/hyper/engine"
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/pod"
-	"github.com/hyperhq/runv/hypervisor/qemu"
 	"github.com/hyperhq/runv/hypervisor/types"
-	"github.com/hyperhq/runv/hypervisor/xen"
 	"github.com/hyperhq/runv/lib/glog"
 )
-
-func DriversProbe() hypervisor.HypervisorDriver {
-	xd := xen.InitDriver()
-	if xd != nil {
-		glog.Info("Xen Driver Loaded.")
-		return xd
-	}
-
-	qd := &qemu.QemuDriver{}
-	if err := qd.Initialize(); err == nil {
-		glog.Info("Qemu Driver Loaded")
-		return qd
-	} else {
-		glog.Info("Qemu Driver Load failed: ", err.Error())
-	}
-
-	glog.Error("No driver available")
-	return nil
-}
 
 func (daemon *Daemon) CmdVmCreate(job *engine.Job) (err error) {
 	var (
@@ -179,5 +158,5 @@ func (daemon *Daemon) NewVm(id string, cpu, memory int) *hypervisor.Vm {
 			}
 		}
 	}
-	return hypervisor.NewVm(vmId, cpu, memory)
+	return hypervisor.NewVm(vmId, cpu, memory, false)
 }
