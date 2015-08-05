@@ -6,12 +6,14 @@ import (
 	"strings"
 
 	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/runv/hypervisor/types"
+
 	gflag "github.com/jessevdk/go-flags"
 )
 
 func (cli *HyperClient) HyperCmdKill(args ...string) error {
 	var parser = gflag.NewParser(nil, gflag.Default)
-	parser.Usage = "kill VM_ID\n\nterminate a VM instance"
+	parser.Usage = "kill VM_ID\n\nTerminate a VM instance"
 	args, err := parser.Parse()
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {
@@ -42,8 +44,8 @@ func (cli *HyperClient) HyperCmdKill(args ...string) error {
 		return err
 	}
 	out.Close()
-	if remoteInfo.Exists("ID") {
-		// TODO ...
+	if remoteInfo.GetInt("Code") != types.E_VM_SHUTDOWN {
+		fmt.Fprintf(cli.err, "VM(%s) is failed to shutdown, %s\n", remoteInfo.Get("ID"), remoteInfo.Get("Cause"))
 	}
 
 	return nil

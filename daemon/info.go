@@ -10,27 +10,35 @@ import (
 )
 
 func (daemon *Daemon) CmdInfo(job *engine.Job) error {
-	cli := daemon.dockerCli
-	body, _, err := cli.SendCmdInfo("")
-	out := engine.NewOutput()
-	remoteInfo, err := out.AddEnv()
+	cli := daemon.DockerCli
+	sys, err := cli.SendCmdInfo("")
 	if err != nil {
 		return err
 	}
-	if _, err := out.Write(body); err != nil {
-		return fmt.Errorf("Error while reading remote info!\n")
-	}
-	out.Close()
 
+	var num = 0
+	for _, p := range daemon.PodList {
+		num += len(p.Containers)
+	}
 	v := &engine.Env{}
 	v.Set("ID", daemon.ID)
-	if remoteInfo.Exists("Containers") {
-		v.SetInt("Containers", remoteInfo.GetInt("Containers"))
-	}
+	v.SetInt("Containers", num)
+	v.SetInt("Images", sys.Images)
+	v.Set("Driver", sys.Driver)
+	v.SetJson("DriverStatus", sys.DriverStatus)
+	v.Set("DockerRootDir", sys.DockerRootDir)
+	v.Set("IndexServerAddress", sys.IndexServerAddress)
+	v.Set("ExecutionDriver", "VirtualBox")
 
 	// Get system infomation
 	meminfo, err := sysinfo.GetMemInfo()
+	if err != nil {
+		return err
+	}
 	osinfo, err := sysinfo.GetOSInfo()
+	if err != nil {
+		return err
+	}
 	v.SetInt64("MemTotal", int64(meminfo.MemTotal))
 	v.SetInt64("Pods", daemon.GetPodNum())
 	v.Set("Operating System", osinfo.PrettyName)

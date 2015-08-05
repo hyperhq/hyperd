@@ -4,20 +4,25 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"github.com/hyperhq/hyper/lib/term"
 	"io"
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"text/template"
 	"time"
+
+	"github.com/hyperhq/hyper/lib/docker/cliconfig"
+	"github.com/hyperhq/hyper/lib/docker/pkg/homedir"
+	"github.com/hyperhq/hyper/lib/term"
 )
 
 type HyperClient struct {
 	proto         string
 	addr          string
+	configFile    *cliconfig.ConfigFile
 	scheme        string
 	in            io.ReadCloser
 	out           io.Writer
@@ -106,9 +111,15 @@ func NewHyperClient(proto, addr string, tlsConfig *tls.Config) *HyperClient {
 	inFd, isTerminalIn = term.GetFdInfo(os.Stdin)
 	outFd, isTerminalOut = term.GetFdInfo(os.Stdout)
 
+	clifile, err := cliconfig.Load(filepath.Join(homedir.Get(), ".docker"))
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "WARNING: Error loading config file %v\n", err)
+	}
+
 	return &HyperClient{
 		proto:         proto,
 		addr:          addr,
+		configFile:    clifile,
 		in:            os.Stdin,
 		out:           os.Stdout,
 		err:           os.Stdout,

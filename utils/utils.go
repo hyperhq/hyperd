@@ -1,7 +1,10 @@
 package utils
 
 import (
+	"bytes"
+	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"mime"
@@ -17,6 +20,10 @@ var (
 	IAMSTATIC string = "true"
 	INITSHA1  string = ""
 	INITPATH  string = ""
+
+	HYPER_ROOT   string
+	HYPER_FILE   string
+	HYPER_DAEMON interface{}
 )
 
 const (
@@ -101,4 +108,66 @@ func ConvertPermStrToInt(str string) int {
 		res = 511
 	}
 	return res
+}
+
+func RandStr(strSize int, randType string) string {
+	var dictionary string
+	if randType == "alphanum" {
+		dictionary = "0123456789abcdefghijklmnopqrstuvwxyz"
+	}
+
+	if randType == "alpha" {
+		dictionary = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+	}
+
+	if randType == "number" {
+		dictionary = "0123456789"
+	}
+
+	var bytes = make([]byte, strSize)
+	rand.Read(bytes)
+	for k, v := range bytes {
+		bytes[k] = dictionary[v%byte(len(dictionary))]
+	}
+	return string(bytes)
+}
+
+func JSONMarshal(v interface{}, safeEncoding bool) ([]byte, error) {
+	b, err := json.Marshal(v)
+
+	if safeEncoding {
+		b = bytes.Replace(b, []byte("\\u003c"), []byte("<"), -1)
+		b = bytes.Replace(b, []byte("\\u003e"), []byte(">"), -1)
+		b = bytes.Replace(b, []byte("\\u0026"), []byte("&"), -1)
+	}
+	return b, err
+}
+
+type Data struct {
+	Root string `json:root`
+	ISO  string `json:iso`
+}
+
+func SetDaemon(d interface{}) {
+	HYPER_DAEMON = d
+}
+
+func SetHyperEnv(file, rootpath, isopath string) error {
+	HYPER_ROOT = rootpath
+	f, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE, 0666)
+	if err != nil {
+		return err
+	}
+	var d = Data{
+		Root: rootpath,
+		ISO:  isopath,
+	}
+	var str []byte
+	str, err = json.Marshal(d)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(f, string(str))
+	defer f.Close()
+	return nil
 }

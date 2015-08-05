@@ -2,6 +2,7 @@ package client
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +16,10 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/hyperhq/hyper/lib/docker/cliconfig"
+	"github.com/hyperhq/hyper/lib/docker/pkg/jsonmessage"
+	"github.com/hyperhq/hyper/lib/docker/pkg/stdcopy"
+	"github.com/hyperhq/hyper/lib/docker/registry"
 	"github.com/hyperhq/hyper/lib/term"
 	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/hypervisor/pod"
@@ -102,6 +107,50 @@ func (cli *HyperClient) clientRequest(method, path string, in io.Reader, headers
 	return resp.Body, resp.Header.Get("Content-Type"), statusCode, nil
 }
 
+func (cli *HyperClient) clientRequestAttemptLogin(method, path string, in io.Reader, out io.Writer, index *registry.IndexInfo, cmdName string) (io.ReadCloser, int, error) {
+	cmdAttempt := func(authConfig cliconfig.AuthConfig) (io.ReadCloser, int, error) {
+		buf, err := json.Marshal(authConfig)
+		if err != nil {
+			return nil, -1, err
+		}
+		registryAuthHeader := []string{
+			base64.URLEncoding.EncodeToString(buf),
+		}
+
+		// begin the request
+		body, contentType, statusCode, err := cli.clientRequest(method, path, in, map[string][]string{
+			"X-Registry-Auth": registryAuthHeader,
+		})
+		if err == nil && out != nil {
+			// If we are streaming output, complete the stream since
+			// errors may not appear until later.
+			err = cli.streamBody(body, contentType, true, out, nil)
+		}
+		if err != nil {
+			// Since errors in a stream appear after status 200 has been written,
+			// we may need to change the status code.
+			if strings.Contains(err.Error(), "Authentication is required") ||
+				strings.Contains(err.Error(), "Status 401") ||
+				strings.Contains(err.Error(), "status code 401") {
+				statusCode = http.StatusUnauthorized
+			}
+		}
+		return body, statusCode, err
+	}
+
+	// Resolve the Auth config relevant for this server
+	authConfig := registry.ResolveAuthConfig(cli.configFile, index)
+	body, statusCode, err := cmdAttempt(authConfig)
+	if statusCode == http.StatusUnauthorized {
+		fmt.Fprintf(cli.out, "\nPlease login prior to %s:\n", cmdName)
+		if err = cli.HyperCmdLogin(index.GetAuthConfigKey()); err != nil {
+			return nil, -1, err
+		}
+		authConfig = registry.ResolveAuthConfig(cli.configFile, index)
+		return cmdAttempt(authConfig)
+	}
+	return body, statusCode, err
+}
 func (cli *HyperClient) call(method, path string, data interface{}, headers map[string][]string) (io.ReadCloser, int, error) {
 	params, err := cli.encodeData(data)
 	if err != nil {
@@ -135,13 +184,18 @@ func (cli *HyperClient) streamBody(body io.ReadCloser, contentType string, setRa
 	defer body.Close()
 
 	if utils.MatchesContentType(contentType, "application/json") {
-		for {
-			buf := new(bytes.Buffer)
-			buf.ReadFrom(body)
-			str := buf.String()
-			fmt.Printf(str)
+		return jsonmessage.DisplayJSONMessagesStream(body, stdout, cli.outFd, cli.isTerminalOut)
+	}
+	if stdout != nil || stderr != nil {
+		// When TTY is ON, use regular copy
+		var err error
+		if setRawTerminal {
+			_, err = io.Copy(stdout, body)
+		} else {
+			_, err = stdcopy.StdCopy(stdout, stderr, body)
 		}
-		return nil
+		fmt.Println("[stream] End of stdout")
+		return err
 	}
 	return nil
 }
@@ -206,7 +260,7 @@ func (cli *HyperClient) getTtySize() (int, int) {
 }
 
 func (cli *HyperClient) GetTag() string {
-	return pod.RandStr(8, "alphanum")
+	return utils.RandStr(8, "alphanum")
 }
 
 func (cli *HyperClient) ConvertYamlToJson(yamlBody []byte) ([]byte, error) {

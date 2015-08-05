@@ -33,7 +33,7 @@ func (daemon *Daemon) CmdPodStop(job *engine.Job) error {
 func (daemon *Daemon) StopPod(podId, stopVm string) (int, string, error) {
 	glog.V(1).Infof("Prepare to stop the POD: %s", podId)
 	// find the vm id which running POD, and stop it
-	if daemon.podList[podId].Status != types.S_POD_RUNNING {
+	if daemon.PodList[podId].Status != types.S_POD_RUNNING {
 		return -1, "", fmt.Errorf("The POD %s has aleady stopped, can not stop again!", podId)
 	}
 	vmid, err := daemon.GetPodVmByName(podId)
@@ -42,15 +42,15 @@ func (daemon *Daemon) StopPod(podId, stopVm string) (int, string, error) {
 	}
 	// we need to set the 'RestartPolicy' of the pod to 'never' if stop command is invoked
 	// for kubernetes
-	if daemon.podList[podId].Type == "kubernetes" {
-		daemon.podList[podId].RestartPolicy = "never"
-		if daemon.podList[podId].Vm == "" {
+	if daemon.PodList[podId].Type == "kubernetes" {
+		daemon.PodList[podId].RestartPolicy = "never"
+		if daemon.PodList[podId].Vm == "" {
 			return types.E_VM_SHUTDOWN, "", nil
 		}
 	}
 
-	vm, _ := daemon.vmList[vmid]
-	mypod, _ := daemon.podList[podId]
+	vm, _ := daemon.VmList[vmid]
+	mypod, _ := daemon.PodList[podId]
 
 	qemuResponse := vm.StopPod(mypod, stopVm)
 

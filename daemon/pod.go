@@ -9,8 +9,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/hyperhq/hyper/docker"
 	"github.com/hyperhq/hyper/engine"
+	dockertypes "github.com/hyperhq/hyper/lib/docker/api/types"
 	"github.com/hyperhq/hyper/storage/aufs"
 	dm "github.com/hyperhq/hyper/storage/devicemapper"
 	"github.com/hyperhq/hyper/storage/overlay"
@@ -30,7 +30,7 @@ func (daemon *Daemon) CmdPodCreate(job *engine.Job) error {
 	podArgs := job.Args[0]
 
 	podId := fmt.Sprintf("pod-%s", pod.RandStr(10, "alpha"))
-	err := daemon.CreatePod(podId, podArgs)
+	err := daemon.CreatePod(podId, podArgs, nil, false)
 	if err != nil {
 		return err
 	}
@@ -58,11 +58,11 @@ func (daemon *Daemon) CmdPodStart(job *engine.Job) error {
 
 	glog.Infof("pod:%s, vm:%s", podId, vmId)
 	// Do the status check for the given pod
-	if _, ok := daemon.podList[podId]; !ok {
+	if _, ok := daemon.PodList[podId]; !ok {
 		return fmt.Errorf("The pod(%s) can not be found, please create it first", podId)
 	}
 
-	code, cause, err := daemon.StartPod(podId, "", vmId)
+	code, cause, err := daemon.StartPod(podId, "", vmId, nil, false, false, types.VM_KEEP_NONE)
 	if err != nil {
 		glog.Error(err.Error())
 		return err
@@ -91,7 +91,7 @@ func (daemon *Daemon) CmdPodRun(job *engine.Job) error {
 
 	glog.Info(podArgs)
 
-	code, cause, err := daemon.StartPod(podId, podArgs, "")
+	code, cause, err := daemon.StartPod(podId, podArgs, "", nil, false, false, types.VM_KEEP_NONE)
 	if err != nil {
 		glog.Error(err.Error())
 		return err
@@ -109,7 +109,7 @@ func (daemon *Daemon) CmdPodRun(job *engine.Job) error {
 	return nil
 }
 
-func (daemon *Daemon) CreatePod(podId, podArgs string) error {
+func (daemon *Daemon) CreatePod(podId, podArgs string, config interface{}, autoremove bool) error {
 
 	glog.V(1).Infof("podArgs: %s", podArgs)
 	userPod, err := pod.ProcessPodBytes([]byte(podArgs))
@@ -145,26 +145,14 @@ func (daemon *Daemon) CreatePod(podId, podArgs string) error {
 		glog.V(1).Info("Process the Containers section in POD SPEC\n")
 		for _, c := range userPod.Containers {
 			imgName := c.Image
-			body, _, err := daemon.dockerCli.SendCmdCreate(imgName)
+			cId, _, err := daemon.DockerCli.SendCmdCreate(imgName, []string{}, nil)
 			if err != nil {
 				glog.Error(err.Error())
 				daemon.DeletePodFromDB(podId)
 				return err
 			}
-			out := engine.NewOutput()
-			remoteInfo, err := out.AddEnv()
-			if err != nil {
-				daemon.DeletePodFromDB(podId)
-				return err
-			}
-			if _, err := out.Write(body); err != nil {
-				daemon.DeletePodFromDB(podId)
-				return fmt.Errorf("Error while reading remote info!\n")
-			}
-			out.Close()
 
-			containerId := remoteInfo.Get("Id")
-			mypod.AddContainer(containerId, "", "", []string{}, types.S_POD_CREATED)
+			mypod.AddContainer(string(cId), "", "", []string{}, types.S_POD_CREATED)
 		}
 	}
 
@@ -195,7 +183,7 @@ func (daemon *Daemon) ParsePod(mypod *hypervisor.Pod, userPod *pod.UserPod,
 		sharedDir         = path.Join(hypervisor.BaseDir, vmId, hypervisor.ShareDirTag)
 		containerInfoList = []*hypervisor.ContainerInfo{}
 		volumeInfoList    = []*hypervisor.VolumeInfo{}
-		cli               = daemon.dockerCli
+		cli               = daemon.DockerCli
 	)
 
 	storageDriver = daemon.Storage.StorageType
@@ -223,7 +211,7 @@ func (daemon *Daemon) ParsePod(mypod *hypervisor.Pod, userPod *pod.UserPod,
 	}
 
 	for i, c := range mypod.Containers {
-		var jsonResponse *docker.ConfigJSON
+		var jsonResponse *dockertypes.ContainerJSONRaw
 		if jsonResponse, err = cli.GetContainerInfo(c.Id); err != nil {
 			glog.Error("got error when get container Info ", err.Error())
 			return nil, nil, err
@@ -357,8 +345,8 @@ func (daemon *Daemon) ParsePod(mypod *hypervisor.Pod, userPod *pod.UserPod,
 			Image:      devFullName,
 			Fstype:     fstype,
 			Workdir:    jsonResponse.Config.WorkingDir,
-			Entrypoint: jsonResponse.Config.Entrypoint,
-			Cmd:        jsonResponse.Config.Cmd,
+			Entrypoint: jsonResponse.Config.Entrypoint.Slice(),
+			Cmd:        jsonResponse.Config.Cmd.Slice(),
 			Envs:       env,
 		}
 		glog.V(1).Infof("Container Info is \n%v", containerInfo)
@@ -446,7 +434,7 @@ func (daemon *Daemon) ParsePod(mypod *hypervisor.Pod, userPod *pod.UserPod,
 	return containerInfoList, volumeInfoList, nil
 }
 
-func (daemon *Daemon) StartPod(podId, podArgs, vmId string) (int, string, error) {
+func (daemon *Daemon) StartPod(podId, podArgs, vmId string, config interface{}, lazy, autoremove bool, keep int) (int, string, error) {
 	var (
 		podData []byte
 		err     error
@@ -456,7 +444,7 @@ func (daemon *Daemon) StartPod(podId, podArgs, vmId string) (int, string, error)
 
 	if podArgs == "" {
 		var ok bool
-		mypod, ok = daemon.podList[podId]
+		mypod, ok = daemon.PodList[podId]
 		if !ok {
 			return -1, "", fmt.Errorf("Can not find the POD instance of %s", podId)
 		}
@@ -468,12 +456,12 @@ func (daemon *Daemon) StartPod(podId, podArgs, vmId string) (int, string, error)
 	} else {
 		podData = []byte(podArgs)
 
-		if err := daemon.CreatePod(podId, podArgs); err != nil {
+		if err := daemon.CreatePod(podId, podArgs, nil, autoremove); err != nil {
 			glog.Error(err.Error())
 			return -1, "", err
 		}
 
-		mypod = daemon.podList[podId]
+		mypod = daemon.PodList[podId]
 	}
 
 	userPod, err := pod.ProcessPodBytes(podData)
@@ -521,7 +509,7 @@ func (daemon *Daemon) StartPod(podId, podArgs, vmId string) (int, string, error)
 		daemon.AddVm(vm)
 	} else {
 		var ok bool
-		vm, ok = daemon.vmList[vmId]
+		vm, ok = daemon.VmList[vmId]
 		if !ok {
 			err = fmt.Errorf("The VM %s doesn't exist", vmId)
 			return -1, "", err
@@ -573,7 +561,7 @@ func (daemon *Daemon) RestartPod(mypod *hypervisor.Pod) error {
 	// The pod is stopped, the vm is gone
 	for _, c := range mypod.Containers {
 		glog.V(1).Infof("Ready to rm container: %s", c.Id)
-		if _, _, err := daemon.dockerCli.SendCmdDelete(c.Id); err != nil {
+		if _, _, err := daemon.DockerCli.SendCmdDelete(c.Id); err != nil {
 			glog.V(1).Infof("Error to rm container: %s", err.Error())
 		}
 	}
@@ -587,7 +575,7 @@ func (daemon *Daemon) RestartPod(mypod *hypervisor.Pod) error {
 	}
 
 	// Start the pod
-	_, _, err = daemon.StartPod(mypod.Id, string(podData), "")
+	_, _, err = daemon.StartPod(mypod.Id, string(podData), "", nil, false, false, types.VM_KEEP_NONE)
 	if err != nil {
 		glog.Error(err.Error())
 		return err
@@ -608,7 +596,7 @@ func (daemon *Daemon) CmdPodInfo(job *engine.Job) error {
 	podName := job.Args[0]
 	vmId := ""
 	// We need to find the VM which running the POD
-	pod, ok := daemon.podList[podName]
+	pod, ok := daemon.PodList[podName]
 	if ok {
 		vmId = pod.Vm
 	}
@@ -647,7 +635,7 @@ func hyperHandlePodEvent(qemuResponse *types.QemuResponse, data interface{},
 				daemon.DeletePodFromDB(mypod.Id)
 				for _, c := range mypod.Containers {
 					glog.V(1).Infof("Ready to rm container: %s", c.Id)
-					if _, _, err := daemon.dockerCli.SendCmdDelete(c.Id); err != nil {
+					if _, _, err := daemon.DockerCli.SendCmdDelete(c.Id); err != nil {
 						glog.V(1).Infof("Error to rm container: %s", err.Error())
 					}
 				}
@@ -663,7 +651,7 @@ func hyperHandlePodEvent(qemuResponse *types.QemuResponse, data interface{},
 				daemon.DeletePodFromDB(mypod.Id)
 				for _, c := range mypod.Containers {
 					glog.V(1).Infof("Ready to rm container: %s", c.Id)
-					if _, _, err := daemon.dockerCli.SendCmdDelete(c.Id); err != nil {
+					if _, _, err := daemon.DockerCli.SendCmdDelete(c.Id); err != nil {
 						glog.V(1).Infof("Error to rm container: %s", err.Error())
 					}
 				}

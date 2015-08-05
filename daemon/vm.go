@@ -14,6 +14,7 @@ import (
 func (daemon *Daemon) CmdVmCreate(job *engine.Job) (err error) {
 	var (
 		vmId = fmt.Sprintf("vm-%s", pod.RandStr(10, "alpha"))
+		vm   *hypervisor.Vm
 		cpu  = 1
 		mem  = 128
 	)
@@ -32,18 +33,7 @@ func (daemon *Daemon) CmdVmCreate(job *engine.Job) (err error) {
 		}
 	}
 
-	b := &hypervisor.BootConfig{
-		CPU:    cpu,
-		Memory: mem,
-		Kernel: daemon.kernel,
-		Initrd: daemon.initrd,
-		Bios:   daemon.bios,
-		Cbfs:   daemon.cbfs,
-	}
-
-	vm := daemon.NewVm(vmId, cpu, mem)
-
-	err = vm.Launch(b)
+	vm, err = daemon.StartVm(vmId, cpu, mem, true, 0)
 	if err != nil {
 		return err
 	}
@@ -64,7 +54,7 @@ func (daemon *Daemon) CmdVmCreate(job *engine.Job) (err error) {
 
 func (daemon *Daemon) CmdVmKill(job *engine.Job) error {
 	vmId := job.Args[0]
-	if _, ok := daemon.vmList[vmId]; !ok {
+	if _, ok := daemon.VmList[vmId]; !ok {
 		return fmt.Errorf("Can not find the VM(%s)", vmId)
 	}
 	code, cause, err := daemon.KillVm(vmId)
@@ -85,7 +75,7 @@ func (daemon *Daemon) CmdVmKill(job *engine.Job) error {
 }
 
 func (daemon *Daemon) KillVm(vmId string) (int, string, error) {
-	vm, ok := daemon.vmList[vmId]
+	vm, ok := daemon.VmList[vmId]
 	if !ok {
 		return 0, "", nil
 	}
@@ -98,7 +88,7 @@ func (daemon *Daemon) KillVm(vmId string) (int, string, error) {
 
 // This function will only be invoked during daemon start
 func (daemon *Daemon) AssociateAllVms() error {
-	for _, mypod := range daemon.podList {
+	for _, mypod := range daemon.PodList {
 		if mypod.Vm == "" {
 			continue
 		}
@@ -136,7 +126,7 @@ func (daemon *Daemon) ReleaseAllVms() (int, error) {
 		err error = nil
 	)
 
-	for _, vm := range daemon.vmList {
+	for _, vm := range daemon.VmList {
 		ret, err = vm.ReleaseVm()
 		if err != nil {
 			/* FIXME: continue to release other vms? */
@@ -147,13 +137,32 @@ func (daemon *Daemon) ReleaseAllVms() (int, error) {
 	return ret, err
 }
 
+func (daemon *Daemon) StartVm(vmId string, cpu, mem int, lazy bool, keep int) (*hypervisor.Vm, error) {
+	b := &hypervisor.BootConfig{
+		CPU:    cpu,
+		Memory: mem,
+		Kernel: daemon.kernel,
+		Initrd: daemon.initrd,
+		Bios:   daemon.bios,
+		Cbfs:   daemon.cbfs,
+	}
+
+	vm := daemon.NewVm(vmId, cpu, mem)
+
+	err := vm.Launch(b)
+	if err != nil {
+		return nil, err
+	}
+	return vm, nil
+}
+
 func (daemon *Daemon) NewVm(id string, cpu, memory int) *hypervisor.Vm {
 	vmId := id
 
 	if vmId == "" {
 		for {
 			vmId = fmt.Sprintf("vm-%s", pod.RandStr(10, "alpha"))
-			if _, ok := daemon.vmList[vmId]; !ok {
+			if _, ok := daemon.VmList[vmId]; !ok {
 				break
 			}
 		}

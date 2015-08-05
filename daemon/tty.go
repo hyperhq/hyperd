@@ -41,7 +41,7 @@ func (daemon *Daemon) CmdTty(job *engine.Job) (err error) {
 		}
 	}
 
-	vm, ok := daemon.vmList[vmid]
+	vm, ok := daemon.VmList[vmid]
 	if !ok {
 		return fmt.Errorf("vm %s doesn't exist!")
 	}

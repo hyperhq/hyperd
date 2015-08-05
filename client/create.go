@@ -17,7 +17,7 @@ func (cli *HyperClient) HyperCmdCreate(args ...string) error {
 		Yaml bool `short:"y" long:"yaml" default:"false" default-mask:"-" description:"create a pod based on Yaml file"`
 	}
 	var parser = gflag.NewParser(&opts, gflag.Default)
-	parser.Usage = "create [OPTIONS] POD_FILE\n\ncreate a pod, but without running it"
+	parser.Usage = "create [OPTIONS] POD_FILE\n\nCreate a pod into 'pending' status, but without running it"
 	args, err := parser.Parse()
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {

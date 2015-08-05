@@ -3,11 +3,12 @@ package client
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/hyperhq/hyper/engine"
-	"github.com/hyperhq/hyper/lib/promise"
 	"io"
 	"net/url"
 	"strings"
+
+	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/hyper/lib/promise"
 
 	gflag "github.com/jessevdk/go-flags"
 )
@@ -18,7 +19,7 @@ func (cli *HyperClient) HyperCmdExec(args ...string) error {
 		Vm     bool `long:"vm" default:"false" value-name:"false" description:"attach to vm"`
 	}
 	var parser = gflag.NewParser(&opts, gflag.Default|gflag.IgnoreUnknown)
-	parser.Usage = "exec [OPTIONS] POD|CONTAINER COMMAND [ARGS...]\n\nrun a command in a container of a running pod"
+	parser.Usage = "exec [OPTIONS] POD|CONTAINER COMMAND [ARGS...]\n\nRun a command in a container of a running pod"
 	args, err := parser.Parse()
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {
@@ -111,7 +112,6 @@ func (cli *HyperClient) HyperCmdExec(args ...string) error {
 		fmt.Printf("Error hijack: %s", err.Error())
 		return err
 	}
-	//fmt.Printf("Success to exec the command %s for POD %s!\n", command, podName)
 	return nil
 }
 

@@ -29,7 +29,7 @@ func (daemon *Daemon) CmdList(job *engine.Job) error {
 	v := &engine.Env{}
 	v.Set("item", item)
 	if item == "vm" {
-		for vm, v := range daemon.vmList {
+		for vm, v := range daemon.VmList {
 			switch v.Status {
 			case types.S_VM_ASSOCIATED:
 				status = "associated"
@@ -50,7 +50,7 @@ func (daemon *Daemon) CmdList(job *engine.Job) error {
 	}
 
 	if item == "pod" {
-		for p, v := range daemon.podList {
+		for p, v := range daemon.PodList {
 			switch v.Status {
 			case types.S_POD_RUNNING:
 				status = "running"
@@ -80,7 +80,7 @@ func (daemon *Daemon) CmdList(job *engine.Job) error {
 	}
 
 	if item == "container" {
-		for _, p := range daemon.podList {
+		for _, p := range daemon.PodList {
 			for _, c := range p.Containers {
 				switch c.Status {
 				case types.S_POD_RUNNING:

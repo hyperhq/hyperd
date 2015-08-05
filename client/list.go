@@ -2,11 +2,13 @@ package client
 
 import (
 	"fmt"
-	"github.com/hyperhq/hyper/engine"
-	gflag "github.com/jessevdk/go-flags"
 	"net/url"
 	"os"
 	"strings"
+
+	"github.com/hyperhq/hyper/engine"
+
+	gflag "github.com/jessevdk/go-flags"
 )
 
 func (cli *HyperClient) HyperCmdList(args ...string) error {

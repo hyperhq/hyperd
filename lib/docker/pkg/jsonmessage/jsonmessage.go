@@ -1,10 +1,15 @@
-package docker
+package jsonmessage
 
 import (
 	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
+	"time"
+
+	"github.com/hyperhq/hyper/lib/docker/pkg/term"
+	"github.com/hyperhq/hyper/lib/docker/pkg/timeutils"
+	"github.com/hyperhq/hyper/lib/docker/pkg/units"
 )
 
 type JSONError struct {
@@ -25,17 +30,25 @@ type JSONProgress struct {
 
 func (p *JSONProgress) String() string {
 	var (
-		width   = 200
-		pbBox   string
-		current = 19
+		width       = 200
+		pbBox       string
+		numbersBox  string
+		timeLeftBox string
 	)
+
+	ws, err := term.GetWinsize(p.terminalFd)
+	if err == nil {
+		width = int(ws.Width)
+	}
 
 	if p.Current <= 0 && p.Total <= 0 {
 		return ""
 	}
+	current := units.HumanSize(float64(p.Current))
 	if p.Total <= 0 {
 		return fmt.Sprintf("%8v", current)
 	}
+	total := units.HumanSize(float64(p.Total))
 	percentage := int(float64(p.Current)/float64(p.Total)*100) / 2
 	if percentage > 50 {
 		percentage = 50
@@ -48,8 +61,19 @@ func (p *JSONProgress) String() string {
 		}
 		pbBox = fmt.Sprintf("[%s>%s] ", strings.Repeat("=", percentage), strings.Repeat(" ", numSpaces))
 	}
+	numbersBox = fmt.Sprintf("%8v/%v", current, total)
 
-	return pbBox
+	if p.Current > 0 && p.Start > 0 && percentage < 50 {
+		fromStart := time.Now().UTC().Sub(time.Unix(int64(p.Start), 0))
+		perEntry := fromStart / time.Duration(p.Current)
+		left := time.Duration(p.Total-p.Current) * perEntry
+		left = (left / time.Second) * time.Second
+
+		if width > 50 {
+			timeLeftBox = " " + left.String()
+		}
+	}
+	return pbBox + numbersBox + timeLeftBox
 }
 
 type JSONMessage struct {
@@ -80,18 +104,16 @@ func (jm *JSONMessage) Display(out io.Writer, isTerminal bool) error {
 		return nil
 	}
 	if jm.Time != 0 {
+		fmt.Fprintf(out, "%s ", time.Unix(jm.Time, 0).Format(timeutils.RFC3339NanoFixed))
 	}
 	if jm.ID != "" {
 		fmt.Fprintf(out, "%s: ", jm.ID)
-		fmt.Printf("%s: \n", jm.ID)
 	}
 	if jm.From != "" {
 		fmt.Fprintf(out, "(from %s) ", jm.From)
-		fmt.Printf("(from %s) \n", jm.From)
 	}
 	if jm.Progress != nil && isTerminal {
 		fmt.Fprintf(out, "%s %s%s", jm.Status, jm.Progress.String(), endl)
-		fmt.Printf("%s %s%s\n", jm.Status, jm.Progress.String(), endl)
 	} else if jm.ProgressMessage != "" { //deprecated
 		fmt.Fprintf(out, "%s %s%s", jm.Status, jm.ProgressMessage, endl)
 	} else if jm.Stream != "" {

@@ -36,7 +36,7 @@ func (daemon *Daemon) CmdAttach(job *engine.Job) (err error) {
 		return err
 	}
 
-	vm, ok := daemon.vmList[vmId]
+	vm, ok := daemon.VmList[vmId]
 	if !ok {
 		return fmt.Errorf("Can find VM whose Id is %s!", vmId)
 	}

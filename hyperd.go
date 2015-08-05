@@ -7,16 +7,27 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/hyperhq/hyper/engine"
 	"github.com/hyperhq/hyper/daemon"
-	"github.com/hyperhq/runv/lib/glog"
+	"github.com/hyperhq/hyper/docker"
+	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/hyper/lib/docker/pkg/reexec"
 	"github.com/hyperhq/hyper/utils"
+	"github.com/hyperhq/runv/driverloader"
+	"github.com/hyperhq/runv/hypervisor"
+	"github.com/hyperhq/runv/lib/glog"
+
+	"github.com/Unknwon/goconfig"
 )
 
 func main() {
+	if reexec.Init() {
+		return
+	}
+
 	flConfig := flag.String("config", "", "Config file for hyperd")
 	flHost := flag.String("host", "", "Host for hyperd")
 	flHelp := flag.Bool("help", false, "Print help message for Hyperd daemon")
+	flDriver := flag.String("driver", "", "Exec driver for Hyperd daemon")
 	glog.Init()
 	flag.Usage = func() { printHelp() }
 	flag.Parse()
@@ -24,7 +35,11 @@ func main() {
 		printHelp()
 		return
 	}
-	mainDaemon(*flConfig, *flHost)
+	if *flDriver == "" || (*flDriver != "kvm" && *flDriver != "xen" && *flDriver != "vbox") {
+		fmt.Printf("Please specify the exec driver, such as 'kvm', 'xen' or 'vbox'\n")
+		return
+	}
+	mainDaemon(*flConfig, *flHost, *flDriver)
 }
 
 func printHelp() {
@@ -32,12 +47,13 @@ func printHelp() {
   %s [OPTIONS]
 
 Application Options:
-  --config=""            configuration for %s
-  --v=0                  log level fro V logs
-  --log_dir              log directory
-  --host                 host address and port for hyperd(such as --host=tcp://127.0.0.1:12345)
-  --logtostderr          log to standard error instead of files
-  --alsologtostderr      log to standard error as well as files
+  --config=""            Configuration for %s
+  --driver=""            Exec driver for hyperd daemon
+  --v=0                  Log level fro V logs
+  --log_dir              Log directory
+  --host                 Host address and port for hyperd(such as --host=tcp://127.0.0.1:12345)
+  --logtostderr          Log to standard error instead of files
+  --alsologtostderr      Log to standard error as well as files
 
 Help Options:
   -h, --help             Show this help message
@@ -46,16 +62,58 @@ Help Options:
 	fmt.Printf(helpMessage, os.Args[0], os.Args[0])
 }
 
-func mainDaemon(config, host string) {
-	glog.V(0).Infof("The config file is %s", config)
+func mainDaemon(config, host, driver string) {
+	glog.V(1).Infof("The config file is %s", config)
 	if config == "" {
 		config = "/etc/hyper/config"
 	}
+	if _, err := os.Stat(config); err != nil {
+		if os.IsNotExist(err) {
+			glog.Errorf("Can not find config file(%s)", config)
+			return
+		}
+		glog.Errorf(err.Error())
+		return
+	}
+
+	os.Setenv("HYPER_CONFIG", config)
+	cfg, err := goconfig.LoadConfigFile(config)
+	if err != nil {
+		glog.Errorf("Read config file (%s) failed, %s", config, err.Error())
+		return
+	}
+	hyperRoot, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Root")
+	iso, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Vbox")
+
+	if hyperRoot == "" {
+		hyperRoot = "/var/lib/hyper"
+	}
+	if _, err := os.Stat(hyperRoot); err != nil {
+		if err := os.MkdirAll(hyperRoot, 0755); err != nil {
+			glog.Errorf(err.Error())
+			return
+		}
+	}
+
+	utils.SetHyperEnv(fmt.Sprintf("%s/.hyperconfig", os.Getenv("HOME")), hyperRoot, iso)
 	eng := engine.New(config)
+	docker.Init()
 
 	d, err := daemon.NewDaemon(eng)
 	if err != nil {
 		glog.Errorf("The hyperd create failed, %s\n", err.Error())
+		return
+	}
+
+	if hypervisor.HDriver, err = driverloader.Probe(driver); err != nil {
+		glog.Errorf("%s\n", err.Error())
+		return
+	}
+	// Set the daemon object as the global varibal
+	// which will be used for puller and builder
+	utils.SetDaemon(d)
+	if err := d.DockerCli.Setup(); err != nil {
+		glog.Error(err.Error())
 		return
 	}
 

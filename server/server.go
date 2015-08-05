@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
 	"expvar"
 	"fmt"
@@ -17,12 +18,18 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/gorilla/mux"
 	"github.com/hyperhq/hyper/engine"
+	dockertypes "github.com/hyperhq/hyper/lib/docker/api/types"
+	"github.com/hyperhq/hyper/lib/docker/cliconfig"
+	"github.com/hyperhq/hyper/lib/docker/pkg/ioutils"
+	"github.com/hyperhq/hyper/lib/docker/pkg/streamformatter"
 	"github.com/hyperhq/hyper/lib/portallocator"
 	"github.com/hyperhq/hyper/lib/version"
+	"github.com/hyperhq/hyper/types"
 	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/lib/glog"
+
+	"github.com/gorilla/mux"
 )
 
 var (
@@ -211,6 +218,33 @@ func getList(eng *engine.Engine, version version.Version, w http.ResponseWriter,
 	return writeJSONEnv(w, http.StatusOK, env)
 }
 
+func getImages(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+	if err := r.ParseForm(); err != nil {
+		return nil
+	}
+
+	job := eng.Job("images", r.Form.Get("all"))
+	stdoutBuf := bytes.NewBuffer(nil)
+
+	job.Stdout.Add(stdoutBuf)
+
+	if err := job.Run(); err != nil {
+		return err
+	}
+
+	str := engine.Tail(stdoutBuf, 1)
+	type response struct {
+		Images []string `json:"imagesList"`
+	}
+	var res response
+	if err := json.Unmarshal([]byte(str), &res); err != nil {
+		return err
+	}
+	var env engine.Env
+	env.SetList("imagesList", res.Images)
+	return writeJSONEnv(w, http.StatusOK, env)
+}
+
 func getPodInfo(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
 	if err := r.ParseForm(); err != nil {
 		return nil
@@ -310,7 +344,7 @@ func postAttach(eng *engine.Engine, version version.Version, w http.ResponseWrit
 	}
 
 	var (
-		job                 = eng.Job("attach", r.Form.Get("type"), r.Form.Get("value"), r.Form.Get("tag"))
+		job                 = eng.Job("attach", r.Form.Get("type"), r.Form.Get("value"), r.Form.Get("tag"), r.Form.Get("remove"))
 		errOut    io.Writer = os.Stderr
 		errStream io.Writer
 	)
@@ -338,6 +372,27 @@ func postAttach(eng *engine.Engine, version version.Version, w http.ResponseWrit
 	w.WriteHeader(http.StatusNoContent)
 
 	return nil
+}
+
+func postAuth(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+	job := eng.Job("auth")
+	job.Stdin.Add(r.Body)
+	stdoutBuf := bytes.NewBuffer(nil)
+	job.Stdout.Add(stdoutBuf)
+	if err := job.Run(); err != nil {
+		return err
+	}
+	var (
+		dat             map[string]interface{}
+		returnedJSONstr string
+	)
+	returnedJSONstr = engine.Tail(stdoutBuf, 1)
+	if err := json.Unmarshal([]byte(returnedJSONstr), &dat); err != nil {
+		return err
+	}
+	return writeJSON(w, http.StatusOK, &dockertypes.AuthResponse{
+		Status: dat["status"].(string),
+	})
 }
 
 func postContainerCreate(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
@@ -368,6 +423,36 @@ func postContainerCreate(eng *engine.Engine, version version.Version, w http.Res
 
 	env.Set("ContainerID", dat["ContainerID"].(string))
 	return writeJSONEnv(w, http.StatusCreated, env)
+}
+
+func postContainerCommit(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+	if err := r.ParseForm(); err != nil {
+		return nil
+	}
+
+	glog.V(1).Infof("container ID is %s\n", r.Form.Get("container"))
+	job := eng.Job("commit", r.Form.Get("container"), r.Form.Get("repo"), r.Form.Get("author"), r.Form.Get("change"), r.Form.Get("message"), r.Form.Get("pause"))
+	stdoutBuf := bytes.NewBuffer(nil)
+
+	job.Stdout.Add(stdoutBuf)
+	if err := job.Run(); err != nil {
+		return err
+	}
+	var (
+		env             engine.Env
+		dat             map[string]interface{}
+		returnedJSONstr string
+	)
+	returnedJSONstr = engine.Tail(stdoutBuf, 1)
+	if err := json.Unmarshal([]byte(returnedJSONstr), &dat); err != nil {
+		return err
+	}
+
+	env.Set("ID", dat["ID"].(string))
+	env.SetInt("Code", (int)(dat["Code"].(float64)))
+	env.Set("Cause", dat["Cause"].(string))
+
+	return writeJSONEnv(w, http.StatusOK, env)
 }
 
 func postPodCreate(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
@@ -437,7 +522,7 @@ func postPodRun(eng *engine.Engine, version version.Version, w http.ResponseWrit
 		return nil
 	}
 
-	job := eng.Job("podRun", r.Form.Get("podArgs"))
+	job := eng.Job("podRun", r.Form.Get("podArgs"), r.Form.Get("remove"))
 	stdoutBuf := bytes.NewBuffer(nil)
 	job.Stdout.Add(stdoutBuf)
 
@@ -528,15 +613,116 @@ func postImageCreate(eng *engine.Engine, version version.Version, w http.Respons
 	if err := r.ParseForm(); err != nil {
 		return nil
 	}
+	authEncoded := r.Header.Get("X-Registry-Auth")
+	authConfig := &cliconfig.AuthConfig{}
+	if authEncoded != "" {
+		authJson := base64.NewDecoder(base64.URLEncoding, strings.NewReader(authEncoded))
+		if err := json.NewDecoder(authJson).Decode(authConfig); err != nil {
+			// for a pull it is not an error if no auth was given
+			// to increase compatibility with the existing api it is defaulting to be empty
+			authConfig = &cliconfig.AuthConfig{}
+		}
+	}
 
+	w.Header().Set("Content-Type", "application/json")
 	glog.V(1).Infof("Image name is %s\n", r.Form.Get("imageName"))
 	job := eng.Job("pull", r.Form.Get("imageName"))
+
+	output := ioutils.NewWriteFlusher(w)
+	metaHeaders := map[string][]string{}
+	for k, v := range r.Header {
+		if strings.HasPrefix(k, "X-Meta-") {
+			metaHeaders[k] = v
+		}
+	}
+	job.Stdout.Add(output)
+	imagePullConfig := &types.ImagePullConfig{
+		MetaHeaders: metaHeaders,
+		AuthConfig:  authConfig,
+	}
+	job.SetenvJson("ImagePullConfig", imagePullConfig)
+	if err := job.Run(); err != nil {
+		sf := streamformatter.NewJSONStreamFormatter()
+		output.Write(sf.FormatError(err))
+	}
+	return nil
+}
+
+func postImageBuild(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+	if err := r.ParseForm(); err != nil {
+		return nil
+	}
+	w.Header().Set("Content-Type", "application/json")
+
+	glog.V(1).Infof("Image name is %s\n", r.Form.Get("name"))
+	job := eng.Job("build", r.Form.Get("name"))
 	stdoutBuf := bytes.NewBuffer(nil)
 
 	job.Stdout.Add(stdoutBuf)
+	job.Stdin.Add(r.Body)
+	output := ioutils.NewWriteFlusher(w)
 	if err := job.Run(); err != nil {
+		sf := streamformatter.NewJSONStreamFormatter()
+		output.Write(sf.FormatError(err))
+	}
+	return nil
+}
+
+func postImagePush(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+	if vars == nil {
+		return fmt.Errorf("Missing parameter")
+	}
+
+	metaHeaders := map[string][]string{}
+	for k, v := range r.Header {
+		if strings.HasPrefix(k, "X-Meta-") {
+			metaHeaders[k] = v
+		}
+	}
+	if err := parseForm(r); err != nil {
 		return err
 	}
+	authConfig := &cliconfig.AuthConfig{}
+	output := ioutils.NewWriteFlusher(w)
+
+	authEncoded := r.Header.Get("X-Registry-Auth")
+	if authEncoded != "" {
+		// the new format is to handle the authConfig as a header
+		authJson := base64.NewDecoder(base64.URLEncoding, strings.NewReader(authEncoded))
+		if err := json.NewDecoder(authJson).Decode(authConfig); err != nil {
+			// to increase compatibility to existing api it is defaulting to be empty
+			authConfig = &cliconfig.AuthConfig{}
+		}
+	} else {
+		// the old format is supported for compatibility if there was no authConfig header
+		if err := json.NewDecoder(r.Body).Decode(authConfig); err != nil {
+			err = fmt.Errorf("Bad parameters and missing X-Registry-Auth: %v", err)
+			sf := streamformatter.NewJSONStreamFormatter()
+			output.Write(sf.FormatError(err))
+			return nil
+		}
+	}
+
+	imagePushConfig := &types.ImagePushConfig{
+		MetaHeaders: metaHeaders,
+		AuthConfig:  authConfig,
+		Tag:         r.Form.Get("tag"),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	job := eng.Job("push", r.Form.Get("remote"))
+	job.Stdout.Add(output)
+	if err := job.SetenvJson("ImagePushConfig", imagePushConfig); err != nil {
+		sf := streamformatter.NewJSONStreamFormatter()
+		output.Write(sf.FormatError(err))
+		return nil
+	}
+	if err := job.Run(); err != nil {
+		sf := streamformatter.NewJSONStreamFormatter()
+		output.Write(sf.FormatError(err))
+	}
+
 	return nil
 }
 
@@ -582,6 +768,45 @@ func postPodRemove(eng *engine.Engine, version version.Version, w http.ResponseW
 
 	return writeJSONEnv(w, http.StatusOK, env)
 }
+
+func postImagesRemove(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+	if err := r.ParseForm(); err != nil {
+		return nil
+	}
+
+	glog.V(1).Infof("Image(%s) is process to be removed", r.Form.Get("imageId"))
+	var (
+		force   string = "yes"
+		noprune string = "yes"
+	)
+	if r.Form.Get("force") != "" {
+		force = r.Form.Get("force")
+	}
+	if r.Form.Get("noprune") != "" {
+		noprune = r.Form.Get("noprune")
+	}
+	job := eng.Job("imagesremove", r.Form.Get("imageId"), force, noprune)
+	stdoutBuf := bytes.NewBuffer(nil)
+
+	job.Stdout.Add(stdoutBuf)
+
+	if err := job.Run(); err != nil {
+		return err
+	}
+
+	str := engine.Tail(stdoutBuf, 1)
+	type response struct {
+		Images []string `json:"imagesList"`
+	}
+	var res response
+	if err := json.Unmarshal([]byte(str), &res); err != nil {
+		return err
+	}
+	var env engine.Env
+	env.SetList("imagesList", res.Images)
+	return writeJSONEnv(w, http.StatusOK, env)
+}
+
 func optionsHandler(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
 	w.WriteHeader(http.StatusOK)
 	return nil
@@ -667,14 +892,19 @@ func createRouter(eng *engine.Engine, logging, enableCors bool, corsHeaders stri
 	}
 	m := map[string]map[string]HttpApiFunc{
 		"GET": {
-			"/info":     getInfo,
-			"/pod/info": getPodInfo,
-			"/version":  getVersion,
-			"/list":     getList,
+			"/info":       getInfo,
+			"/pod/info":   getPodInfo,
+			"/version":    getVersion,
+			"/list":       getList,
+			"/images/get": getImages,
 		},
 		"POST": {
+			"/auth":             postAuth,
 			"/container/create": postContainerCreate,
+			"/container/commit": postContainerCommit,
 			"/image/create":     postImageCreate,
+			"/image/build":      postImageBuild,
+			"/image/push":       postImagePush,
 			"/pod/create":       postPodCreate,
 			"/pod/start":        postPodStart,
 			"/pod/remove":       postPodRemove,
@@ -685,6 +915,7 @@ func createRouter(eng *engine.Engine, logging, enableCors bool, corsHeaders stri
 			"/exec":             postExec,
 			"/attach":           postAttach,
 			"/tty/resize":       postTtyResize,
+			"/images/remove":    postImagesRemove,
 		},
 		"DELETE": {},
 		"OPTIONS": {
@@ -898,7 +1129,7 @@ func setupUnixHttp(addr string, job *engine.Job) (*HttpServer, error) {
 		return nil, err
 	}
 
-	if err := os.Chmod(addr, 0660); err != nil {
+	if err := os.Chmod(addr, 0777); err != nil {
 		return nil, err
 	}
 

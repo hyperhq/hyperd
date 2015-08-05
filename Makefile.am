@@ -1,8 +1,8 @@
 export GOPATH:=$(abs_top_srcdir)/Godeps/_workspace:$(GOPATH)
 if WITH_XEN
-HYPER_BULD_TAGS=with_xen
+HYPER_BULD_TAGS=with_xen libdm_no_deferred_remove
 else
-HYPER_BULD_TAGS=
+HYPER_BULD_TAGS=libdm_no_deferred_remove
 endif
 
 all-local: build-hyperd build-hyper
