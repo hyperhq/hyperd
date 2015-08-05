@@ -9,7 +9,7 @@ import (
 
 	"github.com/hyperhq/hyper/daemon"
 	"github.com/hyperhq/hyper/lib/docker/daemon/graphdriver"
-	"github.com/hyperhq/hyper/lib/govbox"
+	"github.com/hyperhq/runv/lib/govbox"
 	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/hypervisor/types"
 	"github.com/hyperhq/runv/lib/glog"
