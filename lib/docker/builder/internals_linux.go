@@ -10,6 +10,8 @@ import (
 	"github.com/hyperhq/hyper/lib/docker/daemon"
 	"github.com/hyperhq/hyper/lib/docker/pkg/stringid"
 	"github.com/hyperhq/hyper/lib/docker/runconfig"
+	"github.com/hyperhq/hyper/utils"
+	"github.com/hyperhq/runv/lib/glog"
 )
 
 func fixPermissions(source, destination string, uid, gid int, destExisted bool) error {
@@ -49,31 +51,35 @@ func (b *Builder) create() (*daemon.Container, error) {
 		return nil, fmt.Errorf("Please provide a source image with `from` prior to run")
 	}
 	b.Config.Image = b.image
-
-	hostConfig := &runconfig.HostConfig{
-		CpuShares:    b.cpuShares,
-		CpuPeriod:    b.cpuPeriod,
-		CpuQuota:     b.cpuQuota,
-		CpusetCpus:   b.cpuSetCpus,
-		CpusetMems:   b.cpuSetMems,
-		CgroupParent: b.cgroupParent,
-		Memory:       b.memory,
-		MemorySwap:   b.memorySwap,
-		NetworkMode:  "bridge",
-	}
-
 	config := *b.Config
 
-	// Create the container
-	c, warnings, err := b.Daemon.Create(b.Config, hostConfig, "")
+	// Create the Pod
+
+	podId := fmt.Sprintf("buildpod-%s", utils.RandStr(10, "alpha"))
+	podString, err := MakeBasicPod(podId, b.image, b.Config.Cmd.Slice())
 	if err != nil {
 		return nil, err
 	}
-	for _, warning := range warnings {
-		fmt.Fprintf(b.OutStream, " ---> [Warning] %s\n", warning)
+	err = b.Hyperdaemon.CreatePod(podId, podString, config, false)
+	if err != nil {
+		return nil, err
+	}
+	// Get the container
+	var (
+		containerId = ""
+		c           *daemon.Container
+	)
+	for _, i := range b.Hyperdaemon.PodList[podId].Containers {
+		containerId = i.Id
+	}
+	c, err = b.Daemon.Get(containerId)
+	if err != nil {
+		glog.Error(err.Error())
+		return nil, err
 	}
 
 	b.TmpContainers[c.ID] = struct{}{}
+	b.TmpPods[podId] = struct{}{}
 	fmt.Fprintf(b.OutStream, " ---> Running in %s\n", stringid.TruncateID(c.ID))
 
 	if config.Cmd.Len() > 0 {

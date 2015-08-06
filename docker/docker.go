@@ -2,7 +2,6 @@ package docker
 
 import (
 	"fmt"
-	"github.com/hyperhq/runv/lib/glog"
 	"io"
 	"os"
 	"path/filepath"
@@ -13,6 +12,8 @@ import (
 	"github.com/hyperhq/hyper/lib/docker/pkg/homedir"
 	"github.com/hyperhq/hyper/lib/docker/pkg/system"
 	"github.com/hyperhq/hyper/lib/docker/registry"
+	"github.com/hyperhq/hyper/utils"
+	"github.com/hyperhq/runv/lib/glog"
 )
 
 var (
@@ -90,6 +91,7 @@ func migrateKey() (err error) {
 func NewDocker() (*Docker, error) {
 	registryService := registry.NewService(registryCfg)
 	daemonCfg.TrustKeyPath = getDaemonConfDir() + "/" + defaultTrustKeyFile
+	daemonCfg.Root = utils.HYPER_ROOT
 	d, err := daemon.NewDaemon(daemonCfg, registryService)
 	if err != nil {
 		glog.Errorf("Error starting daemon: %v", err)

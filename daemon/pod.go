@@ -476,7 +476,7 @@ func (daemon *Daemon) StartPod(podId, podArgs, vmId string, config interface{}, 
 	}()
 
 	if vmId == "" {
-		glog.V(1).Infof("The config: kernel=%s, initrd=%s", daemon.kernel, daemon.initrd)
+		glog.V(1).Infof("The config: kernel=%s, initrd=%s", daemon.Kernel, daemon.Initrd)
 		var (
 			cpu = 1
 			mem = 128
@@ -493,13 +493,13 @@ func (daemon *Daemon) StartPod(podId, podArgs, vmId string, config interface{}, 
 		b := &hypervisor.BootConfig{
 			CPU:    cpu,
 			Memory: mem,
-			Kernel: daemon.kernel,
-			Initrd: daemon.initrd,
-			Bios:   daemon.bios,
-			Cbfs:   daemon.cbfs,
+			Kernel: daemon.Kernel,
+			Initrd: daemon.Initrd,
+			Bios:   daemon.Bios,
+			Cbfs:   daemon.Cbfs,
 		}
 
-		vm = daemon.NewVm("", cpu, mem)
+		vm = daemon.NewVm("", cpu, mem, lazy, keep)
 
 		err = vm.Launch(b)
 		if err != nil {
@@ -615,6 +615,11 @@ func hyperHandlePodEvent(qemuResponse *types.QemuResponse, data interface{},
 	daemon := data.(*Daemon)
 
 	if qemuResponse.Code == types.E_POD_FINISHED {
+		if vm.Keep != types.VM_KEEP_NONE {
+			mypod.Vm = ""
+			vm.Status = types.S_VM_IDLE
+			return false
+		}
 		mypod.SetPodContainerStatus(qemuResponse.Data.([]uint32))
 		mypod.Vm = ""
 		vm.Status = types.S_VM_IDLE

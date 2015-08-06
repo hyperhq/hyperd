@@ -77,6 +77,7 @@ func (b *Builder) create() (*daemon.Container, error) {
 	}
 
 	b.TmpContainers[c.ID] = struct{}{}
+	b.TmpPods[podId] = struct{}{}
 	fmt.Fprintf(b.OutStream, " ---> Running in %s\n", stringid.TruncateID(c.ID))
 
 	if config.Cmd.Len() > 0 {

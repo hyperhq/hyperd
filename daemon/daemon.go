@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"runtime"
 	"strconv"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/hyperhq/hyper/lib/portallocator"
 	apiserver "github.com/hyperhq/hyper/server"
 	dm "github.com/hyperhq/hyper/storage/devicemapper"
+	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/driverloader"
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/network"
@@ -56,10 +58,10 @@ type Daemon struct {
 	DockerCli   DockerInterface
 	PodList     map[string]*hypervisor.Pod
 	VmList      map[string]*hypervisor.Vm
-	kernel      string
-	initrd      string
-	bios        string
-	cbfs        string
+	Kernel      string
+	Initrd      string
+	Bios        string
+	Cbfs        string
 	BridgeIface string
 	BridgeIP    string
 	Host        string
@@ -206,13 +208,13 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 		return nil, err
 	}
 
-	var tempdir = "/var/run/hyper/"
+	var tempdir = path.Join(utils.HYPER_ROOT, "run")
 	os.Setenv("TMPDIR", tempdir)
 	if err := os.MkdirAll(tempdir, 0755); err != nil && !os.IsExist(err) {
 		return nil, err
 	}
 
-	var realRoot = "/var/lib/hyper/"
+	var realRoot = path.Join(utils.HYPER_ROOT, "lib")
 	// Create the root directory if it doesn't exists
 	if err := os.MkdirAll(realRoot, 0755); err != nil && !os.IsExist(err) {
 		return nil, err
@@ -242,10 +244,10 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 		ID:        fmt.Sprintf("%d", os.Getpid()),
 		db:        db,
 		eng:       eng,
-		kernel:    kernel,
-		initrd:    initrd,
-		bios:      bios,
-		cbfs:      cbfs,
+		Kernel:    kernel,
+		Initrd:    initrd,
+		Bios:      bios,
+		Cbfs:      cbfs,
 		DockerCli: dockerCli,
 		PodList:   pList,
 		VmList:    vList,
@@ -293,14 +295,14 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 				break
 			}
 		}
-		stor.RootPath = "/var/lib/docker/overlay"
+		stor.RootPath = path.Join(utils.HYPER_ROOT, "overlay")
 	} else {
 		return nil, fmt.Errorf("hyperd can not support docker's backing storage: %s", storageDriver)
 	}
 	daemon.Storage = stor
 	dmPool := dm.DeviceMapper{
-		Datafile:         "/var/lib/hyper/data",
-		Metadatafile:     "/var/lib/hyper/metadata",
+		Datafile:         path.Join(utils.HYPER_ROOT, "lib") + "/data",
+		Metadatafile:     path.Join(utils.HYPER_ROOT, "lib") + "/metadata",
 		DataLoopFile:     "/dev/loop6",
 		MetadataLoopFile: "/dev/loop7",
 		PoolName:         "hyper-volume-pool",

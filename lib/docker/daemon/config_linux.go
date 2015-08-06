@@ -1,16 +1,18 @@
 package daemon
 
 import (
+	"fmt"
 	"net"
 
 	"github.com/hyperhq/hyper/lib/docker/opts"
 	flag "github.com/hyperhq/hyper/lib/docker/pkg/mflag"
 	"github.com/hyperhq/hyper/lib/docker/pkg/ulimit"
+	"github.com/hyperhq/hyper/utils"
 )
 
 var (
-	defaultPidFile = "/var/run/docker.pid"
-	defaultGraph   = "/var/lib/hyper"
+	defaultGraph   = utils.HYPER_ROOT
+	defaultPidFile = fmt.Sprintf("%s/docker.pid", utils.HYPER_ROOT)
 	defaultExec    = "native"
 )
 

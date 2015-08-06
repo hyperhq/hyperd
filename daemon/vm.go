@@ -108,7 +108,7 @@ func (daemon *Daemon) AssociateAllVms() error {
 		}
 		glog.V(1).Infof("The data for vm(%s) is %v", mypod.Vm, vmData)
 
-		vm := daemon.NewVm(mypod.Vm, userPod.Resource.Vcpu, userPod.Resource.Memory)
+		vm := daemon.NewVm(mypod.Vm, userPod.Resource.Vcpu, userPod.Resource.Memory, false, types.VM_KEEP_NONE)
 
 		err = vm.AssociateVm(mypod, vmData)
 		if err != nil {
@@ -141,13 +141,13 @@ func (daemon *Daemon) StartVm(vmId string, cpu, mem int, lazy bool, keep int) (*
 	b := &hypervisor.BootConfig{
 		CPU:    cpu,
 		Memory: mem,
-		Kernel: daemon.kernel,
-		Initrd: daemon.initrd,
-		Bios:   daemon.bios,
-		Cbfs:   daemon.cbfs,
+		Kernel: daemon.Kernel,
+		Initrd: daemon.Initrd,
+		Bios:   daemon.Bios,
+		Cbfs:   daemon.Cbfs,
 	}
 
-	vm := daemon.NewVm(vmId, cpu, mem)
+	vm := daemon.NewVm(vmId, cpu, mem, lazy, keep)
 
 	err := vm.Launch(b)
 	if err != nil {
@@ -156,7 +156,7 @@ func (daemon *Daemon) StartVm(vmId string, cpu, mem int, lazy bool, keep int) (*
 	return vm, nil
 }
 
-func (daemon *Daemon) NewVm(id string, cpu, memory int) *hypervisor.Vm {
+func (daemon *Daemon) NewVm(id string, cpu, memory int, lazy bool, keep int) *hypervisor.Vm {
 	vmId := id
 
 	if vmId == "" {
@@ -167,5 +167,5 @@ func (daemon *Daemon) NewVm(id string, cpu, memory int) *hypervisor.Vm {
 			}
 		}
 	}
-	return hypervisor.NewVm(vmId, cpu, memory, false)
+	return hypervisor.NewVm(vmId, cpu, memory, lazy, keep)
 }
