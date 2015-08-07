@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	MS_BIND = syscall.MS_BIND
+	MS_BIND uintptr = syscall.MS_BIND
 )
 
 func Mount(source string, target string, fstype string, flags uintptr, data string) error {
