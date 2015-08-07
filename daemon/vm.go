@@ -145,6 +145,7 @@ func (daemon *Daemon) StartVm(vmId string, cpu, mem int, lazy bool, keep int) (*
 		Initrd: daemon.Initrd,
 		Bios:   daemon.Bios,
 		Cbfs:   daemon.Cbfs,
+		Vbox:   daemon.VboxImage,
 	}
 
 	vm := daemon.NewVm(vmId, cpu, mem, lazy, keep)
@@ -152,6 +153,40 @@ func (daemon *Daemon) StartVm(vmId string, cpu, mem int, lazy bool, keep int) (*
 	err := vm.Launch(b)
 	if err != nil {
 		return nil, err
+	}
+	_, r1, r2, err1 := vm.GetQemuChan()
+	if err1 != nil {
+		return nil, err1
+	}
+	vmStatus := r1.(chan *types.QemuResponse)
+	subVmStatus := r2.(chan *types.QemuResponse)
+	go func(interface{}) {
+		defer func() {
+			err := recover()
+			if err != nil {
+				glog.Warning("panic during send shutdown message to channel")
+			}
+		}()
+		for {
+			vmResponse := <-vmStatus
+			subVmStatus <- vmResponse
+		}
+	}(subVmStatus)
+	var vmResponse *types.QemuResponse
+	for {
+		vmResponse = <-subVmStatus
+		glog.V(1).Infof("Get the response from VM, VM id is %s, response code is %d!", vmResponse.VmId, vmResponse.Code)
+		if vmResponse.VmId == vmId {
+			if vmResponse.Code == types.E_VM_RUNNING {
+				glog.Infof("Got E_VM_RUNNING code response")
+				break
+			} else {
+				break
+			}
+		}
+	}
+	if vmResponse.Code != types.E_VM_RUNNING {
+		return nil, fmt.Errorf("Vbox does not start successfully")
 	}
 	return vm, nil
 }

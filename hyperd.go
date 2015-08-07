@@ -4,7 +4,11 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/signal"
+	"runtime"
+	"path/filepath"
+	"strings"
 	"syscall"
 
 	"github.com/hyperhq/hyper/daemon"
@@ -24,10 +28,10 @@ func main() {
 		return
 	}
 
+	fnd := flag.Bool("nondaemon", false, "Not daemonize")
 	flConfig := flag.String("config", "", "Config file for hyperd")
 	flHost := flag.String("host", "", "Host for hyperd")
 	flHelp := flag.Bool("help", false, "Print help message for Hyperd daemon")
-	flDriver := flag.String("driver", "", "Exec driver for Hyperd daemon")
 	glog.Init()
 	flag.Usage = func() { printHelp() }
 	flag.Parse()
@@ -35,11 +39,38 @@ func main() {
 		printHelp()
 		return
 	}
-	if *flDriver == "" || (*flDriver != "kvm" && *flDriver != "xen" && *flDriver != "vbox") {
-		fmt.Printf("Please specify the exec driver, such as 'kvm', 'xen' or 'vbox'\n")
+
+	if !*fnd {
+		cmd, err := exec.LookPath(os.Args[0])
+		if err != nil {
+			fmt.Println("cannot find path of arg0 ", os.Args[0])
+			os.Exit(-1)
+		}
+		cmd, err = filepath.Abs(cmd)
+		if err != nil {
+			fmt.Println("cannot find absolute path of arg0 ", os.Args[0])
+			os.Exit(-1)
+		}
+
+		pid, err := utils.Daemonize()
+		if err != nil {
+			fmt.Println("faile to daemonize hyperd")
+			os.Exit(-1)
+		}
+		if pid > 0 {
+			return
+		}
+
+		err = syscall.Exec(cmd, append(os.Args, "--nondaemon"), os.Environ())
+		if err != nil {
+			fmt.Println("fail to exec in nondaemon mode: ", err.Error())
+			os.Exit(-1)
+		}
+
 		return
 	}
-	mainDaemon(*flConfig, *flHost, *flDriver)
+
+	mainDaemon(*flConfig, *flHost)
 }
 
 func printHelp() {
@@ -47,8 +78,8 @@ func printHelp() {
   %s [OPTIONS]
 
 Application Options:
+  --nondaemon            Not daemonize
   --config=""            Configuration for %s
-  --driver=""            Exec driver for hyperd daemon
   --v=0                  Log level fro V logs
   --log_dir              Log directory
   --host                 Host address and port for hyperd(such as --host=tcp://127.0.0.1:12345)
@@ -62,7 +93,7 @@ Help Options:
 	fmt.Printf(helpMessage, os.Args[0], os.Args[0])
 }
 
-func mainDaemon(config, host, driver string) {
+func mainDaemon(config, host string) {
 	glog.V(1).Infof("The config file is %s", config)
 	if config == "" {
 		config = "/etc/hyper/config"
@@ -80,6 +111,21 @@ func mainDaemon(config, host, driver string) {
 	cfg, err := goconfig.LoadConfigFile(config)
 	if err != nil {
 		glog.Errorf("Read config file (%s) failed, %s", config, err.Error())
+		return
+	}
+	driver, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Hypervisor")
+	if runtime.GOOS == "darwin" {
+		driver = "vbox"
+	} else {
+		if driver == "" {
+			// We need to provide a defaut exec drvier
+			var drivers = []string{"kvm", "xen", "vbox"}
+			driver = utils.GetAvailableDriver(drivers)
+		}
+		driver = strings.ToLower(driver)
+	}
+	if driver == "" || (driver != "kvm" && driver != "xen" && driver != "vbox") {
+		fmt.Printf("Please specify the exec driver, such as 'kvm', 'xen' or 'vbox'\n")
 		return
 	}
 	hyperRoot, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Root")
@@ -107,6 +153,11 @@ func mainDaemon(config, host, driver string) {
 
 	if hypervisor.HDriver, err = driverloader.Probe(driver); err != nil {
 		glog.Errorf("%s\n", err.Error())
+		return
+	}
+	d.Hypervisor = driver
+	if err = d.InitNetwork(hypervisor.HDriver, d.BridgeIface, d.BridgeIP); err != nil {
+		glog.Errorf("InitNetwork failed, %s\n", err.Error())
 		return
 	}
 	// Set the daemon object as the global varibal

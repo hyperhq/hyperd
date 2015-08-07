@@ -80,7 +80,7 @@ func (d *Driver) Diff(id, parent string) (diff archive.Archive, err error) {
 		return nil, fmt.Errorf("can not find VM(%s)", d.pullVm)
 	}
 	if vm.Status == types.S_VM_IDLE {
-		code, cause, err = d.daemon.StartPod(podId, d.pullVm, podData, nil, false, true, types.VM_KEEP_AFTER_SHUTDOWN)
+		code, cause, err = d.daemon.StartPod(podId, podData, d.pullVm, nil, false, true, types.VM_KEEP_AFTER_SHUTDOWN)
 		if err != nil {
 			glog.Errorf("Code is %d, Cause is %s, %s", code, cause, err.Error())
 			d.daemon.KillVm(d.pullVm)

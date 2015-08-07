@@ -103,12 +103,14 @@ func (d *Driver) Setup() error {
 		d.daemon = daemon
 	}
 	if vm, err := d.daemon.StartVm(d.pullVm, 1, 64, false, types.VM_KEEP_AFTER_SHUTDOWN); err != nil {
+		glog.Errorf(err.Error())
 		return err
 	} else {
 		d.daemon.AddVm(vm)
 	}
 
 	if err := virtualbox.RegisterDisk(d.pullVm, d.pullVm, d.BaseImage(), 4); err != nil {
+		glog.Errorf(err.Error())
 		return err
 	}
 	ids, err := loadIds(path.Join(d.RootPath(), "layers"))
@@ -318,7 +320,7 @@ func (d *Driver) VmMountLayer(id string) error {
 		return fmt.Errorf("can not find VM(%s)", d.pullVm)
 	}
 	if vm.Status == types.S_VM_IDLE {
-		code, cause, err := d.daemon.StartPod(podId, d.pullVm, podstring, nil, false, true, types.VM_KEEP_AFTER_SHUTDOWN)
+		code, cause, err := d.daemon.StartPod(podId, podstring, d.pullVm, nil, false, true, types.VM_KEEP_AFTER_SHUTDOWN)
 		if err != nil {
 			glog.Errorf("Code is %d, Cause is %s, %s", code, cause, err.Error())
 			d.daemon.KillVm(d.pullVm)

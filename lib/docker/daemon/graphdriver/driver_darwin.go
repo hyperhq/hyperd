@@ -3,8 +3,6 @@ package graphdriver
 import (
 	"path/filepath"
 	"syscall"
-
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 type DiffDiskDriver interface {
@@ -66,6 +64,5 @@ func GetFSMagic(rootpath string) (FsMagic, error) {
 	if err := syscall.Fstatfs(fd, &buf); err != nil {
 		return 0, err
 	}
-	glog.Errorf("%x\n", buf.Type)
 	return FsMagic(buf.Type), nil
 }

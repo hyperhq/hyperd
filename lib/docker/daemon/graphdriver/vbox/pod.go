@@ -86,7 +86,7 @@ func MakeDiffPod(podName, image, id, srcDisk, tgtDisk, outDir string) (string, e
 	var userPod = &pod.UserPod{
 		Name:       podName,
 		Containers: containerList,
-		Resource:   pod.UserResource{Vcpu: 1, Memory: 128},
+		Resource:   pod.UserResource{Vcpu: 1, Memory: 64},
 		Files:      []pod.UserFile{},
 		Volumes:    volList,
 		Tty:        false,
@@ -165,7 +165,7 @@ func MakeMountPod(podName, image, id, diffSrc, volDst string) (string, error) {
 	var userPod = &pod.UserPod{
 		Name:       podName,
 		Containers: containerList,
-		Resource:   pod.UserResource{Vcpu: 1, Memory: 128},
+		Resource:   pod.UserResource{Vcpu: 1, Memory: 64},
 		Files:      []pod.UserFile{},
 		Volumes:    volList,
 		Tty:        false,

@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"path"
-	"runtime"
 	"strconv"
 	"strings"
 
@@ -16,7 +15,6 @@ import (
 	apiserver "github.com/hyperhq/hyper/server"
 	dm "github.com/hyperhq/hyper/storage/devicemapper"
 	"github.com/hyperhq/hyper/utils"
-	"github.com/hyperhq/runv/driverloader"
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/network"
 	"github.com/hyperhq/runv/hypervisor/types"
@@ -62,10 +60,12 @@ type Daemon struct {
 	Initrd      string
 	Bios        string
 	Cbfs        string
+	VboxImage   string
 	BridgeIface string
 	BridgeIP    string
 	Host        string
 	Storage     *Storage
+	Hypervisor  string
 }
 
 // Install installs daemon capabilities to eng.
@@ -176,10 +176,6 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 			glog.Errorf("portallocator.ReleaseAll(): %s", err.Error())
 		}
 	})
-	// Check that the system is supported and we have sufficient privileges
-	if runtime.GOOS != "linux" {
-		return nil, fmt.Errorf("The Hyper daemon is only supported on linux")
-	}
 	if os.Geteuid() != 0 {
 		return nil, fmt.Errorf("The Hyper daemon needs to be run as root")
 	}
@@ -195,6 +191,8 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 	kernel, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Kernel")
 	initrd, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Initrd")
 	glog.V(0).Infof("The config: kernel=%s, initrd=%s", kernel, initrd)
+	vboxImage, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Vbox")
+	glog.V(0).Infof("The config: vbox image=%s", vboxImage)
 	biface, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Bridge")
 	bridgeip, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "BridgeIP")
 	glog.V(0).Infof("The config: bridge=%s, ip=%s", biface, bridgeip)
@@ -202,11 +200,6 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 	cbfs, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Cbfs")
 	glog.V(0).Infof("The config: bios=%s, cbfs=%s", bios, cbfs)
 	host, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Host")
-	driver, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Hypervisor")
-
-	if hypervisor.HDriver, err = driverloader.Probe(driver); err != nil {
-		return nil, err
-	}
 
 	var tempdir = path.Join(utils.HYPER_ROOT, "run")
 	os.Setenv("TMPDIR", tempdir)
@@ -217,11 +210,6 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 	var realRoot = path.Join(utils.HYPER_ROOT, "lib")
 	// Create the root directory if it doesn't exists
 	if err := os.MkdirAll(realRoot, 0755); err != nil && !os.IsExist(err) {
-		return nil, err
-	}
-
-	if err := network.InitNetwork(biface, bridgeip); err != nil {
-		glog.Errorf("InitNetwork failed, %s\n", err.Error())
 		return nil, err
 	}
 
@@ -248,10 +236,13 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 		Initrd:    initrd,
 		Bios:      bios,
 		Cbfs:      cbfs,
+		VboxImage: vboxImage,
 		DockerCli: dockerCli,
 		PodList:   pList,
 		VmList:    vList,
 		Host:      host,
+		BridgeIP:  bridgeip,
+		BridgeIface: biface,
 	}
 
 	stor := &Storage{}
@@ -296,6 +287,9 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 			}
 		}
 		stor.RootPath = path.Join(utils.HYPER_ROOT, "overlay")
+	} else if storageDriver == "vbox" {
+		stor.Fstype = "ext4"
+		stor.RootPath = path.Join(utils.HYPER_ROOT, "vbox")
 	} else {
 		return nil, fmt.Errorf("hyperd can not support docker's backing storage: %s", storageDriver)
 	}
@@ -324,6 +318,16 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 	})
 
 	return daemon, nil
+}
+
+func (daemon *Daemon) InitNetwork(driver hypervisor.HypervisorDriver, biface, bridgeip string) error {
+	err := driver.InitNetwork(biface, bridgeip)
+
+	if err == os.ErrNotExist {
+		   err = network.InitNetwork(biface, bridgeip)
+	}
+
+	return err
 }
 
 func (daemon *Daemon) GetPodNum() int64 {

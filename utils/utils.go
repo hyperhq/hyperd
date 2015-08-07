@@ -10,7 +10,9 @@ import (
 	"mime"
 	"net/http"
 	"os"
+	"os/exec"
 	"strconv"
+	"strings"
 )
 
 var (
@@ -170,4 +172,25 @@ func SetHyperEnv(file, rootpath, isopath string) error {
 	fmt.Fprintf(f, string(str))
 	defer f.Close()
 	return nil
+}
+
+func GetAvailableDriver(drivers []string) string {
+	for _, d := range drivers {
+		if strings.Contains(d, "kvm") {
+			if _, err := exec.LookPath("qemu-system-i386"); err == nil {
+				return d
+			}
+		}
+		if strings.Contains(d, "xen") {
+			if _, err := exec.LookPath("xl"); err == nil {
+				return d
+			}
+		}
+		if strings.Contains(d, "vbox") {
+			if _, err := exec.LookPath("vboxmanage"); err == nil {
+				return d
+			}
+		}
+	}
+	return ""
 }

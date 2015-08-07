@@ -6,14 +6,15 @@ import (
 	"os"
 	"os/user"
 	"path"
+	"runtime"
 	"strings"
-	"syscall"
 
 	"github.com/hyperhq/hyper/engine"
 	dockertypes "github.com/hyperhq/hyper/lib/docker/api/types"
 	"github.com/hyperhq/hyper/storage/aufs"
 	dm "github.com/hyperhq/hyper/storage/devicemapper"
 	"github.com/hyperhq/hyper/storage/overlay"
+	"github.com/hyperhq/hyper/storage/vbox"
 	"github.com/hyperhq/hyper/utils"
 
 	"github.com/hyperhq/runv/hypervisor"
@@ -202,6 +203,13 @@ func (daemon *Daemon) ParsePod(mypod *hypervisor.Pod, userPod *pod.UserPod,
 		rootPath = daemon.Storage.RootPath
 		fstype = daemon.Storage.Fstype
 		rootfs = ""
+	} else if storageDriver == "vbox" {
+		fstype = daemon.Storage.Fstype
+		rootPath = daemon.Storage.RootPath
+		rootfs = "/rootfs"
+		_ = devPrefix
+		_ = volPoolName
+		_ = poolName
 	}
 
 	// Process the 'Files' section
@@ -244,6 +252,13 @@ func (daemon *Daemon) ParsePod(mypod *hypervisor.Pod, userPod *pod.UserPod,
 				return nil, nil, err
 			}
 			devFullName = "/" + c.Id + "/rootfs"
+		} else if storageDriver == "vbox" {
+			devFullName, err = vbox.MountContainerToSharedDir(c.Id, rootPath, "")
+			if err != nil {
+				glog.Error("got error when mount container to share dir ", err.Error())
+				return nil, nil, err
+			}
+			fstype = "ext4"
 		}
 
 		for _, f := range userPod.Containers[i].Files {
@@ -406,18 +421,20 @@ func (daemon *Daemon) ParsePod(mypod *hypervisor.Pod, userPod *pod.UserPod,
 		}
 
 		// Process the situation if the source is not NULL, we need to bind that dir to sharedDir
-		var flags uintptr = syscall.MS_BIND
+		var flags uintptr = utils.MS_BIND
 
 		mountSharedDir := pod.RandStr(10, "alpha")
 		targetDir := path.Join(sharedDir, mountSharedDir)
 		glog.V(1).Infof("trying to bind dir %s to %s", v.Source, targetDir)
 
-		if err := os.MkdirAll(targetDir, 0755); err != nil && !os.IsExist(err) {
-			glog.Errorf("error to create dir %s for volume %s", targetDir, v.Name)
-			return nil, nil, err
+		if runtime.GOOS == "linux" {
+			if err := os.MkdirAll(targetDir, 0755); err != nil && !os.IsExist(err) {
+				glog.Errorf("error to create dir %s for volume %s", targetDir, v.Name)
+				return nil, nil, err
+			}
 		}
 
-		if err := syscall.Mount(v.Source, targetDir, "dir", flags, "--bind"); err != nil {
+		if err := utils.Mount(v.Source, targetDir, "dir", flags, "--bind"); err != nil {
 			glog.Errorf("bind dir %s failed: %s", v.Source, err.Error())
 			return nil, nil, err
 		}
@@ -497,6 +514,7 @@ func (daemon *Daemon) StartPod(podId, podArgs, vmId string, config interface{}, 
 			Initrd: daemon.Initrd,
 			Bios:   daemon.Bios,
 			Cbfs:   daemon.Cbfs,
+			Vbox:   daemon.VboxImage,
 		}
 
 		vm = daemon.NewVm("", cpu, mem, lazy, keep)
