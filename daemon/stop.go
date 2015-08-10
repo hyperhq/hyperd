@@ -49,7 +49,10 @@ func (daemon *Daemon) StopPod(podId, stopVm string) (int, string, error) {
 		}
 	}
 
-	vm, _ := daemon.VmList[vmid]
+	vm, ok := daemon.VmList[vmid]
+	if !ok {
+		return -1, "", fmt.Errorf("VM is not exist")
+	}
 	mypod, _ := daemon.PodList[podId]
 
 	qemuResponse := vm.StopPod(mypod, stopVm)
