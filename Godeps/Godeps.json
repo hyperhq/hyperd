@@ -29,7 +29,7 @@
 			"ImportPath": "github.com/docker/docker/pkg/tarsum",
 			"Comment": "v1.4.1-3973-ga63c7c7",
 			"Rev": "a63c7c7be678880fb5c11f3c9cb7b3029d132b7f"
-		},
+													},
 		{
 			"ImportPath": "github.com/docker/libcontainer/label",
 			"Comment": "v2.2.1-23-g83a102c",
@@ -45,36 +45,12 @@
 			"Rev": "9cbd2a1374f46905c68a4eb3694a130610adc62a"
 		},
 		{
-			"ImportPath": "github.com/google/go-snappy/snappy",
-			"Rev": "eaa750b9bf4dcb7cb20454be850613b66cda3273"
-		},
-		{
 			"ImportPath": "github.com/gorilla/context",
 			"Rev": "215affda49addc4c8ef7e2534915df2c8c35c6cd"
 		},
 		{
 			"ImportPath": "github.com/gorilla/mux",
 			"Rev": "8096f47503459bcc74d1f4c487b7e6e42e5746b5"
-		},
-		{
-			"ImportPath": "github.com/hyperhq/runv/driverloader",
-			"Rev": "57aebf8813e4699a781cb27b45d4068f1754d0e8"
-		},
-		{
-			"ImportPath": "github.com/hyperhq/runv/hypervisor",
-			"Rev": "57aebf8813e4699a781cb27b45d4068f1754d0e8"
-		},
-		{
-			"ImportPath": "github.com/hyperhq/runv/lib/glog",
-			"Rev": "57aebf8813e4699a781cb27b45d4068f1754d0e8"
-		},
-		{
-			"ImportPath": "github.com/hyperhq/runv/lib/govbox",
-			"Rev": "57aebf8813e4699a781cb27b45d4068f1754d0e8"
-		},
-		{
-			"ImportPath": "github.com/hyperhq/runv/lib/telnet",
-			"Rev": "57aebf8813e4699a781cb27b45d4068f1754d0e8"
 		},
 		{
 			"ImportPath": "github.com/jessevdk/go-flags",
@@ -84,6 +60,10 @@
 		{
 			"ImportPath": "github.com/opencontainers/specs",
 			"Rev": "7357ab16e8a68a33b3a0b150af65bc06e2bc17ae"
+		},
+		{
+			"ImportPath": "github.com/syndtr/gosnappy",
+			"Rev": "156a073208e131d7d2e212cb749feae7c339e846"
 		},
 		{
 			"ImportPath": "github.com/syndtr/goleveldb/leveldb",
