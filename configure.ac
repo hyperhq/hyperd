@@ -40,9 +40,10 @@ case $host_os in
 		;;
 	linux*)
 		# Do something specific for linux
-		;;
-	*BSD*)
-		# Do something specific for BSD
+		AC_CHECK_HEADER([libdevmapper.h],
+						[],
+						[AC_MSG_ERROR([Could not find or include libdevmapper.h])],
+						[])
 		;;
 	*)
 		#Default Case
@@ -53,6 +54,9 @@ esac
 
 # Checks for header files.
 AC_CHECK_HEADERS([stdlib.h string.h libxl.h])
+AC_CHECK_HEADER([sqlite3.h], [],
+				[AC_MSG_ERROR([Could not find or include sqlite3.h])],
+				[])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_CHECK_HEADER_STDBOOL
