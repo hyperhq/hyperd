@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/hyperhq/runv/lib/glog"
 )
 
 type DevmapperLogger interface {
@@ -250,7 +250,7 @@ func (t *Task) GetNextTarget(next unsafe.Pointer) (nextPtr unsafe.Pointer, start
 func getLoopbackBackingFile(file *os.File) (uint64, uint64, error) {
 	loopInfo, err := ioctlLoopGetStatus64(file.Fd())
 	if err != nil {
-		logrus.Errorf("Error get loopback backing file: %s", err)
+		glog.Errorf("Error get loopback backing file: %s", err)
 		return 0, 0, ErrGetLoopbackBackingFile
 	}
 	return loopInfo.loDevice, loopInfo.loInode, nil
@@ -258,7 +258,7 @@ func getLoopbackBackingFile(file *os.File) (uint64, uint64, error) {
 
 func LoopbackSetCapacity(file *os.File) error {
 	if err := ioctlLoopSetCapacity(file.Fd(), 0); err != nil {
-		logrus.Errorf("Error loopbackSetCapacity: %s", err)
+		glog.Errorf("Error loopbackSetCapacity: %s", err)
 		return ErrLoopbackSetCapacity
 	}
 	return nil
@@ -298,7 +298,7 @@ func FindLoopDeviceFor(file *os.File) *os.File {
 
 func UdevWait(cookie *uint) error {
 	if res := DmUdevWait(*cookie); res != 1 {
-		logrus.Debugf("Failed to wait on udev cookie %d", *cookie)
+		glog.V(1).Infof("Failed to wait on udev cookie %d", *cookie)
 		return ErrUdevWait
 	}
 	return nil
@@ -318,7 +318,7 @@ func LogInit(logger DevmapperLogger) {
 
 func SetDevDir(dir string) error {
 	if res := DmSetDevDir(dir); res != 1 {
-		logrus.Debugf("Error dm_set_dev_dir")
+		glog.V(1).Infof("Error dm_set_dev_dir")
 		return ErrSetDevDir
 	}
 	return nil
@@ -384,8 +384,8 @@ func RemoveDevice(name string) error {
 }
 
 func RemoveDeviceDeferred(name string) error {
-	logrus.Debugf("[devmapper] RemoveDeviceDeferred START(%s)", name)
-	defer logrus.Debugf("[devmapper] RemoveDeviceDeferred END(%s)", name)
+	glog.V(1).Infof("[devmapper] RemoveDeviceDeferred START(%s)", name)
+	defer glog.V(1).Infof("[devmapper] RemoveDeviceDeferred END(%s)", name)
 	task, err := TaskCreateNamed(DeviceRemove, name)
 	if task == nil {
 		return err
@@ -435,7 +435,7 @@ func CancelDeferredRemove(deviceName string) error {
 func GetBlockDeviceSize(file *os.File) (uint64, error) {
 	size, err := ioctlBlkGetSize64(file.Fd())
 	if err != nil {
-		logrus.Errorf("Error getblockdevicesize: %s", err)
+		glog.Errorf("Error getblockdevicesize: %s", err)
 		return 0, ErrGetBlockSize
 	}
 	return uint64(size), nil
@@ -565,21 +565,21 @@ func GetDriverVersion() (string, error) {
 func GetStatus(name string) (uint64, uint64, string, string, error) {
 	task, err := TaskCreateNamed(DeviceStatus, name)
 	if task == nil {
-		logrus.Debugf("GetStatus: Error TaskCreateNamed: %s", err)
+		glog.V(1).Infof("GetStatus: Error TaskCreateNamed: %s", err)
 		return 0, 0, "", "", err
 	}
 	if err := task.Run(); err != nil {
-		logrus.Debugf("GetStatus: Error Run: %s", err)
+		glog.V(1).Infof("GetStatus: Error Run: %s", err)
 		return 0, 0, "", "", err
 	}
 
 	devinfo, err := task.GetInfo()
 	if err != nil {
-		logrus.Debugf("GetStatus: Error GetInfo: %s", err)
+		glog.V(1).Infof("GetStatus: Error GetInfo: %s", err)
 		return 0, 0, "", "", err
 	}
 	if devinfo.Exists == 0 {
-		logrus.Debugf("GetStatus: Non existing device %s", name)
+		glog.V(1).Infof("GetStatus: Non existing device %s", name)
 		return 0, 0, "", "", fmt.Errorf("Non existing device %s", name)
 	}
 
@@ -638,7 +638,7 @@ func ResumeDevice(name string) error {
 }
 
 func CreateDevice(poolName string, deviceId int) error {
-	logrus.Debugf("[devmapper] CreateDevice(poolName=%v, deviceId=%v)", poolName, deviceId)
+	glog.V(1).Infof("[devmapper] CreateDevice(poolName=%v, deviceId=%v)", poolName, deviceId)
 	task, err := TaskCreateNamed(DeviceTargetMsg, poolName)
 	if task == nil {
 		return err

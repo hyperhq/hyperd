@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docker/docker/pkg/units"
+	"github.com/hyperhq/hyper/lib/docker/pkg/units"
 )
 
 // TestMemInfo tests parseMemInfo with a static meminfo string

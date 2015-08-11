@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/docker/docker/pkg/units"
+	"github.com/hyperhq/hyper/lib/docker/pkg/units"
 )
 
 var (
