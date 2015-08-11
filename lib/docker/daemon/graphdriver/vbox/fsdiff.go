@@ -11,10 +11,10 @@ import (
 	"github.com/hyperhq/hyper/lib/docker/pkg/archive"
 	"github.com/hyperhq/hyper/lib/docker/pkg/chrootarchive"
 	"github.com/hyperhq/hyper/lib/docker/pkg/ioutils"
-	"github.com/hyperhq/runv/lib/govbox"
 	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/hypervisor/types"
 	"github.com/hyperhq/runv/lib/glog"
+	"github.com/hyperhq/runv/lib/govbox"
 )
 
 func (d *Driver) ApplyDiff(id, parent string, diff archive.ArchiveReader) (size int64, err error) {

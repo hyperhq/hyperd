@@ -6,8 +6,8 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"runtime"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 

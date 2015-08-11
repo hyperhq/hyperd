@@ -229,19 +229,19 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 	pList := map[string]*hypervisor.Pod{}
 	vList := map[string]*hypervisor.Vm{}
 	daemon := &Daemon{
-		ID:        fmt.Sprintf("%d", os.Getpid()),
-		db:        db,
-		eng:       eng,
-		Kernel:    kernel,
-		Initrd:    initrd,
-		Bios:      bios,
-		Cbfs:      cbfs,
-		VboxImage: vboxImage,
-		DockerCli: dockerCli,
-		PodList:   pList,
-		VmList:    vList,
-		Host:      host,
-		BridgeIP:  bridgeip,
+		ID:          fmt.Sprintf("%d", os.Getpid()),
+		db:          db,
+		eng:         eng,
+		Kernel:      kernel,
+		Initrd:      initrd,
+		Bios:        bios,
+		Cbfs:        cbfs,
+		VboxImage:   vboxImage,
+		DockerCli:   dockerCli,
+		PodList:     pList,
+		VmList:      vList,
+		Host:        host,
+		BridgeIP:    bridgeip,
 		BridgeIface: biface,
 	}
 
@@ -324,7 +324,7 @@ func (daemon *Daemon) InitNetwork(driver hypervisor.HypervisorDriver, biface, br
 	err := driver.InitNetwork(biface, bridgeip)
 
 	if err == os.ErrNotExist {
-		   err = network.InitNetwork(biface, bridgeip)
+		err = network.InitNetwork(biface, bridgeip)
 	}
 
 	return err
@@ -672,7 +672,7 @@ func (daemon *Daemon) DestroyAndKeepVm() error {
 func (daemon *Daemon) shutdown() error {
 	glog.V(0).Info("The daemon will be shutdown")
 	glog.V(0).Info("Shutdown all VMs")
-	for vm, _ := range daemon.VmList {
+	for vm := range daemon.VmList {
 		daemon.KillVm(vm)
 	}
 	daemon.db.Close()

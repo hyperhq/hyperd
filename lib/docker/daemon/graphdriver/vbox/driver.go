@@ -9,10 +9,10 @@ import (
 
 	"github.com/hyperhq/hyper/daemon"
 	"github.com/hyperhq/hyper/lib/docker/daemon/graphdriver"
-	"github.com/hyperhq/runv/lib/govbox"
 	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/hypervisor/types"
 	"github.com/hyperhq/runv/lib/glog"
+	"github.com/hyperhq/runv/lib/govbox"
 )
 
 func init() {
