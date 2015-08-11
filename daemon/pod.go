@@ -86,13 +86,17 @@ func (daemon *Daemon) CmdPodRun(job *engine.Job) error {
 	if daemon.GetRunningPodNum() >= 1024 {
 		return fmt.Errorf("Pod full, the maximum Pod is 1024!")
 	}
+	var autoremove bool = false
 	podArgs := job.Args[0]
+	if job.Args[1] == "yes" {
+		autoremove = true
+	}
 
 	podId := fmt.Sprintf("pod-%s", pod.RandStr(10, "alpha"))
 
 	glog.Info(podArgs)
 
-	code, cause, err := daemon.StartPod(podId, podArgs, "", nil, false, false, types.VM_KEEP_NONE)
+	code, cause, err := daemon.StartPod(podId, podArgs, "", nil, false, autoremove, types.VM_KEEP_NONE)
 	if err != nil {
 		glog.Error(err.Error())
 		return err
@@ -126,6 +130,7 @@ func (daemon *Daemon) CreatePod(podId, podArgs string, config interface{}, autor
 	mypod := hypervisor.NewPod(podId, userPod)
 	mypod.Handler.Handle = hyperHandlePodEvent
 	mypod.Handler.Data = daemon
+	mypod.Autoremove = autoremove
 
 	// store the UserPod into the db
 	if err := daemon.WritePodToDB(podId, []byte(podArgs)); err != nil {
@@ -641,6 +646,10 @@ func hyperHandlePodEvent(vmResponse *types.VmResponse, data interface{},
 		mypod.SetPodContainerStatus(vmResponse.Data.([]uint32))
 		mypod.Vm = ""
 		vm.Status = types.S_VM_IDLE
+		if mypod.Autoremove == true {
+			daemon.CleanPod(mypod.Id)
+			return false
+		}
 	} else if vmResponse.Code == types.E_VM_SHUTDOWN {
 		if mypod.Status == types.S_POD_RUNNING {
 			mypod.Status = types.S_POD_SUCCEEDED

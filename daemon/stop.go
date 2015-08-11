@@ -33,7 +33,12 @@ func (daemon *Daemon) CmdPodStop(job *engine.Job) error {
 func (daemon *Daemon) StopPod(podId, stopVm string) (int, string, error) {
 	glog.V(1).Infof("Prepare to stop the POD: %s", podId)
 	// find the vm id which running POD, and stop it
-	if daemon.PodList[podId].Status != types.S_POD_RUNNING {
+	mypod, ok := daemon.PodList[podId]
+	if !ok {
+		glog.Errorf("Can not find pod(%s)", podId)
+		return -1, "", fmt.Errorf("Can not find pod(%s)", podId)
+	}
+	if mypod.Status != types.S_POD_RUNNING {
 		return -1, "", fmt.Errorf("The POD %s has aleady stopped, can not stop again!", podId)
 	}
 	vmid, err := daemon.GetPodVmByName(podId)
@@ -42,9 +47,9 @@ func (daemon *Daemon) StopPod(podId, stopVm string) (int, string, error) {
 	}
 	// we need to set the 'RestartPolicy' of the pod to 'never' if stop command is invoked
 	// for kubernetes
-	if daemon.PodList[podId].Type == "kubernetes" {
-		daemon.PodList[podId].RestartPolicy = "never"
-		if daemon.PodList[podId].Vm == "" {
+	if mypod.Type == "kubernetes" {
+		mypod.RestartPolicy = "never"
+		if mypod.Vm == "" {
 			return types.E_VM_SHUTDOWN, "", nil
 		}
 	}
@@ -53,7 +58,6 @@ func (daemon *Daemon) StopPod(podId, stopVm string) (int, string, error) {
 	if !ok {
 		return -1, "", fmt.Errorf("VM is not exist")
 	}
-	mypod, _ := daemon.PodList[podId]
 
 	vmResponse := vm.StopPod(mypod, stopVm)
 
@@ -62,6 +66,9 @@ func (daemon *Daemon) StopPod(podId, stopVm string) (int, string, error) {
 
 	if vmResponse.Code == types.E_VM_SHUTDOWN {
 		daemon.RemoveVm(vmid)
+	}
+	if mypod.Autoremove == true {
+		daemon.CleanPod(podId)
 	}
 
 	return vmResponse.Code, vmResponse.Cause, nil
