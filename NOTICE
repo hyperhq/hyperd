@@ -4,8 +4,7 @@ Copyright 2015 HyperHQ, Inc.
 This product includes software developed at HyperHQ, Inc. (https://www.hyper.sh).
 
 This product contains software (https://github.com/docker/docker) developed
-by Docker, Inc and (https://github.com/golang/glog) developed by Google, Inc.
-Both of them are licensed under the Apache License Version 2.0.
+by Docker, Inc.  It is licensed under the Apache License Version 2.0.
 
 This product contains software (https://github.com/ziutek/telnet) developed
 by Michal Derkacz, licensed under the BSD License.
