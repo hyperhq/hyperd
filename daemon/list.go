@@ -25,7 +25,7 @@ func (daemon *Daemon) CmdList(job *engine.Job) error {
 		podId                 string
 	)
 
-	// Prepare the qemu status to client
+	// Prepare the VM status to client
 	v := &engine.Env{}
 	v.Set("item", item)
 	if item == "vm" {

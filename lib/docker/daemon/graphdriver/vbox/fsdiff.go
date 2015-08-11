@@ -88,13 +88,13 @@ func (d *Driver) Diff(id, parent string) (diff archive.Archive, err error) {
 		}
 		vm := d.daemon.VmList[d.pullVm]
 		// wait for cmd finish
-		_, _, ret3, err := vm.GetQemuChan()
+		_, _, ret3, err := vm.GetVmChan()
 		if err != nil {
 			glog.Error(err.Error())
 			return nil, err
 		}
-		subVmStatus := ret3.(chan *types.QemuResponse)
-		var vmResponse *types.QemuResponse
+		subVmStatus := ret3.(chan *types.VmResponse)
+		var vmResponse *types.VmResponse
 		for {
 			vmResponse = <-subVmStatus
 			if vmResponse.VmId == d.pullVm {

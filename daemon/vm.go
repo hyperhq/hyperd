@@ -40,7 +40,7 @@ func (daemon *Daemon) CmdVmCreate(job *engine.Job) (err error) {
 
 	daemon.AddVm(vm)
 
-	// Prepare the qemu status to client
+	// Prepare the VM status to client
 	v := &engine.Env{}
 	v.Set("ID", vmId)
 	v.SetInt("Code", 0)
@@ -62,7 +62,7 @@ func (daemon *Daemon) CmdVmKill(job *engine.Job) error {
 		return err
 	}
 
-	// Prepare the qemu status to client
+	// Prepare the VM status to client
 	v := &engine.Env{}
 	v.Set("ID", vmId)
 	v.SetInt("Code", code)
@@ -154,12 +154,12 @@ func (daemon *Daemon) StartVm(vmId string, cpu, mem int, lazy bool, keep int) (*
 	if err != nil {
 		return nil, err
 	}
-	_, r1, r2, err1 := vm.GetQemuChan()
+	_, r1, r2, err1 := vm.GetVmChan()
 	if err1 != nil {
 		return nil, err1
 	}
-	vmStatus := r1.(chan *types.QemuResponse)
-	subVmStatus := r2.(chan *types.QemuResponse)
+	vmStatus := r1.(chan *types.VmResponse)
+	subVmStatus := r2.(chan *types.VmResponse)
 	go func(interface{}) {
 		defer func() {
 			err := recover()
@@ -172,7 +172,7 @@ func (daemon *Daemon) StartVm(vmId string, cpu, mem int, lazy bool, keep int) (*
 			subVmStatus <- vmResponse
 		}
 	}(subVmStatus)
-	var vmResponse *types.QemuResponse
+	var vmResponse *types.VmResponse
 	for {
 		vmResponse = <-subVmStatus
 		glog.V(1).Infof("Get the response from VM, VM id is %s, response code is %d!", vmResponse.VmId, vmResponse.Code)

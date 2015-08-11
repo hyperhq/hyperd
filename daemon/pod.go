@@ -36,7 +36,7 @@ func (daemon *Daemon) CmdPodCreate(job *engine.Job) error {
 		return err
 	}
 
-	// Prepare the qemu status to client
+	// Prepare the VM status to client
 	v := &engine.Env{}
 	v.Set("ID", podId)
 	v.SetInt("Code", 0)
@@ -69,7 +69,7 @@ func (daemon *Daemon) CmdPodStart(job *engine.Job) error {
 		return err
 	}
 
-	// Prepare the qemu status to client
+	// Prepare the VM status to client
 	v := &engine.Env{}
 	v.Set("ID", vmId)
 	v.SetInt("Code", code)
@@ -98,7 +98,7 @@ func (daemon *Daemon) CmdPodRun(job *engine.Job) error {
 		return err
 	}
 
-	// Prepare the qemu status to client
+	// Prepare the VM status to client
 	v := &engine.Env{}
 	v.Set("ID", podId)
 	v.SetInt("Code", code)
@@ -552,12 +552,12 @@ func (daemon *Daemon) StartPod(podId, podArgs, vmId string, config interface{}, 
 		return -1, "", err
 	}
 
-	qemuResponse := vm.StartPod(mypod, userPod, containerInfoList, volumeInfoList)
-	if qemuResponse.Data == nil {
-		err = fmt.Errorf("QEMU response data is nil")
-		return qemuResponse.Code, qemuResponse.Cause, err
+	vmResponse := vm.StartPod(mypod, userPod, containerInfoList, volumeInfoList)
+	if vmResponse.Data == nil {
+		err = fmt.Errorf("VM response data is nil")
+		return vmResponse.Code, vmResponse.Cause, err
 	}
-	data := qemuResponse.Data.([]byte)
+	data := vmResponse.Data.([]byte)
 	err = daemon.UpdateVmData(vm.Id, data)
 	if err != nil {
 		glog.Error(err.Error())
@@ -569,8 +569,8 @@ func (daemon *Daemon) StartPod(podId, podArgs, vmId string, config interface{}, 
 		return -1, "", err
 	}
 
-	// XXX we should not close qemuStatus chan, it will be closed in shutdown process
-	return qemuResponse.Code, qemuResponse.Cause, nil
+	// XXX we should not close vmStatus chan, it will be closed in shutdown process
+	return vmResponse.Code, vmResponse.Cause, nil
 }
 
 // The caller must make sure that the restart policy and the status is right to restart
@@ -628,20 +628,20 @@ func (daemon *Daemon) CmdPodInfo(job *engine.Job) error {
 	return nil
 }
 
-func hyperHandlePodEvent(qemuResponse *types.QemuResponse, data interface{},
+func hyperHandlePodEvent(vmResponse *types.VmResponse, data interface{},
 	mypod *hypervisor.Pod, vm *hypervisor.Vm) bool {
 	daemon := data.(*Daemon)
 
-	if qemuResponse.Code == types.E_POD_FINISHED {
+	if vmResponse.Code == types.E_POD_FINISHED {
 		if vm.Keep != types.VM_KEEP_NONE {
 			mypod.Vm = ""
 			vm.Status = types.S_VM_IDLE
 			return false
 		}
-		mypod.SetPodContainerStatus(qemuResponse.Data.([]uint32))
+		mypod.SetPodContainerStatus(vmResponse.Data.([]uint32))
 		mypod.Vm = ""
 		vm.Status = types.S_VM_IDLE
-	} else if qemuResponse.Code == types.E_VM_SHUTDOWN {
+	} else if vmResponse.Code == types.E_VM_SHUTDOWN {
 		if mypod.Status == types.S_POD_RUNNING {
 			mypod.Status = types.S_POD_SUCCEEDED
 			mypod.SetContainerStatus(types.S_POD_SUCCEEDED)

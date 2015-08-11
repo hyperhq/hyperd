@@ -313,13 +313,13 @@ func (b *Builder) runContextCommand(args []string, allowRemote bool, allowDecomp
 		}
 		vm = b.Hyperdaemon.VmList[b.Name]
 		// wait for cmd finish
-		_, _, ret3, err := vm.GetQemuChan()
+		_, _, ret3, err := vm.GetVmChan()
 		if err != nil {
 			glog.Error(err.Error())
 			return err
 		}
-		subVmStatus := ret3.(chan *types.QemuResponse)
-		var vmResponse *types.QemuResponse
+		subVmStatus := ret3.(chan *types.VmResponse)
+		var vmResponse *types.VmResponse
 		for {
 			vmResponse = <-subVmStatus
 			if vmResponse.VmId == b.Name {
@@ -714,13 +714,13 @@ func (b *Builder) run(c *daemon.Container) error {
 		}
 		vm = b.Hyperdaemon.VmList[b.Name]
 		// wait for cmd finish
-		_, _, ret3, err := vm.GetQemuChan()
+		_, _, ret3, err := vm.GetVmChan()
 		if err != nil {
 			glog.Error(err.Error())
 			return err
 		}
-		subVmStatus := ret3.(chan *types.QemuResponse)
-		var vmResponse *types.QemuResponse
+		subVmStatus := ret3.(chan *types.VmResponse)
+		var vmResponse *types.VmResponse
 		for {
 			vmResponse = <-subVmStatus
 			if vmResponse.VmId == b.Name {

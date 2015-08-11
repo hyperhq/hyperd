@@ -18,7 +18,7 @@ func (daemon *Daemon) CmdPodStop(job *engine.Job) error {
 		return err
 	}
 
-	// Prepare the qemu status to client
+	// Prepare the VM status to client
 	v := &engine.Env{}
 	v.Set("ID", podId)
 	v.SetInt("Code", code)
@@ -55,14 +55,14 @@ func (daemon *Daemon) StopPod(podId, stopVm string) (int, string, error) {
 	}
 	mypod, _ := daemon.PodList[podId]
 
-	qemuResponse := vm.StopPod(mypod, stopVm)
+	vmResponse := vm.StopPod(mypod, stopVm)
 
 	// Delete the Vm info for POD
 	daemon.DeleteVmByPod(podId)
 
-	if qemuResponse.Code == types.E_VM_SHUTDOWN {
+	if vmResponse.Code == types.E_VM_SHUTDOWN {
 		daemon.RemoveVm(vmid)
 	}
 
-	return qemuResponse.Code, qemuResponse.Cause, nil
+	return vmResponse.Code, vmResponse.Cause, nil
 }
