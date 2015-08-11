@@ -86,4 +86,4 @@ hyper you are running, as shown by `hyper --version`.
 
 * Twitter: [@hyper_sh](https://twitter.com/hyper_sh)
 * Blog: [https://hyper.sh/blog.html](https://hyper.sh/blog.html)
-* IRC: [#hypersh](irc://chat.freenode.net:6667/#hypersh) ([web](http://webchat.freenode.net?channels=hypersh&uio=d4)) on freenode
+* Slack: [#hyper](https://slack.hyper.sh/) (The IRC has been migrated to slack.)
