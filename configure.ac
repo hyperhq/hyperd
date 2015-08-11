@@ -21,6 +21,34 @@ if test "x$has_godep" != "xyes" ; then
     AC_MSG_ERROR(Unable to find godep binary in PATH)
 fi
 
+AC_CHECK_PROG([has_sqlite3], [sqlite3], [yes], [no])
+if test "x$has_sqlite3" != "xyes" ; then
+    AC_MSG_ERROR(Unable to find sqlite3 binary in PATH)
+fi
+
+# Platform specific setup
+AC_CANONICAL_HOST
+# Check for which host we are on and setup a few things
+# specifically based on the host
+AC_CHECK_PROG([has_virtualbox], [vboxmanage], [yes], [no])
+case $host_os in
+	darwin* )
+		# Do something specific for mac
+		if test "x$has_virtualbox" != "xyes" ; then
+			AC_MSG_ERROR(Unable to find vboxmanage binary in PATH)
+		fi
+		;;
+	linux*)
+		# Do something specific for linux
+		;;
+	*BSD*)
+		# Do something specific for BSD
+		;;
+	*)
+		#Default Case
+		AC_MSG_ERROR([Your platform is not currently supported])
+		;;
+esac
 # Checks for libraries.
 
 # Checks for header files.
