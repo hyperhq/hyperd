@@ -48,15 +48,18 @@ func (cli *HyperClient) HyperCmdRmi(args ...string) error {
 		body, _, err := readBody(cli.call("POST", "/images/remove?"+v.Encode(), nil, nil))
 		if err != nil {
 			fmt.Fprintf(cli.err, "Error remove the image(%s): %s\n", imageId, err.Error())
+			continue
 		}
 		out := engine.NewOutput()
 		remoteInfo, err := out.AddEnv()
 		if err != nil {
 			fmt.Fprintf(cli.err, "Error remove the image(%s): %s\n", imageId, err.Error())
+			continue
 		}
 
 		if _, err := out.Write(body); err != nil {
 			fmt.Fprintf(cli.err, "Error remove the image(%s): %s\n", imageId, err.Error())
+			continue
 		}
 		out.Close()
 		errCode := remoteInfo.GetInt("Code")

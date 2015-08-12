@@ -31,25 +31,28 @@ func (cli *HyperClient) HyperCmdRm(args ...string) error {
 		v.Set("podId", id)
 		body, _, err := readBody(cli.call("POST", "/pod/remove?"+v.Encode(), nil, nil))
 		if err != nil {
-			return err
+			fmt.Fprintf(cli.out, "Error to remove pod(%s), %s", id, err.Error())
+			continue
 		}
 		out := engine.NewOutput()
 		remoteInfo, err := out.AddEnv()
 		if err != nil {
-			return err
+			fmt.Fprintf(cli.out, "Error to remove pod(%s), %s", id, err.Error())
+			continue
 		}
 
 		if _, err := out.Write(body); err != nil {
-			return fmt.Errorf("Error reading remote info: %s", err)
+			fmt.Fprintf(cli.out, "Error to remove pod(%s), %s", id, err.Error())
+			continue
 		}
 		out.Close()
 		errCode := remoteInfo.GetInt("Code")
 		if errCode == types.E_OK || errCode == types.E_VM_SHUTDOWN {
 			//fmt.Println("VM is successful to start!")
+			fmt.Fprintf(cli.out, "Pod(%s) is successful to be deleted!\n", id)
 		} else {
-			return fmt.Errorf("Error code is %d, Cause is %s", remoteInfo.GetInt("Code"), remoteInfo.Get("Cause"))
+			fmt.Fprintf(cli.out, "Error to remove pod(%s), %s", id, remoteInfo.Get("Cause"))
 		}
-		fmt.Printf("Pod(%s) is successful to be deleted!\n", id)
 	}
 	return nil
 }
