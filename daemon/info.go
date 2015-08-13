@@ -28,7 +28,7 @@ func (daemon *Daemon) CmdInfo(job *engine.Job) error {
 	v.SetJson("DriverStatus", sys.DriverStatus)
 	v.Set("DockerRootDir", sys.DockerRootDir)
 	v.Set("IndexServerAddress", sys.IndexServerAddress)
-	v.Set("ExecutionDriver", "VirtualBox")
+	v.Set("ExecutionDriver", daemon.Hypervisor)
 
 	// Get system infomation
 	meminfo, err := sysinfo.GetMemInfo()
