@@ -12,7 +12,7 @@ func (cli *Docker) SendCmdDelete(args ...string) ([]byte, int, error) {
 	config := &daemon.ContainerRmConfig{
 		ForceRemove:  true,
 		RemoveVolume: true,
-		RemoveLink:   true,
+		RemoveLink:   false,
 	}
 
 	if err := cli.daemon.ContainerRm(containerId, config); err != nil {
