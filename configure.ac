@@ -34,14 +34,15 @@ AC_CANONICAL_HOST
 AC_CHECK_PROG([has_virtualbox], [vboxmanage], [yes], [no])
 case $host_os in
 	darwin* )
-		AM_CONDITIONAL([ON_DARWIN], [ true ])
 		# Do something specific for mac
+		AM_CONDITIONAL([ON_DARWIN], [ true ])
 		if test "x$has_virtualbox" != "xyes" ; then
 			AC_MSG_ERROR(Unable to find vboxmanage binary in PATH)
 		fi
 		;;
 	linux*)
 		# Do something specific for linux
+		AM_CONDITIONAL([ON_DARWIN], [ false ])
 		AC_CHECK_HEADER([libdevmapper.h],
 						[],
 						[AC_MSG_ERROR([Could not find or include libdevmapper.h])],
@@ -90,6 +91,12 @@ fi
 AM_CONDITIONAL([WITH_XEN], [test "x$with_xen" == "xyes"])
 
 AC_CONFIG_FILES([Makefile])
+case $build_os in
+	darwin*)
+		AC_CONFIG_FILES([mac_installer/Makefile])
+		;;
+esac
+
 AC_OUTPUT
 
 AC_MSG_RESULT([
