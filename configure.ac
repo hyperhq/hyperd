@@ -4,6 +4,7 @@
 AC_PREREQ([2.69])
 AC_INIT([hyper], [0.2], [hyper.sh])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign subdir-objects])
+AM_EXTRA_RECURSIVE_TARGETS([pkg])
 
 # Checks for programs.
 AC_PROG_CC
@@ -33,6 +34,7 @@ AC_CANONICAL_HOST
 AC_CHECK_PROG([has_virtualbox], [vboxmanage], [yes], [no])
 case $host_os in
 	darwin* )
+		AM_CONDITIONAL([ON_DARWIN], [ true ])
 		# Do something specific for mac
 		if test "x$has_virtualbox" != "xyes" ; then
 			AC_MSG_ERROR(Unable to find vboxmanage binary in PATH)

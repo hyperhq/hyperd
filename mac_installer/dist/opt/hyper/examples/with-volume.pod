@@ -1,0 +1,46 @@
+{
+	"id": "test-container-multi",
+	"containers" : [{
+	    "name": "web",
+	    "image": "tomcat:latest",
+            "volumes": [{
+                "volume": "log",
+                "path": "/var/log",
+                "readOnly": false
+             },{
+                "volume": "tmp",
+                "path": "/mnt",
+                "readOnly": false
+             }]
+	},
+	{
+	    "name": "shell",
+	    "image": "ubuntu:latest",
+	    "workdir": "/",
+	    "command": ["/bin/bash"],
+            "volumes": [{
+                "volume": "log",
+                "path": "/var/log",
+                "readOnly": false
+             },{
+                "volume": "tmp",
+                "path": "/mnt",
+                "readOnly": false
+             }]
+	}],
+	"resource": {
+	    "vcpu": 1,
+	    "memory": 512
+	},
+	"files": [],
+	"volumes": [{
+            "name": "log",
+            "source": "",
+            "driver": ""
+	},{
+            "name": "tmp",
+            "source": "/tmp",
+            "driver": "vfs"
+	}],
+	"tty": true
+}

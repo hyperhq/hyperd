@@ -1,0 +1,26 @@
+{
+	"id": "test-container-ubuntu-attach-files",
+	"containers" : [{
+	    "name": "ubuntu",
+	    "image": "ubuntu:latest",
+	    "workdir": "/",
+	    "command": ["/bin/bash"],
+        "files":  [{
+            "path": "/etc/mysql/conf.d/",
+            "filename": "disable-aio.cnf",
+			"perm":     "0777"
+        }]
+	}],
+	"resource": {
+	    "vcpu": 1,
+	    "memory": 512
+	},
+	"files": [{
+		"name": "disable-aio.cnf",
+		"encoding": "raw", 
+		"uri": "",
+		"content": "[mysqld]\ninnodb_use_native_aio = FALSE"
+	}],
+	"volumes": [],
+	"tty": true
+}

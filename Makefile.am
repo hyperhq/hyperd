@@ -5,6 +5,10 @@ else
 HYPER_BULD_TAGS=libdm_no_deferred_remove
 endif
 
+if ON_DARWIN
+SUBDIRS=mac_installer
+endif
+
 all-local: build-hyperd build-hyper
 clean-local:
 	-rm -f hyperd hyper
