@@ -3,7 +3,6 @@ package client
 import (
 	"encoding/json"
 	"fmt"
-	gflag "github.com/jessevdk/go-flags"
 	"io"
 	"io/ioutil"
 	"net/url"
@@ -11,9 +10,12 @@ import (
 	"strings"
 	"time"
 
-	"hyper/engine"
-	"hyper/lib/promise"
-	"hyper/pod"
+	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/hyper/lib/promise"
+	"github.com/hyperhq/hyper/utils"
+	"github.com/hyperhq/runv/hypervisor/pod"
+
+	gflag "github.com/jessevdk/go-flags"
 )
 
 // hyper run [OPTIONS] image [COMMAND] [ARGS...]
@@ -34,10 +36,11 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 		Env           []string `long:"env" value-name:"[]" default-mask:"-" description:"Set environment variables"`
 		EntryPoint    string   `long:"entrypoint" value-name:"\"\"" default-mask:"-" description:"Overwrite the default ENTRYPOINT of the image"`
 		RestartPolicy string   `long:"restart" default:"never" value-name:"\"\"" default-mask:"-" description:"Restart policy to apply when a container exits (never, onFailure, always)"`
+		Remove        bool     `long:"rm" default:"false" value-name:"" default-mask:"-" description:"Automatically remove the pod when it exits"`
 	}
 
 	var parser = gflag.NewParser(&opts, gflag.Default|gflag.IgnoreUnknown)
-	parser.Usage = "run [OPTIONS] IMAGE [COMMAND] [ARG...]\n\ncreate a pod, and launch a new VM to run the pod"
+	parser.Usage = "run [OPTIONS] IMAGE [COMMAND] [ARG...]\n\nCreate a pod, and launch a new VM to run the pod"
 	args, err := parser.Parse()
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {
@@ -62,9 +65,8 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 				return err
 			}
 		}
-
 		t1 := time.Now()
-		podId, err := cli.RunPod(string(jsonbody))
+		podId, err := cli.RunPod(string(jsonbody), opts.Remove)
 		if err != nil {
 			return err
 		}
@@ -75,8 +77,8 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 	}
 	if opts.K8s != "" {
 		var (
-			kpod pod.KPod
-			userpod  *pod.UserPod
+			kpod    pod.KPod
+			userpod *pod.UserPod
 		)
 		if _, err := os.Stat(opts.K8s); err != nil {
 			return err
@@ -103,9 +105,8 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 		if err != nil {
 			return err
 		}
-
 		t1 := time.Now()
-		podId, err := cli.RunPod(string(jsonbody))
+		podId, err := cli.RunPod(string(jsonbody), opts.Remove)
 		if err != nil {
 			return err
 		}
@@ -123,15 +124,15 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 		command = []string{}
 		env     = []pod.UserEnvironmentVar{}
 	)
-	if len(args) > 2 {
+	if len(args) > 1 {
 		command = args[2:]
 	}
 	if opts.Name == "" {
 		fields := strings.Split(image, ":")
 		if len(fields) < 2 {
-			opts.Name = image + "-" + pod.RandStr(10, "number")
+			opts.Name = image + "-" + utils.RandStr(10, "number")
 		} else {
-			opts.Name = fields[0] + "-" + fields[1] + "-" + pod.RandStr(10, "number")
+			opts.Name = fields[0] + "-" + fields[1] + "-" + utils.RandStr(10, "number")
 		}
 	}
 	if opts.Memory == 0 {
@@ -176,7 +177,7 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 	}
 
 	jsonString, _ := json.Marshal(userPod)
-	podId, err := cli.RunPod(string(jsonString))
+	podId, err := cli.RunPod(string(jsonString), opts.Remove)
 	if err != nil {
 		return err
 	}

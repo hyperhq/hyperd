@@ -1,3 +1,5 @@
+// +build linux
+
 package aufs
 
 import (
@@ -12,8 +14,8 @@ import (
 	"sync"
 	"syscall"
 
-	"hyper/lib/glog"
-	"hyper/utils"
+	"github.com/hyperhq/hyper/utils"
+	"github.com/hyperhq/runv/lib/glog"
 )
 
 /*
@@ -218,7 +220,7 @@ func aufsUnmount(target string) error {
 	cmdString := fmt.Sprintf("auplink %s flush", target)
 	cmd := exec.Command("/bin/sh", "-c", cmdString)
 	if err := cmd.Run(); err != nil {
-		glog.Warningf("Couldn't run auplink command : %s\n", err.Error())
+		glog.Warningf("Couldn't run auplink command : %s\n%s\n", err.Error())
 	}
 	if err := syscall.Unmount(target, 0); err != nil {
 		return err

@@ -1,3 +1,5 @@
+// +build linux
+
 package devicemapper
 
 import (
@@ -12,7 +14,7 @@ import (
 	"strings"
 	"syscall"
 
-	"hyper/lib/glog"
+	"github.com/hyperhq/runv/lib/glog"
 )
 
 type jsonMetadata struct {

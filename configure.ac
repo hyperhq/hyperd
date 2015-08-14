@@ -4,8 +4,7 @@
 AC_PREREQ([2.69])
 AC_INIT([hyper], [0.2], [hyper.sh])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign subdir-objects])
-AC_CONFIG_SRCDIR([hypervisor/xen/hyperxl.c])
-AC_CONFIG_HEADERS([hypervisor/xen/config.h])
+AM_EXTRA_RECURSIVE_TARGETS([pkg])
 
 # Checks for programs.
 AC_PROG_CC
@@ -23,10 +22,43 @@ if test "x$has_godep" != "xyes" ; then
     AC_MSG_ERROR(Unable to find godep binary in PATH)
 fi
 
+AC_CHECK_PROG([has_sqlite3], [sqlite3], [yes], [no])
+if test "x$has_sqlite3" != "xyes" ; then
+    AC_MSG_ERROR(Unable to find sqlite3 binary in PATH)
+fi
+
+# Platform specific setup
+AC_CANONICAL_HOST
+# Check for which host we are on and setup a few things
+# specifically based on the host
+AC_CHECK_PROG([has_virtualbox], [vboxmanage], [yes], [no])
+case $host_os in
+	darwin* )
+		AM_CONDITIONAL([ON_DARWIN], [ true ])
+		# Do something specific for mac
+		if test "x$has_virtualbox" != "xyes" ; then
+			AC_MSG_ERROR(Unable to find vboxmanage binary in PATH)
+		fi
+		;;
+	linux*)
+		# Do something specific for linux
+		AC_CHECK_HEADER([libdevmapper.h],
+						[],
+						[AC_MSG_ERROR([Could not find or include libdevmapper.h])],
+						[])
+		;;
+	*)
+		#Default Case
+		AC_MSG_ERROR([Your platform is not currently supported])
+		;;
+esac
 # Checks for libraries.
 
 # Checks for header files.
 AC_CHECK_HEADERS([stdlib.h string.h libxl.h])
+AC_CHECK_HEADER([sqlite3.h], [],
+				[AC_MSG_ERROR([Could not find or include sqlite3.h])],
+				[])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_CHECK_HEADER_STDBOOL
@@ -57,9 +89,7 @@ fi
 
 AM_CONDITIONAL([WITH_XEN], [test "x$with_xen" == "xyes"])
 
-AC_CONFIG_FILES([Makefile
-                 hypervisor/Makefile
-                 hypervisor/xen/Makefile])
+AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
 
 AC_MSG_RESULT([

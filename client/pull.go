@@ -2,9 +2,11 @@ package client
 
 import (
 	"fmt"
-	gflag "github.com/jessevdk/go-flags"
 	"net/url"
+	"os"
 	"strings"
+
+	gflag "github.com/jessevdk/go-flags"
 )
 
 func (cli *HyperClient) HyperCmdPull(args ...string) error {
@@ -25,7 +27,7 @@ func (cli *HyperClient) HyperCmdPull(args ...string) error {
 	imageName := args[1]
 	v := url.Values{}
 	v.Set("imageName", imageName)
-	err = cli.stream("POST", "/image/create?"+v.Encode(), nil, nil, nil)
+	err = cli.stream("POST", "/image/create?"+v.Encode(), nil, os.Stdout, nil)
 	if err != nil {
 		return err
 	}

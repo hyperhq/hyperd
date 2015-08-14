@@ -1,0 +1,16 @@
+{
+	"id": "test-container-create-ubuntu",
+	"containers" : [{
+	    "name": "ubuntu",
+	    "image": "ubuntu:latest",
+	    "workdir": "/",
+	    "command": ["/bin/bash"]
+	}],
+	"resource": {
+	    "vcpu": 1,
+	    "memory": 512
+	},
+	"files": [],
+	"volumes": [],
+	"tty": true
+}

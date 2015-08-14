@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"hyper/engine"
-	"hyper/types"
+	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/runv/hypervisor/types"
 
 	gflag "github.com/jessevdk/go-flags"
 )
@@ -39,13 +39,13 @@ func (cli *HyperClient) HyperCmdPod(args ...string) error {
 	if err != nil {
 		return err
 	}
-	podId, err := cli.RunPod(string(jsonbody))
+	podId, err := cli.RunPod(string(jsonbody), false)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("POD id is %s\n", podId)
+	fmt.Fprintf(cli.out, "POD id is %s\n", podId)
 	t2 := time.Now()
-	fmt.Printf("Time to run a POD is %d ms\n", (t2.UnixNano()-t1.UnixNano())/1000000)
+	fmt.Fprintf(cli.out, "Time to run a POD is %d ms\n", (t2.UnixNano()-t1.UnixNano())/1000000)
 
 	return nil
 }
@@ -87,12 +87,12 @@ func (cli *HyperClient) CreatePod(jsonbody string) (string, error) {
 
 func (cli *HyperClient) HyperCmdStart(args ...string) error {
 	var opts struct {
-		//		OnlyVm    bool     `long:"onlyvm" default:"false" value-name:"false" description:"Only start a new VM"`
+		// OnlyVm    bool     `long:"onlyvm" default:"false" value-name:"false" description:"Only start a new VM"`
 		Cpu int `short:"c" long:"cpu" default:"1" value-name:"1" description:"CPU number for the VM"`
 		Mem int `short:"m" long:"memory" default:"128" value-name:"128" description:"Memory size (MB) for the VM"`
 	}
 	var parser = gflag.NewParser(&opts, gflag.Default)
-	parser.Usage = "start [-c 1 -m 128]| POD_ID \n\nlaunch a 'pending' pod"
+	parser.Usage = "start [-c 1 -m 128]| POD_ID \n\nLaunch a 'pending' pod"
 	args, err := parser.Parse()
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {
@@ -157,7 +157,7 @@ func (cli *HyperClient) HyperCmdStart(args ...string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Successfully started the Pod(%s)\n", podId)
+	fmt.Fprintf(cli.out, "Successfully started the Pod(%s)\n", podId)
 	return nil
 }
 
@@ -197,9 +197,14 @@ func (cli *HyperClient) StartPod(podId, vmId string) (string, error) {
 	return remoteInfo.Get("ID"), nil
 }
 
-func (cli *HyperClient) RunPod(podstring string) (string, error) {
+func (cli *HyperClient) RunPod(podstring string, autoremove bool) (string, error) {
 	v := url.Values{}
 	v.Set("podArgs", podstring)
+	if autoremove == true {
+		v.Set("remove", "yes")
+	} else {
+		v.Set("remove", "no")
+	}
 	body, _, err := readBody(cli.call("POST", "/pod/run?"+v.Encode(), nil, nil))
 	if err != nil {
 		return "", err

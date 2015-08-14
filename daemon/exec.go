@@ -1,13 +1,10 @@
 package daemon
 
 import (
-	"encoding/json"
 	"fmt"
 
-	"hyper/engine"
-	"hyper/hypervisor"
-	"hyper/lib/glog"
-	"hyper/types"
+	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/runv/lib/glog"
 )
 
 func (daemon *Daemon) CmdExec(job *engine.Job) (err error) {
@@ -18,25 +15,21 @@ func (daemon *Daemon) CmdExec(job *engine.Job) (err error) {
 		return fmt.Errorf("Can not execute 'exec' command without any command!")
 	}
 	var (
-		typeKey = job.Args[0]
-		typeVal = job.Args[1]
-		tag     = job.Args[3]
-		vmId    string
-		podId   string
-		command = []string{}
+		typeKey   = job.Args[0]
+		typeVal   = job.Args[1]
+		cmd       = job.Args[2]
+		tag       = job.Args[3]
+		vmId      string
+		podId     string
+		container string
 	)
-
-	if job.Args[2] != "" {
-		if err = json.Unmarshal([]byte(job.Args[2]), &command); err != nil {
-			return err
-		}
-	}
 
 	// We need find the vm id which running POD, and stop it
 	if typeKey == "pod" {
 		vmId = typeVal
+		container = ""
 	} else {
-		container := typeVal
+		container = typeVal
 		glog.V(1).Infof("Get container id is %s", container)
 		podId, err = daemon.GetPodByContainer(container)
 		if err != nil {
@@ -49,30 +42,17 @@ func (daemon *Daemon) CmdExec(job *engine.Job) (err error) {
 		return err
 	}
 
-	execCmd := &hypervisor.ExecCommand{
-		Command: command,
-		Streams: &hypervisor.TtyIO{
-			Stdin:     job.Stdin,
-			Stdout:    job.Stdout,
-			ClientTag: tag,
-			Callback:  make(chan *types.QemuResponse, 1),
-		},
+	vm, ok := daemon.VmList[vmId]
+	if !ok {
+		return fmt.Errorf("Can find VM whose Id is %s!", vmId)
 	}
 
-	if typeKey == "pod" {
-		execCmd.Container = ""
-	} else {
-		execCmd.Container = typeVal
-	}
+	err = vm.Exec(job.Stdin, job.Stdout, cmd, tag, container)
 
-	qemuEvent, _, _, err := daemon.GetQemuChan(vmId)
 	if err != nil {
 		return err
 	}
 
-	qemuEvent.(chan hypervisor.VmEvent) <- execCmd
-
-	<-execCmd.Streams.Callback
 	defer func() {
 		glog.V(2).Info("Defer function for exec!")
 	}()

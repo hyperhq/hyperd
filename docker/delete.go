@@ -2,21 +2,25 @@ package docker
 
 import (
 	"fmt"
-	"hyper/lib/glog"
-	"net/url"
+	"strings"
+
+	"github.com/hyperhq/hyper/lib/docker/daemon"
 )
 
-func (cli *DockerCli) SendCmdDelete(args ...string) ([]byte, int, error) {
-	container := args[0]
-	glog.V(1).Infof("Prepare to delete the container : %s", container)
-	v := url.Values{}
-	v.Set("v", "1")
-	v.Set("force", "1")
-	_, statusCode, err := readBody(cli.Call("DELETE", "/containers/"+container+"?"+v.Encode(), nil, nil))
-	if err != nil {
-		return nil, statusCode, fmt.Errorf("Error to remove the container(%s), %s", container, err.Error())
+func (cli *Docker) SendCmdDelete(args ...string) ([]byte, int, error) {
+	containerId := args[0]
+	config := &daemon.ContainerRmConfig{
+		ForceRemove:  true,
+		RemoveVolume: true,
+		RemoveLink:   false,
 	}
-	glog.V(1).Infof("status code is %d", statusCode)
 
-	return nil, statusCode, nil
+	if err := cli.daemon.ContainerRm(containerId, config); err != nil {
+		// Force a 404 for the empty string
+		if strings.Contains(strings.ToLower(err.Error()), "prefix can't be empty") {
+			return nil, 500, fmt.Errorf("no such id: \"\"")
+		}
+		return nil, 500, err
+	}
+	return nil, 200, nil
 }

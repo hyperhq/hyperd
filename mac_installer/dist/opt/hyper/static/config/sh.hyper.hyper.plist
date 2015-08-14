@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>sh.hyper.hyper</string>
+  <key>ProgramArguments</key>
+  <array>
+		<string>/opt/hyper/bin/hyperd</string>
+		<string>--config=/opt/hyper/etc/hyper/config</string>
+		<string>-v=1</string>
+		<string>--nondaemon</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+	  <key>PATH</key>
+	  <string>/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin</string>
+  </dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <!-- If you met any problems, uncomment this block to enable more output from launchd
+    <key>StandardErrorPath</key>
+    <string>/var/log/hyper/launchd.stderr.log</string>
+  -->
+</dict>
+</plist>
