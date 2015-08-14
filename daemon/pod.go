@@ -62,8 +62,12 @@ func (daemon *Daemon) CmdPodStart(job *engine.Job) error {
 	if _, ok := daemon.PodList[podId]; !ok {
 		return fmt.Errorf("The pod(%s) can not be found, please create it first", podId)
 	}
+	var lazy = false
+	if daemon.Hypervisor == "vbox" && vmId == "" {
+		lazy = true
+	}
 
-	code, cause, err := daemon.StartPod(podId, "", vmId, nil, false, false, types.VM_KEEP_NONE)
+	code, cause, err := daemon.StartPod(podId, "", vmId, nil, lazy, false, types.VM_KEEP_NONE)
 	if err != nil {
 		glog.Error(err.Error())
 		return err
@@ -96,7 +100,12 @@ func (daemon *Daemon) CmdPodRun(job *engine.Job) error {
 
 	glog.Info(podArgs)
 
-	code, cause, err := daemon.StartPod(podId, podArgs, "", nil, false, autoremove, types.VM_KEEP_NONE)
+	var lazy = false
+	if daemon.Hypervisor == "vbox" {
+		lazy = true
+	}
+
+	code, cause, err := daemon.StartPod(podId, podArgs, "", nil, lazy, autoremove, types.VM_KEEP_NONE)
 	if err != nil {
 		glog.Error(err.Error())
 		return err
@@ -596,9 +605,13 @@ func (daemon *Daemon) RestartPod(mypod *hypervisor.Pod) error {
 	if err != nil {
 		return err
 	}
+	var lazy = false
+	if daemon.Hypervisor == "vbox" {
+		lazy = true
+	}
 
 	// Start the pod
-	_, _, err = daemon.StartPod(mypod.Id, string(podData), "", nil, false, false, types.VM_KEEP_NONE)
+	_, _, err = daemon.StartPod(mypod.Id, string(podData), "", nil, lazy, false, types.VM_KEEP_NONE)
 	if err != nil {
 		glog.Error(err.Error())
 		return err
