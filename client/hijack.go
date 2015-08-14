@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"hyper/lib/promise"
-	"hyper/lib/term"
-	"hyper/utils"
+	"github.com/hyperhq/hyper/lib/promise"
+	"github.com/hyperhq/hyper/lib/term"
+	"github.com/hyperhq/hyper/utils"
 )
 
 func (cli *HyperClient) dial() (net.Conn, error) {

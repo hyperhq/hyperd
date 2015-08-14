@@ -6,9 +6,9 @@ test -z "$srcdir" && srcidr=.
 cd $srcdir
 DIE=0
 
-test -f hypervisor/xen/hyperxl.c || {
+test -f hyperd.go || {
 	echo
-	echo "You must run this script in the top-level hyper drectory."
+	echo "You must run this script in the top-level hyper directory."
 	echo
 	DIE=1
 }
@@ -16,13 +16,6 @@ test -f hypervisor/xen/hyperxl.c || {
 (autoconf --version) < /dev/null > /dev/null 2>&1 || {
 	echo
 	echo "You must have autoconf installed to generate the hyper."
-	echo
-	DIE=1
-}
-
-(autoheader --version) < /dev/null > /dev/null 2>&1 || {
-	echo
-	echo "You must have autoheader installed to generate the hyper."
 	echo
 	DIE=1
 }
@@ -48,7 +41,6 @@ echo
 echo "Generating build-system with:"
 echo "  aclocal:  $(aclocal --version | head -1)"
 echo "  autoconf:  $(autoconf --version | head -1)"
-echo "  autoheader:  $(autoheader --version | head -1)"
 echo "  automake:  $(automake --version | head -1)"
 echo
 
@@ -56,7 +48,6 @@ rm -rf autom4te.cache
 
 aclocal
 autoconf
-autoheader
 automake --add-missing
 
 echo

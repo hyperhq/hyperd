@@ -1,230 +1,143 @@
-// Build this with the docker configuration
 package docker
 
 import (
-	"bytes"
-	"crypto/tls"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"hyper/lib/glog"
 	"io"
-	"io/ioutil"
-	"net"
-	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
-	"time"
+
+	hyperd "github.com/hyperhq/hyper/daemon"
+	"github.com/hyperhq/hyper/lib/docker/daemon"
+	"github.com/hyperhq/hyper/lib/docker/pkg/homedir"
+	"github.com/hyperhq/hyper/lib/docker/pkg/system"
+	"github.com/hyperhq/hyper/lib/docker/registry"
+	"github.com/hyperhq/hyper/utils"
+	"github.com/hyperhq/runv/lib/glog"
 )
 
-// Now, the Hyper will not support the TLS with docker.
-// It is under development.  So the Hyper and docker should be deployed
-// in same machine.
+var (
+	daemonCfg   = &daemon.Config{}
+	registryCfg = &registry.Options{}
+)
+
 const (
 	defaultTrustKeyFile = "key.json"
 	defaultCaFile       = "ca.pem"
 	defaultKeyFile      = "key.pem"
 	defaultCertFile     = "cert.pem"
-	defaultHostAddress  = "unix:///var/run/docker.sock"
-	defaultProto        = "unix"
-	dockerClientVersion = "1.17"
 )
 
-// Define some common configuration of the Docker daemon
-type DockerConfig struct {
-	host         string
-	address      string
-	trustKeyFile string
-	caFile       string
-	keyFile      string
-	certFile     string
-	debugMode    int
-	tlsConfig    *tls.Config
+type Docker struct {
+	daemon *daemon.Daemon
 }
 
-type DockerCli struct {
-	proto        string
-	scheme       string
-	dockerConfig *DockerConfig
-	transport    *http.Transport
-}
-
-func NewDockerCli(keyFile string, proto, addr string, tlsConfig *tls.Config) *DockerCli {
-	var (
-		scheme       = "http"
-		dockerConfig DockerConfig
-	)
-
-	if tlsConfig != nil {
-		scheme = "https"
+func Init() {
+	if daemonCfg.LogConfig.Config == nil {
+		daemonCfg.LogConfig.Config = make(map[string]string)
 	}
-
-	tr := &http.Transport{
-		TLSClientConfig: tlsConfig,
-	}
-
-	timeout := 32 * time.Second
-	if proto == "unix" {
-		tr.DisableCompression = true
-		tr.Dial = func(_, _ string) (net.Conn, error) {
-			return net.DialTimeout(proto, addr, timeout)
+	daemonCfg.InstallFlags()
+	registryCfg.InstallFlags()
+	hyperd.NewDockerImpl = func() (docker hyperd.DockerInterface, e error) {
+		docker, e = NewDocker()
+		if e != nil {
+			return nil, fmt.Errorf("failed to create docker instance")
 		}
-	} else {
-		tr.Proxy = http.ProxyFromEnvironment
-		tr.Dial = (&net.Dialer{Timeout: timeout}).Dial
+		return docker, nil
 	}
-
-	dockerConfig.host = ""
-	dockerConfig.address = addr
-	if keyFile == "" {
-		dockerConfig.keyFile = defaultKeyFile
-	} else {
-		dockerConfig.keyFile = keyFile
-	}
-	dockerConfig.certFile = defaultCertFile
-	dockerConfig.caFile = defaultCaFile
-	dockerConfig.trustKeyFile = defaultTrustKeyFile
-	dockerConfig.debugMode = 1
-	dockerConfig.tlsConfig = tlsConfig
-
-	return &DockerCli{
-		proto:        proto,
-		scheme:       scheme,
-		dockerConfig: &dockerConfig,
-		transport:    tr,
-	}
+	glog.Info("success to create docker")
 }
 
-func (cli *DockerCli) ExecDockerCmd(args ...string) ([]byte, int, error) {
-	command := args[0]
-	switch command {
-	case "info":
-		return cli.SendCmdInfo(args[1])
-	case "create":
-		return cli.SendCmdCreate(args[1])
-	default:
-		return nil, -1, errors.New("This cmd is not supported!\n")
-	}
-	return nil, -1, errors.New("The ExecDockerCmd function is done!\n")
-}
+func migrateKey() (err error) {
+	// Migrate trust key if exists at ~/.docker/key.json and owned by current user
+	oldPath := filepath.Join(homedir.Get(), ".docker", defaultTrustKeyFile)
+	newPath := filepath.Join(getDaemonConfDir(), defaultTrustKeyFile)
+	if _, statErr := os.Stat(newPath); os.IsNotExist(statErr) && currentUserIsOwner(oldPath) {
+		defer func() {
+			// Ensure old path is removed if no error occurred
+			if err == nil {
+				err = os.Remove(oldPath)
+			} else {
+				glog.Warningf("Key migration failed, key file not removed at %s", oldPath)
+			}
+		}()
 
-func (cli *DockerCli) HTTPClient() *http.Client {
-	return &http.Client{Transport: cli.transport}
-}
+		if err := os.MkdirAll(getDaemonConfDir(), os.FileMode(0644)); err != nil {
+			return fmt.Errorf("Unable to create daemon configuration directory: %s", err)
+		}
 
-func (cli *DockerCli) encodeData(data interface{}) (*bytes.Buffer, error) {
-	params := bytes.NewBuffer(nil)
-	if data != nil {
-		buf, err := json.Marshal(data)
+		newFile, err := os.OpenFile(newPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 		if err != nil {
-			return nil, err
+			return fmt.Errorf("error creating key file %q: %s", newPath, err)
 		}
-		if _, err := params.Write(buf); err != nil {
-			return nil, err
-		}
-	}
-	return params, nil
-}
+		defer newFile.Close()
 
-func (cli *DockerCli) clientRequest(method, path string, in io.Reader, headers map[string][]string) (io.ReadCloser, string, int, error) {
-	if in == nil {
-		in = bytes.NewReader([]byte{})
-	}
-	req, err := http.NewRequest(method, fmt.Sprintf("/v%s%s", dockerClientVersion, path), in)
-	if err != nil {
-		return nil, "", -1, err
-	}
-	req.Header.Set("User-Agent", "Docker-client/"+dockerClientVersion)
-	req.URL.Host = cli.dockerConfig.address
-	req.URL.Scheme = cli.scheme
-	if headers != nil {
-		for k, v := range headers {
-			req.Header[k] = v
-		}
-	}
-
-	if req.Header.Get("Content-Type") == "" {
-		req.Header.Set("Content-Type", "text/plain")
-	}
-
-	resp, err := cli.HTTPClient().Do(req)
-	statusCode := -1
-	if resp != nil {
-		statusCode = resp.StatusCode
-	}
-
-	if err != nil {
-		if strings.Contains(err.Error(), "connection refused") {
-			return nil, "", statusCode, err
-		}
-
-		if cli.dockerConfig.tlsConfig == nil {
-			return nil, "", statusCode, fmt.Errorf("Are you trying to connect with a TLS-enabled daemon without TLS, %v", err)
-		}
-		return nil, "", statusCode, fmt.Errorf("An error encountered while connecting: %v", err)
-	}
-
-	if statusCode < 200 || statusCode >= 400 {
-		body, err := ioutil.ReadAll(resp.Body)
+		oldFile, err := os.Open(oldPath)
 		if err != nil {
-			return nil, "", statusCode, err
+			return fmt.Errorf("error opening key file %q: %s", oldPath, err)
+		}
+		defer oldFile.Close()
+
+		if _, err := io.Copy(newFile, oldFile); err != nil {
+			return fmt.Errorf("error copying key: %s", err)
 		}
 
-		return nil, "", statusCode, fmt.Errorf("An error encountered returned from Docker daemon, %s\n", bytes.TrimSpace(body))
-	}
-	glog.V(3).Info("Finish the client request\n")
-	return resp.Body, resp.Header.Get("Content-Type"), statusCode, nil
-}
-
-func (cli *DockerCli) Call(method, path string, data interface{}, headers map[string][]string) (io.ReadCloser, int, error) {
-	params, err := cli.encodeData(data)
-	if err != nil {
-		return nil, -1, err
+		glog.Infof("Migrated key from %s to %s", oldPath, newPath)
 	}
 
-	if data != nil {
-		if headers == nil {
-			headers = make(map[string][]string)
-		}
-		headers["Content-Type"] = []string{"application/json"}
-	}
-	body, _, statusCode, err := cli.clientRequest(method, path, params, headers)
-	return body, statusCode, err
-}
-
-func readBody(stream io.ReadCloser, statusCode int, err error) ([]byte, int, error) {
-	if stream != nil {
-		defer stream.Close()
-	}
-
-	if err != nil {
-		return nil, statusCode, err
-	}
-	body, err := ioutil.ReadAll(stream)
-	if err != nil {
-		return nil, -1, err
-	}
-	return body, statusCode, nil
-}
-
-func (cli *DockerCli) Stream(method, path string, in io.Reader, stdout io.Writer, headers map[string][]string) error {
-	glog.V(3).Info("Ready to get the response from docker daemon\n")
-	body, contentType, _, err := cli.clientRequest(method, path, in, headers)
-	if err != nil {
-		return err
-	}
-	defer body.Close()
-	glog.V(3).Info("Process the response data\n")
-	if strings.Contains(contentType, "application/json") {
-		glog.V(3).Info("Process the response data with JSON\n")
-		return DisplayJSONMessagesStream(body, stdout, 0, true)
-	}
-
-	glog.V(3).Info("Process the response data with pure copy\n")
-	if stdout != nil {
-		_, err := io.Copy(stdout, body)
-		if err != nil {
-			return err
-		}
-	}
 	return nil
+}
+
+func NewDocker() (*Docker, error) {
+	registryService := registry.NewService(registryCfg)
+	daemonCfg.TrustKeyPath = getDaemonConfDir() + "/" + defaultTrustKeyFile
+	daemonCfg.Root = utils.HYPER_ROOT
+	d, err := daemon.NewDaemon(daemonCfg, registryService)
+	if err != nil {
+		glog.Errorf("Error starting daemon: %v", err)
+		return nil, err
+	}
+
+	glog.Info("Daemon has completed initialization")
+	return &Docker{
+		daemon: d,
+	}, nil
+}
+
+func getDaemonConfDir() string {
+	return "/etc/hyper"
+}
+
+func currentUserIsOwner(f string) bool {
+	if fileInfo, err := system.Stat(f); err == nil && fileInfo != nil {
+		if int(fileInfo.Uid()) == os.Getuid() {
+			return true
+		}
+	}
+	return false
+}
+
+func parseTheGivenImageName(image string) (string, string) {
+	n := strings.Index(image, "@")
+	if n > 0 {
+		parts := strings.Split(image, "@")
+		return parts[0], parts[1]
+	}
+
+	n = strings.LastIndex(image, ":")
+	if n < 0 {
+		return image, ""
+	}
+	if tag := image[n+1:]; !strings.Contains(tag, "/") {
+		return image[:n], tag
+	}
+	return image, ""
+}
+
+func (cli Docker) Shutdown() error {
+	return cli.daemon.Shutdown()
+}
+
+func (cli Docker) Setup() error {
+	return cli.daemon.Setup()
 }

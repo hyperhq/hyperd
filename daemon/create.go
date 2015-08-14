@@ -2,14 +2,14 @@ package daemon
 
 import (
 	"fmt"
-	"hyper/engine"
-	"hyper/lib/glog"
+	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/runv/lib/glog"
 )
 
 func (daemon *Daemon) CmdCreate(job *engine.Job) error {
 	imgName := job.Args[0]
-	cli := daemon.dockerCli
-	body, _, err := cli.SendCmdCreate(imgName)
+	cli := daemon.DockerCli
+	body, _, err := cli.SendCmdCreate(imgName, []string{}, nil)
 	if err != nil {
 		return err
 	}

@@ -1,0 +1,2 @@
+Vbox=/opt/hyper/static/iso/hyper-vbox-boot.iso
+Root=/var/lib/hyper

@@ -1,0 +1,22 @@
+{
+  "apiVersion": "V1beta1",
+  "kind": "Pod",
+  "metadata":{
+     "name":"test-k8s-restartPolicy",
+     "labels":{
+        "name":"ubuntu"
+     }
+  },
+  "spec": {
+      "version": "V1beta1",
+      "id": "Ubuntu-Pod",
+      "containers": [
+        {
+          "name": "Ubuntu-1",
+          "image": "ubuntu",
+          "args": ["sleep", "10"]
+        }
+      ],
+      "restartPolicy": "Never"
+  }
+}

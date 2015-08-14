@@ -6,14 +6,14 @@ import (
 	"net/url"
 	"strings"
 
-	"hyper/lib/promise"
+	"github.com/hyperhq/hyper/lib/promise"
 
 	gflag "github.com/jessevdk/go-flags"
 )
 
 func (cli *HyperClient) HyperCmdAttach(args ...string) error {
 	var parser = gflag.NewParser(nil, gflag.Default)
-	parser.Usage = "attach CONTAINER\n\nattach to the tty of a specified container in a pod"
+	parser.Usage = "attach CONTAINER\n\nAttach to the tty of a specified container in a pod"
 	args, err := parser.Parse()
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {

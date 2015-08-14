@@ -4,16 +4,31 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/signal"
+	"path/filepath"
+	"runtime"
+	"strings"
 	"syscall"
 
-	"hyper/engine"
-	"hyper/daemon"
-	"hyper/lib/glog"
-	"hyper/utils"
+	"github.com/hyperhq/hyper/daemon"
+	"github.com/hyperhq/hyper/docker"
+	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/hyper/lib/docker/pkg/reexec"
+	"github.com/hyperhq/hyper/utils"
+	"github.com/hyperhq/runv/driverloader"
+	"github.com/hyperhq/runv/hypervisor"
+	"github.com/hyperhq/runv/lib/glog"
+
+	"github.com/Unknwon/goconfig"
 )
 
 func main() {
+	if reexec.Init() {
+		return
+	}
+
+	fnd := flag.Bool("nondaemon", false, "Not daemonize")
 	flConfig := flag.String("config", "", "Config file for hyperd")
 	flHost := flag.String("host", "", "Host for hyperd")
 	flHelp := flag.Bool("help", false, "Print help message for Hyperd daemon")
@@ -24,6 +39,37 @@ func main() {
 		printHelp()
 		return
 	}
+
+	if !*fnd {
+		cmd, err := exec.LookPath(os.Args[0])
+		if err != nil {
+			fmt.Println("cannot find path of arg0 ", os.Args[0])
+			os.Exit(-1)
+		}
+		cmd, err = filepath.Abs(cmd)
+		if err != nil {
+			fmt.Println("cannot find absolute path of arg0 ", os.Args[0])
+			os.Exit(-1)
+		}
+
+		pid, err := utils.Daemonize()
+		if err != nil {
+			fmt.Println("faile to daemonize hyperd")
+			os.Exit(-1)
+		}
+		if pid > 0 {
+			return
+		}
+
+		err = syscall.Exec(cmd, append(os.Args, "--nondaemon"), os.Environ())
+		if err != nil {
+			fmt.Println("fail to exec in nondaemon mode: ", err.Error())
+			os.Exit(-1)
+		}
+
+		return
+	}
+
 	mainDaemon(*flConfig, *flHost)
 }
 
@@ -32,12 +78,13 @@ func printHelp() {
   %s [OPTIONS]
 
 Application Options:
-  --config=""            configuration for %s
-  --v=0                  log level fro V logs
-  --log_dir              log directory
-  --host                 host address and port for hyperd(such as --host=tcp://127.0.0.1:12345)
-  --logtostderr          log to standard error instead of files
-  --alsologtostderr      log to standard error as well as files
+  --nondaemon            Not daemonize
+  --config=""            Configuration for %s
+  --v=0                  Log level fro V logs
+  --log_dir              Log directory
+  --host                 Host address and port for hyperd(such as --host=tcp://127.0.0.1:12345)
+  --logtostderr          Log to standard error instead of files
+  --alsologtostderr      Log to standard error as well as files
 
 Help Options:
   -h, --help             Show this help message
@@ -47,15 +94,77 @@ Help Options:
 }
 
 func mainDaemon(config, host string) {
-	glog.V(0).Infof("The config file is %s", config)
+	glog.V(1).Infof("The config file is %s", config)
 	if config == "" {
 		config = "/etc/hyper/config"
 	}
+	if _, err := os.Stat(config); err != nil {
+		if os.IsNotExist(err) {
+			glog.Errorf("Can not find config file(%s)", config)
+			return
+		}
+		glog.Errorf(err.Error())
+		return
+	}
+
+	os.Setenv("HYPER_CONFIG", config)
+	cfg, err := goconfig.LoadConfigFile(config)
+	if err != nil {
+		glog.Errorf("Read config file (%s) failed, %s", config, err.Error())
+		return
+	}
+	driver, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Hypervisor")
+	if runtime.GOOS == "darwin" {
+		driver = "vbox"
+	} else {
+		if driver == "" {
+			// We need to provide a defaut exec drvier
+			var drivers = []string{"kvm", "xen", "vbox"}
+			driver = utils.GetAvailableDriver(drivers)
+		}
+		driver = strings.ToLower(driver)
+	}
+	if driver == "" || (driver != "kvm" && driver != "xen" && driver != "vbox") {
+		fmt.Printf("Please specify the exec driver, such as 'kvm', 'xen' or 'vbox'\n")
+		return
+	}
+	hyperRoot, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Root")
+	iso, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Vbox")
+
+	if hyperRoot == "" {
+		hyperRoot = "/var/lib/hyper"
+	}
+	if _, err := os.Stat(hyperRoot); err != nil {
+		if err := os.MkdirAll(hyperRoot, 0755); err != nil {
+			glog.Errorf(err.Error())
+			return
+		}
+	}
+
+	utils.SetHyperEnv(fmt.Sprintf("%s/.hyperconfig", os.Getenv("HOME")), hyperRoot, iso)
 	eng := engine.New(config)
+	docker.Init()
 
 	d, err := daemon.NewDaemon(eng)
 	if err != nil {
 		glog.Errorf("The hyperd create failed, %s\n", err.Error())
+		return
+	}
+
+	if hypervisor.HDriver, err = driverloader.Probe(driver); err != nil {
+		glog.Errorf("%s\n", err.Error())
+		return
+	}
+	d.Hypervisor = driver
+	if err = d.InitNetwork(hypervisor.HDriver, d.BridgeIface, d.BridgeIP); err != nil {
+		glog.Errorf("InitNetwork failed, %s\n", err.Error())
+		return
+	}
+	// Set the daemon object as the global varibal
+	// which will be used for puller and builder
+	utils.SetDaemon(d)
+	if err := d.DockerCli.Setup(); err != nil {
+		glog.Error(err.Error())
 		return
 	}
 

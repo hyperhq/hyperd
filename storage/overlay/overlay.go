@@ -1,3 +1,5 @@
+// +build linux
+
 package overlay
 
 import (
@@ -9,7 +11,7 @@ import (
 	"strconv"
 	"syscall"
 
-	"hyper/utils"
+	"github.com/hyperhq/hyper/utils"
 )
 
 func MountContainerToSharedDir(containerId, rootDir, sharedDir, mountLabel string) (string, error) {

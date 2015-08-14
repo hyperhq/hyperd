@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"hyper/client"
+	"github.com/hyperhq/hyper/client"
 	"os"
 )
 

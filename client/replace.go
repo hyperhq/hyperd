@@ -1,3 +1,5 @@
+// +build linux
+
 package client
 
 import (
@@ -6,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"hyper/types"
+	"github.com/hyperhq/runv/hypervisor/types"
 
 	gflag "github.com/jessevdk/go-flags"
 )
@@ -23,7 +25,7 @@ func (cli *HyperClient) HyperCmdReplace(args ...string) error {
 		Yaml    bool   `short:"y" long:"yaml" default:"false" default-mask:"-" description:"The Pod file is based on Yaml file"`
 	}
 	var parser = gflag.NewParser(&opts, gflag.Default)
-	parser.Usage = "replace --oldpod POD_ID --newpod POD_ID [--file POD_FILE]\n\nreplace the pod in a running VM with a new one"
+	parser.Usage = "replace --oldpod POD_ID --newpod POD_ID [--file POD_FILE]\n\nReplace the pod in a running VM with a new one"
 	args, err := parser.Parse()
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {

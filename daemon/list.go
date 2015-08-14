@@ -2,8 +2,8 @@ package daemon
 
 import (
 	"fmt"
-	"hyper/engine"
-	"hyper/types"
+	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/runv/hypervisor/types"
 )
 
 func (daemon *Daemon) CmdList(job *engine.Job) error {
@@ -25,11 +25,11 @@ func (daemon *Daemon) CmdList(job *engine.Job) error {
 		podId                 string
 	)
 
-	// Prepare the qemu status to client
+	// Prepare the VM status to client
 	v := &engine.Env{}
 	v.Set("item", item)
 	if item == "vm" {
-		for vm, v := range daemon.vmList {
+		for vm, v := range daemon.VmList {
 			switch v.Status {
 			case types.S_VM_ASSOCIATED:
 				status = "associated"
@@ -50,7 +50,7 @@ func (daemon *Daemon) CmdList(job *engine.Job) error {
 	}
 
 	if item == "pod" {
-		for p, v := range daemon.podList {
+		for p, v := range daemon.PodList {
 			switch v.Status {
 			case types.S_POD_RUNNING:
 				status = "running"
@@ -80,24 +80,26 @@ func (daemon *Daemon) CmdList(job *engine.Job) error {
 	}
 
 	if item == "container" {
-		for _, c := range daemon.containerList {
-			switch c.Status {
-			case types.S_POD_RUNNING:
-				status = "running"
-				break
-			case types.S_POD_CREATED:
-				status = "pending"
-				break
-			case types.S_POD_FAILED:
-				status = "failed"
-				break
-			case types.S_POD_SUCCEEDED:
-				status = "succeeded"
-				break
-			default:
-				status = ""
+		for _, p := range daemon.PodList {
+			for _, c := range p.Containers {
+				switch c.Status {
+				case types.S_POD_RUNNING:
+					status = "running"
+					break
+				case types.S_POD_CREATED:
+					status = "pending"
+					break
+				case types.S_POD_FAILED:
+					status = "failed"
+					break
+				case types.S_POD_SUCCEEDED:
+					status = "succeeded"
+					break
+				default:
+					status = ""
+				}
+				containerJsonResponse = append(containerJsonResponse, c.Id+":"+c.PodId+":"+status)
 			}
-			containerJsonResponse = append(containerJsonResponse, c.Id+":"+c.PodId+":"+status)
 		}
 		v.SetList("cData", containerJsonResponse)
 	}

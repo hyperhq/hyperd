@@ -24,6 +24,8 @@ missing
 hypervisor/xen/config.h
 hypervisor/xen/config.h.in
 hypervisor/xen/stamp-h1
+config.guess
+config.sub
 
 # Architecture specific extensions/prefixes
 *.[568vq]

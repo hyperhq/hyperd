@@ -1,0 +1,12 @@
+name: process-yaml-file-ubuntu
+containers:
+  - name:          ubuntu
+    image:         ubuntu:latest
+    workdir:       /
+    command:
+      - /bin/bash
+resource:
+    vcpu:          1
+files:
+volumes:
+tty: true

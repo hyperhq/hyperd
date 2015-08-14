@@ -2,55 +2,28 @@ package daemon
 
 import (
 	"fmt"
-	"hyper/docker"
-	"hyper/engine"
-	"hyper/lib/glog"
-	"hyper/lib/portallocator"
-	"hyper/network"
-	apiserver "hyper/server"
-	dm "hyper/storage/devicemapper"
-	"hyper/types"
+	"io"
 	"os"
-	"runtime"
+	"path"
 	"strconv"
 	"strings"
-	"sync"
+
+	"github.com/hyperhq/hyper/engine"
+	dockertypes "github.com/hyperhq/hyper/lib/docker/api/types"
+	"github.com/hyperhq/hyper/lib/docker/graph"
+	"github.com/hyperhq/hyper/lib/portallocator"
+	apiserver "github.com/hyperhq/hyper/server"
+	dm "github.com/hyperhq/hyper/storage/devicemapper"
+	"github.com/hyperhq/hyper/utils"
+	"github.com/hyperhq/runv/hypervisor"
+	"github.com/hyperhq/runv/hypervisor/network"
+	"github.com/hyperhq/runv/hypervisor/types"
+	"github.com/hyperhq/runv/lib/glog"
 
 	"github.com/Unknwon/goconfig"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
-
-type Vm struct {
-	Id                 string
-	Pod                *Pod
-	Status             uint
-	Cpu                int
-	Mem                int
-	qemuChan           interface{}
-	mainQemuClientChan interface{}
-	qemuClientChan     interface{}
-}
-
-type Pod struct {
-	Id            string
-	Name          string
-	Vm            string
-	Wg            *sync.WaitGroup
-	Containers    []*Container
-	Status        uint
-	Type          string
-	RestartPolicy string
-}
-
-type Container struct {
-	Id     string
-	Name   string
-	PodId  string
-	Image  string
-	Cmds   []string
-	Status uint
-}
 
 type Storage struct {
 	StorageType string
@@ -60,35 +33,53 @@ type Storage struct {
 	DmPoolData  *dm.DeviceMapper
 }
 
+type DockerInterface interface {
+	SendCmdCreate(image string, cmds []string, config interface{}) ([]byte, int, error)
+	SendCmdDelete(arg ...string) ([]byte, int, error)
+	SendCmdInfo(args ...string) (*dockertypes.Info, error)
+	SendCmdImages(all string) ([]*dockertypes.Image, error)
+	GetContainerInfo(args ...string) (*dockertypes.ContainerJSONRaw, error)
+	SendCmdPull(image string, config *graph.ImagePullConfig) ([]byte, int, error)
+	SendCmdAuth(body io.ReadCloser) (string, error)
+	SendCmdPush(remote string, ipconfig *graph.ImagePushConfig) error
+	SendImageDelete(args ...string) ([]dockertypes.ImageDelete, error)
+	SendImageBuild(image string, context io.ReadCloser) ([]byte, int, error)
+	SendContainerCommit(args ...string) ([]byte, int, error)
+	Shutdown() error
+	Setup() error
+}
+
 type Daemon struct {
-	ID                string
-	db                *leveldb.DB
-	eng               *engine.Engine
-	dockerCli         *docker.DockerCli
-	containerList     []*Container
-	podList           map[string]*Pod
-	vmList            map[string]*Vm
-	qemuChan          map[string]interface{}
-	qemuClientChan    map[string]interface{}
-	subQemuClientChan map[string]interface{}
-	kernel            string
-	initrd            string
-	bios              string
-	cbfs              string
-	BridgeIface       string
-	BridgeIP          string
-	Host              string
-	Storage           *Storage
+	ID          string
+	db          *leveldb.DB
+	eng         *engine.Engine
+	DockerCli   DockerInterface
+	PodList     map[string]*hypervisor.Pod
+	VmList      map[string]*hypervisor.Vm
+	Kernel      string
+	Initrd      string
+	Bios        string
+	Cbfs        string
+	VboxImage   string
+	BridgeIface string
+	BridgeIP    string
+	Host        string
+	Storage     *Storage
+	Hypervisor  string
 }
 
 // Install installs daemon capabilities to eng.
 func (daemon *Daemon) Install(eng *engine.Engine) error {
 	// Now, we just install a command 'info' to set/get the information of the docker and Hyper daemon
 	for name, method := range map[string]engine.Handler{
+		"auth":              daemon.CmdAuth,
 		"info":              daemon.CmdInfo,
 		"version":           daemon.CmdVersion,
 		"create":            daemon.CmdCreate,
 		"pull":              daemon.CmdPull,
+		"build":             daemon.CmdBuild,
+		"commit":            daemon.CmdCommit,
+		"push":              daemon.CmdPush,
 		"podCreate":         daemon.CmdPodCreate,
 		"podStart":          daemon.CmdPodStart,
 		"podInfo":           daemon.CmdPodInfo,
@@ -103,6 +94,9 @@ func (daemon *Daemon) Install(eng *engine.Engine) error {
 		"tty":               daemon.CmdTty,
 		"serveapi":          apiserver.ServeApi,
 		"acceptconnections": apiserver.AcceptConnections,
+
+		"images":       daemon.CmdImages,
+		"imagesremove": daemon.CmdImagesRemove,
 	} {
 		glog.V(3).Infof("Engine Register: name= %s\n", name)
 		if err := eng.Register(name, method); err != nil {
@@ -140,8 +134,7 @@ func (daemon *Daemon) Restore() error {
 		return err
 	}
 	for k, v := range podList {
-		wg := new(sync.WaitGroup)
-		err = daemon.CreatePod(v, k, wg)
+		err = daemon.CreatePod(k, v, nil, false)
 		if err != nil {
 			glog.Warning("Got a unexpected error, %s", err.Error())
 			continue
@@ -151,7 +144,7 @@ func (daemon *Daemon) Restore() error {
 			glog.V(1).Info(err.Error(), " for ", k)
 			continue
 		}
-		daemon.podList[k].Vm = string(vmId)
+		daemon.PodList[k].Vm = string(vmId)
 	}
 
 	// associate all VMs
@@ -183,10 +176,6 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 			glog.Errorf("portallocator.ReleaseAll(): %s", err.Error())
 		}
 	})
-	// Check that the system is supported and we have sufficient privileges
-	if runtime.GOOS != "linux" {
-		return nil, fmt.Errorf("The Hyper daemon is only supported on linux")
-	}
 	if os.Geteuid() != 0 {
 		return nil, fmt.Errorf("The Hyper daemon needs to be run as root")
 	}
@@ -202,6 +191,8 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 	kernel, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Kernel")
 	initrd, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Initrd")
 	glog.V(0).Infof("The config: kernel=%s, initrd=%s", kernel, initrd)
+	vboxImage, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Vbox")
+	glog.V(0).Infof("The config: vbox image=%s", vboxImage)
 	biface, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Bridge")
 	bridgeip, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "BridgeIP")
 	glog.V(0).Infof("The config: bridge=%s, ip=%s", biface, bridgeip)
@@ -210,26 +201,19 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 	glog.V(0).Infof("The config: bios=%s, cbfs=%s", bios, cbfs)
 	host, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Host")
 
-	var tempdir = "/var/run/hyper/"
+	var tempdir = path.Join(utils.HYPER_ROOT, "run")
 	os.Setenv("TMPDIR", tempdir)
 	if err := os.MkdirAll(tempdir, 0755); err != nil && !os.IsExist(err) {
 		return nil, err
 	}
 
-	var realRoot = "/var/lib/hyper/"
+	var realRoot = path.Join(utils.HYPER_ROOT, "lib")
 	// Create the root directory if it doesn't exists
 	if err := os.MkdirAll(realRoot, 0755); err != nil && !os.IsExist(err) {
 		return nil, err
 	}
 
-	if err := network.InitNetwork(biface, bridgeip); err != nil {
-		glog.Errorf("InitNetwork failed, %s\n", err.Error())
-		return nil, err
-	}
-
 	var (
-		proto   = "unix"
-		addr    = "/var/run/docker.sock"
 		db_file = fmt.Sprintf("%s/hyper.db", realRoot)
 	)
 	db, err := leveldb.OpenFile(db_file, nil)
@@ -237,107 +221,82 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 		glog.Errorf("open leveldb file failed, %s\n", err.Error())
 		return nil, err
 	}
-	dockerCli := docker.NewDockerCli("", proto, addr, nil)
-	qemuchan := map[string]interface{}{}
-	qemuclient := map[string]interface{}{}
-	subQemuClient := map[string]interface{}{}
-	cList := []*Container{}
-	pList := map[string]*Pod{}
-	vList := map[string]*Vm{}
+	dockerCli, err1 := NewDocker()
+	if err1 != nil {
+		glog.Errorf(err1.Error())
+		return nil, err1
+	}
+	pList := map[string]*hypervisor.Pod{}
+	vList := map[string]*hypervisor.Vm{}
 	daemon := &Daemon{
-		ID:                fmt.Sprintf("%d", os.Getpid()),
-		db:                db,
-		eng:               eng,
-		kernel:            kernel,
-		initrd:            initrd,
-		bios:              bios,
-		cbfs:              cbfs,
-		dockerCli:         dockerCli,
-		containerList:     cList,
-		podList:           pList,
-		vmList:            vList,
-		qemuChan:          qemuchan,
-		qemuClientChan:    qemuclient,
-		subQemuClientChan: subQemuClient,
-		Host:              host,
+		ID:          fmt.Sprintf("%d", os.Getpid()),
+		db:          db,
+		eng:         eng,
+		Kernel:      kernel,
+		Initrd:      initrd,
+		Bios:        bios,
+		Cbfs:        cbfs,
+		VboxImage:   vboxImage,
+		DockerCli:   dockerCli,
+		PodList:     pList,
+		VmList:      vList,
+		Host:        host,
+		BridgeIP:    bridgeip,
+		BridgeIface: biface,
 	}
 
 	stor := &Storage{}
 	// Get the docker daemon info
-	body, _, err := dockerCli.SendCmdInfo()
+	sysinfo, err := dockerCli.SendCmdInfo()
 	if err != nil {
 		return nil, err
 	}
-	outInfo := engine.NewOutput()
-	remoteInfo, err := outInfo.AddEnv()
-	if err != nil {
-		return nil, err
-	}
-	if _, err := outInfo.Write(body); err != nil {
-		return nil, fmt.Errorf("Error while reading remote info!\n")
-	}
-	outInfo.Close()
-	storageDriver := remoteInfo.Get("Driver")
+	storageDriver := sysinfo.Driver
 	stor.StorageType = storageDriver
 	if storageDriver == "devicemapper" {
-		if remoteInfo.Exists("DriverStatus") {
-			var driverStatus [][2]string
-			if err := remoteInfo.GetJson("DriverStatus", &driverStatus); err != nil {
-				return nil, err
+		for _, pair := range sysinfo.DriverStatus {
+			if pair[0] == "Pool Name" {
+				stor.PoolName = pair[1]
 			}
-			for _, pair := range driverStatus {
-				if pair[0] == "Pool Name" {
-					stor.PoolName = pair[1]
+			if pair[0] == "Backing Filesystem" {
+				if strings.Contains(pair[1], "ext") {
+					stor.Fstype = "ext4"
+				} else if strings.Contains(pair[1], "xfs") {
+					stor.Fstype = "xfs"
+				} else {
+					stor.Fstype = "dir"
 				}
-				if pair[0] == "Backing Filesystem" {
-					if strings.Contains(pair[1], "ext") {
-						stor.Fstype = "ext4"
-					} else if strings.Contains(pair[1], "xfs") {
-						stor.Fstype = "xfs"
-					} else {
-						stor.Fstype = "dir"
-					}
-					break
-				}
+				break
 			}
 		}
 	} else if storageDriver == "aufs" {
-		if remoteInfo.Exists("DriverStatus") {
-			var driverStatus [][2]string
-			if err := remoteInfo.GetJson("DriverStatus", &driverStatus); err != nil {
-				return nil, err
+		for _, pair := range sysinfo.DriverStatus {
+			if pair[0] == "Root Dir" {
+				stor.RootPath = pair[1]
 			}
-			for _, pair := range driverStatus {
-				if pair[0] == "Root Dir" {
-					stor.RootPath = pair[1]
-				}
-				if pair[0] == "Backing Filesystem" {
-					stor.Fstype = "dir"
-					break
-				}
+			if pair[0] == "Backing Filesystem" {
+				stor.Fstype = "dir"
+				break
 			}
 		}
 	} else if storageDriver == "overlay" {
-		if remoteInfo.Exists("DriverStatus") {
-			var driverStatus [][1]string
-			if err := remoteInfo.GetJson("DriverStatus", &driverStatus); err != nil {
-				return nil, err
-			}
-			for _, pair := range driverStatus {
-				if pair[0] == "Backing Filesystem" {
-					stor.Fstype = "dir"
-					break
-				}
+		for _, pair := range sysinfo.DriverStatus {
+			if pair[0] == "Backing Filesystem" {
+				stor.Fstype = "dir"
+				break
 			}
 		}
-		stor.RootPath = "/var/lib/docker/overlay"
+		stor.RootPath = path.Join(utils.HYPER_ROOT, "overlay")
+	} else if storageDriver == "vbox" {
+		stor.Fstype = "ext4"
+		stor.RootPath = path.Join(utils.HYPER_ROOT, "vbox")
 	} else {
 		return nil, fmt.Errorf("hyperd can not support docker's backing storage: %s", storageDriver)
 	}
 	daemon.Storage = stor
 	dmPool := dm.DeviceMapper{
-		Datafile:         "/var/lib/hyper/data",
-		Metadatafile:     "/var/lib/hyper/metadata",
+		Datafile:         path.Join(utils.HYPER_ROOT, "lib") + "/data",
+		Metadatafile:     path.Join(utils.HYPER_ROOT, "lib") + "/metadata",
 		DataLoopFile:     "/dev/loop6",
 		MetadataLoopFile: "/dev/loop7",
 		PoolName:         "hyper-volume-pool",
@@ -361,6 +320,16 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 	return daemon, nil
 }
 
+func (daemon *Daemon) InitNetwork(driver hypervisor.HypervisorDriver, biface, bridgeip string) error {
+	err := driver.InitNetwork(biface, bridgeip)
+
+	if err == os.ErrNotExist {
+		err = network.InitNetwork(biface, bridgeip)
+	}
+
+	return err
+}
+
 func (daemon *Daemon) GetPodNum() int64 {
 	iter := daemon.db.NewIterator(util.BytesPrefix([]byte("pod-")), nil)
 	var i int64 = 0
@@ -381,7 +350,7 @@ func (daemon *Daemon) GetPodNum() int64 {
 
 func (daemon *Daemon) GetRunningPodNum() int64 {
 	var num int64 = 0
-	for _, v := range daemon.podList {
+	for _, v := range daemon.PodList {
 		if v.Status == types.S_POD_RUNNING {
 			num++
 		}
@@ -500,10 +469,10 @@ func (daemon *Daemon) DeleteVolumeId(podId string) error {
 	}
 	return nil
 }
-func (daemon *Daemon) WritePodAndContainers(podName string) error {
-	key := fmt.Sprintf("pod-container-%s", podName)
+func (daemon *Daemon) WritePodAndContainers(podId string) error {
+	key := fmt.Sprintf("pod-container-%s", podId)
 	value := ""
-	for _, c := range daemon.podList[podName].Containers {
+	for _, c := range daemon.PodList[podId].Containers {
 		if value == "" {
 			value = c.Id
 		} else {
@@ -586,122 +555,41 @@ func (daemon *Daemon) DeleteVmByPod(podId string) error {
 }
 
 func (daemon *Daemon) GetPodVmByName(podName string) (string, error) {
-	pod := daemon.podList[podName]
+	pod := daemon.PodList[podName]
 	if pod == nil {
 		return "", fmt.Errorf("Not found VM for pod(%s)", podName)
 	}
 	return pod.Vm, nil
 }
 
-func (daemon *Daemon) GetQemuChan(vmid string) (interface{}, interface{}, interface{}, error) {
-	if daemon.qemuChan[vmid] != nil && daemon.qemuClientChan[vmid] != nil {
-		return daemon.qemuChan[vmid], daemon.qemuClientChan[vmid], daemon.subQemuClientChan[vmid], nil
-	}
-	return nil, nil, nil, fmt.Errorf("Can not find the Qemu chan for pod: %s!", vmid)
-}
-
-func (daemon *Daemon) DeleteQemuChan(vmid string) error {
-	if daemon.qemuChan[vmid] != nil {
-		delete(daemon.qemuChan, vmid)
-	}
-	if daemon.qemuClientChan[vmid] != nil {
-		delete(daemon.qemuClientChan, vmid)
-	}
-	if daemon.subQemuClientChan[vmid] != nil {
-		delete(daemon.subQemuClientChan, vmid)
-	}
-
-	return nil
-}
-
-func (daemon *Daemon) SetQemuChan(vmid string, qemuchan, qemuclient, subQemuClient interface{}) error {
-	if daemon.qemuChan[vmid] == nil {
-		if qemuchan != nil {
-			daemon.qemuChan[vmid] = qemuchan
-		}
-		if qemuclient != nil {
-			daemon.qemuClientChan[vmid] = qemuclient
-		}
-		if subQemuClient != nil {
-			daemon.subQemuClientChan[vmid] = subQemuClient
-		}
-		return nil
-	}
-	return fmt.Errorf("Already find a Qemu chan for vm: %s!", vmid)
-}
-
-func (daemon *Daemon) SetPodByContainer(containerId, podId, name, image string, cmds []string, status uint) error {
-	container := &Container{
-		Id:     containerId,
-		Name:   name,
-		PodId:  podId,
-		Image:  image,
-		Cmds:   cmds,
-		Status: status,
-	}
-	daemon.containerList = append(daemon.containerList, container)
-
-	return nil
-}
-
 func (daemon *Daemon) GetPodByContainer(containerId string) (string, error) {
-	var c *Container
-	for _, c = range daemon.containerList {
-		if c.Id == containerId {
-			break
-		}
-	}
-	if c.Id != containerId {
-		return "", fmt.Errorf("Can not find that container!")
-	}
+	var c *hypervisor.Container = nil
 
-	return c.PodId, nil
-}
-
-func (daemon *Daemon) AddPod(pod *Pod) {
-	daemon.podList[pod.Id] = pod
-}
-
-func (daemon *Daemon) RemovePod(podId string) {
-	for _, c := range daemon.podList[podId].Containers {
-		for i, cl := range daemon.containerList {
-			if cl.Id == c.Id {
-				daemon.containerList = append(daemon.containerList[:i], daemon.containerList[i+1:]...)
+	for _, p := range daemon.PodList {
+		for _, c = range p.Containers {
+			if c.Id == containerId {
+				return p.Id, nil
 			}
 		}
 	}
-	delete(daemon.podList, podId)
+
+	return "", fmt.Errorf("Can not find that container!")
 }
 
-func (daemon *Daemon) AddVm(vm *Vm) {
-	daemon.vmList[vm.Id] = vm
+func (daemon *Daemon) AddPod(pod *hypervisor.Pod) {
+	daemon.PodList[pod.Id] = pod
+}
+
+func (daemon *Daemon) RemovePod(podId string) {
+	delete(daemon.PodList, podId)
+}
+
+func (daemon *Daemon) AddVm(vm *hypervisor.Vm) {
+	daemon.VmList[vm.Id] = vm
 }
 
 func (daemon *Daemon) RemoveVm(vmId string) {
-	delete(daemon.vmList, vmId)
-}
-
-func (daemon *Daemon) SetContainerStatus(podId string, status uint) {
-	for _, c := range daemon.podList[podId].Containers {
-		c.Status = status
-	}
-}
-
-func (daemon *Daemon) SetPodContainerStatus(podId string, data []uint32) {
-	failure := 0
-	for i, c := range daemon.podList[podId].Containers {
-		if data[i] != 0 {
-			failure++
-			c.Status = types.S_POD_FAILED
-		} else {
-			c.Status = types.S_POD_SUCCEEDED
-		}
-	}
-	if failure == 0 {
-		daemon.podList[podId].Status = types.S_POD_SUCCEEDED
-	} else {
-		daemon.podList[podId].Status = types.S_POD_FAILED
-	}
+	delete(daemon.VmList, vmId)
 }
 
 func (daemon *Daemon) UpdateVmData(vmId string, data []byte) error {
@@ -756,7 +644,7 @@ func (daemon *Daemon) CleanVolume(stop int) error {
 
 func (daemon *Daemon) DestroyAllVm() error {
 	glog.V(0).Info("The daemon will stop all pod")
-	for _, pod := range daemon.podList {
+	for _, pod := range daemon.PodList {
 		daemon.StopPod(pod.Id, "yes")
 	}
 	iter := daemon.db.NewIterator(util.BytesPrefix([]byte("vm-")), nil)
@@ -784,12 +672,20 @@ func (daemon *Daemon) DestroyAndKeepVm() error {
 func (daemon *Daemon) shutdown() error {
 	glog.V(0).Info("The daemon will be shutdown")
 	glog.V(0).Info("Shutdown all VMs")
-	for vm, _ := range daemon.vmList {
+	for vm := range daemon.VmList {
 		daemon.KillVm(vm)
 	}
 	daemon.db.Close()
 	glog.Flush()
 	return nil
+}
+
+func NewDocker() (DockerInterface, error) {
+	return NewDockerImpl()
+}
+
+var NewDockerImpl = func() (DockerInterface, error) {
+	return nil, fmt.Errorf("no docker create function")
 }
 
 // Now, the daemon can be ran for any linux kernel

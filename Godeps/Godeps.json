@@ -1,10 +1,48 @@
 {
-	"ImportPath": "hyper",
-	"GoVersion": "go1.2.1",
+	"ImportPath": "github.com/hyperhq/hyper",
+	"GoVersion": "go1.4.1",
 	"Deps": [
+		{
+			"ImportPath": "code.google.com/p/gosqlite/sqlite3",
+			"Rev": "c8f3509288e5f36cd7bc4e1d4c9b17cc21a1fdd1"
+		},
 		{
 			"ImportPath": "github.com/Unknwon/goconfig",
 			"Rev": "5cfc02f2789e6e98d8546e40b29d907aedc4c590"
+		},
+		{
+			"ImportPath": "github.com/docker/distribution/digest",
+			"Comment": "v2.1.0-rc.0",
+			"Rev": "a0c63372fad430b7ab08d2763cb7d9e2c512c384"
+		},
+		{
+			"ImportPath": "github.com/docker/distribution/registry/api/errcode",
+			"Comment": "v2.1.0-rc.0",
+			"Rev": "a0c63372fad430b7ab08d2763cb7d9e2c512c384"
+		},
+		{
+			"ImportPath": "github.com/docker/distribution/registry/api/v2",
+			"Comment": "v2.1.0-rc.0",
+			"Rev": "a0c63372fad430b7ab08d2763cb7d9e2c512c384"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/pkg/tarsum",
+			"Comment": "v1.4.1-3973-ga63c7c7",
+			"Rev": "a63c7c7be678880fb5c11f3c9cb7b3029d132b7f"
+													},
+		{
+			"ImportPath": "github.com/docker/libcontainer/label",
+			"Comment": "v2.2.1-23-g83a102c",
+			"Rev": "83a102cc68a09d890cce3b6c2e5c14c49e6373a0"
+		},
+		{
+			"ImportPath": "github.com/docker/libcontainer/user",
+			"Comment": "v2.2.1-23-g83a102c",
+			"Rev": "83a102cc68a09d890cce3b6c2e5c14c49e6373a0"
+		},
+		{
+			"ImportPath": "github.com/docker/libtrust",
+			"Rev": "9cbd2a1374f46905c68a4eb3694a130610adc62a"
 		},
 		{
 			"ImportPath": "github.com/gorilla/context",
@@ -20,12 +58,21 @@
 			"Rev": "5e118789801496c93ba210d34ef1f2ce5a9173bd"
 		},
 		{
+			"ImportPath": "github.com/opencontainers/specs",
+			"Rev": "7357ab16e8a68a33b3a0b150af65bc06e2bc17ae"
+		},
+		{
+			"ImportPath": "github.com/syndtr/gosnappy",
+			"Rev": "156a073208e131d7d2e212cb749feae7c339e846"
+		},
+		{
 			"ImportPath": "github.com/syndtr/goleveldb/leveldb",
 			"Rev": "4875955338b0a434238a31165cb87255ab6e9e4a"
 		},
 		{
-			"ImportPath": "github.com/syndtr/gosnappy/snappy",
-			"Rev": "156a073208e131d7d2e212cb749feae7c339e846"
+			"ImportPath": "github.com/tchap/go-patricia/patricia",
+			"Comment": "v2.2.0",
+			"Rev": "a560f85131e8aafc2cc4bcb1e265ae3fc6ee5f50"
 		},
 		{
 			"ImportPath": "gopkg.in/yaml.v2",

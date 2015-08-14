@@ -1,85 +1,46 @@
 package daemon
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
 
-	"hyper/engine"
-	"hyper/hypervisor"
-	"hyper/hypervisor/qemu"
-	"hyper/hypervisor/xen"
-	"hyper/lib/glog"
-	"hyper/pod"
-	"hyper/types"
+	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/runv/hypervisor"
+	"github.com/hyperhq/runv/hypervisor/pod"
+	"github.com/hyperhq/runv/hypervisor/types"
+	"github.com/hyperhq/runv/lib/glog"
 )
-
-var hypervisorDriver hypervisor.HypervisorDriver = DriversProbe()
-
-func DriversProbe() hypervisor.HypervisorDriver {
-	xd := xen.InitDriver()
-	if xd != nil {
-		glog.Info("Xen Driver Loaded.")
-		return xd
-	}
-
-	qd := &qemu.QemuDriver{}
-	if err := qd.Initialize(); err == nil {
-		glog.Info("Qemu Driver Loaded")
-		return qd
-	} else {
-		glog.Info("Qemu Driver Load failed: ", err.Error())
-	}
-
-	glog.Error("No driver available")
-	return nil
-}
 
 func (daemon *Daemon) CmdVmCreate(job *engine.Job) (err error) {
 	var (
-		vmId          = fmt.Sprintf("vm-%s", pod.RandStr(10, "alpha"))
-		qemuPodEvent  = make(chan hypervisor.VmEvent, 128)
-		qemuStatus    = make(chan *types.QemuResponse, 128)
-		subQemuStatus = make(chan *types.QemuResponse, 128)
-		cpu           = 1
-		mem           = 128
+		vmId = fmt.Sprintf("vm-%s", pod.RandStr(10, "alpha"))
+		vm   *hypervisor.Vm
+		cpu  = 1
+		mem  = 128
 	)
+
 	if job.Args[0] != "" {
 		cpu, err = strconv.Atoi(job.Args[0])
 		if err != nil {
 			return err
 		}
 	}
+
 	if job.Args[1] != "" {
 		mem, err = strconv.Atoi(job.Args[1])
 		if err != nil {
 			return err
 		}
 	}
-	b := &hypervisor.BootConfig{
-		CPU:    cpu,
-		Memory: mem,
-		Kernel: daemon.kernel,
-		Initrd: daemon.initrd,
-		Bios:   daemon.bios,
-		Cbfs:   daemon.cbfs,
-	}
-	go hypervisor.VmLoop(hypervisorDriver, vmId, qemuPodEvent, qemuStatus, b)
-	if err := daemon.SetQemuChan(vmId, qemuPodEvent, qemuStatus, subQemuStatus); err != nil {
-		glog.V(1).Infof("SetQemuChan error: %s", err.Error())
+
+	vm, err = daemon.StartVm(vmId, cpu, mem, true, 0)
+	if err != nil {
 		return err
 	}
 
-	vm := &Vm{
-		Id:     vmId,
-		Pod:    nil,
-		Status: types.S_VM_IDLE,
-		Cpu:    cpu,
-		Mem:    mem,
-	}
 	daemon.AddVm(vm)
 
-	// Prepare the qemu status to client
+	// Prepare the VM status to client
 	v := &engine.Env{}
 	v.Set("ID", vmId)
 	v.SetInt("Code", 0)
@@ -93,7 +54,7 @@ func (daemon *Daemon) CmdVmCreate(job *engine.Job) (err error) {
 
 func (daemon *Daemon) CmdVmKill(job *engine.Job) error {
 	vmId := job.Args[0]
-	if _, ok := daemon.vmList[vmId]; !ok {
+	if _, ok := daemon.VmList[vmId]; !ok {
 		return fmt.Errorf("Can not find the VM(%s)", vmId)
 	}
 	code, cause, err := daemon.KillVm(vmId)
@@ -101,7 +62,7 @@ func (daemon *Daemon) CmdVmKill(job *engine.Job) error {
 		return err
 	}
 
-	// Prepare the qemu status to client
+	// Prepare the VM status to client
 	v := &engine.Env{}
 	v.Set("ID", vmId)
 	v.SetInt("Code", code)
@@ -114,179 +75,132 @@ func (daemon *Daemon) CmdVmKill(job *engine.Job) error {
 }
 
 func (daemon *Daemon) KillVm(vmId string) (int, string, error) {
-	qemuPodEvent, qemuStatus, subQemuStatus, err := daemon.GetQemuChan(vmId)
-	if err != nil {
-		return -1, "", err
+	vm, ok := daemon.VmList[vmId]
+	if !ok {
+		return 0, "", nil
 	}
-	var qemuResponse *types.QemuResponse
-	shutdownPodEvent := &hypervisor.ShutdownCommand{Wait: false}
-	qemuPodEvent.(chan hypervisor.VmEvent) <- shutdownPodEvent
-	// wait for the qemu response
-	for {
-		stop := 0
-		select {
-		case qemuResponse = <-qemuStatus.(chan *types.QemuResponse):
-			glog.V(1).Infof("Got response: %d: %s", qemuResponse.Code, qemuResponse.Cause)
-			if qemuResponse.Code == types.E_VM_SHUTDOWN {
-				stop = 1
-			}
-		case qemuResponse = <-subQemuStatus.(chan *types.QemuResponse):
-			glog.V(1).Infof("Got response: %d: %s", qemuResponse.Code, qemuResponse.Cause)
-			if qemuResponse.Code == types.E_VM_SHUTDOWN {
-				stop = 1
-			}
-		}
-		if stop == 1 {
-			break
-		}
+	ret1, ret2, err := vm.Kill()
+	if err == nil {
+		daemon.RemoveVm(vmId)
 	}
-	close(qemuStatus.(chan *types.QemuResponse))
-	close(subQemuStatus.(chan *types.QemuResponse))
-	daemon.RemoveVm(vmId)
-	daemon.DeleteQemuChan(vmId)
-
-	return qemuResponse.Code, qemuResponse.Cause, nil
+	return ret1, ret2, err
 }
 
 // This function will only be invoked during daemon start
 func (daemon *Daemon) AssociateAllVms() error {
-	for _, mypod := range daemon.podList {
+	for _, mypod := range daemon.PodList {
 		if mypod.Vm == "" {
 			continue
 		}
-		data, err := daemon.GetPodByName(mypod.Id)
+		podData, err := daemon.GetPodByName(mypod.Id)
 		if err != nil {
 			continue
 		}
-		userPod, err := pod.ProcessPodBytes(data)
+		userPod, err := pod.ProcessPodBytes(podData)
 		if err != nil {
 			continue
 		}
 		glog.V(1).Infof("Associate the POD(%s) with VM(%s)", mypod.Id, mypod.Vm)
-		var (
-			qemuPodEvent  = make(chan hypervisor.VmEvent, 128)
-			qemuStatus    = make(chan *types.QemuResponse, 128)
-			subQemuStatus = make(chan *types.QemuResponse, 128)
-		)
-		data, err = daemon.GetVmData(mypod.Vm)
+
+		vmData, err := daemon.GetVmData(mypod.Vm)
 		if err != nil {
 			continue
 		}
-		glog.V(1).Infof("The data for vm(%s) is %v", mypod.Vm, data)
-		go hypervisor.VmAssociate(hypervisorDriver, mypod.Vm, qemuPodEvent,
-			qemuStatus, mypod.Wg, data)
-		ass := <-qemuStatus
-		if ass.Code != types.E_OK {
-			glog.Errorf("cannot associate with vm: %s, error status %d (%s)", mypod.Vm, ass.Code, ass.Cause)
-			return errors.New("load vm status failed")
+		glog.V(1).Infof("The data for vm(%s) is %v", mypod.Vm, vmData)
+
+		vm := daemon.NewVm(mypod.Vm, userPod.Resource.Vcpu, userPod.Resource.Memory, false, types.VM_KEEP_NONE)
+
+		err = vm.AssociateVm(mypod, vmData)
+		if err != nil {
+			continue
 		}
-		if err := daemon.SetQemuChan(mypod.Vm, qemuPodEvent, qemuStatus, subQemuStatus); err != nil {
-			glog.V(1).Infof("SetQemuChan error: %s", err.Error())
-			return err
-		}
-		vm := &Vm{
-			Id:     mypod.Vm,
-			Pod:    mypod,
-			Status: types.S_VM_ASSOCIATED,
-			Cpu:    userPod.Resource.Vcpu,
-			Mem:    userPod.Resource.Memory,
-		}
+
 		daemon.AddVm(vm)
-		daemon.SetContainerStatus(mypod.Id, types.S_POD_RUNNING)
-		mypod.Status = types.S_POD_RUNNING
-		go func(interface{}) {
-			for {
-				podId := mypod.Id
-				qemuResponse := <-qemuStatus
-				subQemuStatus <- qemuResponse
-				if qemuResponse.Code == types.E_POD_FINISHED {
-					data := qemuResponse.Data.([]uint32)
-					daemon.SetPodContainerStatus(podId, data)
-				} else if qemuResponse.Code == types.E_VM_SHUTDOWN {
-					if daemon.podList[mypod.Id].Status == types.S_POD_RUNNING {
-						daemon.podList[mypod.Id].Status = types.S_POD_SUCCEEDED
-						daemon.SetContainerStatus(podId, types.S_POD_SUCCEEDED)
-					}
-					daemon.podList[mypod.Id].Vm = ""
-					daemon.RemoveVm(mypod.Vm)
-					daemon.DeleteQemuChan(mypod.Vm)
-					if mypod.Type == "kubernetes" {
-						switch mypod.Status {
-						case types.S_POD_SUCCEEDED:
-							if mypod.RestartPolicy == "always" {
-								daemon.RestartPod(mypod)
-							} else {
-								daemon.DeletePodFromDB(podId)
-								for _, c := range mypod.Containers {
-									glog.V(1).Infof("Ready to rm container: %s", c.Id)
-									if _, _, err = daemon.dockerCli.SendCmdDelete(c.Id); err != nil {
-										glog.V(1).Infof("Error to rm container: %s", err.Error())
-									}
-								}
-								//								daemon.RemovePod(podId)
-								daemon.DeletePodContainerFromDB(podId)
-								daemon.DeleteVolumeId(podId)
-							}
-							break
-						case types.S_POD_FAILED:
-							if mypod.RestartPolicy != "never" {
-								daemon.RestartPod(mypod)
-							} else {
-								daemon.DeletePodFromDB(podId)
-								for _, c := range mypod.Containers {
-									glog.V(1).Infof("Ready to rm container: %s", c.Id)
-									if _, _, err = daemon.dockerCli.SendCmdDelete(c.Id); err != nil {
-										glog.V(1).Infof("Error to rm container: %s", err.Error())
-									}
-								}
-								//								daemon.RemovePod(podId)
-								daemon.DeletePodContainerFromDB(podId)
-								daemon.DeleteVolumeId(podId)
-							}
-							break
-						default:
-							break
-						}
-					}
-					break
-				}
-			}
-		}(subQemuStatus)
 	}
 	return nil
 }
 
 func (daemon *Daemon) ReleaseAllVms() (int, error) {
-	var qemuResponse *types.QemuResponse
-	for vmId, vm := range daemon.vmList {
-		qemuPodEvent, _, qemuStatus, err := daemon.GetQemuChan(vmId)
+	var (
+		ret       = types.E_OK
+		err error = nil
+	)
+
+	for _, vm := range daemon.VmList {
+		ret, err = vm.ReleaseVm()
 		if err != nil {
-			return -1, err
+			/* FIXME: continue to release other vms? */
+			break
 		}
-		if vm.Status == types.S_VM_IDLE {
-			shutdownPodEvent := &hypervisor.ShutdownCommand{Wait: false}
-			qemuPodEvent.(chan hypervisor.VmEvent) <- shutdownPodEvent
-			for {
-				qemuResponse = <-qemuStatus.(chan *types.QemuResponse)
-				if qemuResponse.Code == types.E_VM_SHUTDOWN {
-					break
-				}
+	}
+
+	return ret, err
+}
+
+func (daemon *Daemon) StartVm(vmId string, cpu, mem int, lazy bool, keep int) (*hypervisor.Vm, error) {
+	b := &hypervisor.BootConfig{
+		CPU:    cpu,
+		Memory: mem,
+		Kernel: daemon.Kernel,
+		Initrd: daemon.Initrd,
+		Bios:   daemon.Bios,
+		Cbfs:   daemon.Cbfs,
+		Vbox:   daemon.VboxImage,
+	}
+
+	vm := daemon.NewVm(vmId, cpu, mem, lazy, keep)
+
+	err := vm.Launch(b)
+	if err != nil {
+		return nil, err
+	}
+	_, r1, r2, err1 := vm.GetVmChan()
+	if err1 != nil {
+		return nil, err1
+	}
+	vmStatus := r1.(chan *types.VmResponse)
+	subVmStatus := r2.(chan *types.VmResponse)
+	go func(interface{}) {
+		defer func() {
+			err := recover()
+			if err != nil {
+				glog.Warning("panic during send shutdown message to channel")
 			}
-			close(qemuStatus.(chan *types.QemuResponse))
-		} else {
-			releasePodEvent := &hypervisor.ReleaseVMCommand{}
-			qemuPodEvent.(chan hypervisor.VmEvent) <- releasePodEvent
-			for {
-				qemuResponse = <-qemuStatus.(chan *types.QemuResponse)
-				if qemuResponse.Code == types.E_VM_SHUTDOWN ||
-					qemuResponse.Code == types.E_OK {
-					break
-				}
-				if qemuResponse.Code == types.E_BUSY {
-					return types.E_BUSY, fmt.Errorf("VM busy")
-				}
+		}()
+		for {
+			vmResponse := <-vmStatus
+			subVmStatus <- vmResponse
+		}
+	}(subVmStatus)
+	var vmResponse *types.VmResponse
+	for {
+		vmResponse = <-subVmStatus
+		glog.V(1).Infof("Get the response from VM, VM id is %s, response code is %d!", vmResponse.VmId, vmResponse.Code)
+		if vmResponse.VmId == vmId {
+			if vmResponse.Code == types.E_VM_RUNNING {
+				glog.Infof("Got E_VM_RUNNING code response")
+				break
+			} else {
+				break
 			}
 		}
 	}
-	return types.E_OK, nil
+	if vmResponse.Code != types.E_VM_RUNNING {
+		return nil, fmt.Errorf("Vbox does not start successfully")
+	}
+	return vm, nil
+}
+
+func (daemon *Daemon) NewVm(id string, cpu, memory int, lazy bool, keep int) *hypervisor.Vm {
+	vmId := id
+
+	if vmId == "" {
+		for {
+			vmId = fmt.Sprintf("vm-%s", pod.RandStr(10, "alpha"))
+			if _, ok := daemon.VmList[vmId]; !ok {
+				break
+			}
+		}
+	}
+	return hypervisor.NewVm(vmId, cpu, memory, lazy, keep)
 }
