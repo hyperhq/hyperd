@@ -38,9 +38,6 @@ func (daemon *Daemon) StopPod(podId, stopVm string) (int, string, error) {
 		glog.Errorf("Can not find pod(%s)", podId)
 		return -1, "", fmt.Errorf("Can not find pod(%s)", podId)
 	}
-	if mypod.Status != types.S_POD_RUNNING {
-		return -1, "", fmt.Errorf("The POD %s has aleady stopped, can not stop again!", podId)
-	}
 	vmid, err := daemon.GetPodVmByName(podId)
 	if err != nil {
 		return -1, "", err
