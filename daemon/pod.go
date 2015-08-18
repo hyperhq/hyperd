@@ -62,10 +62,7 @@ func (daemon *Daemon) CmdPodStart(job *engine.Job) error {
 	if _, ok := daemon.PodList[podId]; !ok {
 		return fmt.Errorf("The pod(%s) can not be found, please create it first", podId)
 	}
-	var lazy = false
-	if daemon.Hypervisor == "vbox" && vmId == "" {
-		lazy = true
-	}
+	var lazy bool = hypervisor.HDriver.SupportLazyMode() && vmId == ""
 
 	code, cause, err := daemon.StartPod(podId, "", vmId, nil, lazy, false, types.VM_KEEP_NONE)
 	if err != nil {
@@ -100,10 +97,7 @@ func (daemon *Daemon) CmdPodRun(job *engine.Job) error {
 
 	glog.Info(podArgs)
 
-	var lazy = false
-	if daemon.Hypervisor == "vbox" {
-		lazy = true
-	}
+	var lazy bool = hypervisor.HDriver.SupportLazyMode()
 
 	code, cause, err := daemon.StartPod(podId, podArgs, "", nil, lazy, autoremove, types.VM_KEEP_NONE)
 	if err != nil {
@@ -605,10 +599,7 @@ func (daemon *Daemon) RestartPod(mypod *hypervisor.Pod) error {
 	if err != nil {
 		return err
 	}
-	var lazy = false
-	if daemon.Hypervisor == "vbox" {
-		lazy = true
-	}
+	var lazy bool = hypervisor.HDriver.SupportLazyMode()
 
 	// Start the pod
 	_, _, err = daemon.StartPod(mypod.Id, string(podData), "", nil, lazy, false, types.VM_KEEP_NONE)
