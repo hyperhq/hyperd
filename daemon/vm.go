@@ -33,7 +33,7 @@ func (daemon *Daemon) CmdVmCreate(job *engine.Job) (err error) {
 		}
 	}
 
-	vm, err = daemon.StartVm(vmId, cpu, mem, true, 0)
+	vm, err = daemon.StartVm(vmId, cpu, mem, false, 0)
 	if err != nil {
 		return err
 	}
