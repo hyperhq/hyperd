@@ -54,4 +54,3 @@ mac_installer/dist/opt/hyper/bin/hyper
 mac_installer/dist/opt/hyper/bin/hyperd
 *.bak
 mac_installer/dist/opt/hyper/examples/*
-
