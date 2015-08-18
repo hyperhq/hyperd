@@ -83,6 +83,5 @@ func MakePod(podName, image, workdir, src, vol, shellDir string, cmds, entrys []
 	if err != nil {
 		return "", err
 	}
-	fmt.Println(string(jsonString))
 	return string(jsonString), nil
 }
