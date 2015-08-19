@@ -98,7 +98,9 @@ func (cli *HyperClient) HyperCmdList(args ...string) error {
 		fmt.Printf("%-66s%15s%10s\n", "Container ID", "POD ID", "Status")
 		for _, c := range containerResponse {
 			fields := strings.Split(c, ":")
-			fmt.Printf("%-66s%15s%10s\n", fields[0], fields[1], fields[2])
+			if len(fields) >= 3 {
+				fmt.Printf("%-66s%15s%10s\n", fields[0], fields[1], fields[2])
+			}
 		}
 	}
 	return nil
