@@ -95,10 +95,16 @@ func (cli *HyperClient) HyperCmdList(args ...string) error {
 	}
 
 	if item == "container" {
-		fmt.Printf("%-66s%15s%10s\n", "Container ID", "POD ID", "Status")
+		fmt.Printf("%-66s%-20s%15s%10s\n", "Container ID", "Name", "POD ID", "Status")
 		for _, c := range containerResponse {
 			fields := strings.Split(c, ":")
-			fmt.Printf("%-66s%15s%10s\n", fields[0], fields[1], fields[2])
+			name := fields[1]
+			if len(name) > 0 {
+				if name[0] == '/' {
+					name = name[1:]
+				}
+			}
+			fmt.Printf("%-66s%-20s%15s%10s\n", fields[0], name, fields[2], fields[3])
 		}
 	}
 	return nil

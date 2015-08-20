@@ -259,7 +259,7 @@ func (cli *HyperClient) GetContainerByPod(podId string) (string, error) {
 	for _, c := range containerResponse {
 		fields := strings.Split(c, ":")
 		containerId := fields[0]
-		if podId == fields[1] {
+		if podId == fields[2] {
 			return containerId, nil
 		}
 	}

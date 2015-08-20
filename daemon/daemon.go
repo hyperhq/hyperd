@@ -34,7 +34,7 @@ type Storage struct {
 }
 
 type DockerInterface interface {
-	SendCmdCreate(image string, cmds []string, config interface{}) ([]byte, int, error)
+	SendCmdCreate(name, image string, cmds []string, config interface{}) ([]byte, int, error)
 	SendCmdDelete(arg ...string) ([]byte, int, error)
 	SendCmdInfo(args ...string) (*dockertypes.Info, error)
 	SendCmdImages(all string) ([]*dockertypes.Image, error)
@@ -45,6 +45,7 @@ type DockerInterface interface {
 	SendImageDelete(args ...string) ([]dockertypes.ImageDelete, error)
 	SendImageBuild(image string, context io.ReadCloser) ([]byte, int, error)
 	SendContainerCommit(args ...string) ([]byte, int, error)
+	SendContainerRename(oName, nName string) error
 	Shutdown() error
 	Setup() error
 }
@@ -79,6 +80,7 @@ func (daemon *Daemon) Install(eng *engine.Engine) error {
 		"pull":              daemon.CmdPull,
 		"build":             daemon.CmdBuild,
 		"commit":            daemon.CmdCommit,
+		"rename":            daemon.CmdRename,
 		"push":              daemon.CmdPush,
 		"podCreate":         daemon.CmdPodCreate,
 		"podStart":          daemon.CmdPodStart,
