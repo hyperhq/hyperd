@@ -286,8 +286,7 @@ func (b *Builder) runContextCommand(args []string, allowRemote bool, allowDecomp
 	vm, ok := b.Hyperdaemon.VmList[b.Name]
 	if !ok {
 		glog.Warningf("can not find VM(%s)", b.Name)
-	}
-	if !ok || vm.Status == types.S_VM_IDLE {
+
 		bo := &hypervisor.BootConfig{
 			CPU:    1,
 			Memory: 512,
@@ -295,6 +294,7 @@ func (b *Builder) runContextCommand(args []string, allowRemote bool, allowDecomp
 			Initrd: b.Hyperdaemon.Initrd,
 			Bios:   b.Hyperdaemon.Bios,
 			Cbfs:   b.Hyperdaemon.Cbfs,
+			Vbox:   b.Hyperdaemon.VboxImage,
 		}
 
 		vm = b.Hyperdaemon.NewVm(b.Name, 1, 512, false, types.VM_KEEP_AFTER_FINISH)
@@ -305,6 +305,8 @@ func (b *Builder) runContextCommand(args []string, allowRemote bool, allowDecomp
 		}
 
 		b.Hyperdaemon.AddVm(vm)
+	}
+	if vm.Status == types.S_VM_IDLE {
 		code, cause, err := b.Hyperdaemon.StartPod(podId, "", b.Name, nil, false, false, types.VM_KEEP_AFTER_FINISH)
 		if err != nil {
 			glog.Errorf("Code is %d, Cause is %s, %s", code, cause, err.Error())
@@ -704,8 +706,27 @@ func (b *Builder) run(c *daemon.Container) error {
 	vm, ok := b.Hyperdaemon.VmList[b.Name]
 	if !ok {
 		glog.Warningf("can not find VM(%s)", b.Name)
+
+		bo := &hypervisor.BootConfig{
+			CPU:    1,
+			Memory: 512,
+			Kernel: b.Hyperdaemon.Kernel,
+			Initrd: b.Hyperdaemon.Initrd,
+			Bios:   b.Hyperdaemon.Bios,
+			Cbfs:   b.Hyperdaemon.Cbfs,
+			Vbox:   b.Hyperdaemon.VboxImage,
+		}
+
+		vm = b.Hyperdaemon.NewVm(b.Name, 1, 512, false, types.VM_KEEP_AFTER_FINISH)
+
+		err = vm.Launch(bo)
+		if err != nil {
+			return err
+		}
+
+		b.Hyperdaemon.AddVm(vm)
 	}
-	if !ok || vm.Status == types.S_VM_IDLE {
+	if vm.Status == types.S_VM_IDLE {
 		code, cause, err = b.Hyperdaemon.StartPod(podId, "", b.Name, nil, false, false, types.VM_KEEP_AFTER_FINISH)
 		if err != nil {
 			glog.Errorf("Code is %d, Cause is %s, %s", code, cause, err.Error())

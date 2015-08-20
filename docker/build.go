@@ -29,7 +29,7 @@ func (cli Docker) SendImageBuild(name string, context io.ReadCloser) ([]byte, in
 	buildConfig.RepoName = name        //r.FormValue("t")
 	buildConfig.SuppressOutput = false //boolValue(r, "q")
 	buildConfig.NoCache = false        //boolValue(r, "nocache")
-	buildConfig.ForceRemove = false    //boolValue(r, "forcerm")
+	buildConfig.ForceRemove = true     //boolValue(r, "forcerm")
 	buildConfig.AuthConfig = authConfig
 	buildConfig.ConfigFile = configFile
 	buildConfig.MemorySwap = 0    //int64ValueOrZero(r, "memswap")
