@@ -98,7 +98,7 @@ func (daemon *Daemon) CmdList(job *engine.Job) error {
 				default:
 					status = ""
 				}
-				containerJsonResponse = append(containerJsonResponse, c.Id+":"+c.PodId+":"+status)
+				containerJsonResponse = append(containerJsonResponse, c.Id+":"+c.Name+":"+c.PodId+":"+status)
 			}
 		}
 		v.SetList("cData", containerJsonResponse)

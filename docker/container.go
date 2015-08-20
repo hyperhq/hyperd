@@ -14,3 +14,7 @@ func (cli *Docker) GetContainerInfo(args ...string) (*types.ContainerJSONRaw, er
 	}
 	return containerJSONRaw, nil
 }
+
+func (cli Docker) SendContainerRename(oldName, newName string) error {
+	return cli.daemon.ContainerRename(oldName, newName)
+}

@@ -147,21 +147,29 @@ func (daemon *Daemon) CreatePod(podId, podArgs string, config interface{}, autor
 
 	if containerIds != nil {
 		for _, id := range containerIds {
-			mypod.AddContainer(id, "", "", []string{}, types.S_POD_CREATED)
+			var (
+				name  string
+				image string
+			)
+			if jsonResponse, err := daemon.DockerCli.GetContainerInfo(id); err == nil {
+				name = jsonResponse.Name
+				image = jsonResponse.Config.Image
+			}
+			mypod.AddContainer(id, name, image, []string{}, types.S_POD_CREATED)
 		}
 	} else {
 		// Process the 'Containers' section
 		glog.V(1).Info("Process the Containers section in POD SPEC\n")
 		for _, c := range userPod.Containers {
 			imgName := c.Image
-			cId, _, err := daemon.DockerCli.SendCmdCreate(imgName, []string{}, nil)
+			cId, _, err := daemon.DockerCli.SendCmdCreate(c.Name, imgName, []string{}, nil)
 			if err != nil {
 				glog.Error(err.Error())
 				daemon.DeletePodFromDB(podId)
 				return err
 			}
 
-			mypod.AddContainer(string(cId), "", "", []string{}, types.S_POD_CREATED)
+			mypod.AddContainer(string(cId), c.Name, imgName, []string{}, types.S_POD_CREATED)
 		}
 	}
 
@@ -231,6 +239,12 @@ func (daemon *Daemon) ParsePod(mypod *hypervisor.Pod, userPod *pod.UserPod,
 		if jsonResponse, err = cli.GetContainerInfo(c.Id); err != nil {
 			glog.Error("got error when get container Info ", err.Error())
 			return nil, nil, err
+		}
+		if c.Name == "" {
+			c.Name = jsonResponse.Name
+		}
+		if c.Image == "" {
+			c.Image = jsonResponse.Config.Image
 		}
 
 		if storageDriver == "devicemapper" {

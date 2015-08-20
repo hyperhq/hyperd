@@ -4,7 +4,7 @@ import (
 	"github.com/hyperhq/hyper/lib/docker/runconfig"
 )
 
-func (cli Docker) SendCmdCreate(image string, cmds []string, userConfig interface{}) ([]byte, int, error) {
+func (cli Docker) SendCmdCreate(name, image string, cmds []string, userConfig interface{}) ([]byte, int, error) {
 	config := runconfig.Config{
 		Image: image,
 		Cmd:   runconfig.NewCommand(cmds...),
@@ -13,7 +13,7 @@ func (cli Docker) SendCmdCreate(image string, cmds []string, userConfig interfac
 		config = userConfig.(runconfig.Config)
 	}
 	hostConfig := &runconfig.HostConfig{}
-	containerId, _, err := cli.daemon.ContainerCreate("", &config, hostConfig)
+	containerId, _, err := cli.daemon.ContainerCreate(name, &config, hostConfig)
 	if err != nil {
 		return nil, 500, err
 	}

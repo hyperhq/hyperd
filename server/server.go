@@ -455,6 +455,35 @@ func postContainerCommit(eng *engine.Engine, version version.Version, w http.Res
 	return writeJSONEnv(w, http.StatusOK, env)
 }
 
+func postContainerRename(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+	if err := r.ParseForm(); err != nil {
+		return nil
+	}
+
+	job := eng.Job("rename", r.Form.Get("oldName"), r.Form.Get("newName"))
+	stdoutBuf := bytes.NewBuffer(nil)
+
+	job.Stdout.Add(stdoutBuf)
+	if err := job.Run(); err != nil {
+		return err
+	}
+	var (
+		env             engine.Env
+		dat             map[string]interface{}
+		returnedJSONstr string
+	)
+	returnedJSONstr = engine.Tail(stdoutBuf, 1)
+	if err := json.Unmarshal([]byte(returnedJSONstr), &dat); err != nil {
+		return err
+	}
+
+	env.Set("ID", dat["ID"].(string))
+	env.SetInt("Code", (int)(dat["Code"].(float64)))
+	env.Set("Cause", dat["Cause"].(string))
+
+	return writeJSONEnv(w, http.StatusOK, env)
+}
+
 func postPodCreate(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
 	if err := r.ParseForm(); err != nil {
 		return nil
@@ -902,6 +931,7 @@ func createRouter(eng *engine.Engine, logging, enableCors bool, corsHeaders stri
 			"/auth":             postAuth,
 			"/container/create": postContainerCreate,
 			"/container/commit": postContainerCommit,
+			"/container/rename": postContainerRename,
 			"/image/create":     postImageCreate,
 			"/image/build":      postImageBuild,
 			"/image/push":       postImagePush,
