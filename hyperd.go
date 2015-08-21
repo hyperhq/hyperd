@@ -156,7 +156,7 @@ func mainDaemon(config, host string) {
 		return
 	}
 	d.Hypervisor = driver
-	if err = d.InitNetwork(hypervisor.HDriver, d.BridgeIface, d.BridgeIP); err != nil {
+	if err = hypervisor.InitNetwork(d.BridgeIface, d.BridgeIP, false); err != nil {
 		glog.Errorf("InitNetwork failed, %s\n", err.Error())
 		return
 	}
