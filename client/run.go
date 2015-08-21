@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -37,6 +38,7 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 		EntryPoint    string   `long:"entrypoint" value-name:"\"\"" default-mask:"-" description:"Overwrite the default ENTRYPOINT of the image"`
 		RestartPolicy string   `long:"restart" default:"never" value-name:"\"\"" default-mask:"-" description:"Restart policy to apply when a container exits (never, onFailure, always)"`
 		Remove        bool     `long:"rm" default:"false" value-name:"" default-mask:"-" description:"Automatically remove the pod when it exits"`
+		Portmap       []string `long:"publish" value-name:"[]" default-mask:"-" description:"Publish a container's port to the host, format: --publish [tcp/udp:]hostPort:containerPort"`
 	}
 
 	var parser = gflag.NewParser(&opts, gflag.Default|gflag.IgnoreUnknown)
@@ -123,6 +125,10 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 		image   = args[1]
 		command = []string{}
 		env     = []pod.UserEnvironmentVar{}
+		ports   = []pod.UserContainerPort{}
+		proto   string
+		hPort   string
+		cPort   string
 	)
 	if len(args) > 1 {
 		command = args[2:]
@@ -152,6 +158,36 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 		env = append(env, userEnv)
 	}
 
+	for _, v := range opts.Portmap {
+		port := pod.UserContainerPort{}
+		fields := strings.Split(v, ":")
+		if len(fields) < 2 {
+			return fmt.Errorf("flag needs host port and container port: --publish")
+		} else if len(fields) == 2 {
+			proto = "tcp"
+			hPort = fields[0]
+			cPort = fields[1]
+		} else {
+			proto = fields[0]
+			if proto != "tcp" && proto != "udp" {
+				return fmt.Errorf("flag needs protocol(tcp or udp): --publish")
+			}
+			hPort = fields[1]
+			cPort = fields[2]
+		}
+
+		port.Protocol = proto
+		port.HostPort, err = strconv.Atoi(hPort)
+		if err != nil {
+			return fmt.Errorf("flag needs host port and container port: --publish")
+		}
+		port.ContainerPort, err = strconv.Atoi(cPort)
+		if err != nil {
+			return fmt.Errorf("flag needs host port and container port: --publish")
+		}
+		ports = append(ports, port)
+	}
+
 	var containerList = []pod.UserContainer{}
 	var container = pod.UserContainer{
 		Name:          opts.Name,
@@ -159,7 +195,7 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 		Command:       command,
 		Workdir:       opts.Workdir,
 		Entrypoint:    []string{},
-		Ports:         []pod.UserContainerPort{},
+		Ports:         ports,
 		Envs:          env,
 		Volumes:       []pod.UserVolumeReference{},
 		Files:         []pod.UserFileReference{},
