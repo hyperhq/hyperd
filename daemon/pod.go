@@ -183,7 +183,7 @@ func (daemon *Daemon) CreatePod(podId, podArgs string, config interface{}, autor
 	return nil
 }
 
-func (daemon *Daemon) ParsePod(mypod *hypervisor.Pod, userPod *pod.UserPod,
+func (daemon *Daemon) PreparePod(mypod *hypervisor.Pod, userPod *pod.UserPod,
 	vmId string) ([]*hypervisor.ContainerInfo, []*hypervisor.VolumeInfo, error) {
 	var (
 		fstype            string
@@ -569,7 +569,7 @@ func (daemon *Daemon) StartPod(podId, podArgs, vmId string, config interface{}, 
 
 	fmt.Printf("POD id is %s\n", podId)
 
-	containerInfoList, volumeInfoList, err := daemon.ParsePod(mypod, userPod, vm.Id)
+	containerInfoList, volumeInfoList, err := daemon.PreparePod(mypod, userPod, vm.Id)
 	if err != nil {
 		return -1, "", err
 	}
