@@ -183,14 +183,13 @@ func (daemon *Daemon) CreatePod(podId, podArgs string, config interface{}, autor
 	return nil
 }
 
-func (daemon *Daemon) PreparePod(mypod *hypervisor.Pod, userPod *pod.UserPod,
-	vmId string) ([]*hypervisor.ContainerInfo, []*hypervisor.VolumeInfo, error) {
+func (daemon *Daemon) PrepareContainer(mypod *hypervisor.Pod, userPod *pod.UserPod,
+	vmId string) ([]*hypervisor.ContainerInfo, error) {
 	var (
 		fstype            string
 		poolName          string
 		volPoolName       string
 		devPrefix         string
-		storageDriver     string
 		rootPath          string
 		devFullName       string
 		rootfs            string
@@ -199,11 +198,10 @@ func (daemon *Daemon) PreparePod(mypod *hypervisor.Pod, userPod *pod.UserPod,
 		err               error
 		sharedDir         = path.Join(hypervisor.BaseDir, vmId, hypervisor.ShareDirTag)
 		containerInfoList = []*hypervisor.ContainerInfo{}
-		volumeInfoList    = []*hypervisor.VolumeInfo{}
+		storageDriver     = daemon.Storage.StorageType
 		cli               = daemon.DockerCli
 	)
 
-	storageDriver = daemon.Storage.StorageType
 	if storageDriver == "devicemapper" {
 		poolName = daemon.Storage.PoolName
 		fstype = daemon.Storage.Fstype
@@ -238,7 +236,7 @@ func (daemon *Daemon) PreparePod(mypod *hypervisor.Pod, userPod *pod.UserPod,
 		var jsonResponse *dockertypes.ContainerJSONRaw
 		if jsonResponse, err = cli.GetContainerInfo(c.Id); err != nil {
 			glog.Error("got error when get container Info ", err.Error())
-			return nil, nil, err
+			return nil, err
 		}
 		if c.Name == "" {
 			c.Name = jsonResponse.Name
@@ -249,12 +247,12 @@ func (daemon *Daemon) PreparePod(mypod *hypervisor.Pod, userPod *pod.UserPod,
 
 		if storageDriver == "devicemapper" {
 			if err := dm.CreateNewDevice(c.Id, devPrefix, rootPath); err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 			devFullName, err = dm.MountContainerToSharedDir(c.Id, sharedDir, devPrefix)
 			if err != nil {
 				glog.Error("got error when mount container to share dir ", err.Error())
-				return nil, nil, err
+				return nil, err
 			}
 			fstype, err = dm.ProbeFsType(devFullName)
 			if err != nil {
@@ -264,21 +262,21 @@ func (daemon *Daemon) PreparePod(mypod *hypervisor.Pod, userPod *pod.UserPod,
 			devFullName, err = aufs.MountContainerToSharedDir(c.Id, rootPath, sharedDir, "")
 			if err != nil {
 				glog.Error("got error when mount container to share dir ", err.Error())
-				return nil, nil, err
+				return nil, err
 			}
 			devFullName = "/" + c.Id + "/rootfs"
 		} else if storageDriver == "overlay" {
 			devFullName, err = overlay.MountContainerToSharedDir(c.Id, rootPath, sharedDir, "")
 			if err != nil {
 				glog.Error("got error when mount container to share dir ", err.Error())
-				return nil, nil, err
+				return nil, err
 			}
 			devFullName = "/" + c.Id + "/rootfs"
 		} else if storageDriver == "vbox" {
 			devFullName, err = vbox.MountContainerToSharedDir(c.Id, rootPath, "")
 			if err != nil {
 				glog.Error("got error when mount container to share dir ", err.Error())
-				return nil, nil, err
+				return nil, err
 			}
 			fstype = "ext4"
 		}
@@ -294,12 +292,12 @@ func (daemon *Daemon) PreparePod(mypod *hypervisor.Pod, userPod *pod.UserPod,
 			if file.Uri != "" {
 				err = utils.DownloadFile(file.Uri, fromFile)
 				if err != nil {
-					return nil, nil, err
+					return nil, err
 				}
 			} else if file.Contents != "" {
 				err = ioutil.WriteFile(fromFile, []byte(file.Contents), 0666)
 				if err != nil {
-					return nil, nil, err
+					return nil, err
 				}
 			} else {
 				continue
@@ -307,26 +305,26 @@ func (daemon *Daemon) PreparePod(mypod *hypervisor.Pod, userPod *pod.UserPod,
 			// we need to decode the content
 			fi, err := os.Open(fromFile)
 			if err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 			defer fi.Close()
 			fileContent, err := ioutil.ReadAll(fi)
 			if err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 			if file.Encoding == "base64" {
 				newContent, err := utils.Base64Decode(string(fileContent))
 				if err != nil {
-					return nil, nil, err
+					return nil, err
 				}
 				err = ioutil.WriteFile(fromFile, []byte(newContent), 0666)
 				if err != nil {
-					return nil, nil, err
+					return nil, err
 				}
 			} else {
 				err = ioutil.WriteFile(fromFile, []byte(file.Contents), 0666)
 				if err != nil {
-					return nil, nil, err
+					return nil, err
 				}
 			}
 			// get the uid and gid for that attached file
@@ -348,19 +346,19 @@ func (daemon *Daemon) PreparePod(mypod *hypervisor.Pod, userPod *pod.UserPod,
 				err := dm.AttachFiles(c.Id, devPrefix, fromFile, targetPath, rootPath, f.Perm, uid, gid)
 				if err != nil {
 					glog.Error("got error when attach files ", err.Error())
-					return nil, nil, err
+					return nil, err
 				}
 			} else if storageDriver == "aufs" {
 				err := aufs.AttachFiles(c.Id, fromFile, targetPath, sharedDir, f.Perm, uid, gid)
 				if err != nil {
 					glog.Error("got error when attach files ", err.Error())
-					return nil, nil, err
+					return nil, err
 				}
 			} else if storageDriver == "overlay" {
 				err := overlay.AttachFiles(c.Id, fromFile, targetPath, sharedDir, f.Perm, uid, gid)
 				if err != nil {
 					glog.Error("got error when attach files ", err.Error())
-					return nil, nil, err
+					return nil, err
 				}
 			}
 		}
@@ -391,10 +389,23 @@ func (daemon *Daemon) PreparePod(mypod *hypervisor.Pod, userPod *pod.UserPod,
 		glog.V(1).Infof("container %d created %s, workdir %s, env: %v", i, c.Id, jsonResponse.Config.WorkingDir, env)
 	}
 
+	return containerInfoList, nil
+}
+
+func (daemon *Daemon) PrepareVolume(mypod *hypervisor.Pod, userPod *pod.UserPod,
+	vmId string) ([]*hypervisor.VolumeInfo, error) {
+	var (
+		fstype            string
+		volPoolName       string
+		err               error
+		sharedDir         = path.Join(hypervisor.BaseDir, vmId, hypervisor.ShareDirTag)
+		volumeInfoList    = []*hypervisor.VolumeInfo{}
+	)
+
 	// Process the 'Volumes' section
 	for _, v := range userPod.Volumes {
 		if v.Source == "" {
-			if storageDriver == "devicemapper" {
+			if daemon.Storage.StorageType == "devicemapper" {
 				volName := fmt.Sprintf("%s-%s-%s", volPoolName, mypod.Id, v.Name)
 				dev_id, _ := daemon.GetVolumeId(mypod.Id, volName)
 				glog.Error("DeviceID is %d", dev_id)
@@ -402,12 +413,12 @@ func (daemon *Daemon) PreparePod(mypod *hypervisor.Pod, userPod *pod.UserPod,
 					dev_id, _ = daemon.GetMaxDeviceId()
 					err := daemon.CreateVolume(mypod.Id, volName, fmt.Sprintf("%d", dev_id+1), false)
 					if err != nil {
-						return nil, nil, err
+						return nil, err
 					}
 				} else {
 					err := daemon.CreateVolume(mypod.Id, volName, fmt.Sprintf("%d", dev_id), true)
 					if err != nil {
-						return nil, nil, err
+						return nil, err
 					}
 				}
 
@@ -424,13 +435,12 @@ func (daemon *Daemon) PreparePod(mypod *hypervisor.Pod, userPod *pod.UserPod,
 				volumeInfoList = append(volumeInfoList, myVol)
 				glog.V(1).Infof("volume %s created with dm as %s", v.Name, volName)
 				continue
-
 			} else {
 				// Make sure the v.Name is given
 				v.Source = path.Join("/var/tmp/hyper/", v.Name)
 				if _, err := os.Stat(v.Source); err != nil && os.IsNotExist(err) {
 					if err := os.MkdirAll(v.Source, os.FileMode(0777)); err != nil {
-						return nil, nil, err
+						return nil, err
 					}
 				}
 				v.Driver = "vfs"
@@ -452,13 +462,13 @@ func (daemon *Daemon) PreparePod(mypod *hypervisor.Pod, userPod *pod.UserPod,
 		if runtime.GOOS == "linux" {
 			if err := os.MkdirAll(targetDir, 0755); err != nil && !os.IsExist(err) {
 				glog.Errorf("error to create dir %s for volume %s", targetDir, v.Name)
-				return nil, nil, err
+				return nil, err
 			}
 		}
 
 		if err := utils.Mount(v.Source, targetDir, "dir", flags, "--bind"); err != nil {
 			glog.Errorf("bind dir %s failed: %s", v.Source, err.Error())
-			return nil, nil, err
+			return nil, err
 		}
 		myVol := &hypervisor.VolumeInfo{
 			Name:     v.Name,
@@ -468,6 +478,22 @@ func (daemon *Daemon) PreparePod(mypod *hypervisor.Pod, userPod *pod.UserPod,
 		}
 		glog.V(1).Infof("dir %s is bound to %s", v.Source, targetDir)
 		volumeInfoList = append(volumeInfoList, myVol)
+	}
+
+	return volumeInfoList, nil
+}
+
+func (daemon *Daemon) PreparePod(mypod *hypervisor.Pod, userPod *pod.UserPod,
+	vmId string) ([]*hypervisor.ContainerInfo, []*hypervisor.VolumeInfo, error) {
+
+	containerInfoList, err := daemon.PrepareContainer(mypod, userPod, vmId)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	volumeInfoList, err := daemon.PrepareVolume(mypod, userPod, vmId)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	return containerInfoList, volumeInfoList, nil
