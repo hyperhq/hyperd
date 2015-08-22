@@ -15,6 +15,10 @@ func (daemon *Daemon) CmdPodRm(job *engine.Job) (err error) {
 		cause = ""
 	)
 
+	daemon.PodsMutex.Lock()
+	glog.V(2).Infof("lock PodList")
+	defer glog.V(2).Infof("unlock PodList")
+	defer daemon.PodsMutex.Unlock()
 	code, cause, err = daemon.CleanPod(podId)
 	if err != nil {
 		return err
@@ -53,7 +57,7 @@ func (daemon *Daemon) CleanPod(podId string) (int, string, error) {
 			for _, c := range pod.Containers {
 				glog.V(1).Infof("Ready to rm container: %s", c.Id)
 				if _, _, err = daemon.DockerCli.SendCmdDelete(c.Id); err != nil {
-					glog.V(1).Infof("Error to rm container: %s", err.Error())
+					glog.Warningf("Error to rm container: %s", err.Error())
 				}
 			}
 			daemon.RemovePod(podId)

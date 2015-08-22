@@ -23,9 +23,13 @@ func (daemon *Daemon) CmdInfo(job *engine.Job) error {
 	}
 
 	var num = 0
+	daemon.PodsMutex.RLock()
+	glog.V(2).Infof("lock read of PodList")
 	for _, p := range daemon.PodList {
 		num += len(p.Containers)
 	}
+	daemon.PodsMutex.RUnlock()
+	glog.V(2).Infof("unlock read of PodList")
 	v := &engine.Env{}
 	v.Set("ID", daemon.ID)
 	v.SetInt("Containers", num)
@@ -71,6 +75,10 @@ func (daemon *Daemon) CmdPodInfo(job *engine.Job) error {
 	if len(job.Args) == 0 {
 		return fmt.Errorf("Can not get Pod info without Pod ID")
 	}
+	daemon.PodsMutex.RLock()
+	glog.V(2).Infof("lock read of PodList")
+	defer daemon.PodsMutex.RUnlock()
+	defer glog.V(2).Infof("unlock read of PodList")
 	var (
 		podId   string
 		mypod   *hypervisor.Pod
@@ -242,6 +250,10 @@ func (daemon *Daemon) CmdContainerInfo(job *engine.Job) error {
 	if len(job.Args) == 0 {
 		return fmt.Errorf("Can not get Pod info without Pod ID")
 	}
+	daemon.PodsMutex.RLock()
+	glog.V(2).Infof("lock read of PodList")
+	defer daemon.PodsMutex.RUnlock()
+	defer glog.V(2).Infof("unlock read of PodList")
 	var (
 		find    bool = false
 		mypod   *hypervisor.Pod

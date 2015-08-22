@@ -7,6 +7,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/hyperhq/hyper/engine"
 	dockertypes "github.com/hyperhq/hyper/lib/docker/api/types"
@@ -56,6 +57,7 @@ type Daemon struct {
 	eng         *engine.Engine
 	DockerCli   DockerInterface
 	PodList     map[string]*hypervisor.Pod
+	PodsMutex   *sync.RWMutex
 	VmList      map[string]*hypervisor.Vm
 	Kernel      string
 	Initrd      string
@@ -136,6 +138,10 @@ func (daemon *Daemon) Restore() error {
 	if err != nil {
 		return err
 	}
+	daemon.PodsMutex.Lock()
+	glog.V(2).Infof("lock PodList")
+	defer glog.V(2).Infof("unlock PodList")
+	defer daemon.PodsMutex.Unlock()
 	for k, v := range podList {
 		err = daemon.CreatePod(k, v, nil, false)
 		if err != nil {
@@ -242,6 +248,7 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 		VboxImage:   vboxImage,
 		DockerCli:   dockerCli,
 		PodList:     pList,
+		PodsMutex:   new(sync.RWMutex),
 		VmList:      vList,
 		Host:        host,
 		BridgeIP:    bridgeip,
@@ -353,11 +360,15 @@ func (daemon *Daemon) GetPodNum() int64 {
 
 func (daemon *Daemon) GetRunningPodNum() int64 {
 	var num int64 = 0
+	daemon.PodsMutex.RLock()
+	glog.V(2).Infof("lock read of PodList")
 	for _, v := range daemon.PodList {
 		if v.Status == types.S_POD_RUNNING {
 			num++
 		}
 	}
+	daemon.PodsMutex.RUnlock()
+	glog.V(2).Infof("unlock read of PodList")
 	return num
 }
 
@@ -558,6 +569,10 @@ func (daemon *Daemon) DeleteVmByPod(podId string) error {
 }
 
 func (daemon *Daemon) GetPodVmByName(podName string) (string, error) {
+	daemon.PodsMutex.RLock()
+	glog.V(2).Infof("lock read of PodList")
+	defer glog.V(2).Infof("unlock read of PodList")
+	defer daemon.PodsMutex.RUnlock()
 	pod := daemon.PodList[podName]
 	if pod == nil {
 		return "", fmt.Errorf("Not found VM for pod(%s)", podName)
@@ -568,6 +583,10 @@ func (daemon *Daemon) GetPodVmByName(podName string) (string, error) {
 func (daemon *Daemon) GetPodByContainer(containerId string) (string, error) {
 	var c *hypervisor.Container = nil
 
+	daemon.PodsMutex.RLock()
+	glog.V(2).Infof("lock read of PodList")
+	defer glog.V(2).Infof("unlock read of PodList")
+	defer daemon.PodsMutex.RUnlock()
 	for _, p := range daemon.PodList {
 		for _, c = range p.Containers {
 			if c.Id == containerId {
@@ -647,9 +666,13 @@ func (daemon *Daemon) CleanVolume(stop int) error {
 
 func (daemon *Daemon) DestroyAllVm() error {
 	glog.V(0).Info("The daemon will stop all pod")
+	daemon.PodsMutex.Lock()
+	glog.V(2).Infof("lock PodList")
 	for _, pod := range daemon.PodList {
 		daemon.StopPod(pod.Id, "yes")
 	}
+	daemon.PodsMutex.Unlock()
+	glog.V(2).Infof("unlock PodList")
 	iter := daemon.db.NewIterator(util.BytesPrefix([]byte("vm-")), nil)
 	for iter.Next() {
 		key := iter.Key()

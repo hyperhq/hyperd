@@ -31,6 +31,10 @@ func (daemon *Daemon) CmdPodCreate(job *engine.Job) error {
 	podArgs := job.Args[0]
 
 	podId := fmt.Sprintf("pod-%s", pod.RandStr(10, "alpha"))
+	daemon.PodsMutex.Lock()
+	glog.V(2).Infof("lock PodList")
+	defer glog.V(2).Infof("unlock PodList")
+	defer daemon.PodsMutex.Unlock()
 	err := daemon.CreatePod(podId, podArgs, nil, false)
 	if err != nil {
 		return err
@@ -59,6 +63,10 @@ func (daemon *Daemon) CmdPodStart(job *engine.Job) error {
 
 	glog.Infof("pod:%s, vm:%s", podId, vmId)
 	// Do the status check for the given pod
+	daemon.PodsMutex.Lock()
+	glog.V(2).Infof("lock PodList")
+	defer glog.V(2).Infof("unlock PodList")
+	defer daemon.PodsMutex.Unlock()
 	if _, ok := daemon.PodList[podId]; !ok {
 		return fmt.Errorf("The pod(%s) can not be found, please create it first", podId)
 	}
@@ -99,6 +107,10 @@ func (daemon *Daemon) CmdPodRun(job *engine.Job) error {
 
 	var lazy bool = hypervisor.HDriver.SupportLazyMode()
 
+	daemon.PodsMutex.Lock()
+	glog.V(2).Infof("lock PodList")
+	defer glog.V(2).Infof("unlock PodList")
+	defer daemon.PodsMutex.Unlock()
 	code, cause, err := daemon.StartPod(podId, podArgs, "", nil, lazy, autoremove, types.VM_KEEP_NONE)
 	if err != nil {
 		glog.Error(err.Error())
@@ -676,7 +688,6 @@ func hyperHandlePodEvent(vmResponse *types.VmResponse, data interface{},
 						glog.V(1).Infof("Error to rm container: %s", err.Error())
 					}
 				}
-				//daemon.RemovePod(mypod.Id)
 				daemon.DeletePodContainerFromDB(mypod.Id)
 				daemon.DeleteVolumeId(mypod.Id)
 				break
@@ -692,7 +703,6 @@ func hyperHandlePodEvent(vmResponse *types.VmResponse, data interface{},
 						glog.V(1).Infof("Error to rm container: %s", err.Error())
 					}
 				}
-				//daemon.RemovePod(podId)
 				daemon.DeletePodContainerFromDB(mypod.Id)
 				daemon.DeleteVolumeId(mypod.Id)
 				break

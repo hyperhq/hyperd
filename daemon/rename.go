@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/runv/lib/glog"
 )
 
 func (daemon *Daemon) CmdRename(job *engine.Job) error {
@@ -12,6 +13,11 @@ func (daemon *Daemon) CmdRename(job *engine.Job) error {
 	if err != nil {
 		return err
 	}
+	daemon.PodsMutex.RLock()
+	glog.V(2).Infof("lock read of PodList")
+	defer glog.V(2).Infof("unlock read of PodList")
+	defer daemon.PodsMutex.RUnlock()
+
 	var find bool = false
 	for _, p := range daemon.PodList {
 		for _, c := range p.Containers {

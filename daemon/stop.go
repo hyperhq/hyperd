@@ -13,6 +13,10 @@ func (daemon *Daemon) CmdPodStop(job *engine.Job) error {
 	}
 	podId := job.Args[0]
 	stopVm := job.Args[1]
+	daemon.PodsMutex.Lock()
+	glog.V(2).Infof("lock PodList")
+	defer glog.V(2).Infof("unlock PodList")
+	defer daemon.PodsMutex.Unlock()
 	code, cause, err := daemon.StopPod(podId, stopVm)
 	if err != nil {
 		return err
@@ -38,10 +42,7 @@ func (daemon *Daemon) StopPod(podId, stopVm string) (int, string, error) {
 		glog.Errorf("Can not find pod(%s)", podId)
 		return -1, "", fmt.Errorf("Can not find pod(%s)", podId)
 	}
-	vmid, err := daemon.GetPodVmByName(podId)
-	if err != nil {
-		return -1, "", err
-	}
+	vmid := mypod.Vm
 	// we need to set the 'RestartPolicy' of the pod to 'never' if stop command is invoked
 	// for kubernetes
 	if mypod.Type == "kubernetes" {

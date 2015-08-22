@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/hyperhq/hyper/engine"
 	"github.com/hyperhq/runv/hypervisor/types"
+	"github.com/hyperhq/runv/lib/glog"
 )
 
 func (daemon *Daemon) CmdList(job *engine.Job) error {
@@ -25,6 +26,10 @@ func (daemon *Daemon) CmdList(job *engine.Job) error {
 		podId                 string
 	)
 
+	daemon.PodsMutex.RLock()
+	glog.Infof("lock read of PodList")
+	defer glog.Infof("unlock read of PodList")
+	defer daemon.PodsMutex.RUnlock()
 	// Prepare the VM status to client
 	v := &engine.Env{}
 	v.Set("item", item)
