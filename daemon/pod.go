@@ -168,8 +168,16 @@ func (daemon *Daemon) CreatePod(podId, podArgs string, config interface{}, autor
 				daemon.DeletePodFromDB(podId)
 				return err
 			}
+			var (
+				name  string
+				image string
+			)
+			if jsonResponse, err := daemon.DockerCli.GetContainerInfo(string(cId)); err == nil {
+				name = jsonResponse.Name
+				image = jsonResponse.Config.Image
+			}
 
-			mypod.AddContainer(string(cId), c.Name, imgName, []string{}, types.S_POD_CREATED)
+			mypod.AddContainer(string(cId), name, image, []string{}, types.S_POD_CREATED)
 		}
 	}
 
@@ -624,27 +632,6 @@ func (daemon *Daemon) RestartPod(mypod *hypervisor.Pod) error {
 
 	if err := daemon.WritePodAndContainers(mypod.Id); err != nil {
 		glog.Error("Found an error while saving the Containers info")
-		return err
-	}
-
-	return nil
-}
-
-func (daemon *Daemon) CmdPodInfo(job *engine.Job) error {
-	if len(job.Args) == 0 {
-		return fmt.Errorf("Can not get POD info without POD ID")
-	}
-	podName := job.Args[0]
-	vmId := ""
-	// We need to find the VM which running the POD
-	pod, ok := daemon.PodList[podName]
-	if ok {
-		vmId = pod.Vm
-	}
-	glog.V(1).Infof("Process POD %s: VM ID is %s", podName, vmId)
-	v := &engine.Env{}
-	v.Set("hostname", vmId)
-	if _, err := v.WriteTo(job.Stdout); err != nil {
 		return err
 	}
 

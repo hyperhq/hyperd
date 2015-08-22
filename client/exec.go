@@ -7,8 +7,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/hyperhq/hyper/engine"
 	"github.com/hyperhq/hyper/lib/promise"
+	"github.com/hyperhq/hyper/types"
 
 	gflag "github.com/jessevdk/go-flags"
 )
@@ -36,7 +36,6 @@ func (cli *HyperClient) HyperCmdExec(args ...string) error {
 	}
 	var (
 		podName     = args[1]
-		hostname    = ""
 		tag         = cli.GetTag()
 		containerId string
 	)
@@ -52,12 +51,9 @@ func (cli *HyperClient) HyperCmdExec(args ...string) error {
 		v.Set("value", podName)
 	} else {
 		if strings.Contains(podName, "pod-") {
-			hostname, err = cli.GetPodInfo(podName)
+			_, err = cli.GetPodInfo(podName)
 			if err != nil {
 				return err
-			}
-			if hostname == "" {
-				return fmt.Errorf("The POD : %s does not exist, please create it before exec!", podName)
 			}
 			containerId, err = cli.GetContainerByPod(podName)
 			if err != nil {
@@ -86,7 +82,7 @@ func (cli *HyperClient) HyperCmdExec(args ...string) error {
 	}()
 
 	errCh = promise.Go(func() error {
-		return cli.hijack("POST", "/exec?"+v.Encode(), true, cli.in, cli.out, cli.out, hijacked, nil, hostname)
+		return cli.hijack("POST", "/exec?"+v.Encode(), true, cli.in, cli.out, cli.out, hijacked, nil, "")
 	})
 
 	if err := cli.monitorTtySize(podName, tag); err != nil {
@@ -124,26 +120,10 @@ func (cli *HyperClient) GetPodInfo(podName string) (string, error) {
 		fmt.Printf("Error: %s\n", err)
 		return "", err
 	}
-
-	out := engine.NewOutput()
-	remoteInfo, err := out.AddEnv()
-	if err != nil {
+	var jsonData types.PodInfo
+	if err := json.Unmarshal(body, &jsonData); err != nil {
 		return "", err
 	}
 
-	if _, err := out.Write(body); err != nil {
-		fmt.Printf("Error reading remote info: %s", err)
-		return "", err
-	}
-	out.Close()
-	if remoteInfo.Exists("hostname") {
-		hostname := remoteInfo.Get("hostname")
-		if hostname == "" {
-			return "", nil
-		} else {
-			return hostname, nil
-		}
-	}
-
-	return "", nil
+	return jsonData.Vm, nil
 }
