@@ -3,8 +3,10 @@ package client
 import (
 	"fmt"
 	"net/url"
-	"os"
 	"strings"
+
+	"github.com/hyperhq/hyper/lib/docker/pkg/parsers"
+	"github.com/hyperhq/hyper/lib/docker/registry"
 
 	gflag "github.com/jessevdk/go-flags"
 )
@@ -25,12 +27,14 @@ func (cli *HyperClient) HyperCmdPull(args ...string) error {
 		}
 	}
 	imageName := args[1]
-	v := url.Values{}
-	v.Set("imageName", imageName)
-	err = cli.stream("POST", "/image/create?"+v.Encode(), nil, os.Stdout, nil)
+	remote, _ := parsers.ParseRepositoryTag(imageName)
+	// Resolve the Repository name from fqn to RepositoryInfo
+	repoInfo, err := registry.ParseRepositoryInfo(remote)
 	if err != nil {
 		return err
 	}
-
-	return nil
+	v := url.Values{}
+	v.Set("imageName", imageName)
+	_, _, err = cli.clientRequestAttemptLogin("POST", "/image/create?"+v.Encode(), nil, cli.out, repoInfo.Index, "pull")
+	return err
 }
