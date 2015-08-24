@@ -27,19 +27,15 @@ func (cli *HyperClient) HyperCmdAttach(args ...string) error {
 	}
 	var (
 		podName     = args[1]
-		hostname    = ""
 		tag         = cli.GetTag()
 		containerId = podName
 	)
 
 	v := url.Values{}
 	if strings.Contains(podName, "pod-") {
-		hostname, err = cli.GetPodInfo(podName)
+		_, err = cli.GetPodInfo(podName)
 		if err != nil {
 			return err
-		}
-		if hostname == "" {
-			return fmt.Errorf("The pod(%s) does not exist, please create it before exec!", podName)
 		}
 		containerId, err = cli.GetContainerByPod(podName)
 		if err != nil {
@@ -66,7 +62,7 @@ func (cli *HyperClient) HyperCmdAttach(args ...string) error {
 	}()
 
 	errCh = promise.Go(func() error {
-		return cli.hijack("POST", "/attach?"+v.Encode(), true, cli.in, cli.out, cli.out, hijacked, nil, hostname)
+		return cli.hijack("POST", "/attach?"+v.Encode(), true, cli.in, cli.out, cli.out, hijacked, nil, "")
 	})
 
 	if err := cli.monitorTtySize(podName, tag); err != nil {

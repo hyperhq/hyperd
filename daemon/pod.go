@@ -31,6 +31,10 @@ func (daemon *Daemon) CmdPodCreate(job *engine.Job) error {
 	podArgs := job.Args[0]
 
 	podId := fmt.Sprintf("pod-%s", pod.RandStr(10, "alpha"))
+	daemon.PodsMutex.Lock()
+	glog.V(2).Infof("lock PodList")
+	defer glog.V(2).Infof("unlock PodList")
+	defer daemon.PodsMutex.Unlock()
 	err := daemon.CreatePod(podId, podArgs, nil, false)
 	if err != nil {
 		return err
@@ -59,6 +63,10 @@ func (daemon *Daemon) CmdPodStart(job *engine.Job) error {
 
 	glog.Infof("pod:%s, vm:%s", podId, vmId)
 	// Do the status check for the given pod
+	daemon.PodsMutex.Lock()
+	glog.V(2).Infof("lock PodList")
+	defer glog.V(2).Infof("unlock PodList")
+	defer daemon.PodsMutex.Unlock()
 	if _, ok := daemon.PodList[podId]; !ok {
 		return fmt.Errorf("The pod(%s) can not be found, please create it first", podId)
 	}
@@ -99,6 +107,10 @@ func (daemon *Daemon) CmdPodRun(job *engine.Job) error {
 
 	var lazy bool = hypervisor.HDriver.SupportLazyMode()
 
+	daemon.PodsMutex.Lock()
+	glog.V(2).Infof("lock PodList")
+	defer glog.V(2).Infof("unlock PodList")
+	defer daemon.PodsMutex.Unlock()
 	code, cause, err := daemon.StartPod(podId, podArgs, "", nil, lazy, autoremove, types.VM_KEEP_NONE)
 	if err != nil {
 		glog.Error(err.Error())
@@ -168,8 +180,16 @@ func (daemon *Daemon) CreatePod(podId, podArgs string, config interface{}, autor
 				daemon.DeletePodFromDB(podId)
 				return err
 			}
+			var (
+				name  string
+				image string
+			)
+			if jsonResponse, err := daemon.DockerCli.GetContainerInfo(string(cId)); err == nil {
+				name = jsonResponse.Name
+				image = jsonResponse.Config.Image
+			}
 
-			mypod.AddContainer(string(cId), c.Name, imgName, []string{}, types.S_POD_CREATED)
+			mypod.AddContainer(string(cId), name, image, []string{}, types.S_POD_CREATED)
 		}
 	}
 
@@ -630,27 +650,6 @@ func (daemon *Daemon) RestartPod(mypod *hypervisor.Pod) error {
 	return nil
 }
 
-func (daemon *Daemon) CmdPodInfo(job *engine.Job) error {
-	if len(job.Args) == 0 {
-		return fmt.Errorf("Can not get POD info without POD ID")
-	}
-	podName := job.Args[0]
-	vmId := ""
-	// We need to find the VM which running the POD
-	pod, ok := daemon.PodList[podName]
-	if ok {
-		vmId = pod.Vm
-	}
-	glog.V(1).Infof("Process POD %s: VM ID is %s", podName, vmId)
-	v := &engine.Env{}
-	v.Set("hostname", vmId)
-	if _, err := v.WriteTo(job.Stdout); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func hyperHandlePodEvent(vmResponse *types.VmResponse, data interface{},
 	mypod *hypervisor.Pod, vm *hypervisor.Vm) bool {
 	daemon := data.(*Daemon)
@@ -689,7 +688,6 @@ func hyperHandlePodEvent(vmResponse *types.VmResponse, data interface{},
 						glog.V(1).Infof("Error to rm container: %s", err.Error())
 					}
 				}
-				//daemon.RemovePod(mypod.Id)
 				daemon.DeletePodContainerFromDB(mypod.Id)
 				daemon.DeleteVolumeId(mypod.Id)
 				break
@@ -705,7 +703,6 @@ func hyperHandlePodEvent(vmResponse *types.VmResponse, data interface{},
 						glog.V(1).Infof("Error to rm container: %s", err.Error())
 					}
 				}
-				//daemon.RemovePod(podId)
 				daemon.DeletePodContainerFromDB(mypod.Id)
 				daemon.DeleteVolumeId(mypod.Id)
 				break

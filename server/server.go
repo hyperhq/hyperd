@@ -259,7 +259,6 @@ func getPodInfo(eng *engine.Engine, version version.Version, w http.ResponseWrit
 	}
 
 	var (
-		env             engine.Env
 		dat             map[string]interface{}
 		returnedJSONstr string
 	)
@@ -268,8 +267,32 @@ func getPodInfo(eng *engine.Engine, version version.Version, w http.ResponseWrit
 		return err
 	}
 
-	env.Set("hostname", dat["hostname"].(string))
-	return writeJSONEnv(w, http.StatusCreated, env)
+	return writeJSON(w, http.StatusCreated, dat["data"])
+}
+
+func getContainerInfo(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+	if err := r.ParseForm(); err != nil {
+		return nil
+	}
+
+	job := eng.Job("containerInfo", r.Form.Get("container"))
+	stdoutBuf := bytes.NewBuffer(nil)
+
+	job.Stdout.Add(stdoutBuf)
+	if err := job.Run(); err != nil {
+		return err
+	}
+
+	var (
+		dat             map[string]interface{}
+		returnedJSONstr string
+	)
+	returnedJSONstr = engine.Tail(stdoutBuf, 1)
+	if err := json.Unmarshal([]byte(returnedJSONstr), &dat); err != nil {
+		return err
+	}
+
+	return writeJSON(w, http.StatusCreated, dat["data"])
 }
 
 func postStop(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
@@ -921,11 +944,12 @@ func createRouter(eng *engine.Engine, logging, enableCors bool, corsHeaders stri
 	}
 	m := map[string]map[string]HttpApiFunc{
 		"GET": {
-			"/info":       getInfo,
-			"/pod/info":   getPodInfo,
-			"/version":    getVersion,
-			"/list":       getList,
-			"/images/get": getImages,
+			"/info":           getInfo,
+			"/pod/info":       getPodInfo,
+			"/container/info": getContainerInfo,
+			"/version":        getVersion,
+			"/list":           getList,
+			"/images/get":     getImages,
 		},
 		"POST": {
 			"/auth":             postAuth,
