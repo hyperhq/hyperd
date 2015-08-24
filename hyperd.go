@@ -29,6 +29,7 @@ func main() {
 	}
 
 	fnd := flag.Bool("nondaemon", false, "Not daemonize")
+	flDisableIptables := flag.Bool("noniptables", false, "Don't enable iptables rules")
 	flConfig := flag.String("config", "", "Config file for hyperd")
 	flHost := flag.String("host", "", "Host for hyperd")
 	flHelp := flag.Bool("help", false, "Print help message for Hyperd daemon")
@@ -70,7 +71,7 @@ func main() {
 		return
 	}
 
-	mainDaemon(*flConfig, *flHost)
+	mainDaemon(*flConfig, *flHost, *flDisableIptables)
 }
 
 func printHelp() {
@@ -93,7 +94,7 @@ Help Options:
 	fmt.Printf(helpMessage, os.Args[0], os.Args[0])
 }
 
-func mainDaemon(config, host string) {
+func mainDaemon(config, host string, flDisableIptables bool) {
 	glog.V(1).Infof("The config file is %s", config)
 	if config == "" {
 		config = "/etc/hyper/config"
@@ -156,10 +157,13 @@ func mainDaemon(config, host string) {
 		return
 	}
 	d.Hypervisor = driver
-	if err = d.InitNetwork(hypervisor.HDriver, d.BridgeIface, d.BridgeIP); err != nil {
+
+	disableIptables := cfg.MustBool(goconfig.DEFAULT_SECTION, "DisableIptables", false)
+	if err = hypervisor.InitNetwork(d.BridgeIface, d.BridgeIP, disableIptables || flDisableIptables); err != nil {
 		glog.Errorf("InitNetwork failed, %s\n", err.Error())
 		return
 	}
+
 	// Set the daemon object as the global varibal
 	// which will be used for puller and builder
 	utils.SetDaemon(d)

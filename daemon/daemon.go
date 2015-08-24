@@ -16,7 +16,6 @@ import (
 	dm "github.com/hyperhq/hyper/storage/devicemapper"
 	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/hypervisor"
-	"github.com/hyperhq/runv/hypervisor/network"
 	"github.com/hyperhq/runv/hypervisor/types"
 	"github.com/hyperhq/runv/lib/glog"
 
@@ -320,16 +319,6 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 	})
 
 	return daemon, nil
-}
-
-func (daemon *Daemon) InitNetwork(driver hypervisor.HypervisorDriver, biface, bridgeip string) error {
-	err := driver.InitNetwork(biface, bridgeip)
-
-	if err == os.ErrNotExist {
-		err = network.InitNetwork(biface, bridgeip)
-	}
-
-	return err
 }
 
 func (daemon *Daemon) GetPodNum() int64 {
