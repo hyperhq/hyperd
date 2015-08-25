@@ -129,16 +129,20 @@ func (daemon *Daemon) CmdPodRun(job *engine.Job) error {
 	return nil
 }
 
-func (daemon *Daemon) CreatePod(podId, podArgs string, config interface{}, autoremove bool) error {
-
+func (daemon *Daemon) CreatePod(podId, podArgs string, config interface{}, autoremove bool) (err error) {
 	glog.V(1).Infof("podArgs: %s", podArgs)
-	userPod, err := pod.ProcessPodBytes([]byte(podArgs))
+	var (
+		userPod      *pod.UserPod
+		containerIds []string
+		cId          []byte
+	)
+	userPod, err = pod.ProcessPodBytes([]byte(podArgs))
 	if err != nil {
 		glog.V(1).Infof("Process POD file error: %s", err.Error())
 		return err
 	}
 
-	if err := userPod.Validate(); err != nil {
+	if err = userPod.Validate(); err != nil {
 		return err
 	}
 
@@ -147,12 +151,29 @@ func (daemon *Daemon) CreatePod(podId, podArgs string, config interface{}, autor
 	mypod.Handler.Data = daemon
 	mypod.Autoremove = autoremove
 
+	defer func() {
+		if err != nil {
+			if containerIds == nil {
+				daemon.DeletePodFromDB(podId)
+				if mypod != nil {
+					for _, c := range mypod.Containers {
+						glog.V(1).Infof("Ready to rm container: %s", c.Id)
+						if _, _, err = daemon.DockerCli.SendCmdDelete(c.Id); err != nil {
+							glog.Warningf("Error to rm container: %s", err.Error())
+						}
+					}
+				}
+				daemon.RemovePod(podId)
+				daemon.DeletePodContainerFromDB(podId)
+			}
+		}
+	}()
 	// store the UserPod into the db
-	if err := daemon.WritePodToDB(podId, []byte(podArgs)); err != nil {
+	if err = daemon.WritePodToDB(podId, []byte(podArgs)); err != nil {
 		glog.V(1).Info("Found an error while saveing the POD file")
 		return err
 	}
-	containerIds, err := daemon.GetPodContainersByName(podId)
+	containerIds, err = daemon.GetPodContainersByName(podId)
 	if err != nil {
 		glog.V(1).Info(err.Error())
 	}
@@ -174,10 +195,9 @@ func (daemon *Daemon) CreatePod(podId, podArgs string, config interface{}, autor
 		glog.V(1).Info("Process the Containers section in POD SPEC\n")
 		for _, c := range userPod.Containers {
 			imgName := c.Image
-			cId, _, err := daemon.DockerCli.SendCmdCreate(c.Name, imgName, []string{}, nil)
+			cId, _, err = daemon.DockerCli.SendCmdCreate(c.Name, imgName, []string{}, nil)
 			if err != nil {
 				glog.Error(err.Error())
-				daemon.DeletePodFromDB(podId)
 				return err
 			}
 			var (

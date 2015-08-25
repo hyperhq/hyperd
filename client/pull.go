@@ -7,6 +7,7 @@ import (
 
 	"github.com/hyperhq/hyper/lib/docker/pkg/parsers"
 	"github.com/hyperhq/hyper/lib/docker/registry"
+	"github.com/hyperhq/runv/hypervisor/pod"
 
 	gflag "github.com/jessevdk/go-flags"
 )
@@ -26,7 +27,10 @@ func (cli *HyperClient) HyperCmdPull(args ...string) error {
 			return nil
 		}
 	}
-	imageName := args[1]
+	return cli.PullImage(args[1])
+}
+
+func (cli *HyperClient) PullImage(imageName string) error {
 	remote, _ := parsers.ParseRepositoryTag(imageName)
 	// Resolve the Repository name from fqn to RepositoryInfo
 	repoInfo, err := registry.ParseRepositoryInfo(remote)
@@ -37,4 +41,17 @@ func (cli *HyperClient) HyperCmdPull(args ...string) error {
 	v.Set("imageName", imageName)
 	_, _, err = cli.clientRequestAttemptLogin("POST", "/image/create?"+v.Encode(), nil, cli.out, repoInfo.Index, "pull")
 	return err
+}
+
+func (cli *HyperClient) PullImages(data string) error {
+	userpod, err := pod.ProcessPodBytes([]byte(data))
+	if err != nil {
+		return err
+	}
+	for _, c := range userpod.Containers {
+		if err = cli.PullImage(c.Image); err != nil {
+			return err
+		}
+	}
+	return nil
 }
