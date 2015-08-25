@@ -53,8 +53,15 @@ func (cli *HyperClient) HyperCmdPod(args ...string) error {
 func (cli *HyperClient) CreatePod(jsonbody string) (string, error) {
 	v := url.Values{}
 	v.Set("podArgs", jsonbody)
-	body, _, err := readBody(cli.call("POST", "/pod/create?"+v.Encode(), nil, nil))
-	if err != nil {
+	body, statusCode, err := readBody(cli.call("POST", "/pod/create?"+v.Encode(), nil, nil))
+	if statusCode == 404 && strings.Contains(err.Error(), "could not find image: no such id") {
+		if err := cli.PullImages(jsonbody); err != nil {
+			return "", fmt.Errorf("failed to pull images: %s", err.Error())
+		}
+		if body, _, err = readBody(cli.call("POST", "/pod/create?"+v.Encode(), nil, nil)); err != nil {
+			return "", err
+		}
+	} else if err != nil {
 		return "", err
 	}
 	out := engine.NewOutput()
@@ -205,8 +212,15 @@ func (cli *HyperClient) RunPod(podstring string, autoremove bool) (string, error
 	} else {
 		v.Set("remove", "no")
 	}
-	body, _, err := readBody(cli.call("POST", "/pod/run?"+v.Encode(), nil, nil))
-	if err != nil {
+	body, statusCode, err := readBody(cli.call("POST", "/pod/run?"+v.Encode(), nil, nil))
+	if statusCode == 404 && strings.Contains(err.Error(), "could not find image: no such id") {
+		if err := cli.PullImages(podstring); err != nil {
+			return "", fmt.Errorf("failed to pull images: %s", err.Error())
+		}
+		if body, _, err = readBody(cli.call("POST", "/pod/create?"+v.Encode(), nil, nil)); err != nil {
+			return "", err
+		}
+	} else if err != nil {
 		return "", err
 	}
 	out := engine.NewOutput()
