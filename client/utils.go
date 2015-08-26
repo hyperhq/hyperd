@@ -82,11 +82,6 @@ func (cli *HyperClient) clientRequest(method, path string, in io.Reader, headers
 			return nil, "", statusCode, ErrConnectionRefused
 		}
 
-		/*
-			if cli.tlsConfig == nil {
-				return nil, "", statusCode, fmt.Errorf("%v. Are you trying to connect to a TLS-enabled daemon without TLS?", err)
-			}
-		*/
 		return nil, "", statusCode, fmt.Errorf("An error occurred trying to connect: %v", err)
 	}
 
@@ -98,10 +93,7 @@ func (cli *HyperClient) clientRequest(method, path string, in io.Reader, headers
 		if len(body) == 0 {
 			return nil, "", statusCode, fmt.Errorf("Error: request returned %s for API route and version %s, check if the server supports the requested API version", http.StatusText(statusCode), req.URL)
 		}
-		if len(bytes.TrimSpace(body)) > 150 {
-			return nil, "", statusCode, fmt.Errorf("Error from daemon's response")
-		}
-		return nil, "", statusCode, fmt.Errorf("%s", bytes.TrimSpace(body))
+		return nil, "", statusCode, fmt.Errorf("Error from daemon's response: %s", bytes.TrimSpace(body))
 	}
 
 	return resp.Body, resp.Header.Get("Content-Type"), statusCode, nil
