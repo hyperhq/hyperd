@@ -369,18 +369,23 @@ func (daemon *Daemon) PrepareContainer(mypod *hypervisor.Pod, userPod *pod.UserP
 			}
 			// get the uid and gid for that attached file
 			fileUser := f.User
-			fileGroup := f.Group
-			u, _ := user.Current()
-			if fileUser == "" {
-				uid = u.Uid
-			} else {
-				u, _ = user.Lookup(fileUser)
-				uid = u.Uid
-				gid = u.Gid
+
+			u, err := user.Current()
+			if err != nil {
+				glog.Error("got error when get current user ", err.Error())
+				return nil, err
 			}
-			if fileGroup == "" {
-				gid = u.Gid
+
+			if fileUser != "" {
+				u, err = user.Lookup(fileUser)
+				if err != nil {
+					glog.Error("got error when lookup user ", err.Error())
+					return nil, err
+				}
 			}
+
+			uid = u.Uid
+			gid = u.Gid
 
 			if storageDriver == "devicemapper" {
 				err := dm.AttachFiles(c.Id, devPrefix, fromFile, targetPath, rootPath, f.Perm, uid, gid)
