@@ -17,11 +17,6 @@ if test "x$has_go" != "xyes" ; then
     AC_MSG_ERROR(Unable to find go binary in PATH)
 fi
 
-AC_CHECK_PROG([has_godep], [godep], [yes], [no])
-if test "x$has_godep" != "xyes" ; then
-    AC_MSG_ERROR(Unable to find godep binary in PATH)
-fi
-
 AC_CHECK_PROG([has_sqlite3], [sqlite3], [yes], [no])
 if test "x$has_sqlite3" != "xyes" ; then
     AC_MSG_ERROR(Unable to find sqlite3 binary in PATH)
@@ -101,10 +96,13 @@ AC_OUTPUT
 
 AC_MSG_RESULT([
 	${PACKAGE}  ${VERSION}
+	build OS:   ${build_os}
 	prefix:	    ${prefix}
 
 	has go:     ${has_go}
-	has godep:  ${has_go}
 
 	with xen:   ${with_xen}
+
+	has sqlite3: ${has_sqlite3}
+	has virtualbox: ${has_virtualbox}
 ])

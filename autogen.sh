@@ -4,38 +4,20 @@ srcdir=`dirname $0`
 test -z "$srcdir" && srcidr=.
 
 cd $srcdir
-DIE=0
 
-test -f hyperd.go || {
+function die
+{
 	echo
-	echo "You must run this script in the top-level hyper directory."
+	echo "$1"
 	echo
-	DIE=1
-}
-
-(autoconf --version) < /dev/null > /dev/null 2>&1 || {
-	echo
-	echo "You must have autoconf installed to generate the hyper."
-	echo
-	DIE=1
-}
-
-(automake --version) < /dev/null > /dev/null 2>&1 || {
-	echo
-	echo "You must have automake installed to generate the hyper."
-	echo
-	DIE=1
-}
-(autoreconf --version) < /dev/null > /dev/null 2>&1 || {
-	echo
-	echo "You must have autoreconf installed to generate the hyper."
-	echo
-	DIE=1
-}
-
-if test "$DIE" -eq 1; then
 	exit 1
-fi
+}
+
+test -f hyperd.go || die "You must run this script in the top-level hyper directory."
+
+aclocal --version < /dev/null > /dev/null 2>&1 || die "You must have aclocal installed to generate the hyper."
+autoconf --version < /dev/null > /dev/null 2>&1 || die "You must have autoconf installed to generate the hyper."
+automake --version < /dev/null > /dev/null 2>&1 || die "You must have automake installed to generate the hyper."
 
 echo
 echo "Generating build-system with:"

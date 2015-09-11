@@ -17,6 +17,6 @@ install-exec-local:
 	$(INSTALL_PROGRAM) hyperd $(bindir)
 
 build-hyperd:
-	godep go build -tags "static_build $(HYPER_BULD_TAGS)" hyperd.go
+	go build -tags "static_build $(HYPER_BULD_TAGS)" hyperd.go
 build-hyper:
-	godep go build hyper.go
+	go build hyper.go
