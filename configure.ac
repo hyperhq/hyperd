@@ -96,9 +96,13 @@ AC_OUTPUT
 
 AC_MSG_RESULT([
 	${PACKAGE}  ${VERSION}
+	build OS:   ${build_os}
 	prefix:	    ${prefix}
 
 	has go:     ${has_go}
 
 	with xen:   ${with_xen}
+
+	has sqlite3: ${has_sqlite3}
+	has virtualbox: ${has_virtualbox}
 ])
