@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>os</key>
+  <array>
+		<string>10.10.3</string>
+  </array>
+  <key>bundle</key>
+  <array>
+    <dict>
+	    <key>id</key>
+	    <string>org.virtualbox.app.VirtualBox</string>
+      <key>path</key>
+      <string>/Applications/VirtualBox.app</string>
+      <key>CFBundleShortVersionString</key>
+      <string>5.0.0</string>
+    </dict>
+  </array>
+</dict>
+</plist>
