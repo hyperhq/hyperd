@@ -14,9 +14,12 @@ fi
 
 # clean puller vm
 if which vboxmanage &> /dev/null ; then
-	if vboxmanage showvminfo hyper-mac-puller &> /dev/null; then
-		vboxmanage controlvm hyper-mac-puller poweroff || true
-		vboxmanage unregistervm hyper-mac-puller --delete || true
+	if vboxmanage showvminfo hyper-mac-pull-vm &> /dev/null; then
+		vboxmanage controlvm hyper-mac-pull-vm poweroff || true
+		vboxmanage unregistervm hyper-mac-pull-vm --delete || true
 	fi
 fi
+
+rm -rf /var/run/hyper/vm/hyper-mac-pull-vm
+rm -rf /var/run/hyper/hyper-mac-pull-vm
 

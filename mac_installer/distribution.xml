@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<installer-gui-script minSpecVersion="2">
+    <welcome    file="welcome.html"    mime-type="text/html" />
+    <license    file="license.html"    mime-type="text/plain" />
+    <conclusion file="conclusion.html" mime-type="text/html" />
+    <background file="./background.png" mime-type="image/png" scaling="tofit"/>
+    <pkg-ref id="sh.hyper.hyper"/>
+    <options customize="never" require-scripts="false"/>
+    <volume-check>
+        <allowed-os-versions>
+            <os-version min="10.10.3"/>
+        </allowed-os-versions>
+        <required-bundles all="true" description="Hyper requires VirtualBox 5.0 or later">
+            <bundle
+              CFBundleShortVersionString="5.0.0"
+              id="org.virtualbox.app.VirtualBox"
+              path="/Applications/VirtualBox.app" search="false"/>
+        </required-bundles>
+    </volume-check>
+    <domains
+      enable_anywhere="true"
+      enable_currentUserHome="false"
+      enable_localSystem="true"/>
+    <choices-outline>
+        <line choice="default">
+            <line choice="sh.hyper.hyper"/>
+        </line>
+    </choices-outline>
+    <choice id="default"/>
+    <choice id="sh.hyper.hyper" visible="false">
+        <pkg-ref id="sh.hyper.hyper"/>
+    </choice>
+    <pkg-ref id="sh.hyper.hyper" onConclusion="none">output.pkg</pkg-ref>
+</installer-gui-script>
