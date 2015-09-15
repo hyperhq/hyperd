@@ -18,7 +18,7 @@ import (
 
 var (
 	GITCOMMIT string = "0"
-	VERSION   string = "0.3.0"
+	VERSION   string
 
 	IAMSTATIC string = "true"
 	INITSHA1  string = ""
