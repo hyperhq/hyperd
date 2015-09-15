@@ -30,5 +30,5 @@
     <choice id="sh.hyper.hyper" visible="false">
         <pkg-ref id="sh.hyper.hyper"/>
     </choice>
-    <pkg-ref id="sh.hyper.hyper" version="0.4.0" onConclusion="none">output.pkg</pkg-ref>
+    <pkg-ref id="sh.hyper.hyper" onConclusion="none">output.pkg</pkg-ref>
 </installer-gui-script>
