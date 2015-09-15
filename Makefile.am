@@ -9,6 +9,8 @@ if ON_DARWIN
 SUBDIRS=mac_installer
 endif
 
+VERSION_PARAM=-ldflags "-X github.com/hyperhq/hyper/utils.VERSION $(VERSION)"
+
 all-local: build-hyperd build-hyper
 clean-local:
 	-rm -f hyperd hyper
@@ -17,6 +19,6 @@ install-exec-local:
 	$(INSTALL_PROGRAM) hyperd $(bindir)
 
 build-hyperd:
-	go build -tags "static_build $(HYPER_BULD_TAGS)" hyperd.go
+	go build -tags "static_build $(HYPER_BULD_TAGS)" $(VERSION_PARAM) hyperd.go
 build-hyper:
-	go build hyper.go
+	go build $(VERSION_PARAM) hyper.go
