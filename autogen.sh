@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 srcdir=`dirname $0`
 test -z "$srcdir" && srcidr=.
