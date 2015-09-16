@@ -114,21 +114,7 @@ func mainDaemon(config, host string, flDisableIptables bool) {
 		glog.Errorf("Read config file (%s) failed, %s", config, err.Error())
 		return
 	}
-	driver, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Hypervisor")
-	if runtime.GOOS == "darwin" {
-		driver = "vbox"
-	} else {
-		if driver == "" {
-			// We need to provide a defaut exec drvier
-			var drivers = []string{"kvm", "xen", "vbox"}
-			driver = utils.GetAvailableDriver(drivers)
-		}
-		driver = strings.ToLower(driver)
-	}
-	if driver == "" || (driver != "kvm" && driver != "xen" && driver != "vbox") {
-		fmt.Printf("Please specify the exec driver, such as 'kvm', 'xen' or 'vbox'\n")
-		return
-	}
+
 	hyperRoot, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Root")
 	iso, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Vbox")
 
@@ -152,11 +138,34 @@ func mainDaemon(config, host string, flDisableIptables bool) {
 		return
 	}
 
-	if hypervisor.HDriver, err = driverloader.Probe(driver); err != nil {
-		glog.Errorf("%s\n", err.Error())
-		return
+	driver, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Hypervisor")
+	if runtime.GOOS == "darwin" {
+		driver = "vbox"
+		if hypervisor.HDriver, err = driverloader.Probe(driver); err != nil {
+			glog.Errorf("%s\n", err.Error())
+			return
+		}
+	} else {
+		if driver == "" {
+			// We need to provide a defaut exec drvier
+			var drivers = []string{"xen", "kvm", "vbox"}
+			for _, dri := range drivers {
+				driver = strings.ToLower(dri)
+				if hypervisor.HDriver, err = driverloader.Probe(driver); err != nil {
+					glog.Warningf("%s\n", err.Error())
+					continue
+				} else {
+					break
+				}
+			}
+		}
+		if driver == "" || (driver != "kvm" && driver != "xen" && driver != "vbox") {
+			glog.Errorf("Please specify the exec driver, such as 'kvm', 'xen' or 'vbox'\n")
+			return
+		}
 	}
 	d.Hypervisor = driver
+	glog.Infof("The hypervisor's driver is %s", driver)
 
 	disableIptables := cfg.MustBool(goconfig.DEFAULT_SECTION, "DisableIptables", false)
 	if err = hypervisor.InitNetwork(d.BridgeIface, d.BridgeIP, disableIptables || flDisableIptables); err != nil {
