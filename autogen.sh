@@ -5,7 +5,7 @@ test -z "$srcdir" && srcidr=.
 
 cd $srcdir
 
-function die
+die()
 {
 	echo
 	echo "$1"
