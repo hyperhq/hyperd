@@ -440,11 +440,11 @@ func (daemon *Daemon) PrepareContainer(mypod *hypervisor.Pod, userPod *pod.UserP
 func (daemon *Daemon) PrepareVolume(mypod *hypervisor.Pod, userPod *pod.UserPod,
 	vmId string) ([]*hypervisor.VolumeInfo, error) {
 	var (
-		fstype            string
-		volPoolName       string
-		err               error
-		sharedDir         = path.Join(hypervisor.BaseDir, vmId, hypervisor.ShareDirTag)
-		volumeInfoList    = []*hypervisor.VolumeInfo{}
+		fstype         string
+		volPoolName    string
+		err            error
+		sharedDir      = path.Join(hypervisor.BaseDir, vmId, hypervisor.ShareDirTag)
+		volumeInfoList = []*hypervisor.VolumeInfo{}
 	)
 
 	// Process the 'Volumes' section

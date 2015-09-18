@@ -1,7 +1,5 @@
 package types
 
-import ()
-
 // Pod JSON Data Structure
 type Container struct {
 	Name            string           `json:"name"`
