@@ -182,7 +182,7 @@ func (s *session) newManifest(rec *sessionRecord, v *version) (err error) {
 		defer v.release()
 	}
 	if rec == nil {
-		rec = &sessionRecord{numLevel: s.o.GetNumLevel()}
+		rec = &sessionRecord{}
 	}
 	s.fillRecord(rec, true)
 	v.fillRecord(rec)
@@ -240,9 +240,11 @@ func (s *session) flushManifest(rec *sessionRecord) (err error) {
 	if err != nil {
 		return
 	}
-	err = s.manifestWriter.Sync()
-	if err != nil {
-		return
+	if !s.o.GetNoSync() {
+		err = s.manifestWriter.Sync()
+		if err != nil {
+			return
+		}
 	}
 	s.recordCommited(rec)
 	return

@@ -6,10 +6,13 @@
 package patricia
 
 import (
+	"runtime"
 	"testing"
 )
 
 // Tests -----------------------------------------------------------------------
+
+const overhead = 256
 
 func TestTrie_InsertDense(t *testing.T) {
 	trie := NewTrie()
@@ -158,4 +161,64 @@ func TestTrie_DeleteDense(t *testing.T) {
 			t.Errorf("Unexpected return value, expected=%v, got=%v", v.retVal, ok)
 		}
 	}
+}
+
+func TestTrie_DeleteLeakageDense(t *testing.T) {
+	trie := NewTrie()
+
+	data := []testData{
+		{"aba", 0, success},
+		{"abb", 1, success},
+		{"abc", 2, success},
+		{"abd", 3, success},
+		{"abe", 4, success},
+		{"abf", 5, success},
+		{"abg", 6, success},
+		{"abh", 7, success},
+		{"abi", 8, success},
+		{"abj", 9, success},
+		{"abk", 0, success},
+		{"abl", 1, success},
+		{"abm", 2, success},
+		{"abn", 3, success},
+		{"abo", 4, success},
+		{"abp", 5, success},
+		{"abq", 6, success},
+		{"abr", 7, success},
+		{"abs", 8, success},
+		{"abt", 9, success},
+		{"abu", 0, success},
+		{"abv", 1, success},
+		{"abw", 2, success},
+		{"abx", 3, success},
+		{"aby", 4, success},
+		{"abz", 5, success},
+	}
+
+	oldBytes := heapAllocatedBytes()
+
+	for _, v := range data {
+		if ok := trie.Insert(Prefix(v.key), v.value); ok != v.retVal {
+			t.Errorf("Unexpected return value, expected=%v, got=%v", v.retVal, ok)
+		}
+	}
+
+	for _, v := range data {
+		if ok := trie.Delete([]byte(v.key)); ok != v.retVal {
+			t.Errorf("Unexpected return value, expected=%v, got=%v", v.retVal, ok)
+		}
+	}
+
+	if newBytes := heapAllocatedBytes(); newBytes > oldBytes+overhead {
+		t.Logf("Size=%d, Total=%d, Trie state:\n%s\n", trie.size(), trie.total(), trie.dump())
+		t.Errorf("Heap space leak, grew from %d to %d bytes\n", oldBytes, newBytes)
+	}
+}
+
+func heapAllocatedBytes() uint64 {
+	runtime.GC()
+
+	ms := runtime.MemStats{}
+	runtime.ReadMemStats(&ms)
+	return ms.Alloc
 }
