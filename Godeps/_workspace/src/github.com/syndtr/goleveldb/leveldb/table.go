@@ -287,6 +287,7 @@ func (x *tFilesSortByNum) Less(i, j int) bool {
 // Table operations.
 type tOps struct {
 	s      *session
+	noSync bool
 	cache  *cache.Cache
 	bcache *cache.Cache
 	bpool  *util.BufferPool
@@ -441,22 +442,27 @@ func newTableOps(s *session) *tOps {
 	var (
 		cacher cache.Cacher
 		bcache *cache.Cache
+		bpool  *util.BufferPool
 	)
 	if s.o.GetOpenFilesCacheCapacity() > 0 {
 		cacher = cache.NewLRU(s.o.GetOpenFilesCacheCapacity())
 	}
-	if !s.o.DisableBlockCache {
+	if !s.o.GetDisableBlockCache() {
 		var bcacher cache.Cacher
 		if s.o.GetBlockCacheCapacity() > 0 {
 			bcacher = cache.NewLRU(s.o.GetBlockCacheCapacity())
 		}
 		bcache = cache.NewCache(bcacher)
 	}
+	if !s.o.GetDisableBufferPool() {
+		bpool = util.NewBufferPool(s.o.GetBlockSize() + 5)
+	}
 	return &tOps{
 		s:      s,
+		noSync: s.o.GetNoSync(),
 		cache:  cache.NewCache(cacher),
 		bcache: bcache,
-		bpool:  util.NewBufferPool(s.o.GetBlockSize() + 5),
+		bpool:  bpool,
 	}
 }
 
@@ -501,9 +507,11 @@ func (w *tWriter) finish() (f *tFile, err error) {
 	if err != nil {
 		return
 	}
-	err = w.w.Sync()
-	if err != nil {
-		return
+	if !w.t.noSync {
+		err = w.w.Sync()
+		if err != nil {
+			return
+		}
 	}
 	f = newTableFile(w.file, uint64(w.tw.BytesLen()), iKey(w.first), iKey(w.last))
 	return

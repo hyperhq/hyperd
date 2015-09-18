@@ -417,6 +417,35 @@ func TestParticiaTrie_Delete(t *testing.T) {
 	}
 }
 
+func TestParticiaTrie_DeleteLeakageSparse(t *testing.T) {
+	trie := NewTrie()
+
+	data := []testData{
+		{"Pepan", "Pepan Zdepan", success},
+		{"Honza", "Honza Novak", success},
+		{"Jenik", "Jenik Poustevnicek", success},
+	}
+
+	oldBytes := heapAllocatedBytes()
+
+	for _, v := range data {
+		if ok := trie.Insert([]byte(v.key), v.value); ok != v.retVal {
+			t.Fatalf("Unexpected return value, expected=%v, got=%v", v.retVal, ok)
+		}
+	}
+
+	for _, v := range data {
+		if ok := trie.Delete([]byte(v.key)); ok != v.retVal {
+			t.Errorf("Unexpected return value, expected=%v, got=%v", v.retVal, ok)
+		}
+	}
+
+	if newBytes := heapAllocatedBytes(); newBytes > oldBytes+overhead {
+		t.Logf("Size=%d, Total=%d, Trie state:\n%s\n", trie.size(), trie.total(), trie.dump())
+		t.Errorf("Heap space leak, grew from %d to %d bytes\n", oldBytes, newBytes)
+	}
+}
+
 func TestParticiaTrie_DeleteNonExistent(t *testing.T) {
 	trie := NewTrie()
 

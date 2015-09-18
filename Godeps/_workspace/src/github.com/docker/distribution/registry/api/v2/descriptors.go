@@ -124,7 +124,7 @@ var (
 			},
 		},
 		ErrorCodes: []errcode.ErrorCode{
-			ErrorCodeUnauthorized,
+			errcode.ErrorCodeUnauthorized,
 		},
 		Body: BodyDescriptor{
 			ContentType: "application/json; charset=utf-8",
@@ -145,7 +145,7 @@ var (
 			},
 		},
 		ErrorCodes: []errcode.ErrorCode{
-			ErrorCodeUnauthorized,
+			errcode.ErrorCodeUnauthorized,
 		},
 		Body: BodyDescriptor{
 			ContentType: "application/json; charset=utf-8",
@@ -374,7 +374,7 @@ var routeDescriptors = []RouteDescriptor{
 									Format:      errorsBody,
 								},
 								ErrorCodes: []errcode.ErrorCode{
-									ErrorCodeUnauthorized,
+									errcode.ErrorCodeUnauthorized,
 								},
 							},
 							{
@@ -451,7 +451,7 @@ var routeDescriptors = []RouteDescriptor{
 									Format:      errorsBody,
 								},
 								ErrorCodes: []errcode.ErrorCode{
-									ErrorCodeUnauthorized,
+									errcode.ErrorCodeUnauthorized,
 								},
 							},
 						},
@@ -506,7 +506,7 @@ var routeDescriptors = []RouteDescriptor{
 									Format:      errorsBody,
 								},
 								ErrorCodes: []errcode.ErrorCode{
-									ErrorCodeUnauthorized,
+									errcode.ErrorCodeUnauthorized,
 								},
 							},
 						},
@@ -568,7 +568,7 @@ var routeDescriptors = []RouteDescriptor{
 									Format:      errorsBody,
 								},
 								ErrorCodes: []errcode.ErrorCode{
-									ErrorCodeUnauthorized,
+									errcode.ErrorCodeUnauthorized,
 								},
 							},
 							{
@@ -645,7 +645,7 @@ var routeDescriptors = []RouteDescriptor{
 									Format:      errorsBody,
 								},
 								ErrorCodes: []errcode.ErrorCode{
-									ErrorCodeUnauthorized,
+									errcode.ErrorCodeUnauthorized,
 								},
 							},
 							{
@@ -682,11 +682,19 @@ var routeDescriptors = []RouteDescriptor{
 									},
 								},
 								ErrorCodes: []errcode.ErrorCode{
-									ErrorCodeUnauthorized,
+									errcode.ErrorCodeUnauthorized,
 								},
 								Body: BodyDescriptor{
 									ContentType: "application/json; charset=utf-8",
 									Format:      errorsBody,
+								},
+							},
+							{
+								Name:        "Not allowed",
+								Description: "Manifest put is not allowed because the registry is configured as a pull-through cache or for some other reason",
+								StatusCode:  http.StatusMethodNotAllowed,
+								ErrorCodes: []errcode.ErrorCode{
+									errcode.ErrorCodeUnsupported,
 								},
 							},
 						},
@@ -737,7 +745,7 @@ var routeDescriptors = []RouteDescriptor{
 									},
 								},
 								ErrorCodes: []errcode.ErrorCode{
-									ErrorCodeUnauthorized,
+									errcode.ErrorCodeUnauthorized,
 								},
 								Body: BodyDescriptor{
 									ContentType: "application/json; charset=utf-8",
@@ -755,6 +763,14 @@ var routeDescriptors = []RouteDescriptor{
 								Body: BodyDescriptor{
 									ContentType: "application/json; charset=utf-8",
 									Format:      errorsBody,
+								},
+							},
+							{
+								Name:        "Not allowed",
+								Description: "Manifest delete is not allowed because the registry is configured as a pull-through cache or `delete` has been disabled.",
+								StatusCode:  http.StatusMethodNotAllowed,
+								ErrorCodes: []errcode.ErrorCode{
+									errcode.ErrorCodeUnsupported,
 								},
 							},
 						},
@@ -967,14 +983,14 @@ var routeDescriptors = []RouteDescriptor{
 								},
 							},
 							{
-								Description: "Delete is not enabled on the registry",
+								Description: "Blob delete is not allowed because the registry is configured as a pull-through cache or `delete` has been disabled",
 								StatusCode:  http.StatusMethodNotAllowed,
 								Body: BodyDescriptor{
 									ContentType: "application/json; charset=utf-8",
 									Format:      errorsBody,
 								},
 								ErrorCodes: []errcode.ErrorCode{
-									ErrorCodeUnsupported,
+									errcode.ErrorCodeUnsupported,
 								},
 							},
 						},
@@ -1051,6 +1067,14 @@ var routeDescriptors = []RouteDescriptor{
 								},
 							},
 							unauthorizedResponsePush,
+							{
+								Name:        "Not allowed",
+								Description: "Blob upload is not allowed because the registry is configured as a pull-through cache or for some other reason",
+								StatusCode:  http.StatusMethodNotAllowed,
+								ErrorCodes: []errcode.ErrorCode{
+									errcode.ErrorCodeUnsupported,
+								},
+							},
 						},
 					},
 					{
@@ -1389,6 +1413,7 @@ var routeDescriptors = []RouteDescriptor{
 									ErrorCodeDigestInvalid,
 									ErrorCodeNameInvalid,
 									ErrorCodeBlobUploadInvalid,
+									errcode.ErrorCodeUnsupported,
 								},
 								Body: BodyDescriptor{
 									ContentType: "application/json; charset=utf-8",
