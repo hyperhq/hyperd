@@ -6,7 +6,7 @@ Hyper - Hypervisor-agnostic Docker Runtime
 
 **Hyper is a hypervisor-agnostic tool that allows you to run Docker images on any hypervisor**.
 
-![](https://trello-attachments.s3.amazonaws.com/5551c49246960a31feab3d35/508x224/3b4cc5009489f917b7394a40b6cb57ec/upload_5_29_2015_at_12_56_51_AM.png)
+![](docs/static_files/hyper-run.png)
 
 ## Why Hyper?
 -----------
