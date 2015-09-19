@@ -1,7 +1,5 @@
 package types
 
-import ()
-
 // Container JSON Data Structure
 type ContainerPort struct {
 	Name          string `json:"name"`
