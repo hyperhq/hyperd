@@ -48,11 +48,11 @@ func (daemon *Daemon) CmdTty(job *engine.Job) (err error) {
 
 	row, err := strconv.Atoi(h)
 	if err != nil {
-		glog.Warning("Window row %s incorrect!", h)
+		glog.Warningf("Window row %s incorrect!", h)
 	}
 	column, err := strconv.Atoi(w)
 	if err != nil {
-		glog.Warning("Window column %s incorrect!", h)
+		glog.Warningf("Window column %s incorrect!", h)
 	}
 
 	err = vm.Tty(tag, row, column)

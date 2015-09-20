@@ -31,7 +31,7 @@ func NewTCPProxy(frontendAddr, backendAddr *net.TCPAddr) (*TCPProxy, error) {
 func (proxy *TCPProxy) clientLoop(client *net.TCPConn, quit chan bool) {
 	backend, err := net.DialTCP("tcp", nil, proxy.backendAddr)
 	if err != nil {
-		glog.Infof("Can't forward traffic to backend tcp/%v: %s\n", proxy.backendAddr, err)
+		glog.Infof("Can't forward traffic to backend tcp/%v: %s", proxy.backendAddr, err)
 		client.Close()
 		return
 	}

@@ -43,13 +43,13 @@ func (job *Job) Run() (err error) {
 		// Wait for all background tasks to complete
 		if job.closeIO {
 			if err := job.Stdout.Close(); err != nil {
-				glog.Errorf("%s\n", err)
+				glog.Errorf("%v", err)
 			}
 			if err := job.Stderr.Close(); err != nil {
-				glog.Errorf("%s\n", err)
+				glog.Errorf("%v", err)
 			}
 			if err := job.Stdin.Close(); err != nil {
-				glog.Errorf("%s\n", err)
+				glog.Errorf("%v", err)
 			}
 		}
 	}()
@@ -75,18 +75,18 @@ func (job *Job) Run() (err error) {
 	}
 	// Log beginning and end of the job
 	if job.Eng.Logging {
-		glog.V(0).Infof("+job %s\n", job.CallString())
+		glog.V(0).Infof("+job %s", job.CallString())
 		defer func() {
 			okerr := "OK"
 			if err != nil {
 				okerr = fmt.Sprintf("ERR: %s", err)
 			}
-			glog.V(0).Infof("-job %s %s\n", job.CallString(), okerr)
+			glog.V(0).Infof("-job %s %s", job.CallString(), okerr)
 		}()
 	}
 
 	if job.handler == nil {
-		return fmt.Errorf("%s: command not found\n", job.Name)
+		return fmt.Errorf("%s: command not found", job.Name)
 	}
 
 	var errorMessage = bytes.NewBuffer(nil)

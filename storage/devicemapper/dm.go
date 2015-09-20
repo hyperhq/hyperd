@@ -94,7 +94,7 @@ func AttachFiles(containerId, devPrefix, fromFile, toDir, rootPath, perm, uid, g
 	if err != nil {
 		return err
 	}
-	glog.V(3).Infof("The filesytem type is %s\n", fstype)
+	glog.V(3).Infof("The filesytem type is %s", fstype)
 	options := ""
 	if fstype == "xfs" {
 		// XFS needs nouuid or it can't mount filesystems with the same fs

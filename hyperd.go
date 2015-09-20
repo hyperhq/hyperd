@@ -134,7 +134,7 @@ func mainDaemon(config, host string, flDisableIptables bool) {
 
 	d, err := daemon.NewDaemon(eng)
 	if err != nil {
-		glog.Errorf("The hyperd create failed, %s\n", err.Error())
+		glog.Errorf("The hyperd create failed, %s", err.Error())
 		return
 	}
 
@@ -153,7 +153,7 @@ func mainDaemon(config, host string, flDisableIptables bool) {
 	for _, dri := range drivers {
 		driver := strings.ToLower(dri)
 		if hypervisor.HDriver, err = driverloader.Probe(driver); err != nil {
-			glog.Warningf("%s\n", err.Error())
+			glog.Warningf("%s", err.Error())
 			continue
 		} else {
 			d.Hypervisor = driver
@@ -163,13 +163,13 @@ func mainDaemon(config, host string, flDisableIptables bool) {
 	}
 
 	if hypervisor.HDriver == nil {
-		glog.Errorf("Please specify the exec driver, such as 'kvm', 'xen' or 'vbox'\n")
+		glog.Errorf("Please specify the exec driver, such as 'kvm', 'xen' or 'vbox'")
 		return
 	}
 
 	disableIptables := cfg.MustBool(goconfig.DEFAULT_SECTION, "DisableIptables", false)
 	if err = hypervisor.InitNetwork(d.BridgeIface, d.BridgeIP, disableIptables || flDisableIptables); err != nil {
-		glog.Errorf("InitNetwork failed, %s\n", err.Error())
+		glog.Errorf("InitNetwork failed, %s", err.Error())
 		return
 	}
 
@@ -188,11 +188,11 @@ func mainDaemon(config, host string, flDisableIptables bool) {
 
 	// Install the accepted jobs
 	if err := d.Install(eng); err != nil {
-		glog.Errorf("The hyperd install failed, %s\n", err.Error())
+		glog.Errorf("The hyperd install failed, %s", err.Error())
 		return
 	}
 
-	glog.V(0).Infof("Hyper daemon: %s %s\n",
+	glog.V(0).Infof("Hyper daemon: %s %s",
 		utils.VERSION,
 		utils.GITCOMMIT,
 	)
@@ -200,7 +200,7 @@ func mainDaemon(config, host string, flDisableIptables bool) {
 	// after the daemon is done setting up we can tell the api to start
 	// accepting connections
 	if err := eng.Job("acceptconnections").Run(); err != nil {
-		glog.Error("the acceptconnections job run failed!\n")
+		glog.Error("the acceptconnections job run failed!")
 		return
 	}
 	defaultHost := []string{}
@@ -220,14 +220,14 @@ func mainDaemon(config, host string, flDisableIptables bool) {
 	serveAPIWait := make(chan error)
 	go func() {
 		if err := job.Run(); err != nil {
-			glog.Errorf("ServeAPI error: %v\n", err)
+			glog.Errorf("ServeAPI error: %v", err)
 			serveAPIWait <- err
 			return
 		}
 		serveAPIWait <- nil
 	}()
 
-	glog.V(0).Info("Daemon has completed initialization\n")
+	glog.V(0).Info("Daemon has completed initialization")
 
 	if err := d.Restore(); err != nil {
 		glog.Warningf("Fail to restore the previous VM")
@@ -242,7 +242,7 @@ func mainDaemon(config, host string, flDisableIptables bool) {
 		// exited the daemon process above)
 		eng.Shutdown()
 		if errAPI != nil {
-			glog.Warningf("Shutting down due to ServeAPI error: %v\n", errAPI)
+			glog.Warningf("Shutting down due to ServeAPI error: %v", errAPI)
 		}
 		break
 	case <-stop:

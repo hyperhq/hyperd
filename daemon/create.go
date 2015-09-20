@@ -28,7 +28,7 @@ func (daemon *Daemon) CmdCreate(job *engine.Job) error {
 	containerId := remoteInfo.Get("Id")
 	if containerId != "" {
 		v.Set("ContainerID", containerId)
-		glog.V(3).Infof("The ContainerID is %s\n", containerId)
+		glog.V(3).Infof("The ContainerID is %s", containerId)
 	} else {
 		return fmt.Errorf("Hyper ERROR: AN error encountered during creating container!\n")
 	}
