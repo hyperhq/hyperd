@@ -1,4 +1,4 @@
-export GOPATH:=$(abs_top_srcdir)/Godeps/_workspace:$(GOPATH)
+override GOPATH:=$(abs_top_srcdir:/src/github.com/hyperhq/hyper=):$(abs_top_srcdir)/Godeps/_workspace:$(GOPATH)
 if WITH_XEN
 HYPER_BULD_TAGS=with_xen libdm_no_deferred_remove
 else
