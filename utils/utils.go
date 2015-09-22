@@ -146,33 +146,8 @@ func JSONMarshal(v interface{}, safeEncoding bool) ([]byte, error) {
 	return b, err
 }
 
-type Data struct {
-	Root string `json:root`
-	ISO  string `json:iso`
-}
-
 func SetDaemon(d interface{}) {
 	HYPER_DAEMON = d
-}
-
-func SetHyperEnv(file, rootpath, isopath string) error {
-	HYPER_ROOT = rootpath
-	f, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE, 0666)
-	if err != nil {
-		return err
-	}
-	var d = Data{
-		Root: rootpath,
-		ISO:  isopath,
-	}
-	var str []byte
-	str, err = json.Marshal(d)
-	if err != nil {
-		return err
-	}
-	fmt.Fprintf(f, string(str))
-	defer f.Close()
-	return nil
 }
 
 func GetAvailableDriver(drivers []string) string {

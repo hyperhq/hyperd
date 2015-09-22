@@ -116,11 +116,11 @@ func mainDaemon(config, host string, flDisableIptables bool) {
 	}
 
 	hyperRoot, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Root")
-	iso, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Vbox")
 
 	if hyperRoot == "" {
 		hyperRoot = "/var/lib/hyper"
 	}
+	utils.HYPER_ROOT = hyperRoot
 	if _, err := os.Stat(hyperRoot); err != nil {
 		if err := os.MkdirAll(hyperRoot, 0755); err != nil {
 			glog.Errorf(err.Error())
@@ -128,7 +128,6 @@ func mainDaemon(config, host string, flDisableIptables bool) {
 		}
 	}
 
-	utils.SetHyperEnv(fmt.Sprintf("%s/.hyperconfig", os.Getenv("HOME")), hyperRoot, iso)
 	eng := engine.New(config)
 	docker.Init()
 
