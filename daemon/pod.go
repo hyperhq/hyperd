@@ -192,7 +192,7 @@ func (daemon *Daemon) CreatePod(podId, podArgs string, config interface{}, autor
 		}
 	} else {
 		// Process the 'Containers' section
-		glog.V(1).Info("Process the Containers section in POD SPEC\n")
+		glog.V(1).Info("Process the Containers section in POD SPEC")
 		for _, c := range userPod.Containers {
 			imgName := c.Image
 			cId, _, err = daemon.DockerCli.SendCmdCreate(c.Name, imgName, []string{}, nil)
@@ -453,7 +453,7 @@ func (daemon *Daemon) PrepareVolume(mypod *hypervisor.Pod, userPod *pod.UserPod,
 			if daemon.Storage.StorageType == "devicemapper" {
 				volName := fmt.Sprintf("%s-%s-%s", volPoolName, mypod.Id, v.Name)
 				dev_id, _ := daemon.GetVolumeId(mypod.Id, volName)
-				glog.Error("DeviceID is %d", dev_id)
+				glog.Warningf("DeviceID is %d", dev_id)
 				if dev_id < 1 {
 					dev_id, _ = daemon.GetMaxDeviceId()
 					err := daemon.CreateVolume(mypod.Id, volName, fmt.Sprintf("%d", dev_id+1), false)

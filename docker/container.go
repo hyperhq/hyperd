@@ -7,7 +7,7 @@ import (
 
 func (cli *Docker) GetContainerInfo(args ...string) (*types.ContainerJSONRaw, error) {
 	containerId := args[0]
-	glog.V(1).Infof("ready to get the container(%s) info\n", containerId)
+	glog.V(1).Infof("ready to get the container(%s) info", containerId)
 	containerJSONRaw, err := cli.daemon.ContainerInspectRaw(containerId)
 	if err != nil {
 		return nil, err

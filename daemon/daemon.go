@@ -102,7 +102,7 @@ func (daemon *Daemon) Install(eng *engine.Engine) error {
 		"images":       daemon.CmdImages,
 		"imagesremove": daemon.CmdImagesRemove,
 	} {
-		glog.V(3).Infof("Engine Register: name= %s\n", name)
+		glog.V(3).Infof("Engine Register: name= %s", name)
 		if err := eng.Register(name, method); err != nil {
 			return err
 		}
@@ -144,7 +144,7 @@ func (daemon *Daemon) Restore() error {
 	for k, v := range podList {
 		err = daemon.CreatePod(k, v, nil, false)
 		if err != nil {
-			glog.Warning("Got a unexpected error, %s", err.Error())
+			glog.Warningf("Got a unexpected error, %s", err.Error())
 			continue
 		}
 		vmId, err := daemon.GetVmByPod(k)
@@ -226,7 +226,7 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 	)
 	db, err := leveldb.OpenFile(db_file, nil)
 	if err != nil {
-		glog.Errorf("open leveldb file failed, %s\n", err.Error())
+		glog.Errorf("open leveldb file failed, %s", err.Error())
 		return nil, err
 	}
 	dockerCli, err1 := NewDocker()

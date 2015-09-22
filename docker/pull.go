@@ -28,8 +28,8 @@ func (cli Docker) SendCmdPull(image string, imagePullConfig *graph.ImagePullConf
 		}
 	}
 
-	glog.V(3).Infof("The Repository is %s, and the tag is %s\n", repository, tag)
-	glog.V(3).Info("pull the image from the repository!\n")
+	glog.V(3).Infof("The Repository is %s, and the tag is %s", repository, tag)
+	glog.V(3).Info("pull the image from the repository!")
 	err := cli.daemon.Repositories().Pull(repository, tag, imagePullConfig)
 	if err != nil {
 		return nil, -1, err

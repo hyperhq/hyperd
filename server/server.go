@@ -183,7 +183,7 @@ func getList(eng *engine.Engine, version version.Version, w http.ResponseWriter,
 		return nil
 	}
 
-	glog.V(1).Infof("List type is %s\n", r.Form.Get("item"))
+	glog.V(1).Infof("List type is %s", r.Form.Get("item"))
 	job := eng.Job("list", r.Form.Get("item"))
 	stdoutBuf := bytes.NewBuffer(nil)
 
@@ -300,7 +300,7 @@ func postStop(eng *engine.Engine, version version.Version, w http.ResponseWriter
 		return nil
 	}
 
-	glog.V(1).Infof("Stop the POD name is %s\n", r.Form.Get("podName"))
+	glog.V(1).Infof("Stop the POD name is %s", r.Form.Get("podName"))
 	job := eng.Job("podStop", r.Form.Get("podId"), r.Form.Get("stopVm"))
 	stdoutBuf := bytes.NewBuffer(nil)
 	job.Stdout.Add(stdoutBuf)
@@ -353,7 +353,7 @@ func postExec(eng *engine.Engine, version version.Version, w http.ResponseWriter
 	// Now run the user process in container.
 	job.SetCloseIO(false)
 	if err := job.Run(); err != nil {
-		fmt.Fprintf(errOut, "Error starting exec command in POD %s: %s\n", r.Form.Get("podname"), err.Error())
+		fmt.Fprintf(errOut, "Error starting exec command in POD %s: %s", r.Form.Get("podname"), err.Error())
 		return err
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -423,7 +423,7 @@ func postContainerCreate(eng *engine.Engine, version version.Version, w http.Res
 		return nil
 	}
 
-	glog.V(1).Infof("Image name is %s\n", r.Form.Get("imageName"))
+	glog.V(1).Infof("Image name is %s", r.Form.Get("imageName"))
 	job := eng.Job("create", r.Form.Get("imageName"))
 	stdoutBuf := bytes.NewBuffer(nil)
 	stderrBuf := bytes.NewBuffer(nil)
@@ -453,7 +453,7 @@ func postContainerCommit(eng *engine.Engine, version version.Version, w http.Res
 		return nil
 	}
 
-	glog.V(1).Infof("container ID is %s\n", r.Form.Get("container"))
+	glog.V(1).Infof("container ID is %s", r.Form.Get("container"))
 	job := eng.Job("commit", r.Form.Get("container"), r.Form.Get("repo"), r.Form.Get("author"), r.Form.Get("change"), r.Form.Get("message"), r.Form.Get("pause"))
 	stdoutBuf := bytes.NewBuffer(nil)
 
@@ -512,7 +512,7 @@ func postPodCreate(eng *engine.Engine, version version.Version, w http.ResponseW
 		return nil
 	}
 
-	glog.V(1).Infof("Args string is %s\n", r.Form.Get("podArgs"))
+	glog.V(1).Infof("Args string is %s", r.Form.Get("podArgs"))
 	job := eng.Job("podCreate", r.Form.Get("podArgs"))
 	stdoutBuf := bytes.NewBuffer(nil)
 
@@ -677,7 +677,7 @@ func postImageCreate(eng *engine.Engine, version version.Version, w http.Respons
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	glog.V(1).Infof("Image name is %s\n", r.Form.Get("imageName"))
+	glog.V(1).Infof("Image name is %s", r.Form.Get("imageName"))
 	job := eng.Job("pull", r.Form.Get("imageName"))
 
 	output := ioutils.NewWriteFlusher(w)
@@ -706,7 +706,7 @@ func postImageBuild(eng *engine.Engine, version version.Version, w http.Response
 	}
 	w.Header().Set("Content-Type", "application/json")
 
-	glog.V(1).Infof("Image name is %s\n", r.Form.Get("name"))
+	glog.V(1).Infof("Image name is %s", r.Form.Get("name"))
 	job := eng.Job("build", r.Form.Get("name"))
 	stdoutBuf := bytes.NewBuffer(nil)
 
@@ -878,10 +878,10 @@ func ping(eng *engine.Engine, version version.Version, w http.ResponseWriter, r 
 func makeHttpHandler(eng *engine.Engine, logging bool, localMethod string, localRoute string, handlerFunc HttpApiFunc, corsHeaders string, dockerVersion version.Version) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// log the request
-		glog.V(0).Infof("Calling %s %s\n", localMethod, localRoute)
+		glog.V(0).Infof("Calling %s %s", localMethod, localRoute)
 
 		if logging {
-			glog.V(1).Infof("%s %s\n", r.Method, r.RequestURI)
+			glog.V(1).Infof("%s %s", r.Method, r.RequestURI)
 		}
 
 		if strings.Contains(r.Header.Get("User-Agent"), "Docker-Client/") {
@@ -985,7 +985,7 @@ func createRouter(eng *engine.Engine, logging, enableCors bool, corsHeaders stri
 
 	for method, routes := range m {
 		for route, fct := range routes {
-			glog.V(0).Infof("Registering %s, %s\n", method, route)
+			glog.V(0).Infof("Registering %s, %s", method, route)
 			// NOTE: scope issue, make sure the variables are local and won't be changed
 			localRoute := route
 			localFct := fct
@@ -1130,7 +1130,7 @@ func ServeApi(job *engine.Job) error {
 			}
 			job.Eng.OnShutdown(func() {
 				if err := srv.Close(); err != nil {
-					glog.Errorf("%s\n", err)
+					glog.Errorf("%v", err)
 				}
 			})
 			if err = srv.Serve(); err != nil && strings.Contains(err.Error(), "use of closed network connection") {

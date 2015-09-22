@@ -116,7 +116,7 @@ func (proxy *UDPProxy) Run() {
 		if !hit {
 			proxyConn, err = net.DialUDP("udp", nil, proxy.backendAddr)
 			if err != nil {
-				glog.Infof("Can't proxy a datagram to udp/%s: %s\n", proxy.backendAddr, err)
+				glog.Infof("Can't proxy a datagram to udp/%s: %s", proxy.backendAddr, err)
 				proxy.connTrackLock.Unlock()
 				continue
 			}
@@ -127,7 +127,7 @@ func (proxy *UDPProxy) Run() {
 		for i := 0; i != read; {
 			written, err := proxyConn.Write(readBuf[i:read])
 			if err != nil {
-				glog.Infof("Can't proxy a datagram to udp/%s: %s\n", proxy.backendAddr, err)
+				glog.Infof("Can't proxy a datagram to udp/%s: %s", proxy.backendAddr, err)
 				break
 			}
 			i += written
