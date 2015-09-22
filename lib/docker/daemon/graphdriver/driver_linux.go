@@ -3,8 +3,6 @@ package graphdriver
 import (
 	"path/filepath"
 	"syscall"
-
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 type DiffDiskDriver interface {
