@@ -7,11 +7,13 @@ import (
 	"io/ioutil"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/hyper/lib/docker/pkg/namesgenerator"
 	"github.com/hyperhq/hyper/lib/promise"
 	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/hypervisor/pod"
@@ -134,11 +136,22 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 		command = args[2:]
 	}
 	if opts.Name == "" {
-		fields := strings.Split(image, ":")
+		opts.Name = image
+		fields := strings.Split(image, "/")
+		if len(fields) > 1 {
+			opts.Name = fields[len(fields)-1]
+		}
+		fields = strings.Split(opts.Name, ":")
 		if len(fields) < 2 {
-			opts.Name = image + "-" + utils.RandStr(10, "number")
+			opts.Name = opts.Name + "-" + utils.RandStr(10, "number")
 		} else {
 			opts.Name = fields[0] + "-" + fields[1] + "-" + utils.RandStr(10, "number")
+		}
+
+		validContainerNameChars := `[a-zA-Z0-9][a-zA-Z0-9_.-]`
+		validContainerNamePattern := regexp.MustCompile(`^/?` + validContainerNameChars + `+$`)
+		if !validContainerNamePattern.MatchString(opts.Name) {
+			opts.Name = namesgenerator.GetRandomName(0)
 		}
 	}
 	if opts.Memory == 0 {
