@@ -13,7 +13,7 @@ import (
 
 func (cli *HyperClient) HyperCmdRmi(args ...string) error {
 	var opts struct {
-		Noprune bool `long:"no-prune" default:"true" default-mask:"-" description:"Do not delete untagged parents"`
+		Noprune bool `long:"no-prune" default:"false" default-mask:"-" description:"Do not delete untagged parents"`
 		Force   bool `short:"f" long:"force" default:"true" default-mask:"-" description:"Force removal of the image"`
 	}
 	var parser = gflag.NewParser(&opts, gflag.Default)
@@ -27,14 +27,14 @@ func (cli *HyperClient) HyperCmdRmi(args ...string) error {
 		}
 	}
 	var (
-		noprune string = "yes"
+		noprune string = "no"
 		force   string = "yes"
 	)
 	if len(args) < 2 {
 		return fmt.Errorf("\"rmi\" requires a minimum of 1 argument, please provide IMAGE ID.\n")
 	}
-	if opts.Noprune == false {
-		noprune = "no"
+	if opts.Noprune == true {
+		noprune = "yes"
 	}
 	if opts.Force == false {
 		force = "no"
