@@ -102,11 +102,9 @@ func (d *Driver) Setup() error {
 		}
 		d.daemon = daemon
 	}
-	if vm, err := d.daemon.StartVm(d.pullVm, 1, 64, false, types.VM_KEEP_AFTER_SHUTDOWN); err != nil {
+	if _, err := d.daemon.StartVm(d.pullVm, 1, 64, false, types.VM_KEEP_AFTER_SHUTDOWN); err != nil {
 		glog.Errorf(err.Error())
 		return err
-	} else {
-		d.daemon.AddVm(vm)
 	}
 
 	if err := virtualbox.RegisterDisk(d.pullVm, d.pullVm, d.BaseImage(), 4); err != nil {
