@@ -25,7 +25,7 @@ func ApplyServices(vm *hypervisor.Vm, container string, services []pod.UserServi
 
 	vm.WriteFile(container, config, GenerateServiceConfig(services))
 
-	command := "haproxy -f /usr/local/etc/haproxy/haproxy.cfg -p /usr/local/etc/haproxy/haproxy.cfg -sf $(cat /var/run/haproxy.pid)"
+	command := "haproxy -f /usr/local/etc/haproxy/haproxy.cfg -p /usr/local/etc/haproxy/haproxy.cfg -sf `cat /var/run/haproxy.pid`"
 	execcmd, err := json.Marshal(command)
 	if err != nil {
 		return err
