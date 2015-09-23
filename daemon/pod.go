@@ -247,7 +247,7 @@ func (daemon *Daemon) PrepareContainer(mypod *hypervisor.Pod, userPod *pod.UserP
 		fstype = daemon.Storage.Fstype
 		volPoolName = "hyper-volume-pool"
 		devPrefix = poolName[:strings.Index(poolName, "-pool")]
-		rootPath = "/var/lib/docker/devicemapper"
+		rootPath = path.Join(utils.HYPER_ROOT, "devicemapper")
 		rootfs = "/rootfs"
 	} else if storageDriver == "aufs" {
 		rootPath = daemon.Storage.RootPath
