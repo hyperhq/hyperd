@@ -22,12 +22,79 @@ var (
 	ServiceConfig string = "haproxy.cfg"
 )
 
-func ApplyServices(vm *hypervisor.Vm, container string, services []pod.UserService) error {
-	config := path.Join(ServiceVolume, ServiceConfig)
+func UpdateLoopbackAddress(vm *hypervisor.Vm, container string, oldServices, newServices []pod.UserService) error {
+	addedIPs := make([]string, 0, 1)
+	deletedIPs := make([]string, 0, 1)
 
+	for _, n := range newServices {
+		found := 0
+		for _, o := range oldServices {
+			if n.ServiceIP == o.ServiceIP {
+				found = 1
+			}
+		}
+		if found == 0 {
+			addedIPs = append(addedIPs, n.ServiceIP)
+		}
+	}
+
+	for _, o := range oldServices {
+		found := 0
+		for _, n := range newServices {
+			if n.ServiceIP == o.ServiceIP {
+				found = 1
+			}
+		}
+		if found == 0 {
+			deletedIPs = append(deletedIPs, o.ServiceIP)
+		}
+	}
+
+	for _, ip := range addedIPs {
+		err := SetupLoopbackAddress(vm, container, ip, "add")
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, ip := range deletedIPs {
+		err := SetupLoopbackAddress(vm, container, ip, "del")
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Setup lo ip address
+// options for operation: add or del
+func SetupLoopbackAddress(vm *hypervisor.Vm, container, ip, operation string) error {
+	command := "ip addr " + operation + " dev lo " + ip + "/32"
+	execcmd, err := json.Marshal(strings.Split(command, " "))
+	if err != nil {
+		return err
+	}
+
+	return vm.Exec(nil, nil, string(execcmd), "", container)
+}
+
+func ApplyServices(vm *hypervisor.Vm, container string, services []pod.UserService) error {
+	// Update lo ip addresses
+	oldServices, err := GetServices(vm, container)
+	if err != nil {
+		return err
+	}
+	err = UpdateLoopbackAddress(vm, container, oldServices, services)
+	if err != nil {
+		return err
+	}
+
+	// Update haproxy config
+	config := path.Join(ServiceVolume, ServiceConfig)
 	vm.WriteFile(container, config, GenerateServiceConfig(services))
 
-	command := "haproxy -D -f /usr/local/etc/haproxy/haproxy.cfg -p /var/run/haproxy.pid -sf `cat /var/run/haproxy.pid`"
+	command := "haproxy -f /usr/local/etc/haproxy/haproxy.cfg -p /var/run/haproxy.pid -sf `cat /var/run/haproxy.pid`"
 	execcmd, err := json.Marshal(strings.Split(command, " "))
 	if err != nil {
 		return err

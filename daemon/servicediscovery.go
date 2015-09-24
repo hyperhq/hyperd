@@ -141,8 +141,9 @@ func (daemon *Daemon) ProcessPodBytes(body []byte, podId string) (*pod.UserPod, 
 
 	userPod.Type = "service-discovery"
 	serviceContainer := pod.UserContainer{
-		Name:  userPod.Name + "-service-discovery",
-		Image: servicediscovery.ServiceImage,
+		Name:    userPod.Name + "-service-discovery",
+		Image:   servicediscovery.ServiceImage,
+		Command: []string{"haproxy", "-D", "-f", "/usr/local/etc/haproxy/haproxy.cfg", "-p", "/var/run/haproxy.pid"},
 	}
 
 	serviceVolRef := pod.UserVolumeReference{
