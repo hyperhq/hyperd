@@ -7,6 +7,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"strconv"
+	"strings"
 
 	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/hypervisor"
@@ -55,20 +57,43 @@ func GetServices(vm *hypervisor.Vm, container string) ([]pod.UserService, error)
 					Protocol: "TCP",
 				}
 
-				_, err := fmt.Fscanf(reader, "%s %s %s:%d", &t1, &t2, &s.ServiceIP, &s.ServicePort)
+				_, err := fmt.Fscanf(reader, "%s %s %s", &t1, &t2, &t3)
 				if err != nil {
 					return nil, err
 				}
+
+				hostport := strings.Split(t3, ":")
+				s.ServiceIP = hostport[0]
+				port, err := strconv.ParseInt(hostport[1], 10, 32)
+				if err != nil {
+					return nil, err
+				}
+				s.ServicePort = int(port)
 
 				services = append(services, s)
-			} else if string(first[0][:]) == "server" {
+			} else if string(first[0][:]) == "\tserver" {
 				var idx int
 				var h pod.UserServiceBackend
-				_, err := fmt.Fscanf(reader, "%s\t%s-%d-%d %s:%d %s", &t1, &t2, &idx, &t3, &h.HostIP, &h.HostPort, &t4)
-
+				_, err := fmt.Fscanf(reader, "%s %s %s %s", &t1, &t2, &t3, &t4)
 				if err != nil {
 					return nil, err
 				}
+
+				hostport := strings.Split(t3, ":")
+				h.HostIP = hostport[0]
+				port, err := strconv.ParseInt(hostport[1], 10, 32)
+				if err != nil {
+					return nil, err
+				}
+				h.HostPort = int(port)
+
+				idxs := strings.Split(t2, "-")
+				idxLong, err := strconv.ParseInt(idxs[1], 10, 32)
+				if err != nil {
+					return nil, err
+				}
+				idx = int(idxLong)
+
 				services[idx].Hosts = append(services[idx].Hosts, h)
 			}
 		}
@@ -89,7 +114,7 @@ func GenerateServiceConfig(services []pod.UserService) []byte {
 		back := fmt.Sprintf("backend back%d\n\tbalance\troundrobin\n", idx)
 		data = append(data, back...)
 		for hostid, host := range srv.Hosts {
-			back := fmt.Sprintf("\tserver\tback-%d-%d %s:%d check\n",
+			back := fmt.Sprintf("\tserver back-%d-%d %s:%d check\n",
 				idx, hostid, host.HostIP, host.HostPort)
 			data = append(data, back...)
 		}
