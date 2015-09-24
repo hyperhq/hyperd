@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/user"
 	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -504,14 +505,33 @@ func (daemon *Daemon) PrepareVolume(mypod *hypervisor.Pod, userPod *pod.UserPod,
 		targetDir := path.Join(sharedDir, mountSharedDir)
 		glog.V(1).Infof("trying to bind dir %s to %s", v.Source, targetDir)
 
+		stat, err := os.Stat(v.Source)
+		if err != nil {
+			glog.Error("Cannot stat volume Source ", err.Error())
+			return nil, err
+		}
+
 		if runtime.GOOS == "linux" {
-			if err := os.MkdirAll(targetDir, 0755); err != nil && !os.IsExist(err) {
-				glog.Errorf("error to create dir %s for volume %s", targetDir, v.Name)
+			base := filepath.Base(targetDir)
+			if err := os.MkdirAll(base, 0755); err != nil && !os.IsExist(err) {
+				glog.Errorf("error to create dir %s for volume %s", base, v.Name)
 				return nil, err
+			}
+
+			if stat.IsDir() {
+				if err := os.MkdirAll(targetDir, 0755); err != nil && !os.IsExist(err) {
+					glog.Errorf("error to create dir %s for volume %s", targetDir, v.Name)
+					return nil, err
+				}
+			} else if f, err := os.Create(targetDir); err != nil && !os.IsExist(err) {
+				glog.Errorf("error to create file %s for volume %s", targetDir, v.Name)
+				return nil, err
+			} else if err == nil {
+				f.Close()
 			}
 		}
 
-		if err := utils.Mount(v.Source, targetDir, "dir", flags, "--bind"); err != nil {
+		if err := utils.Mount(v.Source, targetDir, "none", flags, "--bind"); err != nil {
 			glog.Errorf("bind dir %s failed: %s", v.Source, err.Error())
 			return nil, err
 		}
