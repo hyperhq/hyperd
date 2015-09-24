@@ -83,7 +83,7 @@ func GenerateServiceConfig(services []pod.UserService) []byte {
 
 	data = append(data, globalConfig...)
 	for idx, srv := range services {
-		front := fmt.Sprintf("frontend front%d %s:%d\n\tuse_backend\tback%d\n",
+		front := fmt.Sprintf("frontend front%d %s:%d\n\tdefault_backend\tback%d\n",
 			idx, srv.ServiceIP, srv.ServicePort, idx)
 		data = append(data, front...)
 		back := fmt.Sprintf("backend back%d\n\tbalance\troundrobin\n", idx)
