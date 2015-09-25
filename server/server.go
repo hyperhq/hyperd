@@ -892,6 +892,88 @@ func postImagesRemove(eng *engine.Engine, version version.Version, w http.Respon
 	return writeJSONEnv(w, http.StatusOK, env)
 }
 
+func getServices(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+	if err := r.ParseForm(); err != nil {
+		return nil
+	}
+
+	job := eng.Job("serviceList", r.Form.Get("podId"))
+	stdoutBuf := bytes.NewBuffer(nil)
+
+	job.Stdout.Add(stdoutBuf)
+	if err := job.Run(); err != nil {
+		return err
+	}
+
+	var (
+		dat             map[string]interface{}
+		returnedJSONstr string
+	)
+	returnedJSONstr = engine.Tail(stdoutBuf, 1)
+	if err := json.Unmarshal([]byte(returnedJSONstr), &dat); err != nil {
+		return err
+	}
+
+	return writeJSON(w, http.StatusCreated, dat["data"])
+}
+
+func postServiceAdd(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+	if err := r.ParseForm(); err != nil {
+		return nil
+	}
+
+	job := eng.Job("serviceAdd", r.Form.Get("podId"), r.Form.Get("services"))
+	stdoutBuf := bytes.NewBuffer(nil)
+
+	job.Stdout.Add(stdoutBuf)
+
+	if err := job.Run(); err != nil {
+		return err
+	}
+
+	var env engine.Env
+	env.Set("Result", "success")
+	return writeJSONEnv(w, http.StatusOK, env)
+}
+
+func postServiceUpdate(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+	if err := r.ParseForm(); err != nil {
+		return nil
+	}
+
+	job := eng.Job("serviceUpdate", r.Form.Get("podId"), r.Form.Get("services"))
+	stdoutBuf := bytes.NewBuffer(nil)
+
+	job.Stdout.Add(stdoutBuf)
+
+	if err := job.Run(); err != nil {
+		return err
+	}
+
+	var env engine.Env
+	env.Set("Result", "success")
+	return writeJSONEnv(w, http.StatusOK, env)
+}
+
+func postServiceDelete(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+	if err := r.ParseForm(); err != nil {
+		return nil
+	}
+
+	job := eng.Job("serviceDelete", r.Form.Get("podId"), r.Form.Get("services"))
+	stdoutBuf := bytes.NewBuffer(nil)
+
+	job.Stdout.Add(stdoutBuf)
+
+	if err := job.Run(); err != nil {
+		return err
+	}
+
+	var env engine.Env
+	env.Set("Result", "success")
+	return writeJSONEnv(w, http.StatusOK, env)
+}
+
 func optionsHandler(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
 	w.WriteHeader(http.StatusOK)
 	return nil
@@ -983,6 +1065,7 @@ func createRouter(eng *engine.Engine, logging, enableCors bool, corsHeaders stri
 			"/version":        getVersion,
 			"/list":           getList,
 			"/images/get":     getImages,
+			"/service/list":   getServices,
 		},
 		"POST": {
 			"/auth":             postAuth,
@@ -1003,6 +1086,9 @@ func createRouter(eng *engine.Engine, logging, enableCors bool, corsHeaders stri
 			"/attach":           postAttach,
 			"/tty/resize":       postTtyResize,
 			"/images/remove":    postImagesRemove,
+			"/service/add":      postServiceAdd,
+			"/service/update":   postServiceUpdate,
+			"/service/delete":   postServiceDelete,
 		},
 		"DELETE": {},
 		"OPTIONS": {

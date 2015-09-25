@@ -81,6 +81,7 @@ func SetupLoopbackAddress(vm *hypervisor.Vm, container, ip, operation string) er
 
 func ApplyServices(vm *hypervisor.Vm, container string, services []pod.UserService) error {
 	// Update lo ip addresses
+	var command []string
 	oldServices, err := GetServices(vm, container)
 	if err != nil {
 		return err

@@ -14,7 +14,7 @@ import (
 )
 
 func (daemon *Daemon) AddService(job *engine.Job) error {
-	var srv pod.UserService
+	var srvs []pod.UserService
 
 	podId := job.Args[0]
 	data := job.Args[1]
@@ -29,14 +29,39 @@ func (daemon *Daemon) AddService(job *engine.Job) error {
 		return err
 	}
 
-	json.Unmarshal([]byte(data), &srv)
-	services = append(services, srv)
+	json.Unmarshal([]byte(data), &srvs)
+	if err != nil {
+		return err
+	}
+
+	for _, s := range srvs {
+		services = append(services, s)
+	}
 
 	return servicediscovery.ApplyServices(vm, container, services)
 }
 
+func (daemon *Daemon) UpdateService(job *engine.Job) error {
+	var srv []pod.UserService
+
+	podId := job.Args[0]
+	data := job.Args[1]
+
+	vm, container, err := daemon.GetServiceContainerInfo(podId)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal([]byte(data), &srv)
+	if err != nil {
+		return err
+	}
+
+	return servicediscovery.ApplyServices(vm, container, srv)
+}
+
 func (daemon *Daemon) DeleteService(job *engine.Job) error {
-	var srv pod.UserService
+	var srvs []pod.UserService
 	var services []pod.UserService
 	var services2 []pod.UserService
 	var found int = 0
@@ -54,24 +79,28 @@ func (daemon *Daemon) DeleteService(job *engine.Job) error {
 		return err
 	}
 
-	json.Unmarshal([]byte(data), &srv)
+	err = json.Unmarshal([]byte(data), &srvs)
+	if err != nil {
+		return err
+	}
+
 	for _, s := range services {
-		if s.ServicePort != srv.ServicePort {
-			services2 = append(services2, s)
-			continue
+		shouldRemain := true
+		for _, srv := range srvs {
+			if s.ServiceIP == srv.ServiceIP && s.ServicePort == srv.ServicePort {
+				shouldRemain = false
+				found = 1
+				break
+			}
 		}
 
-		if s.ServiceIP != srv.ServiceIP {
+		if shouldRemain {
 			services2 = append(services2, s)
-			continue
 		}
-
-		found = 1
-		continue
 	}
 
 	if found == 0 {
-		return fmt.Errorf("Pod %s doesn't container this service", podId)
+		return fmt.Errorf("Pod %s doesn't use this service", podId)
 	}
 
 	return servicediscovery.ApplyServices(vm, container, services2)
