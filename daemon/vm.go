@@ -13,10 +13,9 @@ import (
 
 func (daemon *Daemon) CmdVmCreate(job *engine.Job) (err error) {
 	var (
-		vmId = fmt.Sprintf("vm-%s", pod.RandStr(10, "alpha"))
-		vm   *hypervisor.Vm
-		cpu  = 1
-		mem  = 128
+		vm  *hypervisor.Vm
+		cpu = 1
+		mem = 128
 	)
 
 	if job.Args[0] != "" {
@@ -33,16 +32,25 @@ func (daemon *Daemon) CmdVmCreate(job *engine.Job) (err error) {
 		}
 	}
 
-	vm, err = daemon.StartVm(vmId, cpu, mem, false, 0)
+	vm, err = daemon.StartVm("", cpu, mem, false, 0)
 	if err != nil {
 		return err
 	}
 
-	daemon.AddVm(vm)
+	defer func() {
+		if err != nil {
+			daemon.KillVm(vm.Id)
+		}
+	}()
+
+	err = daemon.WaitVmStart(vm)
+	if err != nil {
+		return err
+	}
 
 	// Prepare the VM status to client
 	v := &engine.Env{}
-	v.Set("ID", vmId)
+	v.Set("ID", vm.Id)
 	v.SetInt("Code", 0)
 	v.Set("Cause", "")
 	if _, err := v.WriteTo(job.Stdout); err != nil {
@@ -138,6 +146,18 @@ func (daemon *Daemon) ReleaseAllVms() (int, error) {
 }
 
 func (daemon *Daemon) StartVm(vmId string, cpu, mem int, lazy bool, keep int) (*hypervisor.Vm, error) {
+	var (
+		DEFAULT_CPU = 1
+		DEFAULT_MEM = 128
+	)
+
+	if cpu <= 0 {
+		cpu = DEFAULT_CPU
+	}
+	if mem <= 0 {
+		mem = DEFAULT_MEM
+	}
+
 	b := &hypervisor.BootConfig{
 		CPU:    cpu,
 		Memory: mem,
@@ -150,44 +170,48 @@ func (daemon *Daemon) StartVm(vmId string, cpu, mem int, lazy bool, keep int) (*
 
 	vm := daemon.NewVm(vmId, cpu, mem, lazy, keep)
 
+	glog.V(1).Infof("The config: kernel=%s, initrd=%s", daemon.Kernel, daemon.Initrd)
 	err := vm.Launch(b)
 	if err != nil {
 		return nil, err
 	}
-	_, r1, r2, err1 := vm.GetVmChan()
+
+	daemon.AddVm(vm)
+	return vm, nil
+}
+
+func (daemon *Daemon) WaitVmStart(vm *hypervisor.Vm) error {
+	_, r2, _, err1 := vm.GetVmChan()
 	if err1 != nil {
-		return nil, err1
+		return err1
 	}
-	vmStatus := r1.(chan *types.VmResponse)
-	subVmStatus := r2.(chan *types.VmResponse)
-	go func(interface{}) {
-		defer func() {
-			err := recover()
-			if err != nil {
-				glog.Warning("panic during send shutdown message to channel")
-			}
-		}()
-		for {
-			vmResponse := <-vmStatus
-			subVmStatus <- vmResponse
-		}
-	}(subVmStatus)
-	var vmResponse *types.VmResponse
-	for {
-		vmResponse = <-subVmStatus
-		glog.V(1).Infof("Get the response from VM, VM id is %s, response code is %d!", vmResponse.VmId, vmResponse.Code)
-		if vmResponse.VmId == vmId {
-			if vmResponse.Code == types.E_VM_RUNNING {
-				glog.Infof("Got E_VM_RUNNING code response")
-				break
-			} else {
-				break
-			}
-		}
-	}
+	vmResponse := <-r2.(chan *types.VmResponse)
+	glog.V(1).Infof("Get the response from VM, VM id is %s, response code is %d!", vmResponse.VmId, vmResponse.Code)
 	if vmResponse.Code != types.E_VM_RUNNING {
-		return nil, fmt.Errorf("Vbox does not start successfully")
+		return fmt.Errorf("Vbox does not start successfully")
 	}
+	return nil
+}
+
+func (daemon *Daemon) GetVM(vmId string, resource *pod.UserResource, lazy bool, keep int) (*hypervisor.Vm, error) {
+	if vmId == "" {
+		return daemon.StartVm("", resource.Vcpu, resource.Memory, lazy, keep)
+	}
+
+	vm, ok := daemon.VmList[vmId]
+	if !ok {
+		return nil, fmt.Errorf("The VM %s doesn't exist", vmId)
+	}
+	/* FIXME: check if any pod is running on this vm? */
+	glog.Infof("find vm:%s", vm.Id)
+	if resource.Vcpu != vm.Cpu {
+		return nil, fmt.Errorf("The new pod's cpu setting is different with the VM's cpu")
+	}
+
+	if resource.Memory != vm.Mem {
+		return nil, fmt.Errorf("The new pod's memory setting is different with the VM's memory")
+	}
+
 	return vm, nil
 }
 

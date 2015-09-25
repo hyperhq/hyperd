@@ -225,7 +225,7 @@ func (cli *HyperClient) resizeTty(id, tag string) {
 	}
 }
 func (cli *HyperClient) monitorTtySize(id, tag string) error {
-	cli.resizeTty(id, tag)
+	//cli.resizeTty(id, tag)
 
 	sigchan := make(chan os.Signal, 1)
 	signal.Notify(sigchan, syscall.SIGWINCH)

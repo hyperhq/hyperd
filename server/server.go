@@ -544,29 +544,62 @@ func postPodStart(eng *engine.Engine, version version.Version, w http.ResponseWr
 		return nil
 	}
 
-	job := eng.Job("podStart", r.Form.Get("podId"), r.Form.Get("vmId"))
-	stdoutBuf := bytes.NewBuffer(nil)
-	job.Stdout.Add(stdoutBuf)
+	ttyTag := r.Form.Get("tag")
+	job := eng.Job("podStart", r.Form.Get("podId"), r.Form.Get("vmId"), ttyTag)
 
-	if err := job.Run(); err != nil {
-		return err
+	if ttyTag == "" {
+		stdoutBuf := bytes.NewBuffer(nil)
+		job.Stdout.Add(stdoutBuf)
+
+		if err := job.Run(); err != nil {
+			return err
+		}
+
+		var (
+			env             engine.Env
+			dat             map[string]interface{}
+			returnedJSONstr string
+		)
+		returnedJSONstr = engine.Tail(stdoutBuf, 1)
+		if err := json.Unmarshal([]byte(returnedJSONstr), &dat); err != nil {
+			return err
+		}
+
+		env.Set("ID", dat["ID"].(string))
+		env.SetInt("Code", (int)(dat["Code"].(float64)))
+		env.Set("Cause", dat["Cause"].(string))
+
+		return writeJSONEnv(w, http.StatusOK, env)
+	} else {
+		var (
+			errOut    io.Writer = os.Stderr
+			errStream io.Writer
+		)
+
+		// Setting up the streaming http interface.
+		inStream, outStream, err := hijackServer(w)
+		if err != nil {
+			return err
+		}
+		defer closeStreams(inStream, outStream)
+
+		fmt.Fprintf(outStream, "HTTP/1.1 101 UPGRADED\r\nContent-Type: application/vnd.docker.raw-stream\r\nConnection: Upgrade\r\nUpgrade: tcp\r\n\r\n")
+
+		errStream = outStream
+		job.Stdin.Add(inStream)
+		job.Stdout.Add(outStream)
+		job.Stderr.Set(errStream)
+
+		// Now run the user process in container.
+		job.SetCloseIO(false)
+		if err := job.Run(); err != nil {
+			fmt.Fprintf(errOut, "Error starting attach to POD %s: %s\n", r.Form.Get("podname"), err.Error())
+			return err
+		}
+		w.WriteHeader(http.StatusNoContent)
+
+		return nil
 	}
-
-	var (
-		env             engine.Env
-		dat             map[string]interface{}
-		returnedJSONstr string
-	)
-	returnedJSONstr = engine.Tail(stdoutBuf, 1)
-	if err := json.Unmarshal([]byte(returnedJSONstr), &dat); err != nil {
-		return err
-	}
-
-	env.Set("ID", dat["ID"].(string))
-	env.SetInt("Code", (int)(dat["Code"].(float64)))
-	env.Set("Cause", dat["Cause"].(string))
-
-	return writeJSONEnv(w, http.StatusOK, env)
 }
 
 func postPodRun(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {

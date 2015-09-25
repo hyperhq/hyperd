@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -59,8 +60,27 @@ func (daemon *Daemon) CmdPodStart(job *engine.Job) error {
 		return fmt.Errorf("Pod full, the maximum Pod is 1024!")
 	}
 
+	var (
+		tag         string              = ""
+		ttys        []*hypervisor.TtyIO = []*hypervisor.TtyIO{}
+		ttyCallback chan *types.VmResponse
+	)
+
 	podId := job.Args[0]
 	vmId := job.Args[1]
+	if len(job.Args) > 2 {
+		tag = job.Args[2]
+	}
+	if tag != "" {
+		glog.V(1).Info("Pod Run with client terminal tag: ", tag)
+		ttyCallback = make(chan *types.VmResponse, 1)
+		ttys = append(ttys, &hypervisor.TtyIO{
+			Stdin:     job.Stdin,
+			Stdout:    job.Stdout,
+			ClientTag: tag,
+			Callback:  ttyCallback,
+		})
+	}
 
 	glog.Infof("pod:%s, vm:%s", podId, vmId)
 	// Do the status check for the given pod
@@ -73,10 +93,15 @@ func (daemon *Daemon) CmdPodStart(job *engine.Job) error {
 	}
 	var lazy bool = hypervisor.HDriver.SupportLazyMode() && vmId == ""
 
-	code, cause, err := daemon.StartPod(podId, "", vmId, nil, lazy, false, types.VM_KEEP_NONE)
+	code, cause, err := daemon.StartPod(podId, "", vmId, nil, lazy, false, types.VM_KEEP_NONE, ttys)
 	if err != nil {
 		glog.Error(err.Error())
 		return err
+	}
+
+	if len(ttys) > 0 {
+		<-ttyCallback
+		return nil
 	}
 
 	// Prepare the VM status to client
@@ -96,10 +121,29 @@ func (daemon *Daemon) CmdPodRun(job *engine.Job) error {
 	if daemon.GetRunningPodNum() >= 1024 {
 		return fmt.Errorf("Pod full, the maximum Pod is 1024!")
 	}
-	var autoremove bool = false
+	var (
+		autoremove  bool                = false
+		tag         string              = ""
+		ttys        []*hypervisor.TtyIO = []*hypervisor.TtyIO{}
+		ttyCallback chan *types.VmResponse
+	)
 	podArgs := job.Args[0]
 	if job.Args[1] == "yes" {
 		autoremove = true
+	}
+	if len(job.Args) > 2 {
+		tag = job.Args[2]
+	}
+
+	if tag != "" {
+		glog.V(1).Info("Pod Run with client terminal tag: ", tag)
+		ttyCallback = make(chan *types.VmResponse, 1)
+		ttys = append(ttys, &hypervisor.TtyIO{
+			Stdin:     job.Stdin,
+			Stdout:    job.Stdout,
+			ClientTag: tag,
+			Callback:  ttyCallback,
+		})
 	}
 
 	podId := fmt.Sprintf("pod-%s", pod.RandStr(10, "alpha"))
@@ -112,10 +156,15 @@ func (daemon *Daemon) CmdPodRun(job *engine.Job) error {
 	glog.V(2).Infof("lock PodList")
 	defer glog.V(2).Infof("unlock PodList")
 	defer daemon.PodsMutex.Unlock()
-	code, cause, err := daemon.StartPod(podId, podArgs, "", nil, lazy, autoremove, types.VM_KEEP_NONE)
+	code, cause, err := daemon.StartPod(podId, podArgs, "", nil, lazy, autoremove, types.VM_KEEP_NONE, ttys)
 	if err != nil {
 		glog.Error(err.Error())
 		return err
+	}
+
+	if len(ttys) > 0 {
+		<-ttyCallback
+		return nil
 	}
 
 	// Prepare the VM status to client
@@ -564,7 +613,8 @@ func (daemon *Daemon) PreparePod(mypod *hypervisor.Pod, userPod *pod.UserPod,
 	return containerInfoList, volumeInfoList, nil
 }
 
-func (daemon *Daemon) StartPod(podId, podArgs, vmId string, config interface{}, lazy, autoremove bool, keep int) (int, string, error) {
+func (daemon *Daemon) StartPod(podId, podArgs, vmId string, config interface{}, lazy, autoremove bool, keep int, streams []*hypervisor.TtyIO) (int, string, error) {
+	glog.V(1).Infof("podArgs: %s", podArgs)
 	var (
 		podData []byte
 		err     error
@@ -572,29 +622,22 @@ func (daemon *Daemon) StartPod(podId, podArgs, vmId string, config interface{}, 
 		vm      *hypervisor.Vm = nil
 	)
 
-	if podArgs == "" {
-		var ok bool
-		mypod, ok = daemon.PodList[podId]
-		if !ok {
-			return -1, "", fmt.Errorf("Can not find the POD instance of %s", podId)
-		}
-
-		podData, err = daemon.GetPodByName(podId)
-		if err != nil {
-			return -1, "", err
-		}
-	} else {
-		podData = []byte(podArgs)
-
-		if err := daemon.CreatePod(podId, podArgs, nil, autoremove); err != nil {
-			glog.Error(err.Error())
-			return -1, "", err
-		}
-
-		mypod = daemon.PodList[podId]
+	mypod, podData, err = daemon.GetPod(podId, podArgs, autoremove)
+	if err != nil {
+		return -1, "", err
 	}
 
 	userPod, err := pod.ProcessPodBytes(podData)
+	if err != nil {
+		return -1, "", err
+	}
+
+	if !userPod.Tty && streams != nil && len(streams) > 0 {
+		cause := "Spec does not support TTY, but IO streams are provided"
+		return -1, cause, errors.New(cause)
+	}
+
+	vm, err = daemon.GetVM(vmId, &userPod.Resource, lazy, keep)
 	if err != nil {
 		return -1, "", err
 	}
@@ -605,67 +648,28 @@ func (daemon *Daemon) StartPod(podId, podArgs, vmId string, config interface{}, 
 		}
 	}()
 
-	if vmId == "" {
-		glog.V(1).Infof("The config: kernel=%s, initrd=%s", daemon.Kernel, daemon.Initrd)
-		var (
-			cpu = 1
-			mem = 128
-		)
-
-		if userPod.Resource.Vcpu > 0 {
-			cpu = userPod.Resource.Vcpu
-		}
-
-		if userPod.Resource.Memory > 0 {
-			mem = userPod.Resource.Memory
-		}
-
-		b := &hypervisor.BootConfig{
-			CPU:    cpu,
-			Memory: mem,
-			Kernel: daemon.Kernel,
-			Initrd: daemon.Initrd,
-			Bios:   daemon.Bios,
-			Cbfs:   daemon.Cbfs,
-			Vbox:   daemon.VboxImage,
-		}
-
-		vm = daemon.NewVm("", cpu, mem, lazy, keep)
-
-		err = vm.Launch(b)
-		if err != nil {
-			return -1, "", err
-		}
-
-		daemon.AddVm(vm)
-	} else {
-		var ok bool
-		vm, ok = daemon.VmList[vmId]
-		if !ok {
-			err = fmt.Errorf("The VM %s doesn't exist", vmId)
-			return -1, "", err
-		}
-		/* FIXME: check if any pod is running on this vm? */
-		glog.Infof("find vm:%s", vm.Id)
-		if userPod.Resource.Vcpu != vm.Cpu {
-			err = fmt.Errorf("The new pod's cpu setting is different with the VM's cpu")
-			return -1, "", err
-		}
-
-		if userPod.Resource.Memory != vm.Mem {
-			err = fmt.Errorf("The new pod's memory setting is different with the VM's memory")
-			return -1, "", err
-		}
-	}
-
-	fmt.Printf("POD id is %s\n", podId)
-
 	containerInfoList, volumeInfoList, err := daemon.PreparePod(mypod, userPod, vm.Id)
 	if err != nil {
 		return -1, "", err
 	}
 
+	for idx, str := range streams {
+		if idx >= len(userPod.Containers) {
+			break
+		}
+
+		err = vm.Attach(str.Stdin, str.Stdout, str.ClientTag, containerInfoList[idx].Id, str.Callback, nil)
+		if err != nil {
+			glog.Errorf("Failed to attach client %s before start pod", str.ClientTag)
+			return -1, "", err
+		}
+		glog.V(1).Infof("Attach client %s before start pod", str.ClientTag)
+	}
+
 	vmResponse := vm.StartPod(mypod, userPod, containerInfoList, volumeInfoList)
+	if streams != nil && len(streams) > 0 && vmResponse.Code == types.E_OK {
+		return 0, "", nil
+	}
 	if vmResponse.Data == nil {
 		err = fmt.Errorf("VM response data is nil")
 		return vmResponse.Code, vmResponse.Cause, err
@@ -707,7 +711,7 @@ func (daemon *Daemon) RestartPod(mypod *hypervisor.Pod) error {
 	var lazy bool = hypervisor.HDriver.SupportLazyMode()
 
 	// Start the pod
-	_, _, err = daemon.StartPod(mypod.Id, string(podData), "", nil, lazy, false, types.VM_KEEP_NONE)
+	_, _, err = daemon.StartPod(mypod.Id, string(podData), "", nil, lazy, false, types.VM_KEEP_NONE, []*hypervisor.TtyIO{})
 	if err != nil {
 		glog.Error(err.Error())
 		return err

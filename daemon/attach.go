@@ -3,6 +3,7 @@ package daemon
 import (
 	"fmt"
 	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/runv/hypervisor/types"
 	"github.com/hyperhq/runv/lib/glog"
 )
 
@@ -41,7 +42,8 @@ func (daemon *Daemon) CmdAttach(job *engine.Job) (err error) {
 		return fmt.Errorf("Can find VM whose Id is %s!", vmId)
 	}
 
-	err = vm.Attach(job.Stdin, job.Stdout, tag, container, nil)
+	ttyCallback := make(chan *types.VmResponse, 1)
+	err = vm.Attach(job.Stdin, job.Stdout, tag, container, ttyCallback, nil)
 	if err != nil {
 		return err
 	}
@@ -49,6 +51,8 @@ func (daemon *Daemon) CmdAttach(job *engine.Job) (err error) {
 	defer func() {
 		glog.V(2).Info("Defer function for exec!")
 	}()
+
+	<-ttyCallback
 
 	return nil
 }

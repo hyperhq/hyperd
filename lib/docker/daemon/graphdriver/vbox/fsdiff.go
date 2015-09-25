@@ -12,6 +12,7 @@ import (
 	"github.com/hyperhq/hyper/lib/docker/pkg/chrootarchive"
 	"github.com/hyperhq/hyper/lib/docker/pkg/ioutils"
 	"github.com/hyperhq/hyper/utils"
+	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/types"
 	"github.com/hyperhq/runv/lib/glog"
 	"github.com/hyperhq/runv/lib/govbox"
@@ -80,7 +81,7 @@ func (d *Driver) Diff(id, parent string) (diff archive.Archive, err error) {
 		return nil, fmt.Errorf("can not find VM(%s)", d.pullVm)
 	}
 	if vm.Status == types.S_VM_IDLE {
-		code, cause, err = d.daemon.StartPod(podId, podData, d.pullVm, nil, false, true, types.VM_KEEP_AFTER_SHUTDOWN)
+		code, cause, err = d.daemon.StartPod(podId, podData, d.pullVm, nil, false, true, types.VM_KEEP_AFTER_SHUTDOWN, []*hypervisor.TtyIO{})
 		if err != nil {
 			glog.Errorf("Code is %d, Cause is %s, %s", code, cause, err.Error())
 			d.daemon.KillVm(d.pullVm)

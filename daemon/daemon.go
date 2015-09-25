@@ -382,6 +382,31 @@ func (daemon *Daemon) WritePodToDB(podName string, podData []byte) error {
 	return nil
 }
 
+func (daemon *Daemon) GetPod(podId, podArgs string, autoremove bool) (mypod *hypervisor.Pod, podData []byte, err error) {
+	if podArgs == "" {
+		var ok bool
+		if mypod, ok = daemon.PodList[podId]; !ok {
+			return nil, []byte{}, fmt.Errorf("Can not find the POD instance of %s", podId)
+		}
+
+		podData, err = daemon.GetPodByName(podId)
+		if err != nil {
+			return nil, []byte{}, err
+		}
+	} else {
+		podData = []byte(podArgs)
+
+		if err = daemon.CreatePod(podId, podArgs, nil, autoremove); err != nil {
+			glog.Error(err.Error())
+			return nil, []byte{}, err
+		}
+
+		mypod = daemon.PodList[podId]
+	}
+
+	return mypod, podData, nil
+}
+
 func (daemon *Daemon) GetPodByName(podName string) ([]byte, error) {
 	key := fmt.Sprintf("pod-%s", podName)
 	data, err := daemon.db.Get([]byte(key), nil)

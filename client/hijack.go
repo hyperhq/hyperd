@@ -54,7 +54,7 @@ func (cli *HyperClient) hijack(method, path string, setRawTerminal bool, in io.R
 	}
 	if err != nil {
 		if strings.Contains(err.Error(), "connection refused") {
-			return fmt.Errorf("Cannot connect to the Docker daemon. Is 'docker' running on this host?")
+			return fmt.Errorf("Cannot connect to the Hyper daemon. Is 'hyperd' running on this host?")
 		}
 		return err
 	}
