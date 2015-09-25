@@ -13,9 +13,9 @@ import (
 
 func (daemon *Daemon) CmdVmCreate(job *engine.Job) (err error) {
 	var (
-		vm   *hypervisor.Vm
-		cpu  = 1
-		mem  = 128
+		vm  *hypervisor.Vm
+		cpu = 1
+		mem = 128
 	)
 
 	if job.Args[0] != "" {
@@ -151,8 +151,12 @@ func (daemon *Daemon) StartVm(vmId string, cpu, mem int, lazy bool, keep int) (*
 		DEFAULT_MEM = 128
 	)
 
-	if cpu <= 0 { cpu = DEFAULT_CPU }
-	if mem <= 0 { mem = DEFAULT_MEM }
+	if cpu <= 0 {
+		cpu = DEFAULT_CPU
+	}
+	if mem <= 0 {
+		mem = DEFAULT_MEM
+	}
 
 	b := &hypervisor.BootConfig{
 		CPU:    cpu,
@@ -208,7 +212,7 @@ func (daemon *Daemon) GetVM(vmId string, resource *pod.UserResource, lazy bool, 
 		return nil, fmt.Errorf("The new pod's memory setting is different with the VM's memory")
 	}
 
-	return vm,nil
+	return vm, nil
 }
 
 func (daemon *Daemon) NewVm(id string, cpu, memory int, lazy bool, keep int) *hypervisor.Vm {

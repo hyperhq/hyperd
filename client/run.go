@@ -3,7 +3,6 @@ package client
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -14,7 +13,6 @@ import (
 
 	"github.com/hyperhq/hyper/engine"
 	"github.com/hyperhq/hyper/lib/docker/pkg/namesgenerator"
-	"github.com/hyperhq/hyper/lib/promise"
 	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/hypervisor/pod"
 
@@ -226,62 +224,22 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 	}
 
 	jsonString, _ := json.Marshal(userPod)
-	podId, err := cli.RunPod(string(jsonString), opts.Remove)
+
+	podId, err := cli.CreatePod(string(jsonString))
 	if err != nil {
 		return err
 	}
+
+	if opts.Remove {
+		defer func() { cli.HyperCmdRm(podId) }()
+	}
+
+	_, err = cli.StartPod(podId, "", true)
+	if err != nil {
+		return err
+	}
+
 	fmt.Printf("POD id is %s\n", podId)
-	// Get the container ID of this POD
-	containerId, err := cli.GetContainerByPod(podId)
-	if err != nil {
-		return err
-	}
-	var (
-		tag      = cli.GetTag()
-		hijacked = make(chan io.Closer)
-		errCh    chan error
-	)
-	v := url.Values{}
-	v.Set("type", "container")
-	v.Set("value", containerId)
-	v.Set("tag", tag)
-
-	// Block the return until the chan gets closed
-	defer func() {
-		// fmt.Printf("End of CmdExec(), Waiting for hijack to finish.\n")
-		if _, ok := <-hijacked; ok {
-			fmt.Printf("Hijack did not finish (chan still open)\n")
-		}
-	}()
-
-	errCh = promise.Go(func() error {
-		return cli.hijack("POST", "/attach?"+v.Encode(), true, cli.in, cli.out, cli.out, hijacked, nil, "")
-	})
-
-	if err := cli.monitorTtySize(podId, tag); err != nil {
-		fmt.Printf("Monitor tty size fail for %s!\n", podId)
-	}
-
-	// Acknowledge the hijack before starting
-	select {
-	case closer := <-hijacked:
-		// Make sure that hijack gets closed when returning. (result
-		// in closing hijack chan and freeing server's goroutines.
-		if closer != nil {
-			defer closer.Close()
-		}
-	case err := <-errCh:
-		if err != nil {
-			fmt.Printf("Error hijack: %s", err.Error())
-			return err
-		}
-	}
-
-	if err := <-errCh; err != nil {
-		fmt.Printf("Error hijack: %s", err.Error())
-		return err
-	}
-	// fmt.Printf("Success to exec the command %s for POD %s!\n", command, podId)
 	return nil
 }
 

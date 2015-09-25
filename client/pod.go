@@ -160,7 +160,7 @@ func (cli *HyperClient) HyperCmdStart(args ...string) error {
 		vmId = args[2]
 	}
 	// fmt.Printf("Pod ID is %s, VM ID is %s\n", podId, vmId)
-	_, err = cli.StartPod(podId, vmId)
+	_, err = cli.StartPod(podId, vmId, false)
 	if err != nil {
 		return err
 	}
@@ -168,10 +168,26 @@ func (cli *HyperClient) HyperCmdStart(args ...string) error {
 	return nil
 }
 
-func (cli *HyperClient) StartPod(podId, vmId string) (string, error) {
+func (cli *HyperClient) StartPod(podId, vmId string, tty bool) (string, error) {
+	var tag string = ""
 	v := url.Values{}
 	v.Set("podId", podId)
 	v.Set("vmId", vmId)
+
+	if tty {
+		tag = cli.GetTag()
+	}
+	v.Set("tag", tag)
+
+	if !tty {
+		return cli.startPodWithoutTty(&v)
+	} else {
+		return "", cli.hijackRequest("pod/start", podId, tag, &v)
+	}
+}
+
+func (cli *HyperClient) startPodWithoutTty(v *url.Values) (string, error) {
+
 	body, _, err := readBody(cli.call("POST", "/pod/start?"+v.Encode(), nil, nil))
 	if err != nil {
 		return "", err
@@ -187,13 +203,7 @@ func (cli *HyperClient) StartPod(podId, vmId string) (string, error) {
 	}
 	out.Close()
 	errCode := remoteInfo.GetInt("Code")
-	if errCode == types.E_OK {
-		//fmt.Println("VM is successful to start!")
-	} else {
-		// case types.E_CONTEXT_INIT_FAIL:
-		// case types.E_DEVICE_FAIL:
-		// case types.E_QMP_INIT_FAIL:
-		// case types.E_QMP_COMMAND_FAIL:
+	if errCode != types.E_OK {
 		if errCode != types.E_BAD_REQUEST &&
 			errCode != types.E_FAILED {
 			return "", fmt.Errorf("Error code is %d", errCode)
@@ -234,13 +244,7 @@ func (cli *HyperClient) RunPod(podstring string, autoremove bool) (string, error
 	}
 	out.Close()
 	errCode := remoteInfo.GetInt("Code")
-	if errCode == types.E_OK {
-		//fmt.Println("VM is successful to start!")
-	} else {
-		// case types.E_CONTEXT_INIT_FAIL:
-		// case types.E_DEVICE_FAIL:
-		// case types.E_QMP_INIT_FAIL:
-		// case types.E_QMP_COMMAND_FAIL:
+	if errCode != types.E_OK {
 		if errCode != types.E_BAD_REQUEST &&
 			errCode != types.E_FAILED {
 			return "", fmt.Errorf("Error code is %d", errCode)

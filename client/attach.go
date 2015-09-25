@@ -49,6 +49,10 @@ func (cli *HyperClient) HyperCmdAttach(args ...string) error {
 	}
 	v.Set("tag", tag)
 
+	return cli.hijackRequest("attach", podName, tag, &v)
+}
+
+func (cli *HyperClient) hijackRequest(method, pod, tag string, v *url.Values) error {
 	var (
 		hijacked = make(chan io.Closer)
 		errCh    chan error
@@ -61,12 +65,14 @@ func (cli *HyperClient) HyperCmdAttach(args ...string) error {
 		}
 	}()
 
+	request := fmt.Sprintf("/%s?%s", method, v.Encode())
+
 	errCh = promise.Go(func() error {
-		return cli.hijack("POST", "/attach?"+v.Encode(), true, cli.in, cli.out, cli.out, hijacked, nil, "")
+		return cli.hijack("POST", request, true, cli.in, cli.out, cli.out, hijacked, nil, "")
 	})
 
-	if err := cli.monitorTtySize(podName, tag); err != nil {
-		fmt.Printf("Monitor tty size fail for %s!\n", podName)
+	if err := cli.monitorTtySize(pod, tag); err != nil {
+		fmt.Printf("Monitor tty size fail for %s!\n", pod)
 	}
 
 	// Acknowledge the hijack before starting
@@ -88,6 +94,6 @@ func (cli *HyperClient) HyperCmdAttach(args ...string) error {
 		fmt.Printf("Error hijack: %s", err.Error())
 		return err
 	}
-	fmt.Printf("Successfully attached to pod(%s)\n", podName)
+	fmt.Printf("Successfully attached to pod(%s)\n", pod)
 	return nil
 }
