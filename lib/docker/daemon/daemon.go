@@ -621,9 +621,6 @@ func NewDaemon(config *Config, registryService *registry.Service) (daemon *Daemo
 		return nil, err
 	}
 
-	// Set the default driver
-	graphdriver.DefaultDriver = config.GraphDriver
-
 	// Load storage driver
 	driver, err := graphdriver.New(config.Root, config.GraphOptions)
 	if err != nil {
