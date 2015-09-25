@@ -14,6 +14,7 @@ import (
 	"github.com/hyperhq/hyper/daemon"
 	"github.com/hyperhq/hyper/docker"
 	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/hyper/lib/docker/daemon/graphdriver"
 	"github.com/hyperhq/hyper/lib/docker/pkg/reexec"
 	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/driverloader"
@@ -126,6 +127,11 @@ func mainDaemon(config, host string, flDisableIptables bool) {
 			glog.Errorf(err.Error())
 			return
 		}
+	}
+
+	storageDriver, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "StorageDriver")
+	if storageDriver != "" {
+		graphdriver.DefaultDriver = storageDriver
 	}
 
 	eng := engine.New(config)

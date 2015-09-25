@@ -104,7 +104,7 @@ func GetDriver(name, home string, options []string) (Driver, error) {
 }
 
 func New(root string, options []string) (driver Driver, err error) {
-	for _, name := range []string{os.Getenv("DOCKER_DRIVER"), DefaultDriver} {
+	for _, name := range []string{os.Getenv("HYPER_STORAGE_DRIVER"), DefaultDriver} {
 		if name != "" {
 			glog.V(1).Infof("[graphdriver] trying provided driver %q", name) // so the logs show specified driver
 			return GetDriver(name, root, options)
