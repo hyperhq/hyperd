@@ -180,54 +180,6 @@ func (daemon *Daemon) CmdPodRun(job *engine.Job) error {
 	return nil
 }
 
-func (daemon *Daemon) ProcessPodBytes(body []byte, podId string) (*pod.UserPod, error) {
-	var containers []pod.UserContainer
-	var haproxyDir string = path.Join(utils.HYPER_ROOT, "services", podId, "haproxy")
-
-	userPod, err := pod.ProcessPodBytes(body)
-	if err != nil {
-		glog.V(1).Infof("Process POD file error: %s", err.Error())
-		return nil, err
-	}
-
-	if len(userPod.Services) == 0 {
-		return userPod, nil
-	}
-
-	haproxyContainer := pod.UserContainer{
-		Name:  userPod.Name + "-haproxy",
-		Image: "haproxy:latest",
-	}
-
-	//haproxyContainer.Command = append(haproxyContainer.Command, "bash")
-	haproxyVolRef := pod.UserVolumeReference{
-		Volume:   "haproxy-volume",
-		Path:     "/usr/local/etc/haproxy/",
-		ReadOnly: false,
-	}
-
-	/* PrepareServices will check haproxy volume */
-	haproxyVolume := pod.UserVolume{
-		Name:   "haproxy-volume",
-		Source: haproxyDir,
-		Driver: "vfs",
-	}
-
-	userPod.Volumes = append(userPod.Volumes, haproxyVolume)
-
-	haproxyContainer.Volumes = append(haproxyContainer.Volumes, haproxyVolRef)
-
-	containers = append(containers, haproxyContainer)
-
-	for _, c := range userPod.Containers {
-		containers = append(containers, c)
-	}
-
-	userPod.Containers = containers
-
-	return userPod, nil
-}
-
 func (daemon *Daemon) CreatePod(podId, podArgs string, config interface{}, autoremove bool) (err error) {
 	glog.V(1).Infof("podArgs: %s", podArgs)
 	var (
