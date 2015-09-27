@@ -106,7 +106,7 @@ func (daemon *Daemon) CmdPodInfo(job *engine.Job) error {
 	}
 	podData, err := daemon.GetPodByName(mypod.Id)
 	if err == nil {
-		if userpod, err = pod.ProcessPodBytes(podData); err != nil {
+		if userpod, err = daemon.ProcessPodBytes(podData, mypod.Id); err != nil {
 			return err
 		}
 	}
@@ -295,7 +295,7 @@ func (daemon *Daemon) CmdContainerInfo(job *engine.Job) error {
 	}
 	podData, err := daemon.GetPodByName(mypod.Id)
 	if err == nil {
-		if userpod, err = pod.ProcessPodBytes(podData); err != nil {
+		if userpod, err = daemon.ProcessPodBytes(podData, mypod.Id); err != nil {
 			return err
 		}
 	}

@@ -13,6 +13,7 @@ import (
 
 	"github.com/hyperhq/hyper/engine"
 	dockertypes "github.com/hyperhq/hyper/lib/docker/api/types"
+	"github.com/hyperhq/hyper/servicediscovery"
 	"github.com/hyperhq/hyper/storage/aufs"
 	dm "github.com/hyperhq/hyper/storage/devicemapper"
 	"github.com/hyperhq/hyper/storage/overlay"
@@ -179,6 +180,54 @@ func (daemon *Daemon) CmdPodRun(job *engine.Job) error {
 	return nil
 }
 
+func (daemon *Daemon) ProcessPodBytes(body []byte, podId string) (*pod.UserPod, error) {
+	var containers []pod.UserContainer
+	var haproxyDir string = path.Join(utils.HYPER_ROOT, "services", podId, "haproxy")
+
+	userPod, err := pod.ProcessPodBytes(body)
+	if err != nil {
+		glog.V(1).Infof("Process POD file error: %s", err.Error())
+		return nil, err
+	}
+
+	if len(userPod.Services) == 0 {
+		return userPod, nil
+	}
+
+	haproxyContainer := pod.UserContainer{
+		Name:  userPod.Name + "-haproxy",
+		Image: "haproxy:latest",
+	}
+
+	//haproxyContainer.Command = append(haproxyContainer.Command, "bash")
+	haproxyVolRef := pod.UserVolumeReference{
+		Volume:   "haproxy-volume",
+		Path:     "/usr/local/etc/haproxy/",
+		ReadOnly: false,
+	}
+
+	/* PrepareServices will check haproxy volume */
+	haproxyVolume := pod.UserVolume{
+		Name:   "haproxy-volume",
+		Source: haproxyDir,
+		Driver: "vfs",
+	}
+
+	userPod.Volumes = append(userPod.Volumes, haproxyVolume)
+
+	haproxyContainer.Volumes = append(haproxyContainer.Volumes, haproxyVolRef)
+
+	containers = append(containers, haproxyContainer)
+
+	for _, c := range userPod.Containers {
+		containers = append(containers, c)
+	}
+
+	userPod.Containers = containers
+
+	return userPod, nil
+}
+
 func (daemon *Daemon) CreatePod(podId, podArgs string, config interface{}, autoremove bool) (err error) {
 	glog.V(1).Infof("podArgs: %s", podArgs)
 	var (
@@ -186,7 +235,7 @@ func (daemon *Daemon) CreatePod(podId, podArgs string, config interface{}, autor
 		containerIds []string
 		cId          []byte
 	)
-	userPod, err = pod.ProcessPodBytes([]byte(podArgs))
+	userPod, err = daemon.ProcessPodBytes([]byte(podArgs), podId)
 	if err != nil {
 		glog.V(1).Infof("Process POD file error: %s", err.Error())
 		return err
@@ -487,6 +536,14 @@ func (daemon *Daemon) PrepareContainer(mypod *hypervisor.Pod, userPod *pod.UserP
 	return containerInfoList, nil
 }
 
+func (daemon *Daemon) PrepareServices(userPod *pod.UserPod, podId string) error {
+	err := servicediscovery.PrepareServices(userPod, podId)
+	if err != nil {
+		glog.Errorf("PrepareServices failed %s", err.Error())
+	}
+	return err
+}
+
 func (daemon *Daemon) PrepareVolume(mypod *hypervisor.Pod, userPod *pod.UserPod,
 	vmId string) ([]*hypervisor.VolumeInfo, error) {
 	var (
@@ -600,6 +657,8 @@ func (daemon *Daemon) PrepareVolume(mypod *hypervisor.Pod, userPod *pod.UserPod,
 func (daemon *Daemon) PreparePod(mypod *hypervisor.Pod, userPod *pod.UserPod,
 	vmId string) ([]*hypervisor.ContainerInfo, []*hypervisor.VolumeInfo, error) {
 
+	daemon.PrepareServices(userPod, mypod.Id)
+
 	containerInfoList, err := daemon.PrepareContainer(mypod, userPod, vmId)
 	if err != nil {
 		return nil, nil, err
@@ -627,7 +686,7 @@ func (daemon *Daemon) StartPod(podId, podArgs, vmId string, config interface{}, 
 		return -1, "", err
 	}
 
-	userPod, err := pod.ProcessPodBytes(podData)
+	userPod, err := daemon.ProcessPodBytes(podData, podId)
 	if err != nil {
 		return -1, "", err
 	}
