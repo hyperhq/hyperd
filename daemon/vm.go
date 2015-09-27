@@ -181,11 +181,13 @@ func (daemon *Daemon) StartVm(vmId string, cpu, mem int, lazy bool, keep int) (*
 }
 
 func (daemon *Daemon) WaitVmStart(vm *hypervisor.Vm) error {
-	_, r2, _, err1 := vm.GetVmChan()
-	if err1 != nil {
-		return err1
+	Status, err := vm.GetResponseChan()
+	if err != nil {
+		return err
 	}
-	vmResponse := <-r2.(chan *types.VmResponse)
+	defer vm.ReleaseResponseChan(Status)
+
+	vmResponse := <-Status
 	glog.V(1).Infof("Get the response from VM, VM id is %s, response code is %d!", vmResponse.VmId, vmResponse.Code)
 	if vmResponse.Code != types.E_VM_RUNNING {
 		return fmt.Errorf("Vbox does not start successfully")

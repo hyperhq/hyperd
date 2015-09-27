@@ -315,15 +315,16 @@ func (b *Builder) runContextCommand(args []string, allowRemote bool, allowDecomp
 		}
 		vm = b.Hyperdaemon.VmList[b.Name]
 		// wait for cmd finish
-		_, _, ret3, err := vm.GetVmChan()
+		Status, err := vm.GetResponseChan()
 		if err != nil {
 			glog.Error(err.Error())
 			return err
 		}
-		subVmStatus := ret3.(chan *types.VmResponse)
+		defer vm.ReleaseResponseChan(Status)
+
 		var vmResponse *types.VmResponse
 		for {
-			vmResponse = <-subVmStatus
+			vmResponse = <-Status
 			if vmResponse.VmId == b.Name {
 				if vmResponse.Code == types.E_POD_FINISHED {
 					glog.Infof("Got E_POD_FINISHED code response")
@@ -735,15 +736,15 @@ func (b *Builder) run(c *daemon.Container) error {
 		}
 		vm = b.Hyperdaemon.VmList[b.Name]
 		// wait for cmd finish
-		_, _, ret3, err := vm.GetVmChan()
+		Status, err := vm.GetResponseChan()
 		if err != nil {
 			glog.Error(err.Error())
 			return err
 		}
-		subVmStatus := ret3.(chan *types.VmResponse)
+		defer vm.ReleaseResponseChan(Status)
 		var vmResponse *types.VmResponse
 		for {
-			vmResponse = <-subVmStatus
+			vmResponse = <-Status
 			if vmResponse.VmId == b.Name {
 				if vmResponse.Code == types.E_POD_FINISHED {
 					glog.Infof("Got E_POD_FINISHED code response")
