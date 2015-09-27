@@ -104,7 +104,7 @@ func (daemon *Daemon) AssociateAllVms() error {
 		if err != nil {
 			continue
 		}
-		userPod, err := pod.ProcessPodBytes(podData)
+		userPod, err := daemon.ProcessPodBytes(podData, mypod.Id)
 		if err != nil {
 			continue
 		}
