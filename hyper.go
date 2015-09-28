@@ -32,5 +32,6 @@ func main() {
 
 	if err := cli.Cmd(flag.Args()...); err != nil {
 		fmt.Printf("%s ERROR: %s\n", os.Args[0], err.Error())
+		os.Exit(-1)
 	}
 }
