@@ -50,9 +50,12 @@ func (cli *HyperClient) HyperCmdPod(args ...string) error {
 	return nil
 }
 
-func (cli *HyperClient) CreatePod(jsonbody string) (string, error) {
+func (cli *HyperClient) CreatePod(jsonbody string, remove bool) (string, error) {
 	v := url.Values{}
 	v.Set("podArgs", jsonbody)
+	if remove {
+		v.Set("remove", "yes")
+	}
 	body, statusCode, err := readBody(cli.call("POST", "/pod/create?"+v.Encode(), nil, nil))
 	if statusCode == 404 {
 		if err := cli.PullImages(jsonbody); err != nil {

@@ -32,13 +32,17 @@ func (daemon *Daemon) CmdPodCreate(job *engine.Job) error {
 		return fmt.Errorf("Pod full, the maximum Pod is 1024!")
 	}
 	podArgs := job.Args[0]
+	autoRemove := false
+	if job.Args[1] == "yes" || job.Args[1] == "true" {
+		autoRemove = true
+	}
 
 	podId := fmt.Sprintf("pod-%s", pod.RandStr(10, "alpha"))
 	daemon.PodsMutex.Lock()
 	glog.V(2).Infof("lock PodList")
 	defer glog.V(2).Infof("unlock PodList")
 	defer daemon.PodsMutex.Unlock()
-	err := daemon.CreatePod(podId, podArgs, nil, false)
+	err := daemon.CreatePod(podId, podArgs, nil, autoRemove)
 	if err != nil {
 		return err
 	}
