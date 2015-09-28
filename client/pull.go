@@ -53,5 +53,9 @@ func (cli *HyperClient) PullImages(data string) error {
 			return err
 		}
 	}
+	/* Hack here, pull service discovery image `haproxy` */
+	if len(userpod.Services) > 0 {
+		return cli.PullImage("haproxy")
+	}
 	return nil
 }

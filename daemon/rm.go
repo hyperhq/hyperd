@@ -2,8 +2,11 @@ package daemon
 
 import (
 	"fmt"
+	"os"
+	"path"
 
 	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/hypervisor/types"
 	"github.com/hyperhq/runv/lib/glog"
 )
@@ -42,6 +45,7 @@ func (daemon *Daemon) CleanPod(podId string) (int, string, error) {
 		cause = ""
 		err   error
 	)
+	os.RemoveAll(path.Join(utils.HYPER_ROOT, "services", podId))
 	pod, ok := daemon.PodList[podId]
 	if !ok {
 		return -1, "", fmt.Errorf("Can not find that Pod(%s)", podId)
@@ -84,5 +88,6 @@ func (daemon *Daemon) CleanPod(podId string) (int, string, error) {
 		}
 		code = types.E_OK
 	}
+
 	return code, cause, nil
 }
