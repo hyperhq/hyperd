@@ -44,7 +44,7 @@ func (daemon *Daemon) CmdExec(job *engine.Job) (err error) {
 
 	vm, ok := daemon.VmList[vmId]
 	if !ok {
-		return fmt.Errorf("Can find VM whose Id is %s!", vmId)
+		return fmt.Errorf("Can not find VM whose Id is %s!", vmId)
 	}
 
 	err = vm.Exec(job.Stdin, job.Stdout, cmd, tag, container)
