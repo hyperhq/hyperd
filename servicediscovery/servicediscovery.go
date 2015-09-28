@@ -97,7 +97,7 @@ func ApplyServices(vm *hypervisor.Vm, container string, services []pod.UserServi
 
 	command = append(command, "sh")
 	command = append(command, "-c")
-	command = append(command, "'haproxy -f /usr/local/etc/haproxy/haproxy.cfg -p /var/run/haproxy.pid -sf `cat /var/run/haproxy.pid`'")
+	command = append(command, "haproxy -f /usr/local/etc/haproxy/haproxy.cfg -p /var/run/haproxy.pid -sf `cat /var/run/haproxy.pid`")
 	execcmd, err := json.Marshal(command)
 	if err != nil {
 		return err
