@@ -87,9 +87,9 @@ func (daemon *Daemon) CmdPodStart(job *engine.Job) error {
 	// Do the status check for the given pod
 	daemon.PodsMutex.Lock()
 	glog.V(2).Infof("lock PodList")
-	defer glog.V(2).Infof("unlock PodList")
-	defer daemon.PodsMutex.Unlock()
 	if _, ok := daemon.PodList[podId]; !ok {
+		glog.V(2).Infof("unlock PodList")
+		daemon.PodsMutex.Unlock()
 		return fmt.Errorf("The pod(%s) can not be found, please create it first", podId)
 	}
 	var lazy bool = hypervisor.HDriver.SupportLazyMode() && vmId == ""
@@ -97,13 +97,19 @@ func (daemon *Daemon) CmdPodStart(job *engine.Job) error {
 	code, cause, err := daemon.StartPod(podId, "", vmId, nil, lazy, false, types.VM_KEEP_NONE, ttys)
 	if err != nil {
 		glog.Error(err.Error())
+		glog.V(2).Infof("unlock PodList")
+		daemon.PodsMutex.Unlock()
 		return err
 	}
 
 	if len(ttys) > 0 {
+		glog.V(2).Infof("unlock PodList")
+		daemon.PodsMutex.Unlock()
 		<-ttyCallback
 		return nil
 	}
+	defer glog.V(2).Infof("unlock PodList")
+	defer daemon.PodsMutex.Unlock()
 
 	// Prepare the VM status to client
 	v := &engine.Env{}

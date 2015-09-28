@@ -246,6 +246,7 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 func (cli *HyperClient) GetContainerByPod(podId string) (string, error) {
 	v := url.Values{}
 	v.Set("item", "container")
+	v.Set("pod", podId)
 	body, _, err := readBody(cli.call("GET", "/list?"+v.Encode(), nil, nil))
 	if err != nil {
 		return "", err

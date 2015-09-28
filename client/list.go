@@ -12,8 +12,13 @@ import (
 )
 
 func (cli *HyperClient) HyperCmdList(args ...string) error {
-	var parser = gflag.NewParser(nil, gflag.Default)
-	parser.Usage = "list [pod|container]\n\nlist all pods or container information"
+	var opts struct {
+		Aux bool   `short:"x" long:"aux" default:"false" value-name:"false" description:"show the auxiliary containers"`
+		Pod string `short:"p" long:"pod" value-name:"\"\"" description:"only list the specified pod"`
+	}
+
+	var parser = gflag.NewParser(&opts, gflag.Default|gflag.IgnoreUnknown)
+	parser.Usage = "list [OPTIONS] [pod|container]\n\nlist all pods or container information"
 	args, err := parser.Parse()
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {
@@ -35,6 +40,12 @@ func (cli *HyperClient) HyperCmdList(args ...string) error {
 
 	v := url.Values{}
 	v.Set("item", item)
+	if opts.Aux {
+		v.Set("auxiliary", "yes")
+	}
+	if opts.Pod != "" {
+		v.Set("pod", opts.Pod)
+	}
 	body, _, err := readBody(cli.call("GET", "/list?"+v.Encode(), nil, nil))
 	if err != nil {
 		return err
