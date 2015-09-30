@@ -3,7 +3,6 @@ package utils
 import (
 	"bytes"
 	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 )
 
 var (
@@ -39,33 +39,23 @@ func MatchesContentType(contentType, expectedType string) bool {
 	return err == nil && mimetype == expectedType
 }
 
-func DownloadFile(uri, target string) error {
-	f, err := os.OpenFile(target, os.O_RDWR|os.O_CREATE, 0666)
-	stat, err := f.Stat()
-	if err != nil {
-		return err
+func UriReader(uri string) (io.ReadCloser, error) {
+	if strings.HasPrefix(uri, "http:") || strings.HasPrefix(uri, "https:") {
+		req, _ := http.NewRequest("GET", uri, nil)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		return resp.Body, nil
+	} else if strings.HasPrefix(uri, "file://") {
+		src := strings.TrimPrefix(uri, "file://")
+		f, err := os.Open(src)
+		if err != nil {
+			return nil, err
+		}
+		return f, nil
 	}
-
-	req, _ := http.NewRequest("GET", uri, nil)
-	req.Header.Set("Range", "bytes="+strconv.FormatInt(stat.Size(), 10)+"-")
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
-	}
-	_, err = io.Copy(f, resp.Body)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func Base64Decode(fileContent string) (string, error) {
-	b64 := base64.NewEncoding("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/")
-	decodeBytes, err := b64.DecodeString(fileContent)
-	if err != nil {
-		return "", err
-	}
-	return string(decodeBytes), nil
+	return nil, fmt.Errorf("Unsupported URI: %s", uri)
 }
 
 // FormatMountLabel returns a string to be used by the mount command.
@@ -86,20 +76,22 @@ func FormatMountLabel(src, mountLabel string) string {
 	return src
 }
 
-func ConvertPermStrToInt(str string) int {
+func PermInt(str string) int {
 	var res = 0
 	if str[0] == '0' {
 		if len(str) == 1 {
 			res = 0
 		} else if str[1] == 'x' {
 			// this is hex number
-			for i := 2; i < len(str); i++ {
-				res = res*16 + int(str[i]-'0')
+			i64, err := strconv.ParseInt(str[2:], 16, 0)
+			if err == nil {
+				res = int(i64)
 			}
 		} else {
 			// this is a octal number
-			for i := 1; i < len(str); i++ {
-				res = res*8 + int(str[i]-'0')
+			i64, err := strconv.ParseInt(str[2:], 8, 0)
+			if err == nil {
+				res = int(i64)
 			}
 		}
 	} else {
@@ -109,6 +101,19 @@ func ConvertPermStrToInt(str string) int {
 		res = 511
 	}
 	return res
+}
+
+func UidInt(str string) int {
+	switch str {
+	case "", "root":
+		return 0
+	default:
+		i, err := strconv.Atoi(str)
+		if err != nil {
+			return 0
+		}
+		return i
+	}
 }
 
 func RandStr(strSize int, randType string) string {

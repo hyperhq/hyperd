@@ -1,11 +1,11 @@
 package daemon
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
-	"os/user"
 	"path"
 	"path/filepath"
 	"runtime"
@@ -14,6 +14,7 @@ import (
 	"github.com/hyperhq/hyper/engine"
 	dockertypes "github.com/hyperhq/hyper/lib/docker/api/types"
 	"github.com/hyperhq/hyper/servicediscovery"
+	"github.com/hyperhq/hyper/storage"
 	"github.com/hyperhq/hyper/storage/aufs"
 	dm "github.com/hyperhq/hyper/storage/devicemapper"
 	"github.com/hyperhq/hyper/storage/overlay"
@@ -290,8 +291,6 @@ func (daemon *Daemon) PrepareContainer(mypod *hypervisor.Pod, userPod *pod.UserP
 		rootPath          string
 		devFullName       string
 		rootfs            string
-		uid               string
-		gid               string
 		err               error
 		sharedDir         = path.Join(hypervisor.BaseDir, vmId, hypervisor.ShareDirTag)
 		containerInfoList = []*hypervisor.ContainerInfo{}
@@ -380,86 +379,45 @@ func (daemon *Daemon) PrepareContainer(mypod *hypervisor.Pod, userPod *pod.UserP
 
 		for _, f := range userPod.Containers[i].Files {
 			targetPath := f.Path
+			if strings.HasSuffix(targetPath, "/") {
+				targetPath = targetPath + f.Filename
+			}
 			file, ok := files[f.Filename]
 			if !ok {
 				continue
 			}
-			var fromFile = "/tmp/" + file.Name
-			defer os.RemoveAll(fromFile)
+
+			var src io.Reader
+
 			if file.Uri != "" {
-				err = utils.DownloadFile(file.Uri, fromFile)
+				urisrc, err := utils.UriReader(file.Uri)
 				if err != nil {
 					return nil, err
 				}
-			} else if file.Contents != "" {
-				err = ioutil.WriteFile(fromFile, []byte(file.Contents), 0666)
-				if err != nil {
-					return nil, err
-				}
+				defer urisrc.Close()
+				src = urisrc
 			} else {
-				continue
-			}
-			// we need to decode the content
-			fi, err := os.Open(fromFile)
-			if err != nil {
-				return nil, err
-			}
-			defer fi.Close()
-			fileContent, err := ioutil.ReadAll(fi)
-			if err != nil {
-				return nil, err
-			}
-			if file.Encoding == "base64" {
-				newContent, err := utils.Base64Decode(string(fileContent))
-				if err != nil {
-					return nil, err
-				}
-				err = ioutil.WriteFile(fromFile, []byte(newContent), 0666)
-				if err != nil {
-					return nil, err
-				}
-			} else {
-				err = ioutil.WriteFile(fromFile, []byte(file.Contents), 0666)
-				if err != nil {
-					return nil, err
-				}
-			}
-			// get the uid and gid for that attached file
-			fileUser := f.User
-
-			u, err := user.Current()
-			if err != nil {
-				glog.Error("got error when get current user ", err.Error())
-				return nil, err
+				src = strings.NewReader(file.Contents)
 			}
 
-			if fileUser != "" {
-				u, err = user.Lookup(fileUser)
-				if err != nil {
-					glog.Error("got error when lookup user ", err.Error())
-					return nil, err
-				}
+			switch file.Encoding {
+			case "base64":
+				src = base64.NewDecoder(base64.StdEncoding, src)
+			default:
 			}
-
-			uid = u.Uid
-			gid = u.Gid
 
 			if storageDriver == "devicemapper" {
-				err := dm.AttachFiles(c.Id, devPrefix, fromFile, targetPath, rootPath, f.Perm, uid, gid)
+				err := dm.InjectFile(src, c.Id, devPrefix, targetPath, rootPath,
+					utils.PermInt(f.Perm), utils.UidInt(f.User), utils.UidInt(f.Group))
 				if err != nil {
-					glog.Error("got error when attach files ", err.Error())
+					glog.Error("got error when inject files ", err.Error())
 					return nil, err
 				}
-			} else if storageDriver == "aufs" {
-				err := aufs.AttachFiles(c.Id, fromFile, targetPath, sharedDir, f.Perm, uid, gid)
+			} else if storageDriver == "aufs" || storageDriver == "overlay" {
+				err := storage.FsInjectFile(src, c.Id, targetPath, sharedDir,
+					utils.PermInt(f.Perm), utils.UidInt(f.User), utils.UidInt(f.Group))
 				if err != nil {
-					glog.Error("got error when attach files ", err.Error())
-					return nil, err
-				}
-			} else if storageDriver == "overlay" {
-				err := overlay.AttachFiles(c.Id, fromFile, targetPath, sharedDir, f.Perm, uid, gid)
-				if err != nil {
-					glog.Error("got error when attach files ", err.Error())
+					glog.Error("got error when inject files ", err.Error())
 					return nil, err
 				}
 			}
