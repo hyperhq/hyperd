@@ -5,15 +5,15 @@ package devicemapper
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
-	"path/filepath"
-	"strconv"
 	"strings"
 	"syscall"
 
+	"github.com/hyperhq/hyper/storage"
 	"github.com/hyperhq/runv/lib/glog"
 )
 
@@ -61,14 +61,11 @@ func CreateNewDevice(containerId, devPrefix, rootPath string) error {
 	return nil
 }
 
-func AttachFiles(containerId, devPrefix, fromFile, toDir, rootPath, perm, uid, gid string) error {
+func InjectFile(src io.Reader, containerId, devPrefix, target, rootPath string, perm, uid, gid int) error {
 	if containerId == "" {
 		return fmt.Errorf("Please make sure the arguments are not NULL!\n")
 	}
-	permInt, err := strconv.Atoi(perm)
-	if err != nil {
-		return err
-	}
+	permDir := perm | 0111
 	// Define the basic directory, need to get them via the 'info' command
 	var (
 		mntPath = fmt.Sprintf("%s/mnt/", rootPath)
@@ -78,11 +75,11 @@ func AttachFiles(containerId, devPrefix, fromFile, toDir, rootPath, perm, uid, g
 	// Get the mount point for the container ID
 	idMountPath := path.Join(mntPath, containerId)
 	rootFs := path.Join(idMountPath, "rootfs")
-	targetDir := path.Join(rootFs, toDir)
+	targetFile := path.Join(rootFs, target)
 
 	// Whether we have the mounter directory
 	if _, err := os.Stat(idMountPath); err != nil && os.IsNotExist(err) {
-		if err := os.MkdirAll(idMountPath, os.FileMode(permInt)); err != nil {
+		if err := os.MkdirAll(idMountPath, os.FileMode(permDir)); err != nil {
 			return err
 		}
 	}
@@ -108,53 +105,9 @@ func AttachFiles(containerId, devPrefix, fromFile, toDir, rootPath, perm, uid, g
 	if err != nil {
 		return fmt.Errorf("Error mounting '%s' on '%s': %s", devFullName, idMountPath, err)
 	}
+	defer syscall.Unmount(idMountPath, syscall.MNT_DETACH)
 
-	// It just need the block device without copying any files
-	if fromFile == "" || toDir == "" {
-		// we need to unmout the device from the mounted directory
-		syscall.Unmount(idMountPath, syscall.MNT_DETACH)
-		return nil
-	}
-	// Make a new file with the given premission and wirte the source file content in it
-	if _, err := os.Stat(fromFile); err != nil && os.IsNotExist(err) {
-		// The given file is not exist, we need to unmout the device and return
-		syscall.Unmount(idMountPath, syscall.MNT_DETACH)
-		return err
-	}
-	buf, err := ioutil.ReadFile(fromFile)
-	if err != nil {
-		// unmout the device
-		syscall.Unmount(idMountPath, syscall.MNT_DETACH)
-		return err
-	}
-	_, err = os.Stat(targetDir)
-	targetFile := targetDir
-	if err != nil && os.IsNotExist(err) {
-		// we need to create a target directory with given premission
-		if err := os.MkdirAll(targetDir, os.FileMode(permInt)); err != nil {
-			// we need to unmout the device
-			syscall.Unmount(idMountPath, syscall.MNT_DETACH)
-			return err
-		}
-		targetFile = targetDir + "/" + filepath.Base(fromFile)
-	} else {
-		targetFile = targetDir + "/" + filepath.Base(fromFile)
-	}
-	err = ioutil.WriteFile(targetFile, buf, os.FileMode(permInt))
-	if err != nil {
-		// we need to unmout the device
-		syscall.Unmount(idMountPath, syscall.MNT_DETACH)
-		return err
-	}
-	user_id, _ := strconv.Atoi(uid)
-	group_id, _ := strconv.Atoi(gid)
-	if err = syscall.Chown(targetFile, user_id, group_id); err != nil {
-		syscall.Unmount(idMountPath, syscall.MNT_DETACH)
-		return err
-	}
-	// finally we need to unmout the device
-	syscall.Unmount(idMountPath, syscall.MNT_DETACH)
-	return nil
+	return storage.WriteFile(src, targetFile, perm, uid, gid)
 }
 
 func ProbeFsType(device string) (string, error) {

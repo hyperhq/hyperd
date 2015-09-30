@@ -1,0 +1,59 @@
+{
+	"id": "test-inject-file",
+	"containers" : [{
+	    "name": "file-tester",
+	    "image": "ubuntu:latest",
+	    "workdir": "/",
+	    "command": ["/bin/bash"],
+		"files": [{
+			"path": "/root/test/",
+			"filename": "resolv.conf",
+			"perm": "0600"
+		},{
+			"path": "/root/test/logo.png",
+			"filename": "logo",
+			"perm": "0644",
+			"user": "1000",
+			"group": "1000"
+		},{
+			"path": "/root/test/t1",
+			"filename": "data",
+			"perm": "0644"
+		},{
+			"path": "/root/test/t2",
+			"filename": "data2",
+			"perm": "0755"
+		},{
+			"path": "/root/test/t3",
+			"filename": "corrupt",
+			"perm": "0000"
+		}]
+	}],
+	"resource": {
+	    "vcpu": 1,
+	    "memory": 512
+	},
+	"files": [{
+		"name": "resolv.conf",
+		"encoding": "raw",
+		"uri": "file:///etc/resolv.conf"
+	},{
+		"name": "logo",
+		"encoding": "raw",
+		"uri": "http://7xj84t.com1.z0.glb.clouddn.com/test/logo.png"
+	},{
+		"name": "data",
+		"encoding": "raw",
+		"content": ""
+	},{
+		"name": "data2",
+		"encoding": "base64",
+		"content": "aGVsbG8sDQpoeXBlciENCg=="
+	},{
+		"name": "corrupt",
+		"encoding": "base64",
+		"content": "VsbG8sDQpoeXBlciENCg="
+	}],
+	"volumes": [],
+	"tty": true
+}
