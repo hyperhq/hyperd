@@ -674,12 +674,17 @@ func (daemon *Daemon) StartPod(podId, podArgs, vmId string, config interface{}, 
 		return -1, "", err
 	}
 
+	ttyContainers := containerInfoList
+	if userPod.Type == "service-discovery" {
+		ttyContainers = containerInfoList[1:]
+	}
+
 	for idx, str := range streams {
-		if idx >= len(userPod.Containers) {
+		if idx >= len(ttyContainers) {
 			break
 		}
 
-		err = vm.Attach(str.Stdin, str.Stdout, str.ClientTag, containerInfoList[idx].Id, str.Callback, nil)
+		err = vm.Attach(str.Stdin, str.Stdout, str.ClientTag, ttyContainers[idx].Id, str.Callback, nil)
 		if err != nil {
 			glog.Errorf("Failed to attach client %s before start pod", str.ClientTag)
 			return -1, "", err
