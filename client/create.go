@@ -2,8 +2,6 @@ package client
 
 import (
 	"fmt"
-	"io/ioutil"
-	"os"
 	"strings"
 
 	gflag "github.com/jessevdk/go-flags"
@@ -27,20 +25,13 @@ func (cli *HyperClient) HyperCmdCreate(args ...string) error {
 		}
 	}
 	jsonFile := args[1]
-	if _, err := os.Stat(jsonFile); err != nil {
-		return err
-	}
-	jsonbody, err := ioutil.ReadFile(jsonFile)
+
+	jsonbody, err := cli.JsonFromFile(jsonFile, opts.Yaml, false)
 	if err != nil {
 		return err
 	}
-	if opts.Yaml == true {
-		jsonbody, err = cli.ConvertYamlToJson(jsonbody)
-		if err != nil {
-			return err
-		}
-	}
-	podId, err := cli.CreatePod(string(jsonbody))
+
+	podId, err := cli.CreatePod(jsonbody, false)
 	if err != nil {
 		return err
 	}

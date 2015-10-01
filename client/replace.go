@@ -4,7 +4,6 @@ package client
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -64,21 +63,12 @@ func (cli *HyperClient) HyperCmdReplace(args ...string) error {
 		return nil
 	}
 	if newPodFile != "" {
-		if _, err := os.Stat(newPodFile); err != nil && os.IsNotExist(err) {
-			return err
-		}
-		jsonbody, err := ioutil.ReadFile(newPodFile)
+		jsonbody, err := cli.JsonFromFile(newPodFile, opts.Yaml, false)
 		if err != nil {
 			return err
 		}
 
-		if opts.Yaml == true {
-			jsonbody, err = cli.ConvertYamlToJson(jsonbody)
-			if err != nil {
-				return err
-			}
-		}
-		newPodId, err := cli.CreatePod(string(jsonbody))
+		newPodId, err := cli.CreatePod(jsonbody, false)
 		if err != nil {
 			return err
 		}

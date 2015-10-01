@@ -27,32 +27,36 @@ func (cli *HyperClient) HyperCmdRm(args ...string) error {
 	}
 	pods := args[1:]
 	for _, id := range pods {
-		v := url.Values{}
-		v.Set("podId", id)
-		body, _, err := readBody(cli.call("POST", "/pod/remove?"+v.Encode(), nil, nil))
-		if err != nil {
-			fmt.Fprintf(cli.out, "Error to remove pod(%s), %s", id, err.Error())
-			continue
-		}
-		out := engine.NewOutput()
-		remoteInfo, err := out.AddEnv()
-		if err != nil {
-			fmt.Fprintf(cli.out, "Error to remove pod(%s), %s", id, err.Error())
-			continue
-		}
-
-		if _, err := out.Write(body); err != nil {
-			fmt.Fprintf(cli.out, "Error to remove pod(%s), %s", id, err.Error())
-			continue
-		}
-		out.Close()
-		errCode := remoteInfo.GetInt("Code")
-		if errCode == types.E_OK || errCode == types.E_VM_SHUTDOWN {
-			//fmt.Println("VM is successful to start!")
+		err := cli.RmPod(id)
+		if err == nil {
 			fmt.Fprintf(cli.out, "Pod(%s) is successful to be deleted!\n", id)
 		} else {
-			fmt.Fprintf(cli.out, "Error to remove pod(%s), %s", id, remoteInfo.Get("Cause"))
+			fmt.Fprintf(cli.out, "%v\n", err)
 		}
+	}
+	return nil
+}
+
+func (cli *HyperClient) RmPod(id string) error {
+	v := url.Values{}
+	v.Set("podId", id)
+	body, _, err := readBody(cli.call("POST", "/pod/remove?"+v.Encode(), nil, nil))
+	if err != nil {
+		return fmt.Errorf("Error to remove pod(%s), %s", id, err.Error())
+	}
+	out := engine.NewOutput()
+	remoteInfo, err := out.AddEnv()
+	if err != nil {
+		return fmt.Errorf("Error to remove pod(%s), %s", id, err.Error())
+	}
+
+	if _, err := out.Write(body); err != nil {
+		return fmt.Errorf("Error to remove pod(%s), %s", id, err.Error())
+	}
+	out.Close()
+	errCode := remoteInfo.GetInt("Code")
+	if !(errCode == types.E_OK || errCode == types.E_VM_SHUTDOWN) {
+		return fmt.Errorf("Error to remove pod(%s), %s", id, remoteInfo.Get("Cause"))
 	}
 	return nil
 }

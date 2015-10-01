@@ -517,8 +517,10 @@ func postPodCreate(eng *engine.Engine, version version.Version, w http.ResponseW
 		return nil
 	}
 
-	glog.V(1).Infof("Args string is %s", r.Form.Get("podArgs"))
-	job := eng.Job("podCreate", r.Form.Get("podArgs"))
+	podArgs := r.Form.Get("podArgs")
+	autoRemove := r.Form.Get("remove")
+	glog.V(1).Infof("Args string is %s, %s", podArgs, autoRemove)
+	job := eng.Job("podCreate", podArgs, autoRemove)
 	stdoutBuf := bytes.NewBuffer(nil)
 
 	job.Stdout.Add(stdoutBuf)

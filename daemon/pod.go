@@ -33,13 +33,17 @@ func (daemon *Daemon) CmdPodCreate(job *engine.Job) error {
 		return fmt.Errorf("Pod full, the maximum Pod is 1024!")
 	}
 	podArgs := job.Args[0]
+	autoRemove := false
+	if job.Args[1] == "yes" || job.Args[1] == "true" {
+		autoRemove = true
+	}
 
 	podId := fmt.Sprintf("pod-%s", pod.RandStr(10, "alpha"))
 	daemon.PodsMutex.Lock()
 	glog.V(2).Infof("lock PodList")
 	defer glog.V(2).Infof("unlock PodList")
 	defer daemon.PodsMutex.Unlock()
-	err := daemon.CreatePod(podId, podArgs, nil, false)
+	err := daemon.CreatePod(podId, podArgs, nil, autoRemove)
 	if err != nil {
 		return err
 	}
@@ -627,12 +631,17 @@ func (daemon *Daemon) StartPod(podId, podArgs, vmId string, config interface{}, 
 		return -1, "", err
 	}
 
+	ttyContainers := containerInfoList
+	if userPod.Type == "service-discovery" {
+		ttyContainers = containerInfoList[1:]
+	}
+
 	for idx, str := range streams {
-		if idx >= len(userPod.Containers) {
+		if idx >= len(ttyContainers) {
 			break
 		}
 
-		err = vm.Attach(str.Stdin, str.Stdout, str.ClientTag, containerInfoList[idx].Id, str.Callback, nil)
+		err = vm.Attach(str.Stdin, str.Stdout, str.ClientTag, ttyContainers[idx].Id, str.Callback, nil)
 		if err != nil {
 			glog.Errorf("Failed to attach client %s before start pod", str.ClientTag)
 			return -1, "", err

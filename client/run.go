@@ -29,7 +29,8 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 		K8s           string   `short:"k" long:"kubernetes" value-name:"\"\"" description:"Create and Run a pod based on the kubernetes pod file"`
 		Yaml          bool     `short:"y" long:"yaml" default:"false" default-mask:"-" description:"Create a pod based on Yaml file"`
 		Name          string   `long:"name" value-name:"\"\"" description:"Assign a name to the container"`
-		Attach        bool     `long:"attach" default:"true" default-mask:"-" description:"Attach the stdin, stdout and stderr to the container"`
+		Attach        bool     `short:"a" long:"attach" default:"false" default-mask:"-" description:"(from podfile) Attach the stdin, stdout and stderr to the container"`
+		Detach        bool     `short:"d" long:"detach" default:"false" default-mask:"-" description:"(from cmdline) Not Attach the stdin, stdout and stderr to the container"`
 		Workdir       string   `long:"workdir" default:"/" value-name:"\"\"" default-mask:"-" description:"Working directory inside the container"`
 		Tty           bool     `long:"tty" default:"true" default-mask:"-" description:"Allocate a pseudo-TTY"`
 		Cpu           int      `long:"cpu" default:"1" value-name:"1" default-mask:"-" description:"CPU number for the VM"`
@@ -51,196 +52,212 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 			return nil
 		}
 	}
-	if opts.PodFile != "" {
-		if _, err := os.Stat(opts.PodFile); err != nil {
-			return err
-		}
 
-		jsonbody, err := ioutil.ReadFile(opts.PodFile)
-		if err != nil {
-			return err
-		}
-
-		if opts.Yaml == true {
-			jsonbody, err = cli.ConvertYamlToJson(jsonbody)
-			if err != nil {
-				return err
-			}
-		}
-		t1 := time.Now()
-		podId, err := cli.RunPod(string(jsonbody), opts.Remove)
-		if err != nil {
-			return err
-		}
-		fmt.Printf("POD id is %s\n", podId)
-		t2 := time.Now()
-		fmt.Printf("Time to run a POD is %d ms\n", (t2.UnixNano()-t1.UnixNano())/1000000)
-		return nil
-	}
-	if opts.K8s != "" {
-		var (
-			kpod    pod.KPod
-			userpod *pod.UserPod
-		)
-		if _, err := os.Stat(opts.K8s); err != nil {
-			return err
-		}
-
-		jsonbody, err := ioutil.ReadFile(opts.K8s)
-		if err != nil {
-			return err
-		}
-		if opts.Yaml == true {
-			jsonbody, err = cli.ConvertYamlToJson(jsonbody)
-			if err != nil {
-				return err
-			}
-		}
-		if err := json.Unmarshal(jsonbody, &kpod); err != nil {
-			return err
-		}
-		userpod, err = kpod.Convert()
-		if err != nil {
-			return err
-		}
-		jsonbody, err = json.Marshal(*userpod)
-		if err != nil {
-			return err
-		}
-		t1 := time.Now()
-		podId, err := cli.RunPod(string(jsonbody), opts.Remove)
-		if err != nil {
-			return err
-		}
-		fmt.Printf("POD id is %s\n", podId)
-		t2 := time.Now()
-		fmt.Printf("Time to run a POD is %d ms\n", (t2.UnixNano()-t1.UnixNano())/1000000)
-		return nil
-	}
-
-	if len(args) == 0 {
-		return fmt.Errorf("%s: \"run\" requires a minimum of 1 argument, please provide the image.", os.Args[0])
-	}
 	var (
-		image   = args[1]
-		command = []string{}
-		env     = []pod.UserEnvironmentVar{}
-		ports   = []pod.UserContainerPort{}
-		proto   string
-		hPort   string
-		cPort   string
+		podJson string
+		attach  bool = false
 	)
-	if len(args) > 1 {
-		command = args[2:]
-	}
-	if opts.Name == "" {
-		opts.Name = image
-		fields := strings.Split(image, "/")
-		if len(fields) > 1 {
-			opts.Name = fields[len(fields)-1]
-		}
-		fields = strings.Split(opts.Name, ":")
-		if len(fields) < 2 {
-			opts.Name = opts.Name + "-" + utils.RandStr(10, "number")
-		} else {
-			opts.Name = fields[0] + "-" + fields[1] + "-" + utils.RandStr(10, "number")
-		}
 
-		validContainerNameChars := `[a-zA-Z0-9][a-zA-Z0-9_.-]`
-		validContainerNamePattern := regexp.MustCompile(`^/?` + validContainerNameChars + `+$`)
-		if !validContainerNamePattern.MatchString(opts.Name) {
-			opts.Name = namesgenerator.GetRandomName(0)
+	if opts.PodFile != "" {
+		attach = opts.Attach
+		podJson, err = cli.JsonFromFile(opts.PodFile, opts.Yaml, false)
+	} else if opts.K8s != "" {
+		attach = opts.Attach
+		podJson, err = cli.JsonFromFile(opts.K8s, opts.Yaml, false)
+	} else {
+		if len(args) == 0 {
+			return fmt.Errorf("%s: \"run\" requires a minimum of 1 argument, please provide the image.", os.Args[0])
 		}
-	}
-	if opts.Memory == 0 {
-		opts.Memory = 128
-	}
-	if opts.Cpu == 0 {
-		opts.Cpu = 1
-	}
-	for _, v := range opts.Env {
-		if v == "" || !strings.Contains(v, "=") {
-			continue
-		}
-		userEnv := pod.UserEnvironmentVar{
-			Env:   v[:strings.Index(v, "=")],
-			Value: v[strings.Index(v, "=")+1:],
-		}
-		env = append(env, userEnv)
+		attach = !opts.Detach
+		podJson, err = cli.JsonFromCmdline(args[1:], opts.Env, opts.Portmap,
+			opts.Name, opts.Workdir, opts.RestartPolicy, opts.Cpu, opts.Memory, opts.Tty)
 	}
 
-	for _, v := range opts.Portmap {
-		port := pod.UserContainerPort{}
-		fields := strings.Split(v, ":")
-		if len(fields) < 2 {
-			return fmt.Errorf("flag needs host port and container port: --publish")
-		} else if len(fields) == 2 {
-			proto = "tcp"
-			hPort = fields[0]
-			cPort = fields[1]
-		} else {
-			proto = fields[0]
-			if proto != "tcp" && proto != "udp" {
-				return fmt.Errorf("flag needs protocol(tcp or udp): --publish")
-			}
-			hPort = fields[1]
-			cPort = fields[2]
-		}
-
-		port.Protocol = proto
-		port.HostPort, err = strconv.Atoi(hPort)
-		if err != nil {
-			return fmt.Errorf("flag needs host port and container port: --publish")
-		}
-		port.ContainerPort, err = strconv.Atoi(cPort)
-		if err != nil {
-			return fmt.Errorf("flag needs host port and container port: --publish")
-		}
-		ports = append(ports, port)
-	}
-
-	var containerList = []pod.UserContainer{}
-	var container = pod.UserContainer{
-		Name:          opts.Name,
-		Image:         image,
-		Command:       command,
-		Workdir:       opts.Workdir,
-		Entrypoint:    []string{},
-		Ports:         ports,
-		Envs:          env,
-		Volumes:       []pod.UserVolumeReference{},
-		Files:         []pod.UserFileReference{},
-		RestartPolicy: opts.RestartPolicy,
-	}
-	containerList = append(containerList, container)
-
-	var userPod = &pod.UserPod{
-		Name:       opts.Name,
-		Containers: containerList,
-		Resource:   pod.UserResource{Vcpu: opts.Cpu, Memory: opts.Memory},
-		Files:      []pod.UserFile{},
-		Volumes:    []pod.UserVolume{},
-		Tty:        opts.Tty,
-	}
-
-	jsonString, _ := json.Marshal(userPod)
-
-	podId, err := cli.CreatePod(string(jsonString))
 	if err != nil {
 		return err
 	}
 
-	if opts.Remove {
-		defer func() { cli.HyperCmdRm(podId) }()
-	}
+	t1 := time.Now()
 
-	_, err = cli.StartPod(podId, "", true)
+	podId, err := cli.CreatePod(podJson, opts.Remove)
 	if err != nil {
 		return err
 	}
 
 	fmt.Printf("POD id is %s\n", podId)
+
+	_, err = cli.StartPod(podId, "", attach)
+	if err != nil {
+		return err
+	}
+
+	if !attach {
+		t2 := time.Now()
+		fmt.Printf("Time to run a POD is %d ms\n", (t2.UnixNano()-t1.UnixNano())/1000000)
+	}
 	return nil
+}
+
+func (cli *HyperClient) JsonFromFile(filename string, yaml, k8s bool) (string, error) {
+	if _, err := os.Stat(filename); err != nil {
+		return "", err
+	}
+
+	jsonbody, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return "", err
+	}
+
+	if yaml == true {
+		jsonbody, err = cli.ConvertYamlToJson(jsonbody)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	if k8s {
+		var kpod pod.KPod
+
+		if err := json.Unmarshal(jsonbody, &kpod); err != nil {
+			return "", err
+		}
+		userpod, err := kpod.Convert()
+		if err != nil {
+			return "", err
+		}
+		jsonbody, err = json.Marshal(*userpod)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	return string(jsonbody), nil
+}
+
+// cmdArgs: args[1:]
+func (cli *HyperClient) JsonFromCmdline(cmdArgs, cmdEnvs, cmdPortmaps []string,
+	cmdName, cmdWorkdir, cmdRestartPolicy string, cpu, memory int, tty bool) (string, error) {
+
+	var (
+		name    = cmdName
+		image   = cmdArgs[0]
+		command = []string{}
+		env     = []pod.UserEnvironmentVar{}
+		ports   = []pod.UserContainerPort{}
+	)
+	if len(cmdArgs) > 1 {
+		command = cmdArgs[1:]
+	}
+	if name == "" {
+		name = imageToName(image)
+	}
+	if memory == 0 {
+		memory = 128
+	}
+	if cpu == 0 {
+		cpu = 1
+	}
+	for _, v := range cmdEnvs {
+		if eqlIndex := strings.Index(v, "="); eqlIndex > 0 {
+			env = append(env, pod.UserEnvironmentVar{
+				Env:   v[:eqlIndex],
+				Value: v[eqlIndex+1:],
+			})
+		}
+	}
+
+	for _, v := range cmdPortmaps {
+		p, err := parsePortMapping(v)
+		if err != nil {
+			return "", err
+		}
+		ports = append(ports, *p)
+	}
+
+	containerList := []pod.UserContainer{{
+		Name:          name,
+		Image:         image,
+		Command:       command,
+		Workdir:       cmdWorkdir,
+		Entrypoint:    []string{},
+		Ports:         ports,
+		Envs:          env,
+		Volumes:       []pod.UserVolumeReference{},
+		Files:         []pod.UserFileReference{},
+		RestartPolicy: cmdRestartPolicy,
+	}}
+
+	userPod := &pod.UserPod{
+		Name:       name,
+		Containers: containerList,
+		Resource:   pod.UserResource{Vcpu: cpu, Memory: memory},
+		Files:      []pod.UserFile{},
+		Volumes:    []pod.UserVolume{},
+		Tty:        tty,
+	}
+
+	jsonString, _ := json.Marshal(userPod)
+	return string(jsonString), nil
+}
+
+func parsePortMapping(portmap string) (*pod.UserContainerPort, error) {
+
+	var (
+		port  = pod.UserContainerPort{}
+		proto string
+		hPort string
+		cPort string
+		err   error
+	)
+
+	fields := strings.Split(portmap, ":")
+	if len(fields) < 2 {
+		return nil, fmt.Errorf("flag needs host port and container port: --publish")
+	} else if len(fields) == 2 {
+		proto = "tcp"
+		hPort = fields[0]
+		cPort = fields[1]
+	} else {
+		proto = fields[0]
+		if proto != "tcp" && proto != "udp" {
+			return nil, fmt.Errorf("flag needs protocol(tcp or udp): --publish")
+		}
+		hPort = fields[1]
+		cPort = fields[2]
+	}
+
+	port.Protocol = proto
+	port.HostPort, err = strconv.Atoi(hPort)
+	if err != nil {
+		return nil, fmt.Errorf("flag needs host port and container port: --publish: %v", err)
+	}
+	port.ContainerPort, err = strconv.Atoi(cPort)
+	if err != nil {
+		return nil, fmt.Errorf("flag needs host port and container port: --publish: %v", err)
+	}
+
+	return &port, nil
+}
+
+func imageToName(image string) string {
+	name := image
+	fields := strings.Split(image, "/")
+	if len(fields) > 1 {
+		name = fields[len(fields)-1]
+	}
+	fields = strings.Split(name, ":")
+	if len(fields) < 2 {
+		name = name + "-" + utils.RandStr(10, "number")
+	} else {
+		name = fields[0] + "-" + fields[1] + "-" + utils.RandStr(10, "number")
+	}
+
+	validContainerNameChars := `[a-zA-Z0-9][a-zA-Z0-9_.-]`
+	validContainerNamePattern := regexp.MustCompile(`^/?` + validContainerNameChars + `+$`)
+	if !validContainerNamePattern.MatchString(name) {
+		name = namesgenerator.GetRandomName(0)
+	}
+	return name
 }
 
 func (cli *HyperClient) GetContainerByPod(podId string) (string, error) {
