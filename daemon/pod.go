@@ -187,14 +187,13 @@ func (daemon *Daemon) CmdPodRun(job *engine.Job) error {
 	return nil
 }
 
-func (daemon *Daemon) CreatePod(podId, podArgs string, config interface{}, autoremove bool) (err error) {
+func (daemon *Daemon) CreatePod(podId, podArgs string, config interface{}, autoremove bool) error {
 	glog.V(1).Infof("podArgs: %s", podArgs)
 	var (
-		userPod      *pod.UserPod
 		containerIds []string
 		cId          []byte
 	)
-	userPod, err = daemon.ProcessPodBytes([]byte(podArgs), podId)
+	userPod, err := daemon.ProcessPodBytes([]byte(podArgs), podId)
 	if err != nil {
 		glog.V(1).Infof("Process POD file error: %s", err.Error())
 		return err
