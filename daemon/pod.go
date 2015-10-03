@@ -380,51 +380,12 @@ func (daemon *Daemon) PrepareContainer(mypod *hypervisor.Pod, userPod *pod.UserP
 			fstype = "ext4"
 		}
 
-		for _, f := range userPod.Containers[i].Files {
-			targetPath := f.Path
-			if strings.HasSuffix(targetPath, "/") {
-				targetPath = targetPath + f.Filename
-			}
-			file, ok := files[f.Filename]
-			if !ok {
-				continue
-			}
-
-			var src io.Reader
-
-			if file.Uri != "" {
-				urisrc, err := utils.UriReader(file.Uri)
-				if err != nil {
-					return nil, err
-				}
-				defer urisrc.Close()
-				src = urisrc
-			} else {
-				src = strings.NewReader(file.Contents)
-			}
-
-			switch file.Encoding {
-			case "base64":
-				src = base64.NewDecoder(base64.StdEncoding, src)
-			default:
-			}
-
-			if storageDriver == "devicemapper" {
-				err := dm.InjectFile(src, c.Id, devPrefix, targetPath, rootPath,
-					utils.PermInt(f.Perm), utils.UidInt(f.User), utils.UidInt(f.Group))
-				if err != nil {
-					glog.Error("got error when inject files ", err.Error())
-					return nil, err
-				}
-			} else if storageDriver == "aufs" || storageDriver == "overlay" {
-				err := storage.FsInjectFile(src, c.Id, targetPath, sharedDir,
-					utils.PermInt(f.Perm), utils.UidInt(f.User), utils.UidInt(f.Group))
-				if err != nil {
-					glog.Error("got error when inject files ", err.Error())
-					return nil, err
-				}
-			}
+		err = processInjectFiles(&userPod.Containers[i], files, c.Id, storageDriver, devPrefix, rootPath, sharedDir)
+		if err != nil {
+			return nil, err
 		}
+
+		processImageVolumes(jsonResponse, c.Id, userPod, &userPod.Containers[i])
 
 		env := make(map[string]string)
 		for _, v := range jsonResponse.Config.Env {
@@ -453,6 +414,80 @@ func (daemon *Daemon) PrepareContainer(mypod *hypervisor.Pod, userPod *pod.UserP
 	}
 
 	return containerInfoList, nil
+}
+
+func processInjectFiles(container *pod.UserContainer, files map[string]pod.UserFile,
+	id, storageDriver, devPrefix, rootPath, sharedDir string) error {
+	for _, f := range container.Files {
+		targetPath := f.Path
+		if strings.HasSuffix(targetPath, "/") {
+			targetPath = targetPath + f.Filename
+		}
+		file, ok := files[f.Filename]
+		if !ok {
+			continue
+		}
+
+		var src io.Reader
+
+		if file.Uri != "" {
+			urisrc, err := utils.UriReader(file.Uri)
+			if err != nil {
+				return err
+			}
+			defer urisrc.Close()
+			src = urisrc
+		} else {
+			src = strings.NewReader(file.Contents)
+		}
+
+		switch file.Encoding {
+		case "base64":
+			src = base64.NewDecoder(base64.StdEncoding, src)
+		default:
+		}
+
+		if storageDriver == "devicemapper" {
+			err := dm.InjectFile(src, id, devPrefix, targetPath, rootPath,
+				utils.PermInt(f.Perm), utils.UidInt(f.User), utils.UidInt(f.Group))
+			if err != nil {
+				glog.Error("got error when inject files ", err.Error())
+				return err
+			}
+		} else if storageDriver == "aufs" || storageDriver == "overlay" {
+			err := storage.FsInjectFile(src, id, targetPath, sharedDir,
+				utils.PermInt(f.Perm), utils.UidInt(f.User), utils.UidInt(f.Group))
+			if err != nil {
+				glog.Error("got error when inject files ", err.Error())
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func processImageVolumes(config *dockertypes.ContainerJSONRaw, id string, userPod *pod.UserPod, container *pod.UserContainer) {
+	if config.Config.Volumes == nil {
+		return
+	}
+
+	for tgt := range config.Config.Volumes {
+		n := id + "-" + tgt
+		v := pod.UserVolume{
+			Name:   n,
+			Source: "",
+			Driver: "vfs", //will check if it should equal to the storage engine, and it should be reclaim after
+			//after the container finished
+		}
+		r := pod.UserVolumeReference{
+			Volume:   n,
+			Path:     tgt,
+			ReadOnly: false,
+		}
+		userPod.Volumes = append(userPod.Volumes, v)
+		container.Volumes = append(container.Volumes, r)
+	}
 }
 
 func (daemon *Daemon) PrepareServices(userPod *pod.UserPod, podId string) error {
