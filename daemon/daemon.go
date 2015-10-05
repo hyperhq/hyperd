@@ -55,7 +55,7 @@ type Daemon struct {
 	db          *leveldb.DB
 	eng         *engine.Engine
 	DockerCli   DockerInterface
-	PodList     map[string]*hypervisor.Pod
+	PodList     map[string]*hypervisor.PodStatus
 	PodsMutex   *sync.RWMutex
 	VmList      map[string]*hypervisor.Vm
 	Kernel      string
@@ -238,7 +238,7 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 		glog.Errorf(err1.Error())
 		return nil, err1
 	}
-	pList := map[string]*hypervisor.Pod{}
+	pList := map[string]*hypervisor.PodStatus{}
 	vList := map[string]*hypervisor.Vm{}
 	daemon := &Daemon{
 		ID:          fmt.Sprintf("%d", os.Getpid()),
@@ -386,7 +386,7 @@ func (daemon *Daemon) WritePodToDB(podName string, podData []byte) error {
 	return nil
 }
 
-func (daemon *Daemon) GetPod(podId, podArgs string, autoremove bool) (mypod *hypervisor.Pod, podData []byte, err error) {
+func (daemon *Daemon) GetPod(podId, podArgs string, autoremove bool) (mypod *hypervisor.PodStatus, podData []byte, err error) {
 	if podArgs == "" {
 		var ok bool
 		if mypod, ok = daemon.PodList[podId]; !ok {
@@ -616,7 +616,7 @@ func (daemon *Daemon) GetPodByContainer(containerId string) (string, error) {
 	return "", fmt.Errorf("Can not find that container!")
 }
 
-func (daemon *Daemon) AddPod(pod *hypervisor.Pod) {
+func (daemon *Daemon) AddPod(pod *hypervisor.PodStatus) {
 	daemon.PodList[pod.Id] = pod
 }
 

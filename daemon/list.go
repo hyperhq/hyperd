@@ -12,13 +12,13 @@ import (
 func (daemon *Daemon) CmdList(job *engine.Job) error {
 	var (
 		item                  string
-		dedicade              bool            = false
-		podId                 string          = ""
-		auxiliary             bool            = false
-		pod                   *hypervisor.Pod = nil
-		vmJsonResponse                        = []string{}
-		podJsonResponse                       = []string{}
-		containerJsonResponse                 = []string{}
+		dedicade              bool                  = false
+		podId                 string                = ""
+		auxiliary             bool                  = false
+		pod                   *hypervisor.PodStatus = nil
+		vmJsonResponse                              = []string{}
+		podJsonResponse                             = []string{}
+		containerJsonResponse                       = []string{}
 	)
 	if len(job.Args) == 0 {
 		item = "pod"
@@ -117,7 +117,7 @@ func showVM(v *hypervisor.Vm) string {
 	return p + ":" + status
 }
 
-func showPod(pod *hypervisor.Pod) string {
+func showPod(pod *hypervisor.PodStatus) string {
 	var status string
 
 	switch pod.Status {
@@ -142,7 +142,7 @@ func showPod(pod *hypervisor.Pod) string {
 	return pod.Name + ":" + pod.Vm + ":" + status
 }
 
-func showPodContainers(pod *hypervisor.Pod, aux bool) []string {
+func showPodContainers(pod *hypervisor.PodStatus, aux bool) []string {
 
 	rsp := []string{}
 	filterServiceDiscovery := !aux && (pod.Type == "service-discovery")
