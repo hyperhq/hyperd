@@ -284,7 +284,7 @@ func (daemon *Daemon) CreatePod(podId, podArgs string, config interface{}, autor
 	return nil
 }
 
-func (daemon *Daemon) PrepareContainer(mypod *hypervisor.Pod, userPod *pod.UserPod,
+func (daemon *Daemon) PrepareContainer(mypod *hypervisor.PodStatus, userPod *pod.UserPod,
 	vmId string) ([]*hypervisor.ContainerInfo, error) {
 	var (
 		fstype            string
@@ -498,7 +498,7 @@ func (daemon *Daemon) PrepareServices(userPod *pod.UserPod, podId string) error 
 	return err
 }
 
-func (daemon *Daemon) PrepareVolume(mypod *hypervisor.Pod, userPod *pod.UserPod,
+func (daemon *Daemon) PrepareVolume(mypod *hypervisor.PodStatus, userPod *pod.UserPod,
 	vmId string) ([]*hypervisor.VolumeInfo, error) {
 	var (
 		fstype         string
@@ -608,7 +608,7 @@ func (daemon *Daemon) PrepareVolume(mypod *hypervisor.Pod, userPod *pod.UserPod,
 	return volumeInfoList, nil
 }
 
-func (daemon *Daemon) PreparePod(mypod *hypervisor.Pod, userPod *pod.UserPod,
+func (daemon *Daemon) PreparePod(mypod *hypervisor.PodStatus, userPod *pod.UserPod,
 	vmId string) ([]*hypervisor.ContainerInfo, []*hypervisor.VolumeInfo, error) {
 
 	daemon.PrepareServices(userPod, mypod.Id)
@@ -631,7 +631,7 @@ func (daemon *Daemon) StartPod(podId, podArgs, vmId string, config interface{}, 
 	var (
 		podData []byte
 		err     error
-		mypod   *hypervisor.Pod
+		mypod   *hypervisor.PodStatus
 		vm      *hypervisor.Vm = nil
 	)
 
@@ -709,7 +709,7 @@ func (daemon *Daemon) StartPod(podId, podArgs, vmId string, config interface{}, 
 }
 
 // The caller must make sure that the restart policy and the status is right to restart
-func (daemon *Daemon) RestartPod(mypod *hypervisor.Pod) error {
+func (daemon *Daemon) RestartPod(mypod *hypervisor.PodStatus) error {
 	// Remove the pod
 	// The pod is stopped, the vm is gone
 	for _, c := range mypod.Containers {
@@ -744,7 +744,7 @@ func (daemon *Daemon) RestartPod(mypod *hypervisor.Pod) error {
 }
 
 func hyperHandlePodEvent(vmResponse *types.VmResponse, data interface{},
-	mypod *hypervisor.Pod, vm *hypervisor.Vm) bool {
+	mypod *hypervisor.PodStatus, vm *hypervisor.Vm) bool {
 	daemon := data.(*Daemon)
 
 	if vmResponse.Code == types.E_POD_FINISHED {

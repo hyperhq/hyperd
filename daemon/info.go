@@ -81,7 +81,7 @@ func (daemon *Daemon) CmdPodInfo(job *engine.Job) error {
 	defer glog.V(2).Infof("unlock read of PodList")
 	var (
 		podId   string
-		mypod   *hypervisor.Pod
+		mypod   *hypervisor.PodStatus
 		userpod *pod.UserPod
 		ok      bool
 		imageid string
@@ -256,7 +256,7 @@ func (daemon *Daemon) CmdContainerInfo(job *engine.Job) error {
 	defer glog.V(2).Infof("unlock read of PodList")
 	var (
 		find    bool = false
-		mypod   *hypervisor.Pod
+		mypod   *hypervisor.PodStatus
 		c       *hypervisor.Container
 		i       int = 0
 		imageid string
