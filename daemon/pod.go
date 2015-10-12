@@ -650,7 +650,7 @@ func (p *Pod) AttachTtys(streams []*hypervisor.TtyIO) (err error) {
 func (p *Pod) Start(daemon *Daemon, vmId string, lazy, autoremove bool, keep int, streams []*hypervisor.TtyIO) (*types.VmResponse, error) {
 
 	var err error = nil
-	
+
 	if err = p.GetVM(daemon, vmId, lazy, keep); err != nil {
 		return nil, err
 	}

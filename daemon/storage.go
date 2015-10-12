@@ -55,7 +55,8 @@ func StorageFactory(sysinfo *dockertypes.Info) (Storage, error) {
 }
 
 type DevMapperStorage struct {
-	PoolName   string
+	CtnPoolName   string
+	VolPoolName string
 	DevPrefix  string
 	FsType     string
 	rootPath   string
@@ -65,10 +66,12 @@ type DevMapperStorage struct {
 func DMFactory(sysinfo *dockertypes.Info) (Storage, error) {
 	driver := &DevMapperStorage{}
 
-	driver.PoolName = DEFAULT_DM_POOL
-	driver.DevPrefix = driver.PoolName[:strings.Index(driver.PoolName, "-pool")]
+	driver.VolPoolName = DEFAULT_DM_POOL
 
 	for _, pair := range sysinfo.DriverStatus {
+		if pair[0] == "Pool Name" {
+			driver.CtnPoolName = pair[1]
+		}
 		if pair[0] == "Backing Filesystem" {
 			if strings.Contains(pair[1], "ext") {
 				driver.FsType = "ext4"
@@ -80,6 +83,7 @@ func DMFactory(sysinfo *dockertypes.Info) (Storage, error) {
 			break
 		}
 	}
+	driver.DevPrefix = driver.CtnPoolName[:strings.Index(driver.CtnPoolName, "-pool")]
 	driver.rootPath = path.Join(utils.HYPER_ROOT, "devicemapper")
 	return driver, nil
 }
@@ -98,7 +102,7 @@ func (dms *DevMapperStorage) Init() error {
 		Metadatafile:     path.Join(utils.HYPER_ROOT, "lib") + "/metadata",
 		DataLoopFile:     DEFAULT_DM_DATA_LOOP,
 		MetadataLoopFile: DEFAULT_DM_META_LOOP,
-		PoolName:         dms.PoolName,
+		PoolName:         dms.VolPoolName,
 		Size:             DEFAULT_DM_POOL_SIZE,
 	}
 	dms.DmPoolData = &dmPool
@@ -137,7 +141,7 @@ func (dms *DevMapperStorage) InjectFile(src io.Reader, containerId, target, root
 }
 
 func (dms *DevMapperStorage) CreateVolume(daemon *Daemon, podId, shortName string) (*hypervisor.VolumeInfo, error) {
-	volName := fmt.Sprintf("%s-%s-%s", dms.PoolName, podId, shortName)
+	volName := fmt.Sprintf("%s-%s-%s", dms.VolPoolName, podId, shortName)
 	dev_id, _ := daemon.GetVolumeId(podId, volName)
 	glog.Infof("DeviceID is %d", dev_id)
 
@@ -148,7 +152,7 @@ func (dms *DevMapperStorage) CreateVolume(daemon *Daemon, podId, shortName strin
 		restore = false
 	}
 	dev_id_str := strconv.Itoa(dev_id)
-	err := dm.CreateVolume(dms.PoolName, volName, dev_id_str, DEFAULT_DM_VOL_SIZE, restore)
+	err := dm.CreateVolume(dms.VolPoolName, volName, dev_id_str, DEFAULT_DM_VOL_SIZE, restore)
 	if err != nil {
 		return nil, err
 	}
