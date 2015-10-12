@@ -8,19 +8,16 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"runtime"
 	"strings"
+	"time"
 
+	"github.com/docker/docker/daemon/logger"
+	"github.com/docker/docker/daemon/logger/jsonfilelog"
 	"github.com/hyperhq/hyper/engine"
 	dockertypes "github.com/hyperhq/hyper/lib/docker/api/types"
 	"github.com/hyperhq/hyper/servicediscovery"
 	"github.com/hyperhq/hyper/storage"
-	"github.com/hyperhq/hyper/storage/aufs"
-	dm "github.com/hyperhq/hyper/storage/devicemapper"
-	"github.com/hyperhq/hyper/storage/overlay"
-	"github.com/hyperhq/hyper/storage/vbox"
 	"github.com/hyperhq/hyper/utils"
-
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/pod"
 	"github.com/hyperhq/runv/hypervisor/types"
@@ -39,11 +36,11 @@ func (daemon *Daemon) CmdPodCreate(job *engine.Job) error {
 	}
 
 	podId := fmt.Sprintf("pod-%s", pod.RandStr(10, "alpha"))
-	daemon.PodsMutex.Lock()
+	daemon.PodList.Lock()
 	glog.V(2).Infof("lock PodList")
 	defer glog.V(2).Infof("unlock PodList")
-	defer daemon.PodsMutex.Unlock()
-	err := daemon.CreatePod(podId, podArgs, nil, autoRemove)
+	defer daemon.PodList.Unlock()
+	err := daemon.CreatePod(podId, podArgs, autoRemove)
 	if err != nil {
 		return err
 	}
@@ -90,11 +87,11 @@ func (daemon *Daemon) CmdPodStart(job *engine.Job) error {
 
 	glog.Infof("pod:%s, vm:%s", podId, vmId)
 	// Do the status check for the given pod
-	daemon.PodsMutex.Lock()
+	daemon.PodList.Lock()
 	glog.V(2).Infof("lock PodList")
-	if _, ok := daemon.PodList[podId]; !ok {
+	if _, ok := daemon.PodList.Get(podId); !ok {
 		glog.V(2).Infof("unlock PodList")
-		daemon.PodsMutex.Unlock()
+		daemon.PodList.Unlock()
 		return fmt.Errorf("The pod(%s) can not be found, please create it first", podId)
 	}
 	var lazy bool = hypervisor.HDriver.SupportLazyMode() && vmId == ""
@@ -103,18 +100,18 @@ func (daemon *Daemon) CmdPodStart(job *engine.Job) error {
 	if err != nil {
 		glog.Error(err.Error())
 		glog.V(2).Infof("unlock PodList")
-		daemon.PodsMutex.Unlock()
+		daemon.PodList.Unlock()
 		return err
 	}
 
 	if len(ttys) > 0 {
 		glog.V(2).Infof("unlock PodList")
-		daemon.PodsMutex.Unlock()
+		daemon.PodList.Unlock()
 		<-ttyCallback
 		return nil
 	}
 	defer glog.V(2).Infof("unlock PodList")
-	defer daemon.PodsMutex.Unlock()
+	defer daemon.PodList.Unlock()
 
 	// Prepare the VM status to client
 	v := &engine.Env{}
@@ -164,10 +161,10 @@ func (daemon *Daemon) CmdPodRun(job *engine.Job) error {
 
 	var lazy bool = hypervisor.HDriver.SupportLazyMode()
 
-	daemon.PodsMutex.Lock()
+	daemon.PodList.Lock()
 	glog.V(2).Infof("lock PodList")
 	defer glog.V(2).Infof("unlock PodList")
-	defer daemon.PodsMutex.Unlock()
+	defer daemon.PodList.Unlock()
 	code, cause, err := daemon.StartPod(podId, podArgs, "", nil, lazy, autoremove, types.VM_KEEP_NONE, ttys)
 	if err != nil {
 		glog.Error(err.Error())
@@ -191,233 +188,225 @@ func (daemon *Daemon) CmdPodRun(job *engine.Job) error {
 	return nil
 }
 
-func (daemon *Daemon) CreatePod(podId, podArgs string, config interface{}, autoremove bool) error {
+// I'd like to move the remain part of this file to another file.
+type Pod struct {
+	id         string
+	status     *hypervisor.PodStatus
+	spec       *pod.UserPod
+	vm         *hypervisor.Vm
+	containers []*hypervisor.ContainerInfo
+	volumes    []*hypervisor.VolumeInfo
+}
+
+func (p *Pod) GetVM(daemon *Daemon, id string, lazy bool, keep int) (err error) {
+	if p == nil || p.spec == nil {
+		return errors.New("Pod: unable to create VM without resource info.")
+	}
+	p.vm, err = daemon.GetVM(id, &p.spec.Resource, lazy, keep)
+	return
+}
+
+func (p *Pod) SetVM(id string, vm *hypervisor.Vm) {
+	p.status.Vm = id
+	p.vm = vm
+}
+
+func (p *Pod) KillVM(daemon *Daemon) {
+	if p.vm != nil {
+		daemon.KillVm(p.vm.Id)
+		p.vm = nil
+	}
+}
+
+func (p *Pod) Status() *hypervisor.PodStatus {
+	return p.status
+}
+
+func CreatePod(daemon *Daemon, dclient DockerInterface, podId, podArgs string, autoremove bool) (*Pod, error) {
 	glog.V(1).Infof("podArgs: %s", podArgs)
-	var (
-		containerIds []string
-		cId          []byte
-	)
-	userPod, err := daemon.ProcessPodBytes([]byte(podArgs), podId)
+
+	resPath := filepath.Join(DefaultResourcePath, podId)
+	if err := os.MkdirAll(resPath, os.FileMode(0755)); err != nil {
+		glog.Error("cannot create resource dir ", resPath)
+		return nil, err
+	}
+
+	spec, err := ProcessPodBytes([]byte(podArgs), podId)
 	if err != nil {
 		glog.V(1).Infof("Process POD file error: %s", err.Error())
-		return err
+		return nil, err
 	}
 
-	if err = userPod.Validate(); err != nil {
-		return err
+	if err = spec.Validate(); err != nil {
+		return nil, err
 	}
 
-	mypod := hypervisor.NewPod(podId, userPod)
-	mypod.Handler.Handle = hyperHandlePodEvent
-	mypod.Handler.Data = daemon
-	mypod.Autoremove = autoremove
+	status := hypervisor.NewPod(podId, spec)
+	status.Handler.Handle = hyperHandlePodEvent
+	status.Autoremove = autoremove
+	status.ResourcePath = resPath
+
+	pod := &Pod{
+		id:     podId,
+		status: status,
+		spec:   spec,
+	}
+
+	if err = pod.InitContainers(daemon, dclient); err != nil {
+		return nil, err
+	}
+
+	return pod, nil
+}
+
+func (p *Pod) InitContainers(daemon *Daemon, dclient DockerInterface) (err error) {
+
+	type cinfo struct {
+		id    string
+		name  string
+		image string
+	}
+
+	var (
+		containers map[string]*cinfo = make(map[string]*cinfo)
+		created    []string          = []string{}
+	)
+
+	// trying load existing containers from db
+	if ids, _ := daemon.GetPodContainersByName(p.id); ids != nil {
+		for _, id := range ids {
+			if jsonResponse, err := daemon.DockerCli.GetContainerInfo(id); err == nil {
+				n := strings.TrimLeft(jsonResponse.Name, "/")
+				containers[n] = &cinfo{
+					id:    id,
+					name:  jsonResponse.Name,
+					image: jsonResponse.Config.Image,
+				}
+				glog.V(1).Infof("Found exist container %s (%s), image: %s", n, id, jsonResponse.Config.Image)
+			}
+		}
+	}
 
 	defer func() {
 		if err != nil {
-			if containerIds == nil {
-				daemon.DeletePodFromDB(podId)
-				if mypod != nil {
-					for _, c := range mypod.Containers {
-						glog.V(1).Infof("Ready to rm container: %s", c.Id)
-						if _, _, err = daemon.DockerCli.SendCmdDelete(c.Id); err != nil {
-							glog.Warningf("Error to rm container: %s", err.Error())
-						}
-					}
-				}
-				daemon.RemovePod(podId)
-				daemon.DeletePodContainerFromDB(podId)
+			for _, cid := range created {
+				dclient.SendCmdDelete(cid)
 			}
 		}
 	}()
-	// store the UserPod into the db
-	if err = daemon.WritePodToDB(podId, []byte(podArgs)); err != nil {
-		glog.V(1).Info("Found an error while saveing the POD file")
-		return err
-	}
-	containerIds, err = daemon.GetPodContainersByName(podId)
-	if err != nil {
-		glog.V(1).Info(err.Error())
-	}
 
-	if containerIds != nil {
-		for _, id := range containerIds {
-			var (
-				name  string
-				image string
-			)
-			if jsonResponse, err := daemon.DockerCli.GetContainerInfo(id); err == nil {
-				name = jsonResponse.Name
-				image = jsonResponse.Config.Image
-			}
-			mypod.AddContainer(id, name, image, []string{}, types.S_POD_CREATED)
+	glog.V(1).Info("Process the Containers section in POD SPEC")
+	for _, c := range p.spec.Containers {
+
+		glog.V(1).Info("trying to init container ", c.Name)
+
+		if info, ok := containers[c.Name]; ok {
+			p.status.AddContainer(info.id, info.name, info.image, []string{}, types.S_POD_CREATED)
+			continue
 		}
-	} else {
-		// Process the 'Containers' section
-		glog.V(1).Info("Process the Containers section in POD SPEC")
-		for _, c := range userPod.Containers {
-			imgName := c.Image
-			cId, _, err = daemon.DockerCli.SendCmdCreate(c.Name, imgName, []string{}, nil)
-			if err != nil {
-				glog.Error(err.Error())
-				return err
-			}
-			var (
-				name  string
-				image string
-			)
-			if jsonResponse, err := daemon.DockerCli.GetContainerInfo(string(cId)); err == nil {
-				name = jsonResponse.Name
-				image = jsonResponse.Config.Image
-			}
 
-			mypod.AddContainer(string(cId), name, image, []string{}, types.S_POD_CREATED)
+		var (
+			cId []byte
+			rsp *dockertypes.ContainerJSONRaw
+		)
+
+		cId, _, err = dclient.SendCmdCreate(c.Name, c.Image, []string{}, nil)
+		if err != nil {
+			glog.Error(err.Error())
+			return
 		}
-	}
 
-	daemon.AddPod(mypod)
+		created = append(created, string(cId))
 
-	if err = daemon.WritePodAndContainers(podId); err != nil {
-		glog.V(1).Info("Found an error while saveing the Containers info")
-		return err
+		if rsp, err = dclient.GetContainerInfo(string(cId)); err != nil {
+			return
+		}
+
+		p.status.AddContainer(string(cId), rsp.Name, rsp.Config.Image, []string{}, types.S_POD_CREATED)
 	}
 
 	return nil
 }
 
-func (daemon *Daemon) PrepareContainer(mypod *hypervisor.PodStatus, userPod *pod.UserPod,
-	vmId string) ([]*hypervisor.ContainerInfo, error) {
-	var (
-		fstype            string
-		poolName          string
-		volPoolName       string
-		devPrefix         string
-		rootPath          string
-		devFullName       string
-		rootfs            string
-		err               error
-		sharedDir         = path.Join(hypervisor.BaseDir, vmId, hypervisor.ShareDirTag)
-		containerInfoList = []*hypervisor.ContainerInfo{}
-		storageDriver     = daemon.Storage.StorageType
-		cli               = daemon.DockerCli
-	)
+//FIXME: there was a `config` argument passed by docker/builder, but we never processed it.
+func (daemon *Daemon) CreatePod(podId, podArgs string, autoremove bool) error {
 
-	if storageDriver == "devicemapper" {
-		poolName = daemon.Storage.PoolName
-		fstype = daemon.Storage.Fstype
-		volPoolName = "hyper-volume-pool"
-		devPrefix = poolName[:strings.Index(poolName, "-pool")]
-		rootPath = path.Join(utils.HYPER_ROOT, "devicemapper")
-		rootfs = "/rootfs"
-	} else if storageDriver == "aufs" {
-		rootPath = daemon.Storage.RootPath
-		fstype = daemon.Storage.Fstype
-		rootfs = ""
-	} else if storageDriver == "overlay" {
-		rootPath = daemon.Storage.RootPath
-		fstype = daemon.Storage.Fstype
-		rootfs = ""
-	} else if storageDriver == "vbox" {
-		fstype = daemon.Storage.Fstype
-		rootPath = daemon.Storage.RootPath
-		rootfs = "/rootfs"
-		_ = devPrefix
-		_ = volPoolName
-		_ = poolName
+	pod, err := CreatePod(daemon, daemon.DockerCli, podId, podArgs, autoremove)
+	if err != nil {
+		return err
 	}
 
-	// Process the 'Files' section
-	files := make(map[string](pod.UserFile))
-	for _, v := range userPod.Files {
-		files[v.Name] = v
-	}
-
-	for i, c := range mypod.Containers {
-		var jsonResponse *dockertypes.ContainerJSONRaw
-		if jsonResponse, err = cli.GetContainerInfo(c.Id); err != nil {
-			glog.Error("got error when get container Info ", err.Error())
-			return nil, err
-		}
-		if c.Name == "" {
-			c.Name = jsonResponse.Name
-		}
-		if c.Image == "" {
-			c.Image = jsonResponse.Config.Image
-		}
-
-		if storageDriver == "devicemapper" {
-			if err := dm.CreateNewDevice(c.Id, devPrefix, rootPath); err != nil {
-				return nil, err
-			}
-			devFullName, err = dm.MountContainerToSharedDir(c.Id, sharedDir, devPrefix)
-			if err != nil {
-				glog.Error("got error when mount container to share dir ", err.Error())
-				return nil, err
-			}
-			fstype, err = dm.ProbeFsType(devFullName)
-			if err != nil {
-				fstype = "ext4"
-			}
-		} else if storageDriver == "aufs" {
-			devFullName, err = aufs.MountContainerToSharedDir(c.Id, rootPath, sharedDir, "")
-			if err != nil {
-				glog.Error("got error when mount container to share dir ", err.Error())
-				return nil, err
-			}
-			devFullName = "/" + c.Id + "/rootfs"
-		} else if storageDriver == "overlay" {
-			devFullName, err = overlay.MountContainerToSharedDir(c.Id, rootPath, sharedDir, "")
-			if err != nil {
-				glog.Error("got error when mount container to share dir ", err.Error())
-				return nil, err
-			}
-			devFullName = "/" + c.Id + "/rootfs"
-		} else if storageDriver == "vbox" {
-			devFullName, err = vbox.MountContainerToSharedDir(c.Id, rootPath, "")
-			if err != nil {
-				glog.Error("got error when mount container to share dir ", err.Error())
-				return nil, err
-			}
-			fstype = "ext4"
-		}
-
-		err = processInjectFiles(&userPod.Containers[i], files, c.Id, storageDriver, devPrefix, rootPath, sharedDir)
-		if err != nil {
-			return nil, err
-		}
-
-		processImageVolumes(jsonResponse, c.Id, userPod, &userPod.Containers[i])
-
-		env := make(map[string]string)
-		for _, v := range jsonResponse.Config.Env {
-			env[v[:strings.Index(v, "=")]] = v[strings.Index(v, "=")+1:]
-		}
-		for _, e := range userPod.Containers[i].Envs {
-			env[e.Env] = e.Value
-		}
-		glog.V(1).Infof("Parsing envs for container %d: %d Evs", i, len(env))
-		glog.V(1).Infof("The fs type is %s", fstype)
-		glog.V(1).Infof("WorkingDir is %s", string(jsonResponse.Config.WorkingDir))
-		glog.V(1).Infof("Image is %s", string(devFullName))
-		containerInfo := &hypervisor.ContainerInfo{
-			Id:         c.Id,
-			Rootfs:     rootfs,
-			Image:      devFullName,
-			Fstype:     fstype,
-			Workdir:    jsonResponse.Config.WorkingDir,
-			Entrypoint: jsonResponse.Config.Entrypoint.Slice(),
-			Cmd:        jsonResponse.Config.Cmd.Slice(),
-			Envs:       env,
-		}
-		glog.V(1).Infof("Container Info is \n%v", containerInfo)
-		containerInfoList = append(containerInfoList, containerInfo)
-		glog.V(1).Infof("container %d created %s, workdir %s, env: %v", i, c.Id, jsonResponse.Config.WorkingDir, env)
-	}
-
-	return containerInfoList, nil
+	return daemon.AddPod(pod, podArgs)
 }
 
-func processInjectFiles(container *pod.UserContainer, files map[string]pod.UserFile,
-	id, storageDriver, devPrefix, rootPath, sharedDir string) error {
+func (p *Pod) PrepareContainers(sd Storage, dclient DockerInterface) (err error) {
+	err = nil
+	p.containers = []*hypervisor.ContainerInfo{}
+
+	var (
+		sharedDir = path.Join(hypervisor.BaseDir, p.vm.Id, hypervisor.ShareDirTag)
+	)
+
+	files := make(map[string](pod.UserFile))
+	for _, f := range p.spec.Files {
+		files[f.Name] = f
+	}
+
+	for i, c := range p.status.Containers {
+		var (
+			info *dockertypes.ContainerJSONRaw
+			ci   *hypervisor.ContainerInfo
+		)
+		info, err = getContinerInfo(dclient, c)
+
+		ci, err = sd.PrepareContainer(c.Id, sharedDir)
+		if err != nil {
+			return err
+		}
+		ci.Workdir = info.Config.WorkingDir
+		ci.Entrypoint = info.Config.Entrypoint.Slice()
+		ci.Cmd = info.Config.Cmd.Slice()
+
+		env := make(map[string]string)
+		for _, v := range info.Config.Env {
+			env[v[:strings.Index(v, "=")]] = v[strings.Index(v, "=")+1:]
+		}
+		for _, e := range p.spec.Containers[i].Envs {
+			env[e.Env] = e.Value
+		}
+		ci.Envs = env
+
+		processImageVolumes(info, c.Id, p.spec, &p.spec.Containers[i])
+
+		err = processInjectFiles(&p.spec.Containers[i], files, sd, c.Id, sd.RootPath(), sharedDir)
+		if err != nil {
+			return err
+		}
+
+		p.containers = append(p.containers, ci)
+		glog.V(1).Infof("Container Info is \n%v", ci)
+	}
+
+	return nil
+}
+
+func getContinerInfo(dclient DockerInterface, container *hypervisor.Container) (info *dockertypes.ContainerJSONRaw, err error) {
+	info, err = dclient.GetContainerInfo(container.Id)
+	if err != nil {
+		glog.Error("got error when get container Info ", err.Error())
+		return nil, err
+	}
+	if container.Name == "" {
+		container.Name = info.Name
+	}
+	if container.Image == "" {
+		container.Image = info.Config.Image
+	}
+	return
+}
+
+func processInjectFiles(container *pod.UserContainer, files map[string]pod.UserFile, sd Storage,
+	id, rootPath, sharedDir string) error {
 	for _, f := range container.Files {
 		targetPath := f.Path
 		if strings.HasSuffix(targetPath, "/") {
@@ -447,20 +436,11 @@ func processInjectFiles(container *pod.UserContainer, files map[string]pod.UserF
 		default:
 		}
 
-		if storageDriver == "devicemapper" {
-			err := dm.InjectFile(src, id, devPrefix, targetPath, rootPath,
-				utils.PermInt(f.Perm), utils.UidInt(f.User), utils.UidInt(f.Group))
-			if err != nil {
-				glog.Error("got error when inject files ", err.Error())
-				return err
-			}
-		} else if storageDriver == "aufs" || storageDriver == "overlay" {
-			err := storage.FsInjectFile(src, id, targetPath, sharedDir,
-				utils.PermInt(f.Perm), utils.UidInt(f.User), utils.UidInt(f.Group))
-			if err != nil {
-				glog.Error("got error when inject files ", err.Error())
-				return err
-			}
+		err := sd.InjectFile(src, id, targetPath, sharedDir,
+			utils.PermInt(f.Perm), utils.UidInt(f.User), utils.UidInt(f.Group))
+		if err != nil {
+			glog.Error("got error when inject files ", err.Error())
+			return err
 		}
 	}
 
@@ -473,12 +453,10 @@ func processImageVolumes(config *dockertypes.ContainerJSONRaw, id string, userPo
 	}
 
 	for tgt := range config.Config.Volumes {
-		n := id + "-" + tgt
+		n := id + strings.Replace(tgt, "/", "_", -1)
 		v := pod.UserVolume{
 			Name:   n,
 			Source: "",
-			Driver: "vfs", //will check if it should equal to the storage engine, and it should be reclaim after
-			//after the container finished
 		}
 		r := pod.UserVolumeReference{
 			Volume:   n,
@@ -490,185 +468,165 @@ func processImageVolumes(config *dockertypes.ContainerJSONRaw, id string, userPo
 	}
 }
 
-func (daemon *Daemon) PrepareServices(userPod *pod.UserPod, podId string) error {
-	err := servicediscovery.PrepareServices(userPod, podId)
+func (p *Pod) PrepareServices() error {
+	err := servicediscovery.PrepareServices(p.spec, p.id)
 	if err != nil {
 		glog.Errorf("PrepareServices failed %s", err.Error())
 	}
 	return err
 }
 
-func (daemon *Daemon) PrepareVolume(mypod *hypervisor.PodStatus, userPod *pod.UserPod,
-	vmId string) ([]*hypervisor.VolumeInfo, error) {
+func (p *Pod) PrepareVolume(daemon *Daemon, sd Storage) (err error) {
+	err = nil
+	p.volumes = []*hypervisor.VolumeInfo{}
+
 	var (
-		fstype         string
-		volPoolName    string
-		err            error
-		sharedDir      = path.Join(hypervisor.BaseDir, vmId, hypervisor.ShareDirTag)
-		volumeInfoList = []*hypervisor.VolumeInfo{}
+		sharedDir = path.Join(hypervisor.BaseDir, p.vm.Id, hypervisor.ShareDirTag)
 	)
 
-	// Process the 'Volumes' section
-	for _, v := range userPod.Volumes {
+	for _, v := range p.spec.Volumes {
+		var vol *hypervisor.VolumeInfo
 		if v.Source == "" {
-			if daemon.Storage.StorageType == "devicemapper" {
-				volName := fmt.Sprintf("%s-%s-%s", volPoolName, mypod.Id, v.Name)
-				dev_id, _ := daemon.GetVolumeId(mypod.Id, volName)
-				glog.Warningf("DeviceID is %d", dev_id)
-				if dev_id < 1 {
-					dev_id, _ = daemon.GetMaxDeviceId()
-					err := daemon.CreateVolume(mypod.Id, volName, fmt.Sprintf("%d", dev_id+1), false)
-					if err != nil {
-						return nil, err
-					}
-				} else {
-					err := daemon.CreateVolume(mypod.Id, volName, fmt.Sprintf("%d", dev_id), true)
-					if err != nil {
-						return nil, err
-					}
-				}
+			vol, err = sd.CreateVolume(daemon, p.id, v.Name)
+			if err != nil {
+				return
+			}
 
-				fstype, err = dm.ProbeFsType("/dev/mapper/" + volName)
-				if err != nil {
-					fstype = "ext4"
-				}
-				myVol := &hypervisor.VolumeInfo{
-					Name:     v.Name,
-					Filepath: path.Join("/dev/mapper/", volName),
-					Fstype:   fstype,
-					Format:   "raw",
-				}
-				volumeInfoList = append(volumeInfoList, myVol)
-				glog.V(1).Infof("volume %s created with dm as %s", v.Name, volName)
-				continue
-			} else {
-				// Make sure the v.Name is given
-				v.Source = path.Join("/var/tmp/hyper/", v.Name)
-				if _, err := os.Stat(v.Source); err != nil && os.IsNotExist(err) {
-					if err := os.MkdirAll(v.Source, os.FileMode(0777)); err != nil {
-						return nil, err
-					}
-				}
+			v.Source = vol.Filepath
+			if sd.Type() != "devicemapper" {
 				v.Driver = "vfs"
+			} else {
+				v.Driver = "raw"
 			}
 		}
 
-		if v.Driver != "vfs" {
-			glog.V(1).Infof("bypass %s volume %s", v.Driver, v.Name)
-			continue
-		}
-
-		// Process the situation if the source is not NULL, we need to bind that dir to sharedDir
-		var flags uintptr = utils.MS_BIND
-
-		mountSharedDir := pod.RandStr(10, "alpha")
-		targetDir := path.Join(sharedDir, mountSharedDir)
-		glog.V(1).Infof("trying to bind dir %s to %s", v.Source, targetDir)
-
-		stat, err := os.Stat(v.Source)
-		if err != nil {
-			glog.Error("Cannot stat volume Source ", err.Error())
-			return nil, err
-		}
-
-		if runtime.GOOS == "linux" {
-			base := filepath.Base(targetDir)
-			if err := os.MkdirAll(base, 0755); err != nil && !os.IsExist(err) {
-				glog.Errorf("error to create dir %s for volume %s", base, v.Name)
-				return nil, err
+		if v.Driver == "vfs" {
+			vol.Filepath, err = storage.MountVFSVolume(v.Source, sharedDir)
+			if err != nil {
+				return
 			}
-
-			if stat.IsDir() {
-				if err := os.MkdirAll(targetDir, 0755); err != nil && !os.IsExist(err) {
-					glog.Errorf("error to create dir %s for volume %s", targetDir, v.Name)
-					return nil, err
-				}
-			} else if f, err := os.Create(targetDir); err != nil && !os.IsExist(err) {
-				glog.Errorf("error to create file %s for volume %s", targetDir, v.Name)
-				return nil, err
-			} else if err == nil {
-				f.Close()
-			}
+			glog.V(1).Infof("dir %s is bound to %s", v.Source, vol.Filepath)
 		}
 
-		if err := utils.Mount(v.Source, targetDir, "none", flags, "--bind"); err != nil {
-			glog.Errorf("bind dir %s failed: %s", v.Source, err.Error())
-			return nil, err
-		}
-		myVol := &hypervisor.VolumeInfo{
-			Name:     v.Name,
-			Filepath: mountSharedDir,
-			Fstype:   "dir",
-			Format:   "",
-		}
-		glog.V(1).Infof("dir %s is bound to %s", v.Source, targetDir)
-		volumeInfoList = append(volumeInfoList, myVol)
+		p.volumes = append(p.volumes, vol)
 	}
 
-	return volumeInfoList, nil
+	return nil
 }
 
-func (daemon *Daemon) PreparePod(mypod *hypervisor.PodStatus, userPod *pod.UserPod,
-	vmId string) ([]*hypervisor.ContainerInfo, []*hypervisor.VolumeInfo, error) {
-
-	daemon.PrepareServices(userPod, mypod.Id)
-
-	containerInfoList, err := daemon.PrepareContainer(mypod, userPod, vmId)
-	if err != nil {
-		return nil, nil, err
+func (p *Pod) Prepare(daemon *Daemon) (err error) {
+	if err = p.PrepareServices(); err != nil {
+		return
 	}
 
-	volumeInfoList, err := daemon.PrepareVolume(mypod, userPod, vmId)
-	if err != nil {
-		return nil, nil, err
+	if err = p.PrepareContainers(daemon.Storage, daemon.DockerCli); err != nil {
+		return
 	}
 
-	return containerInfoList, volumeInfoList, nil
+	if err = p.PrepareVolume(daemon, daemon.Storage); err != nil {
+		return
+	}
+
+	return nil
 }
 
-func (daemon *Daemon) StartPod(podId, podArgs, vmId string, config interface{}, lazy, autoremove bool, keep int, streams []*hypervisor.TtyIO) (int, string, error) {
-	glog.V(1).Infof("podArgs: %s", podArgs)
+func (p *Pod) getLogger(daemon *Daemon) (err error) {
+	if p.spec.LogConfig.Type == "" {
+		p.spec.LogConfig.Type = daemon.DefaultLog.Type
+		p.spec.LogConfig.Config = daemon.DefaultLog.Config
+	}
+
+	if p.spec.LogConfig.Type == "none" {
+		return nil
+	}
+
 	var (
-		podData []byte
-		err     error
-		mypod   *hypervisor.PodStatus
-		vm      *hypervisor.Vm = nil
+		needLogger []int = []int{}
+		creator    logger.Creator
 	)
 
-	mypod, podData, err = daemon.GetPod(podId, podArgs, autoremove)
-	if err != nil {
-		return -1, "", err
-	}
-
-	userPod, err := daemon.ProcessPodBytes(podData, podId)
-	if err != nil {
-		return -1, "", err
-	}
-
-	if !userPod.Tty && streams != nil && len(streams) > 0 {
-		cause := "Spec does not support TTY, but IO streams are provided"
-		return -1, cause, errors.New(cause)
-	}
-
-	vm, err = daemon.GetVM(vmId, &userPod.Resource, lazy, keep)
-	if err != nil {
-		return -1, "", err
-	}
-
-	defer func() {
-		if vm != nil && err != nil && vmId == "" {
-			daemon.KillVm(vm.Id)
+	for i, c := range p.status.Containers {
+		if c.Logs.Driver == nil {
+			needLogger = append(needLogger, i)
 		}
-	}()
-
-	containerInfoList, volumeInfoList, err := daemon.PreparePod(mypod, userPod, vm.Id)
-	if err != nil {
-		return -1, "", err
 	}
 
-	ttyContainers := containerInfoList
-	if userPod.Type == "service-discovery" {
-		ttyContainers = containerInfoList[1:]
+	if len(needLogger) == 0 && p.status.Status == types.S_POD_RUNNING {
+		return nil
+	}
+
+	if err = logger.ValidateLogOpts(p.spec.LogConfig.Type, p.spec.LogConfig.Config); err != nil {
+		return
+	}
+	creator, err = logger.GetLogDriver(p.spec.LogConfig.Type)
+	if err != nil {
+		return
+	}
+	glog.V(1).Infof("configuring log driver [%s] for %s", p.spec.LogConfig.Type, p.id)
+
+	for i, c := range p.status.Containers {
+		ctx := logger.Context{
+			Config:             p.spec.LogConfig.Config,
+			ContainerID:        c.Id,
+			ContainerName:      c.Name,
+			ContainerImageName: p.spec.Containers[i].Image,
+			ContainerCreated:   time.Now(), //FIXME: should record creation time in PodStatus
+		}
+
+		if p.containers != nil && len(p.containers) > i {
+			ctx.ContainerEntrypoint = p.containers[i].Workdir
+			ctx.ContainerArgs = p.containers[i].Cmd
+			ctx.ContainerImageID = p.containers[i].Image
+		}
+
+		if p.spec.LogConfig.Type == jsonfilelog.Name {
+			ctx.LogPath = filepath.Join(p.status.ResourcePath, fmt.Sprintf("%s-json.log", c.Id))
+			glog.V(1).Info("configure container log to ", ctx.LogPath)
+		}
+
+		if c.Logs.Driver, err = creator(ctx); err != nil {
+			return
+		}
+		glog.V(1).Infof("configured logger for %s/%s (%s)", p.id, c.Id, c.Name)
+	}
+
+	return nil
+}
+
+func (p *Pod) startLogging(daemon *Daemon) (err error) {
+	err = nil
+
+	if err = p.getLogger(daemon); err != nil {
+		return
+	}
+
+	if p.spec.LogConfig.Type == "none" {
+		return nil
+	}
+
+	for _, c := range p.status.Containers {
+		var stdout, stderr io.Reader
+
+		tag := "log-" + utils.RandStr(8, "alphanum")
+		if stdout, stderr, err = p.vm.GetLogOutput(c.Id, tag, nil); err != nil {
+			return
+		}
+		c.Logs.Copier = logger.NewCopier(c.Id, map[string]io.Reader{"stdout": stdout, "stderr": stderr}, c.Logs.Driver)
+		c.Logs.Copier.Run()
+
+		if jl, ok := c.Logs.Driver.(*jsonfilelog.JSONFileLogger); ok {
+			c.Logs.LogPath = jl.LogPath()
+		}
+	}
+
+	return nil
+}
+
+func (p *Pod) AttachTtys(streams []*hypervisor.TtyIO) (err error) {
+
+	ttyContainers := p.containers
+	if p.spec.Type == "service-discovery" {
+		ttyContainers = p.containers[1:]
 	}
 
 	for idx, str := range streams {
@@ -676,35 +634,80 @@ func (daemon *Daemon) StartPod(podId, podArgs, vmId string, config interface{}, 
 			break
 		}
 
-		err = vm.Attach(str.Stdin, str.Stdout, str.ClientTag, ttyContainers[idx].Id, str.Callback, nil)
+		err = p.vm.Attach(str.Stdin, str.Stdout, str.ClientTag, ttyContainers[idx].Id, str.Callback, nil)
 		if err != nil {
 			glog.Errorf("Failed to attach client %s before start pod", str.ClientTag)
-			return -1, "", err
+			return
 		}
 		glog.V(1).Infof("Attach client %s before start pod", str.ClientTag)
 	}
 
-	vmResponse := vm.StartPod(mypod, userPod, containerInfoList, volumeInfoList)
-	if streams != nil && len(streams) > 0 && vmResponse.Code == types.E_OK {
-		return 0, "", nil
+	return nil
+}
+
+func (p *Pod) Start(daemon *Daemon, vmId string, lazy, autoremove bool, keep int, streams []*hypervisor.TtyIO) (*types.VmResponse, error) {
+
+	var err error = nil
+
+	if err = p.GetVM(daemon, vmId, lazy, keep); err != nil {
+		return nil, err
 	}
+
+	defer func() {
+		if err != nil && vmId == "" {
+			p.KillVM(daemon)
+		}
+	}()
+
+	if err = p.Prepare(daemon); err != nil {
+		return nil, err
+	}
+
+	if err = p.startLogging(daemon); err != nil {
+		return nil, err
+	}
+
+	if err = p.AttachTtys(streams); err != nil {
+		return nil, err
+	}
+
+	vmResponse := p.vm.StartPod(p.status, p.spec, p.containers, p.volumes)
 	if vmResponse.Data == nil {
 		err = fmt.Errorf("VM response data is nil")
-		return vmResponse.Code, vmResponse.Cause, err
+		return vmResponse, err
 	}
-	data := vmResponse.Data.([]byte)
-	err = daemon.UpdateVmData(vm.Id, data)
+
+	err = daemon.UpdateVmData(p.vm.Id, vmResponse.Data.([]byte))
 	if err != nil {
 		glog.Error(err.Error())
-		return -1, "", err
+		return nil, err
 	}
 	// add or update the Vm info for POD
-	if err := daemon.UpdateVmByPod(podId, vm.Id); err != nil {
+	if err := daemon.UpdateVmByPod(p.id, p.vm.Id); err != nil {
 		glog.Error(err.Error())
+		return nil, err
+	}
+
+	return vmResponse, nil
+}
+
+func (daemon *Daemon) StartPod(podId, podArgs, vmId string, config interface{}, lazy, autoremove bool, keep int, streams []*hypervisor.TtyIO) (int, string, error) {
+	glog.V(1).Infof("podArgs: %s", podArgs)
+	var (
+		err error
+		p   *Pod
+	)
+
+	p, err = daemon.GetPod(podId, podArgs, autoremove)
+	if err != nil {
 		return -1, "", err
 	}
 
-	// XXX we should not close vmStatus chan, it will be closed in shutdown process
+	vmResponse, err := p.Start(daemon, vmId, lazy, autoremove, keep, streams)
+	if err != nil {
+		return -1, "", err
+	}
+
 	return vmResponse.Code, vmResponse.Cause, nil
 }
 

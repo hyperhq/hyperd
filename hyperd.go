@@ -178,6 +178,10 @@ func mainDaemon(config, host string, flDisableIptables bool) {
 		return
 	}
 
+	defaultLog, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Logger")
+	defaultLogCfg, _ := cfg.GetSection("Log")
+	d.DefaultLogCfg(defaultLog, defaultLogCfg)
+
 	// Set the daemon object as the global varibal
 	// which will be used for puller and builder
 	utils.SetDaemon(d)

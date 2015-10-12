@@ -49,7 +49,6 @@ func (b *Builder) create() (*daemon.Container, error) {
 		return nil, fmt.Errorf("Please provide a source image with `from` prior to run")
 	}
 	b.Config.Image = b.image
-	config := *b.Config
 
 	// Create the Pod
 
@@ -58,7 +57,7 @@ func (b *Builder) create() (*daemon.Container, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = b.Hyperdaemon.CreatePod(podId, podString, config, false)
+	err = b.Hyperdaemon.CreatePod(podId, podString, false)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +66,11 @@ func (b *Builder) create() (*daemon.Container, error) {
 		containerId = ""
 		c           *daemon.Container
 	)
-	for _, i := range b.Hyperdaemon.PodList[podId].Containers {
+	ps, ok := b.Hyperdaemon.PodList.GetStatus(podId)
+	if !ok {
+		return fmt.Errorf("Cannot find pod %s", podId)
+	}
+	for _, i := range ps.Containers {
 		containerId = i.Id
 	}
 	c, err = b.Daemon.Get(containerId)

@@ -107,7 +107,13 @@ func (d *Driver) Diff(id, parent string) (diff archive.Archive, err error) {
 			}
 		}
 
-		d.daemon.PodList[podId].Vm = d.pullVm
+		pod, ok := d.daemon.PodList.Get(podId)
+		if !ok {
+			glog.Errorf("pod %s does not exist", podId)
+			return nil, fmt.Errorf("pod %s does not exist", podId)
+		}
+		pod.SetVM(d.pullVm, vm)
+
 		// release pod from VM
 		code, cause, err = d.daemon.StopPod(podId, "no")
 		if err != nil {

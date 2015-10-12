@@ -13,23 +13,20 @@ func (daemon *Daemon) CmdRename(job *engine.Job) error {
 	if err != nil {
 		return err
 	}
-	daemon.PodsMutex.RLock()
+	daemon.PodList.RLock()
 	glog.V(2).Infof("lock read of PodList")
 	defer glog.V(2).Infof("unlock read of PodList")
-	defer daemon.PodsMutex.RUnlock()
+	defer daemon.PodList.RUnlock()
 
-	var find bool = false
-	for _, p := range daemon.PodList {
-		for _, c := range p.Containers {
+	daemon.PodList.Find(func(p *Pod) bool {
+		for _, c := range p.status.Containers {
 			if c.Name == "/"+oldname {
 				c.Name = "/" + newname
-				find = true
+				return true
 			}
 		}
-		if find == true {
-			break
-		}
-	}
+		return false
+	})
 
 	v := &engine.Env{}
 	v.Set("ID", newname)
