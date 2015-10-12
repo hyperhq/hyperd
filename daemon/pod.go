@@ -2,7 +2,6 @@ package daemon
 
 import (
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -643,11 +642,6 @@ func (daemon *Daemon) StartPod(podId, podArgs, vmId string, config interface{}, 
 	userPod, err := daemon.ProcessPodBytes(podData, podId)
 	if err != nil {
 		return -1, "", err
-	}
-
-	if !userPod.Tty && streams != nil && len(streams) > 0 {
-		cause := "Spec does not support TTY, but IO streams are provided"
-		return -1, cause, errors.New(cause)
 	}
 
 	vm, err = daemon.GetVM(vmId, &userPod.Resource, lazy, keep)

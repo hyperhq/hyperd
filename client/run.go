@@ -32,7 +32,7 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 		Attach        bool     `short:"a" long:"attach" default:"false" default-mask:"-" description:"(from podfile) Attach the stdin, stdout and stderr to the container"`
 		Detach        bool     `short:"d" long:"detach" default:"false" default-mask:"-" description:"(from cmdline) Not Attach the stdin, stdout and stderr to the container"`
 		Workdir       string   `long:"workdir" default:"/" value-name:"\"\"" default-mask:"-" description:"Working directory inside the container"`
-		Tty           bool     `long:"tty" default:"true" default-mask:"-" description:"Allocate a pseudo-TTY"`
+		Tty           bool     `short:"i" long:"interactive" default:"false" default-mask:"-" description:"the running command is interactive, such as bash shell"`
 		Cpu           int      `long:"cpu" default:"1" value-name:"1" default-mask:"-" description:"CPU number for the VM"`
 		Memory        int      `long:"memory" default:"128" value-name:"128" default-mask:"-" description:"Memory size (MB) for the VM"`
 		Env           []string `long:"env" value-name:"[]" default-mask:"-" description:"Set environment variables"`
