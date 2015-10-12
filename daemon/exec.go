@@ -35,7 +35,7 @@ func (daemon *Daemon) CmdExec(job *engine.Job) (err error) {
 		if err != nil {
 			return
 		}
-		vmId, err = daemon.GetPodVmByName(podId)
+		vmId, err = daemon.GetVmByPodId(podId)
 	}
 
 	if err != nil {

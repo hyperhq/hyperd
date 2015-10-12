@@ -129,32 +129,30 @@ func (daemon *Daemon) GetServices(job *engine.Job) error {
 }
 
 func (daemon *Daemon) GetServiceContainerInfo(podId string) (*hypervisor.Vm, string, error) {
-	daemon.PodsMutex.RLock()
-	mypod, ok := daemon.PodList[podId]
+	daemon.PodList.RLock()
+	pod, ok := daemon.PodList.Get(podId)
 	if !ok {
-		daemon.PodsMutex.RUnlock()
+		daemon.PodList.RUnlock()
 		return nil, "", fmt.Errorf("Cannot find Pod %s", podId)
 	}
 
-	if mypod.Type != "service-discovery" || len(mypod.Containers) <= 1 {
-		daemon.PodsMutex.RUnlock()
+	if pod.status.Type != "service-discovery" || len(pod.status.Containers) <= 1 {
+		daemon.PodList.RUnlock()
 		return nil, "", fmt.Errorf("Pod %s doesn't have services discovery", podId)
 	}
 
-	container := mypod.Containers[0].Id
-	vmId := mypod.Vm
-	glog.V(1).Infof("Get container id is %s, vm %s", container, vmId)
-	daemon.PodsMutex.RUnlock()
+	container := pod.status.Containers[0].Id
+	glog.V(1).Infof("Get container id is %s", container)
+	daemon.PodList.RUnlock()
 
-	vm, ok := daemon.VmList[vmId]
-	if !ok {
-		return nil, "", fmt.Errorf("Can find VM whose Id is %s!", vmId)
+	if pod.vm == nil {
+		return nil, "", fmt.Errorf("Can find VM for %s!", podId)
 	}
 
-	return vm, container, nil
+	return pod.vm, container, nil
 }
 
-func (daemon *Daemon) ProcessPodBytes(body []byte, podId string) (*pod.UserPod, error) {
+func ProcessPodBytes(body []byte, podId string) (*pod.UserPod, error) {
 	var containers []pod.UserContainer
 	var serviceDir string = path.Join(utils.HYPER_ROOT, "services", podId)
 
