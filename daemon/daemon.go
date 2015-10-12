@@ -9,29 +9,25 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/Unknwon/goconfig"
+	"github.com/docker/docker/daemon/logger/jsonfilelog"
 	"github.com/hyperhq/hyper/engine"
 	dockertypes "github.com/hyperhq/hyper/lib/docker/api/types"
 	"github.com/hyperhq/hyper/lib/docker/graph"
 	"github.com/hyperhq/hyper/lib/portallocator"
 	apiserver "github.com/hyperhq/hyper/server"
-	dm "github.com/hyperhq/hyper/storage/devicemapper"
 	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/hypervisor"
+	"github.com/hyperhq/runv/hypervisor/pod"
 	"github.com/hyperhq/runv/hypervisor/types"
 	"github.com/hyperhq/runv/lib/glog"
-
-	"github.com/Unknwon/goconfig"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
-type Storage struct {
-	StorageType string
-	PoolName    string
-	Fstype      string
-	RootPath    string
-	DmPoolData  *dm.DeviceMapper
-}
+var (
+	DefaultResourcePath string = "/var/run/hyper/Pods"
+)
 
 type DockerInterface interface {
 	SendCmdCreate(name, image string, cmds []string, config interface{}) ([]byte, int, error)
@@ -66,8 +62,9 @@ type Daemon struct {
 	BridgeIface string
 	BridgeIP    string
 	Host        string
-	Storage     *Storage
+	Storage     Storage
 	Hypervisor  string
+	DefaultLog  *pod.PodLogConfig
 }
 
 // Install installs daemon capabilities to eng.
@@ -164,15 +161,6 @@ func (daemon *Daemon) Restore() error {
 	return nil
 }
 
-func (daemon *Daemon) CreateVolume(podId, volName, dev_id string, restore bool) error {
-	err := dm.CreateVolume(daemon.Storage.DmPoolData.PoolName, volName, dev_id, 2*1024*1024*1024, restore)
-	if err != nil {
-		return err
-	}
-	daemon.SetVolumeId(podId, volName, dev_id)
-	return nil
-}
-
 func NewDaemon(eng *engine.Engine) (*Daemon, error) {
 	daemon, err := NewDaemonFromDirectory(eng)
 	if err != nil {
@@ -258,72 +246,17 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 		BridgeIface: biface,
 	}
 
-	stor := &Storage{}
 	// Get the docker daemon info
 	sysinfo, err := dockerCli.SendCmdInfo()
 	if err != nil {
 		return nil, err
 	}
-	storageDriver := sysinfo.Driver
-	stor.StorageType = storageDriver
-	if storageDriver == "devicemapper" {
-		for _, pair := range sysinfo.DriverStatus {
-			if pair[0] == "Pool Name" {
-				stor.PoolName = pair[1]
-			}
-			if pair[0] == "Backing Filesystem" {
-				if strings.Contains(pair[1], "ext") {
-					stor.Fstype = "ext4"
-				} else if strings.Contains(pair[1], "xfs") {
-					stor.Fstype = "xfs"
-				} else {
-					stor.Fstype = "dir"
-				}
-				break
-			}
-		}
-	} else if storageDriver == "aufs" {
-		for _, pair := range sysinfo.DriverStatus {
-			if pair[0] == "Root Dir" {
-				stor.RootPath = pair[1]
-			}
-			if pair[0] == "Backing Filesystem" {
-				stor.Fstype = "dir"
-				break
-			}
-		}
-	} else if storageDriver == "overlay" {
-		for _, pair := range sysinfo.DriverStatus {
-			if pair[0] == "Backing Filesystem" {
-				stor.Fstype = "dir"
-				break
-			}
-		}
-		stor.RootPath = path.Join(utils.HYPER_ROOT, "overlay")
-	} else if storageDriver == "vbox" {
-		stor.Fstype = "ext4"
-		stor.RootPath = path.Join(utils.HYPER_ROOT, "vbox")
-	} else {
-		return nil, fmt.Errorf("hyperd can not support docker's backing storage: %s", storageDriver)
+	stor, err := StorageFactory(sysinfo)
+	if err != nil {
+		return nil, err
 	}
 	daemon.Storage = stor
-	dmPool := dm.DeviceMapper{
-		Datafile:         path.Join(utils.HYPER_ROOT, "lib") + "/data",
-		Metadatafile:     path.Join(utils.HYPER_ROOT, "lib") + "/metadata",
-		DataLoopFile:     "/dev/loop6",
-		MetadataLoopFile: "/dev/loop7",
-		PoolName:         "hyper-volume-pool",
-		Size:             20971520 * 512,
-	}
-	if storageDriver == "devicemapper" {
-		daemon.Storage.DmPoolData = &dmPool
-		// Prepare the DeviceMapper storage
-		if err := dm.CreatePool(&dmPool); err != nil {
-			return nil, err
-		}
-	} else {
-		daemon.CleanVolume(0)
-	}
+	daemon.Storage.Init()
 	eng.OnShutdown(func() {
 		if err := daemon.shutdown(); err != nil {
 			glog.Errorf("Error during daemon.shutdown(): %v", err)
@@ -331,6 +264,17 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 	})
 
 	return daemon, nil
+}
+
+func (daemon *Daemon) DefaultLogCfg(driver string, cfg map[string]string) {
+	if driver == "" {
+		driver = jsonfilelog.Name
+	}
+
+	daemon.DefaultLog = &pod.PodLogConfig{
+		Type:   driver,
+		Config: cfg,
+	}
 }
 
 func (daemon *Daemon) GetPodNum() int64 {
@@ -386,29 +330,47 @@ func (daemon *Daemon) WritePodToDB(podName string, podData []byte) error {
 	return nil
 }
 
-func (daemon *Daemon) GetPod(podId, podArgs string, autoremove bool) (mypod *hypervisor.PodStatus, podData []byte, err error) {
+func (daemon *Daemon) GetPod(podId, podArgs string, autoremove bool) (*Pod, error) {
+	var (
+		ps      *hypervisor.PodStatus
+		spec    *pod.UserPod
+		podData []byte
+		err     error
+	)
 	if podArgs == "" {
 		var ok bool
-		if mypod, ok = daemon.PodList[podId]; !ok {
-			return nil, []byte{}, fmt.Errorf("Can not find the POD instance of %s", podId)
+		if ps, ok = daemon.PodList[podId]; !ok {
+			return nil, fmt.Errorf("Can not find the POD instance of %s", podId)
 		}
 
 		podData, err = daemon.GetPodByName(podId)
 		if err != nil {
-			return nil, []byte{}, err
+			return nil, err
 		}
 	} else {
 		podData = []byte(podArgs)
 
 		if err = daemon.CreatePod(podId, podArgs, nil, autoremove); err != nil {
 			glog.Error(err.Error())
-			return nil, []byte{}, err
+			return nil, err
 		}
 
-		mypod = daemon.PodList[podId]
+		ps = daemon.PodList[podId]
 	}
 
-	return mypod, podData, nil
+	spec, err = daemon.ProcessPodBytes(podData, podId)
+	if err != nil {
+		return nil, err
+	}
+
+	pod := &Pod{
+		id:     podId,
+		status: ps,
+		spec:   spec,
+		vm:     nil,
+	}
+
+	return pod, nil
 }
 
 func (daemon *Daemon) GetPodByName(podName string) ([]byte, error) {
@@ -481,14 +443,7 @@ func (daemon *Daemon) DeleteVolumeId(podId string) error {
 	iter := daemon.db.NewIterator(util.BytesPrefix([]byte(key)), nil)
 	for iter.Next() {
 		value := iter.Key()
-		if string(value)[4:18] == podId {
-			fields := strings.Split(string(iter.Value()), ":")
-			dev_id, _ := strconv.Atoi(fields[1])
-			if err := dm.DeleteVolume(daemon.Storage.DmPoolData, dev_id); err != nil {
-				glog.Error(err.Error())
-				return err
-			}
-		}
+		daemon.Storage.RemoveVolume(podId, iter.Value())
 		err := daemon.db.Delete(value, nil)
 		if err != nil {
 			return err
@@ -668,16 +623,6 @@ func (daemon *Daemon) DeleteVmData(vmId string) error {
 	err := daemon.db.Delete([]byte(key), nil)
 	if err != nil {
 		return err
-	}
-	return nil
-}
-
-// If the stop is 1, we do not delete the pool data. Or just delete it.
-func (daemon *Daemon) CleanVolume(stop int) error {
-	if daemon.Storage.StorageType == "devicemapper" {
-		if stop == 0 {
-			return dm.DMCleanup(daemon.Storage.DmPoolData)
-		}
 	}
 	return nil
 }
