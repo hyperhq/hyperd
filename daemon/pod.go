@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -541,7 +542,20 @@ func (p *Pod) getLogger(daemon *Daemon) (err error) {
 		return nil
 	}
 
-	var creator logger.Creator
+	var (
+		needLogger []int = []int{}
+		creator    logger.Creator
+	)
+
+	for i, c := range p.status.Containers {
+		if c.Logs.Driver == nil {
+			needLogger = append(needLogger, i)
+		}
+	}
+
+	if len(needLogger) == 0 && p.status.Status == types.S_POD_RUNNING {
+		return nil
+	}
 
 	if err = logger.ValidateLogOpts(p.spec.LogConfig.Type, p.spec.LogConfig.Config); err != nil {
 		return
@@ -554,14 +568,17 @@ func (p *Pod) getLogger(daemon *Daemon) (err error) {
 
 	for i, c := range p.status.Containers {
 		ctx := logger.Context{
-			Config:              p.spec.LogConfig.Config,
-			ContainerID:         c.Id,
-			ContainerName:       c.Name,
-			ContainerEntrypoint: p.containers[i].Workdir,
-			ContainerArgs:       p.containers[i].Cmd,
-			ContainerImageID:    p.containers[i].Image,
-			ContainerImageName:  p.spec.Containers[i].Image,
-			ContainerCreated:    time.Now(), //FIXME: should record creation time in PodStatus
+			Config:             p.spec.LogConfig.Config,
+			ContainerID:        c.Id,
+			ContainerName:      c.Name,
+			ContainerImageName: p.spec.Containers[i].Image,
+			ContainerCreated:   time.Now(), //FIXME: should record creation time in PodStatus
+		}
+
+		if p.containers != nil && len(p.containers) > i {
+			ctx.ContainerEntrypoint = p.containers[i].Workdir
+			ctx.ContainerArgs = p.containers[i].Cmd
+			ctx.ContainerImageID = p.containers[i].Image
 		}
 
 		if p.spec.LogConfig.Type == jsonfilelog.Name {

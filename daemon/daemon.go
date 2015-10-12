@@ -82,6 +82,7 @@ func (daemon *Daemon) Install(eng *engine.Engine) error {
 		"podStart":          daemon.CmdPodStart,
 		"podInfo":           daemon.CmdPodInfo,
 		"containerInfo":     daemon.CmdContainerInfo,
+		"containerLogs":     daemon.CmdLogs,
 		"podRm":             daemon.CmdPodRm,
 		"podRun":            daemon.CmdPodRun,
 		"podStop":           daemon.CmdPodStop,
@@ -551,6 +552,36 @@ func (daemon *Daemon) GetPodByContainer(containerId string) (string, error) {
 	}
 
 	return pod.id, nil
+}
+
+func (daemon *Daemon) GetPodByContainerIdOrName(name string) (pod *Pod, idx int, err error) {
+	daemon.PodList.RLock()
+	glog.V(2).Infof("lock read of PodList")
+	defer glog.V(2).Infof("unlock read of PodList")
+	defer daemon.PodList.RUnlock()
+
+	err = nil
+	wslash := name
+	if name[0] != '/' {
+		wslash = "/" + name
+	}
+
+	var c *hypervisor.Container
+	pod = daemon.PodList.Find(func(p *Pod) bool {
+		for idx, c = range p.status.Containers {
+			if c.Name == wslash || c.Id == name {
+				return true
+			}
+		}
+		return false
+	})
+
+	if pod == nil {
+		err = fmt.Errorf("cannot found container %s", name)
+		return
+	}
+
+	return
 }
 
 func (daemon *Daemon) AddPod(pod *Pod, podArgs string) (err error) {
