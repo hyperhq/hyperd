@@ -453,12 +453,10 @@ func processImageVolumes(config *dockertypes.ContainerJSONRaw, id string, userPo
 	}
 
 	for tgt := range config.Config.Volumes {
-		n := id + "-" + tgt
+		n := id + strings.Replace(tgt, "/", "_", -1)
 		v := pod.UserVolume{
 			Name:   n,
 			Source: "",
-			Driver: "vfs", //will check if it should equal to the storage engine, and it should be reclaim after
-			//after the container finished
 		}
 		r := pod.UserVolumeReference{
 			Volume:   n,
