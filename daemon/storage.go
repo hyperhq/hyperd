@@ -55,12 +55,12 @@ func StorageFactory(sysinfo *dockertypes.Info) (Storage, error) {
 }
 
 type DevMapperStorage struct {
-	CtnPoolName   string
+	CtnPoolName string
 	VolPoolName string
-	DevPrefix  string
-	FsType     string
-	rootPath   string
-	DmPoolData *dm.DeviceMapper
+	DevPrefix   string
+	FsType      string
+	rootPath    string
+	DmPoolData  *dm.DeviceMapper
 }
 
 func DMFactory(sysinfo *dockertypes.Info) (Storage, error) {

@@ -300,6 +300,37 @@ func getContainerInfo(eng *engine.Engine, version version.Version, w http.Respon
 	return writeJSON(w, http.StatusCreated, dat["data"])
 }
 
+func getContainerLogs(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+	if err := r.ParseForm(); err != nil {
+		return nil
+	}
+
+	var args []string = []string{r.Form.Get("container"), r.Form.Get("tail"), r.Form.Get("since")}
+	boolVals := []string{"follow", "timestamps", "stdout", "stderr"}
+	for _, k := range boolVals {
+		if v := r.Form.Get(k); v == "yes" {
+			args = append(args, k)
+		}
+	}
+
+	glog.V(1).Infof("Log for %s", r.Form.Get("container"))
+
+	job := eng.Job("containerLogs", args...)
+
+	w.Header().Set("Content-Type", "plain/text")
+
+	outStream := ioutils.NewWriteFlusher(w)
+	job.Stdout.Add(outStream)
+
+	output := ioutils.NewWriteFlusher(w)
+	if err := job.Run(); err != nil {
+		output.Write([]byte(err.Error()))
+		return err
+	}
+
+	return nil
+}
+
 func postStop(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
 	if err := r.ParseForm(); err != nil {
 		return nil
@@ -1069,6 +1100,7 @@ func createRouter(eng *engine.Engine, logging, enableCors bool, corsHeaders stri
 			"/info":           getInfo,
 			"/pod/info":       getPodInfo,
 			"/container/info": getContainerInfo,
+			"/container/logs": getContainerLogs,
 			"/version":        getVersion,
 			"/list":           getList,
 			"/images/get":     getImages,
