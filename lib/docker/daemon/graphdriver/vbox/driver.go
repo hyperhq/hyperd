@@ -345,7 +345,13 @@ func (d *Driver) VmMountLayer(id string) error {
 			}
 		}
 
-		d.daemon.PodList[podId].Vm = d.pullVm
+		pod, ok := d.daemon.PodList.Get(podId)
+		if !ok {
+			glog.Errorf("pod %s does not exist", podId)
+			return fmt.Errorf("pod %s does not exist", podId)
+		}
+		pod.SetVM(d.pullVm, vm)
+
 		// release pod from VM
 		code, cause, err = d.daemon.StopPod(podId, "no")
 		if err != nil {

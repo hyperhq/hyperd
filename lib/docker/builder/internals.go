@@ -18,7 +18,7 @@ import (
 	"strings"
 	"syscall"
 
-	//	hyperdaemon "github.com/hyperhq/hyper/daemon"
+	hyperdaemon "github.com/hyperhq/hyper/daemon"
 	"github.com/hyperhq/hyper/lib/docker/builder/parser"
 	"github.com/hyperhq/hyper/lib/docker/daemon"
 	"github.com/hyperhq/hyper/lib/docker/graph"
@@ -213,7 +213,7 @@ func (b *Builder) runContextCommand(args []string, allowRemote bool, allowDecomp
 	}
 
 	b.Config.Image = b.image
-	config := *b.Config
+	//	config := *b.Config
 
 	// Create the Pod
 	podId := fmt.Sprintf("buildpod-%s", utils.RandStr(10, "alpha"))
@@ -242,7 +242,7 @@ func (b *Builder) runContextCommand(args []string, allowRemote bool, allowDecomp
 	if err != nil {
 		return err
 	}
-	err = b.Hyperdaemon.CreatePod(podId, podString, config, false)
+	err = b.Hyperdaemon.CreatePod(podId, podString, false)
 	if err != nil {
 		return err
 	}
@@ -251,7 +251,12 @@ func (b *Builder) runContextCommand(args []string, allowRemote bool, allowDecomp
 		containerId = ""
 		container   *daemon.Container
 	)
-	for _, i := range b.Hyperdaemon.PodList[podId].Containers {
+
+	ps, ok := b.Hyperdaemon.PodList.GetStatus(podId)
+	if !ok {
+		return fmt.Errorf("Cannot find pod %s", podId)
+	}
+	for _, i := range ps.Containers {
 		containerId = i.Id
 	}
 	container, err = b.Daemon.Get(containerId)
@@ -333,7 +338,12 @@ func (b *Builder) runContextCommand(args []string, allowRemote bool, allowDecomp
 			}
 		}
 
-		b.Hyperdaemon.PodList[podId].Vm = b.Name
+		pod, ok := b.Hyperdaemon.PodList.Get(podId)
+		if !ok {
+			return fmt.Errorf("Cannot find pod %s", podId)
+		}
+		pod.SetVM(b.Name, vm)
+
 		// release pod from VM
 		glog.Warningf("start stop pod")
 		code, cause, err = b.Hyperdaemon.StopPod(podId, "no")
@@ -687,17 +697,19 @@ func (b *Builder) run(c *daemon.Container) error {
 		cause       string
 		err         error
 	)
-	for _, p := range b.Hyperdaemon.PodList {
-		for _, con := range p.Containers {
+	b.Hyperdaemon.PodList.Find(func(p *hyperdaemon.Pod) bool {
+		ps := p.Status()
+		if ps == nil {
+			return false
+		}
+		for _, con := range ps.Containers {
 			if con.Id == c.ID {
 				mycontainer = con
-				break
+				return true
 			}
 		}
-		if mycontainer != nil {
-			break
-		}
-	}
+		return false
+	})
 
 	if mycontainer == nil {
 		return fmt.Errorf("can not find that container(%s)", c.ID)
@@ -753,7 +765,11 @@ func (b *Builder) run(c *daemon.Container) error {
 			}
 		}
 
-		b.Hyperdaemon.PodList[podId].Vm = b.Name
+		pod, ok := b.Hyperdaemon.PodList.Get(podId)
+		if !ok {
+			return fmt.Errorf("Cannot find pod %s", podId)
+		}
+		pod.SetVM(b.Name, vm)
 		// release pod from VM
 		code, cause, err = b.Hyperdaemon.StopPod(podId, "no")
 		if err != nil {

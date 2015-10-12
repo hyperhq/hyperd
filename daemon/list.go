@@ -12,13 +12,13 @@ import (
 func (daemon *Daemon) CmdList(job *engine.Job) error {
 	var (
 		item                  string
-		dedicade              bool                  = false
-		podId                 string                = ""
-		auxiliary             bool                  = false
-		pod                   *hypervisor.PodStatus = nil
-		vmJsonResponse                              = []string{}
-		podJsonResponse                             = []string{}
-		containerJsonResponse                       = []string{}
+		dedicade              bool   = false
+		podId                 string = ""
+		auxiliary             bool   = false
+		pod                   *Pod   = nil
+		vmJsonResponse               = []string{}
+		podJsonResponse              = []string{}
+		containerJsonResponse        = []string{}
 	)
 	if len(job.Args) == 0 {
 		item = "pod"
@@ -38,14 +38,14 @@ func (daemon *Daemon) CmdList(job *engine.Job) error {
 		auxiliary = true
 	}
 
-	daemon.PodsMutex.RLock()
+	daemon.PodList.RLock()
 	glog.Infof("lock read of PodList")
 	defer glog.Infof("unlock read of PodList")
-	defer daemon.PodsMutex.RUnlock()
+	defer daemon.PodList.RUnlock()
 
 	if dedicade {
 		var ok bool
-		pod, ok = daemon.PodList[podId]
+		pod, ok = daemon.PodList.Get(podId)
 		if !ok || (pod == nil) {
 			return fmt.Errorf("Cannot find specified pod %s", podId)
 		}
@@ -60,8 +60,8 @@ func (daemon *Daemon) CmdList(job *engine.Job) error {
 				vmJsonResponse = append(vmJsonResponse, vm+":"+showVM(v))
 			}
 		} else {
-			if v, ok := daemon.VmList[pod.Vm]; ok {
-				vmJsonResponse = append(vmJsonResponse, pod.Vm+":"+showVM(v))
+			if v, ok := daemon.VmList[pod.status.Vm]; ok {
+				vmJsonResponse = append(vmJsonResponse, pod.status.Vm+":"+showVM(v))
 			}
 		}
 		v.SetList("vmData", vmJsonResponse)
@@ -69,22 +69,24 @@ func (daemon *Daemon) CmdList(job *engine.Job) error {
 
 	if item == "pod" {
 		if !dedicade {
-			for p, v := range daemon.PodList {
-				podJsonResponse = append(podJsonResponse, p+":"+showPod(v))
-			}
+			daemon.PodList.Foreach(func(p *Pod) error {
+				podJsonResponse = append(podJsonResponse, p.id+":"+showPod(p.status))
+				return nil
+			})
 		} else {
-			podJsonResponse = append(podJsonResponse, pod.Id+":"+showPod(pod))
+			podJsonResponse = append(podJsonResponse, pod.id+":"+showPod(pod.status))
 		}
 		v.SetList("podData", podJsonResponse)
 	}
 
 	if item == "container" {
 		if !dedicade {
-			for _, p := range daemon.PodList {
-				containerJsonResponse = append(containerJsonResponse, showPodContainers(p, auxiliary)...)
-			}
+			daemon.PodList.Foreach(func(p *Pod) error {
+				containerJsonResponse = append(containerJsonResponse, showPodContainers(p.status, auxiliary)...)
+				return nil
+			})
 		} else {
-			containerJsonResponse = append(containerJsonResponse, showPodContainers(pod, auxiliary)...)
+			containerJsonResponse = append(containerJsonResponse, showPodContainers(pod.status, auxiliary)...)
 		}
 		v.SetList("cData", containerJsonResponse)
 	}

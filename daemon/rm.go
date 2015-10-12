@@ -18,10 +18,10 @@ func (daemon *Daemon) CmdPodRm(job *engine.Job) (err error) {
 		cause = ""
 	)
 
-	daemon.PodsMutex.Lock()
+	daemon.PodList.Lock()
 	glog.V(2).Infof("lock PodList")
 	defer glog.V(2).Infof("unlock PodList")
-	defer daemon.PodsMutex.Unlock()
+	defer daemon.PodList.Unlock()
 	code, cause, err = daemon.CleanPod(podId)
 	if err != nil {
 		return err
@@ -46,19 +46,19 @@ func (daemon *Daemon) CleanPod(podId string) (int, string, error) {
 		err   error
 	)
 	os.RemoveAll(path.Join(utils.HYPER_ROOT, "services", podId))
-	pod, ok := daemon.PodList[podId]
+	pod, ok := daemon.PodList.Get(podId)
 	if !ok {
 		return -1, "", fmt.Errorf("Can not find that Pod(%s)", podId)
 	}
-	if daemon.PodList[podId].Status != types.S_POD_RUNNING {
+	if pod.status.Status != types.S_POD_RUNNING {
 		// If the pod type is kubernetes, we just remove the pod from the pod list.
 		// The persistent data has been removed since we got the E_VM_SHUTDOWN event.
-		if daemon.PodList[podId].Type == "kubernetes" {
+		if pod.status.Type == "kubernetes" {
 			daemon.RemovePod(podId)
 			code = types.E_OK
 		} else {
 			daemon.DeletePodFromDB(podId)
-			for _, c := range pod.Containers {
+			for _, c := range pod.status.Containers {
 				glog.V(1).Infof("Ready to rm container: %s", c.Id)
 				if _, _, err = daemon.DockerCli.SendCmdDelete(c.Id); err != nil {
 					glog.Warningf("Error to rm container: %s", err.Error())
@@ -76,7 +76,7 @@ func (daemon *Daemon) CleanPod(podId string) (int, string, error) {
 		}
 		if code == types.E_VM_SHUTDOWN {
 			daemon.DeletePodFromDB(podId)
-			for _, c := range pod.Containers {
+			for _, c := range pod.status.Containers {
 				glog.V(1).Infof("Ready to rm container: %s", c.Id)
 				if _, _, err = daemon.DockerCli.SendCmdDelete(c.Id); err != nil {
 					glog.V(1).Infof("Error to rm container: %s", err.Error())

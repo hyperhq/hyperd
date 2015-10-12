@@ -94,37 +94,30 @@ func (daemon *Daemon) KillVm(vmId string) (int, string, error) {
 	return ret1, ret2, err
 }
 
-// This function will only be invoked during daemon start
-func (daemon *Daemon) AssociateAllVms() error {
-	for _, mypod := range daemon.PodList {
-		if mypod.Vm == "" {
-			continue
-		}
-		podData, err := daemon.GetPodByName(mypod.Id)
-		if err != nil {
-			continue
-		}
-		userPod, err := daemon.ProcessPodBytes(podData, mypod.Id)
-		if err != nil {
-			continue
-		}
-		glog.V(1).Infof("Associate the POD(%s) with VM(%s)", mypod.Id, mypod.Vm)
-
-		vmData, err := daemon.GetVmData(mypod.Vm)
-		if err != nil {
-			continue
-		}
-		glog.V(1).Infof("The data for vm(%s) is %v", mypod.Vm, vmData)
-
-		vm := daemon.NewVm(mypod.Vm, userPod.Resource.Vcpu, userPod.Resource.Memory, false, types.VM_KEEP_NONE)
-
-		err = vm.AssociateVm(mypod, vmData)
-		if err != nil {
-			continue
-		}
-
-		daemon.AddVm(vm)
+func (p *Pod) AssociateVm(daemon *Daemon, vmId string) error {
+	if p.vm != nil && p.vm.Id != vmId {
+		return fmt.Errorf("pod %s already has vm %s, but trying to associate with %s", p.id, p.vm.Id, vmId)
+	} else if p.vm != nil {
+		return nil
 	}
+
+	vmData, err := daemon.GetVmData(vmId)
+	if err != nil {
+		return err
+	}
+	glog.V(1).Infof("The data for vm(%s) is %v", vmId, vmData)
+
+	p.vm = daemon.NewVm(vmId, p.spec.Resource.Vcpu, p.spec.Resource.Memory, false, types.VM_KEEP_NONE)
+	p.status.Vm = vmId
+
+	err = p.vm.AssociateVm(p.status, vmData)
+	if err != nil {
+		p.vm = nil
+		p.status.Vm = ""
+		return err
+	}
+
+	daemon.AddVm(p.vm)
 	return nil
 }
 
