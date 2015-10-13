@@ -4,9 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand"
 	"path"
 	"strconv"
 	"strings"
+	"time"
 
 	dockertypes "github.com/hyperhq/hyper/lib/docker/api/types"
 	"github.com/hyperhq/hyper/storage"
@@ -106,6 +108,7 @@ func (dms *DevMapperStorage) Init() error {
 		Size:             DEFAULT_DM_POOL_SIZE,
 	}
 	dms.DmPoolData = &dmPool
+	rand.Seed(time.Now().UnixNano())
 
 	// Prepare the DeviceMapper storage
 	return dm.CreatePool(&dmPool)
@@ -145,18 +148,27 @@ func (dms *DevMapperStorage) CreateVolume(daemon *Daemon, podId, shortName strin
 	dev_id, _ := daemon.GetVolumeId(podId, volName)
 	glog.Infof("DeviceID is %d", dev_id)
 
-	restore := true
-	if dev_id < 1 {
-		dev_id, _ = daemon.GetMaxDeviceId()
-		dev_id++
-		restore = false
+	restore := dev_id > 0
+
+	for {
+		if !restore {
+			dev_id = dms.randDevId()
+		}
+		dev_id_str := strconv.Itoa(dev_id)
+
+		err := dm.CreateVolume(dms.VolPoolName, volName, dev_id_str, DEFAULT_DM_VOL_SIZE, restore)
+		if err != nil && !restore && strings.Contains(err.Error(), "failed: File exists") {
+			glog.V(1).Infof("retry for dev_id #%d creating collision: %v", dev_id, err)
+			continue
+		} else if err != nil {
+			glog.V(1).Infof("failed to create dev_id #%d: %v", dev_id, err)
+			return nil, err
+		}
+
+		glog.V(3).Infof("device (%d) created (restore:%v) for %s: %s", dev_id, restore, podId, volName)
+		daemon.SetVolumeId(podId, volName, dev_id_str)
+		break
 	}
-	dev_id_str := strconv.Itoa(dev_id)
-	err := dm.CreateVolume(dms.VolPoolName, volName, dev_id_str, DEFAULT_DM_VOL_SIZE, restore)
-	if err != nil {
-		return nil, err
-	}
-	daemon.SetVolumeId(podId, volName, dev_id_str)
 
 	fstype, err := dm.ProbeFsType("/dev/mapper/" + volName)
 	if err != nil {
@@ -181,6 +193,10 @@ func (dms *DevMapperStorage) RemoveVolume(podId string, record []byte) error {
 		return err
 	}
 	return nil
+}
+
+func (dms *DevMapperStorage) randDevId() int {
+	return rand.Intn(1<<24-1) + 1 // 0 reserved for pool device
 }
 
 type AufsStorage struct {

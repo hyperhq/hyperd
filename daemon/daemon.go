@@ -373,25 +373,6 @@ func (daemon *Daemon) SetVolumeId(podId, volName, dev_id string) error {
 	return nil
 }
 
-func (daemon *Daemon) GetMaxDeviceId() (int, error) {
-	iter := daemon.db.NewIterator(util.BytesPrefix([]byte("vol-")), nil)
-	maxId := 1
-	for iter.Next() {
-		value := iter.Value()
-		fields := strings.Split(string(value), ":")
-		id, _ := strconv.Atoi(fields[1])
-		if id > maxId {
-			maxId = id
-		}
-	}
-	iter.Release()
-	err := iter.Error()
-	if err != nil {
-		return -1, err
-	}
-	return maxId, nil
-}
-
 func (daemon *Daemon) GetVolumeId(podId, volName string) (int, error) {
 	dev_id := 0
 	key := fmt.Sprintf("vol-%s", podId)
