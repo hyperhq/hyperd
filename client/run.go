@@ -38,6 +38,8 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 		Env           []string `long:"env" value-name:"[]" default-mask:"-" description:"Set environment variables"`
 		EntryPoint    string   `long:"entrypoint" value-name:"\"\"" default-mask:"-" description:"Overwrite the default ENTRYPOINT of the image"`
 		RestartPolicy string   `long:"restart" default:"never" value-name:"\"\"" default-mask:"-" description:"Restart policy to apply when a container exits (never, onFailure, always)"`
+		LogDriver     string   `long:"log-driver" value-name:"\"\"" description:"Logging driver for Pod"`
+		LogOpts       []string `long:"log-opt" description:"Log driver options"`
 		Remove        bool     `long:"rm" default:"false" value-name:"" default-mask:"-" description:"Automatically remove the pod when it exits"`
 		Portmap       []string `long:"publish" value-name:"[]" default-mask:"-" description:"Publish a container's port to the host, format: --publish [tcp/udp:]hostPort:containerPort"`
 	}
@@ -69,7 +71,7 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 			return fmt.Errorf("%s: \"run\" requires a minimum of 1 argument, please provide the image.", os.Args[0])
 		}
 		attach = !opts.Detach
-		podJson, err = cli.JsonFromCmdline(args[1:], opts.Env, opts.Portmap,
+		podJson, err = cli.JsonFromCmdline(args[1:], opts.Env, opts.Portmap, opts.LogDriver, opts.LogOpts,
 			opts.Name, opts.Workdir, opts.RestartPolicy, opts.Cpu, opts.Memory, opts.Tty)
 	}
 
@@ -135,7 +137,7 @@ func (cli *HyperClient) JsonFromFile(filename string, yaml, k8s bool) (string, e
 }
 
 // cmdArgs: args[1:]
-func (cli *HyperClient) JsonFromCmdline(cmdArgs, cmdEnvs, cmdPortmaps []string,
+func (cli *HyperClient) JsonFromCmdline(cmdArgs, cmdEnvs, cmdPortmaps []string, cmdLogDriver string, cmdLogOpts []string,
 	cmdName, cmdWorkdir, cmdRestartPolicy string, cpu, memory int, tty bool) (string, error) {
 
 	var (
@@ -144,6 +146,7 @@ func (cli *HyperClient) JsonFromCmdline(cmdArgs, cmdEnvs, cmdPortmaps []string,
 		command = []string{}
 		env     = []pod.UserEnvironmentVar{}
 		ports   = []pod.UserContainerPort{}
+		logOpts = make(map[string]string)
 	)
 	if len(cmdArgs) > 1 {
 		command = cmdArgs[1:]
@@ -163,6 +166,15 @@ func (cli *HyperClient) JsonFromCmdline(cmdArgs, cmdEnvs, cmdPortmaps []string,
 				Env:   v[:eqlIndex],
 				Value: v[eqlIndex+1:],
 			})
+		}
+	}
+
+	for _, v := range cmdLogOpts {
+		eql := strings.Index(v, "=")
+		if eql > 0 {
+			logOpts[v[:eql]] = v[eql+1:]
+		} else {
+			logOpts[v] = ""
 		}
 	}
 
@@ -193,7 +205,11 @@ func (cli *HyperClient) JsonFromCmdline(cmdArgs, cmdEnvs, cmdPortmaps []string,
 		Resource:   pod.UserResource{Vcpu: cpu, Memory: memory},
 		Files:      []pod.UserFile{},
 		Volumes:    []pod.UserVolume{},
-		Tty:        tty,
+		LogConfig: pod.PodLogConfig{
+			Type:   cmdLogDriver,
+			Config: logOpts,
+		},
+		Tty: tty,
 	}
 
 	jsonString, _ := json.Marshal(userPod)
