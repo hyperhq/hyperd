@@ -8,6 +8,11 @@
 			"Rev": "74691fb6f83716190870cde1b658538dd4b18eb0"
 		},
 		{
+			"ImportPath": "github.com/Sirupsen/logrus",
+			"Comment": "v0.8.7",
+			"Rev": "418b41d23a1bf978c06faea5313ba194650ac088"
+		},
+		{
 			"ImportPath": "github.com/Unknwon/goconfig",
 			"Rev": "5cfc02f2789e6e98d8546e40b29d907aedc4c590"
 		},
@@ -27,7 +32,47 @@
 			"Rev": "f651c5d68e0fccf678f6e22b5e4e99ed831a966e"
 		},
 		{
+			"ImportPath": "github.com/docker/docker/daemon/logger",
+			"Comment": "v1.4.1-6273-gd2e7ba4",
+			"Rev": "d2e7ba42b10fda5961470adc4ba4d74011203e60"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/pkg/ioutils",
+			"Comment": "v1.4.1-6273-gd2e7ba4",
+			"Rev": "d2e7ba42b10fda5961470adc4ba4d74011203e60"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/pkg/jsonlog",
+			"Comment": "v1.4.1-6273-gd2e7ba4",
+			"Rev": "d2e7ba42b10fda5961470adc4ba4d74011203e60"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/pkg/pubsub",
+			"Comment": "v1.4.1-6273-gd2e7ba4",
+			"Rev": "d2e7ba42b10fda5961470adc4ba4d74011203e60"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/pkg/random",
+			"Comment": "v1.4.1-6273-gd2e7ba4",
+			"Rev": "d2e7ba42b10fda5961470adc4ba4d74011203e60"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/pkg/tailfile",
+			"Comment": "v1.4.1-6273-gd2e7ba4",
+			"Rev": "d2e7ba42b10fda5961470adc4ba4d74011203e60"
+		},
+		{
 			"ImportPath": "github.com/docker/docker/pkg/tarsum",
+			"Comment": "v1.4.1-6273-gd2e7ba4",
+			"Rev": "d2e7ba42b10fda5961470adc4ba4d74011203e60"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/pkg/timeutils",
+			"Comment": "v1.4.1-6273-gd2e7ba4",
+			"Rev": "d2e7ba42b10fda5961470adc4ba4d74011203e60"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/pkg/units",
 			"Comment": "v1.4.1-6273-gd2e7ba4",
 			"Rev": "d2e7ba42b10fda5961470adc4ba4d74011203e60"
 		},
@@ -75,6 +120,11 @@
 			"ImportPath": "github.com/tchap/go-patricia/patricia",
 			"Comment": "v2.2.0-3-gdf2b712",
 			"Rev": "df2b712478cafdbfe2d6107b809c8ba9cf67c6d9"
+		},
+		{
+			"ImportPath": "gopkg.in/fsnotify.v1",
+			"Comment": "v1.2.0",
+			"Rev": "96c060f6a6b7e0d6f75fddd10efeaca3e5d1bcb0"
 		},
 		{
 			"ImportPath": "gopkg.in/yaml.v2",
