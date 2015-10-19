@@ -23,7 +23,7 @@ func (daemon *Daemon) CmdTty(job *engine.Job) (err error) {
 
 	if strings.Contains(podID, "pod-") {
 		container = ""
-		vmid, err = daemon.GetPodVmByName(podID)
+		vmid, err = daemon.GetVmByPodId(podID)
 		if err != nil {
 			return err
 		}
@@ -35,7 +35,7 @@ func (daemon *Daemon) CmdTty(job *engine.Job) (err error) {
 		if err != nil {
 			return err
 		}
-		vmid, err = daemon.GetPodVmByName(podID)
+		vmid, err = daemon.GetVmByPodId(podID)
 		if err != nil {
 			return err
 		}

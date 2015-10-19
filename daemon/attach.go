@@ -18,21 +18,21 @@ func (daemon *Daemon) CmdAttach(job *engine.Job) (err error) {
 	typeVal := job.Args[1]
 	tag := job.Args[2]
 
-	var podName, container string
+	var podId, container string
 
 	// We need find the vm id which running POD, and stop it
 	if typeKey == "pod" {
-		podName = typeVal
+		podId = typeVal
 		container = ""
 	} else {
 		container = typeVal
-		podName, err = daemon.GetPodByContainer(container)
+		podId, err = daemon.GetPodByContainer(container)
 		if err != nil {
 			return err
 		}
 	}
 
-	vmId, err := daemon.GetPodVmByName(podName)
+	vmId, err := daemon.GetVmByPodId(podId)
 	if err != nil {
 		return err
 	}

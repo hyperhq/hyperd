@@ -13,10 +13,10 @@ func (daemon *Daemon) CmdPodStop(job *engine.Job) error {
 	}
 	podId := job.Args[0]
 	stopVm := job.Args[1]
-	daemon.PodsMutex.Lock()
+	daemon.PodList.Lock()
 	glog.V(2).Infof("lock PodList")
 	defer glog.V(2).Infof("unlock PodList")
-	defer daemon.PodsMutex.Unlock()
+	defer daemon.PodList.Unlock()
 	code, cause, err := daemon.StopPod(podId, stopVm)
 	if err != nil {
 		return err
@@ -37,35 +37,31 @@ func (daemon *Daemon) CmdPodStop(job *engine.Job) error {
 func (daemon *Daemon) StopPod(podId, stopVm string) (int, string, error) {
 	glog.V(1).Infof("Prepare to stop the POD: %s", podId)
 	// find the vm id which running POD, and stop it
-	mypod, ok := daemon.PodList[podId]
+	pod, ok := daemon.PodList.Get(podId)
 	if !ok {
 		glog.Errorf("Can not find pod(%s)", podId)
 		return -1, "", fmt.Errorf("Can not find pod(%s)", podId)
 	}
-	vmid := mypod.Vm
 	// we need to set the 'RestartPolicy' of the pod to 'never' if stop command is invoked
 	// for kubernetes
-	if mypod.Type == "kubernetes" {
-		mypod.RestartPolicy = "never"
-		if mypod.Vm == "" {
-			return types.E_VM_SHUTDOWN, "", nil
-		}
+	if pod.status.Type == "kubernetes" {
+		pod.status.RestartPolicy = "never"
 	}
 
-	vm, ok := daemon.VmList[vmid]
-	if !ok {
-		return -1, "", fmt.Errorf("VM is not exist")
+	if pod.vm == nil {
+		return types.E_VM_SHUTDOWN, "", nil
 	}
 
-	vmResponse := vm.StopPod(mypod, stopVm)
+	vmId := pod.vm.Id
+	vmResponse := pod.vm.StopPod(pod.status, stopVm)
 
 	// Delete the Vm info for POD
 	daemon.DeleteVmByPod(podId)
 
 	if vmResponse.Code == types.E_VM_SHUTDOWN {
-		daemon.RemoveVm(vmid)
+		daemon.RemoveVm(vmId)
 	}
-	if mypod.Autoremove == true {
+	if pod.status.Autoremove == true {
 		daemon.CleanPod(podId)
 	}
 

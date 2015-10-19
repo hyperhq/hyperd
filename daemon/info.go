@@ -10,7 +10,6 @@ import (
 	"github.com/hyperhq/hyper/types"
 	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/hypervisor"
-	"github.com/hyperhq/runv/hypervisor/pod"
 	runvtypes "github.com/hyperhq/runv/hypervisor/types"
 	"github.com/hyperhq/runv/lib/glog"
 )
@@ -22,17 +21,12 @@ func (daemon *Daemon) CmdInfo(job *engine.Job) error {
 		return err
 	}
 
-	var num = 0
-	daemon.PodsMutex.RLock()
-	glog.V(2).Infof("lock read of PodList")
-	for _, p := range daemon.PodList {
-		num += len(p.Containers)
-	}
-	daemon.PodsMutex.RUnlock()
+	var num = daemon.PodList.CountContainers()
+
 	glog.V(2).Infof("unlock read of PodList")
 	v := &engine.Env{}
 	v.Set("ID", daemon.ID)
-	v.SetInt("Containers", num)
+	v.SetInt("Containers", int(num))
 	v.SetInt("Images", sys.Images)
 	v.Set("Driver", sys.Driver)
 	v.SetJson("DriverStatus", sys.DriverStatus)
@@ -75,45 +69,33 @@ func (daemon *Daemon) CmdPodInfo(job *engine.Job) error {
 	if len(job.Args) == 0 {
 		return fmt.Errorf("Can not get Pod info without Pod ID")
 	}
-	daemon.PodsMutex.RLock()
+	daemon.PodList.RLock()
 	glog.V(2).Infof("lock read of PodList")
-	defer daemon.PodsMutex.RUnlock()
+	defer daemon.PodList.RUnlock()
 	defer glog.V(2).Infof("unlock read of PodList")
 	var (
+		pod     *Pod
 		podId   string
-		mypod   *hypervisor.PodStatus
-		userpod *pod.UserPod
 		ok      bool
 		imageid string
 	)
 	if strings.Contains(job.Args[0], "pod-") {
 		podId = job.Args[0]
-		// We need to find the VM which running the POD
-		mypod, ok = daemon.PodList[podId]
+		pod, ok = daemon.PodList.Get(podId)
 		if !ok {
 			return fmt.Errorf("Can not get Pod info with pod ID(%s)", podId)
 		}
 	} else {
-		for _, p := range daemon.PodList {
-			if p.Name == job.Args[0] {
-				mypod = p
-				break
-			}
-		}
-		if mypod == nil {
+		pod = daemon.PodList.GetByName(job.Args[0])
+		if pod == nil {
 			return fmt.Errorf("Can not get Pod info with pod name(%s)", job.Args[0])
 		}
 	}
-	podData, err := daemon.GetPodByName(mypod.Id)
-	if err == nil {
-		if userpod, err = daemon.ProcessPodBytes(podData, mypod.Id); err != nil {
-			return err
-		}
-	}
+
 	// Construct the PodInfo JSON structure
 	cStatus := []types.ContainerStatus{}
 	containers := []types.Container{}
-	for i, c := range mypod.Containers {
+	for i, c := range pod.status.Containers {
 		ports := []types.ContainerPort{}
 		envs := []types.EnvironmentVar{}
 		vols := []types.VolumeMount{}
@@ -126,18 +108,18 @@ func (daemon *Daemon) CmdPodInfo(job *engine.Job) error {
 			}
 			imageid = jsonResponse.Image
 		}
-		for _, port := range userpod.Containers[i].Ports {
+		for _, port := range pod.spec.Containers[i].Ports {
 			ports = append(ports, types.ContainerPort{
 				HostPort:      port.HostPort,
 				ContainerPort: port.ContainerPort,
 				Protocol:      port.Protocol})
 		}
-		for _, e := range userpod.Containers[i].Envs {
+		for _, e := range pod.spec.Containers[i].Envs {
 			envs = append(envs, types.EnvironmentVar{
 				Env:   e.Env,
 				Value: e.Value})
 		}
-		for _, v := range userpod.Containers[i].Volumes {
+		for _, v := range pod.spec.Containers[i].Volumes {
 			vols = append(vols, types.VolumeMount{
 				Name:      v.Volume,
 				MountPath: v.Path,
@@ -148,9 +130,9 @@ func (daemon *Daemon) CmdPodInfo(job *engine.Job) error {
 			ContainerID:     c.Id,
 			Image:           c.Image,
 			ImageID:         imageid,
-			Commands:        userpod.Containers[i].Command,
+			Commands:        pod.spec.Containers[i].Command,
 			Args:            []string{},
-			Workdir:         userpod.Containers[i].Workdir,
+			Workdir:         pod.spec.Containers[i].Workdir,
 			Ports:           ports,
 			Environment:     envs,
 			Volume:          vols,
@@ -168,7 +150,7 @@ func (daemon *Daemon) CmdPodInfo(job *engine.Job) error {
 			s.Waiting.Reason = "Pending"
 			s.Phase = "pending"
 		} else if c.Status == runvtypes.S_POD_RUNNING {
-			s.Running.StartedAt = mypod.StartedAt
+			s.Running.StartedAt = pod.status.StartedAt
 			s.Phase = "running"
 		} else { // S_POD_FAILED or S_POD_SUCCEEDED
 			if c.Status == runvtypes.S_POD_FAILED {
@@ -180,13 +162,13 @@ func (daemon *Daemon) CmdPodInfo(job *engine.Job) error {
 				s.Terminated.Reason = "Succeeded"
 				s.Phase = "succeeded"
 			}
-			s.Terminated.StartedAt = mypod.StartedAt
-			s.Terminated.FinishedAt = mypod.FinishedAt
+			s.Terminated.StartedAt = pod.status.StartedAt
+			s.Terminated.FinishedAt = pod.status.FinishedAt
 		}
 		cStatus = append(cStatus, s)
 	}
 	podVoumes := []types.PodVolume{}
-	for _, v := range userpod.Volumes {
+	for _, v := range pod.spec.Volumes {
 		podVoumes = append(podVoumes, types.PodVolume{
 			Name:     v.Name,
 			HostPath: v.Source,
@@ -197,25 +179,16 @@ func (daemon *Daemon) CmdPodInfo(job *engine.Job) error {
 		Containers: containers,
 	}
 	podIPs := []string{}
-	if mypod.Vm != "" {
-		var vm *hypervisor.Vm = nil
-		for _, m := range daemon.VmList {
-			if mypod.Vm == m.Id {
-				vm = m
-				break
-			}
-		}
-		if vm != nil {
-			podIPs = mypod.GetPodIP(vm)
-		}
+	if pod.vm != nil {
+		podIPs = pod.status.GetPodIP(pod.vm)
 	}
 	status := types.PodStatus{
 		Status:    cStatus,
 		HostIP:    utils.GetHostIP(),
 		PodIP:     podIPs,
-		StartTime: mypod.StartedAt,
+		StartTime: pod.status.StartedAt,
 	}
-	switch mypod.Status {
+	switch pod.status.Status {
 	case runvtypes.S_POD_CREATED:
 		status.Phase = "Pending"
 		break
@@ -233,7 +206,7 @@ func (daemon *Daemon) CmdPodInfo(job *engine.Job) error {
 	data := types.PodInfo{
 		Kind:       "Pod",
 		ApiVersion: utils.APIVERSION,
-		Vm:         mypod.Vm,
+		Vm:         pod.status.Vm,
 		Spec:       spec,
 		Status:     status,
 	}
@@ -250,60 +223,35 @@ func (daemon *Daemon) CmdContainerInfo(job *engine.Job) error {
 	if len(job.Args) == 0 {
 		return fmt.Errorf("Can not get Pod info without Pod ID")
 	}
-	daemon.PodsMutex.RLock()
+	daemon.PodList.RLock()
 	glog.V(2).Infof("lock read of PodList")
-	defer daemon.PodsMutex.RUnlock()
+	defer daemon.PodList.RUnlock()
 	defer glog.V(2).Infof("unlock read of PodList")
 	var (
-		find    bool = false
-		mypod   *hypervisor.PodStatus
+		pod     *Pod
 		c       *hypervisor.Container
 		i       int = 0
 		imageid string
-		userpod *pod.UserPod
 		name    string = job.Args[0]
 	)
 	if name == "" {
 		return fmt.Errorf("Null container name")
 	}
 	glog.Infof(name)
-	for _, mypod = range daemon.PodList {
-		for _, c = range mypod.Containers {
-			glog.Infof(c.Name)
-			if name[0] != '/' {
-				if c.Name == "/"+name {
-					find = true
-					break
-				}
-			} else {
-				if c.Name == name {
-					find = true
-					break
-				}
-			}
-			if c.Id == name {
-				find = true
-				break
-			}
-		}
-		if find == true {
-			break
-		}
+	wslash := name
+	if name[0] != '/' {
+		wslash = "/" + name
 	}
-	if find == false {
+	pod = daemon.PodList.Find(func(p *Pod) bool {
+		for i, c = range p.status.Containers {
+			if c.Name == wslash || c.Id == name {
+				return true
+			}
+		}
+		return false
+	})
+	if pod == nil {
 		return fmt.Errorf("Can not find container by name(%s)", name)
-	}
-	podData, err := daemon.GetPodByName(mypod.Id)
-	if err == nil {
-		if userpod, err = daemon.ProcessPodBytes(podData, mypod.Id); err != nil {
-			return err
-		}
-	}
-	for k, v := range mypod.Containers {
-		if v.Name == c.Name {
-			i = k
-			break
-		}
 	}
 
 	ports := []types.ContainerPort{}
@@ -318,18 +266,18 @@ func (daemon *Daemon) CmdContainerInfo(job *engine.Job) error {
 		}
 		imageid = jsonResponse.Image
 	}
-	for _, port := range userpod.Containers[i].Ports {
+	for _, port := range pod.spec.Containers[i].Ports {
 		ports = append(ports, types.ContainerPort{
 			HostPort:      port.HostPort,
 			ContainerPort: port.ContainerPort,
 			Protocol:      port.Protocol})
 	}
-	for _, e := range userpod.Containers[i].Envs {
+	for _, e := range pod.spec.Containers[i].Envs {
 		envs = append(envs, types.EnvironmentVar{
 			Env:   e.Env,
 			Value: e.Value})
 	}
-	for _, v := range userpod.Containers[i].Volumes {
+	for _, v := range pod.spec.Containers[i].Volumes {
 		vols = append(vols, types.VolumeMount{
 			Name:      v.Volume,
 			MountPath: v.Path,
@@ -345,7 +293,7 @@ func (daemon *Daemon) CmdContainerInfo(job *engine.Job) error {
 		s.Waiting.Reason = "Pending"
 		s.Phase = "pending"
 	} else if c.Status == runvtypes.S_POD_RUNNING {
-		s.Running.StartedAt = mypod.StartedAt
+		s.Running.StartedAt = pod.status.StartedAt
 		s.Phase = "running"
 	} else { // S_POD_FAILED or S_POD_SUCCEEDED
 		if c.Status == runvtypes.S_POD_FAILED {
@@ -357,17 +305,17 @@ func (daemon *Daemon) CmdContainerInfo(job *engine.Job) error {
 			s.Terminated.Reason = "Succeeded"
 			s.Phase = "succeeded"
 		}
-		s.Terminated.StartedAt = mypod.StartedAt
-		s.Terminated.FinishedAt = mypod.FinishedAt
+		s.Terminated.StartedAt = pod.status.StartedAt
+		s.Terminated.FinishedAt = pod.status.FinishedAt
 	}
 	container := types.ContainerInfo{
 		Name:            c.Name,
 		ContainerID:     c.Id,
 		Image:           c.Image,
 		ImageID:         imageid,
-		Commands:        userpod.Containers[i].Command,
+		Commands:        pod.spec.Containers[i].Command,
 		Args:            []string{},
-		Workdir:         userpod.Containers[i].Workdir,
+		Workdir:         pod.spec.Containers[i].Workdir,
 		Ports:           ports,
 		Environment:     envs,
 		Volume:          vols,
