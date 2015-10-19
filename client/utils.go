@@ -186,7 +186,6 @@ func (cli *HyperClient) streamBody(body io.ReadCloser, contentType string, setRa
 		} else {
 			_, err = stdcopy.StdCopy(stdout, stderr, body)
 		}
-		fmt.Println("[stream] End of stdout")
 		return err
 	}
 	return nil
