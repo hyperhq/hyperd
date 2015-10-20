@@ -498,6 +498,8 @@ func (p *Pod) PrepareVolume(daemon *Daemon, sd Storage) (err error) {
 			} else {
 				v.Driver = "raw"
 			}
+		} else {
+			vol = &hypervisor.VolumeInfo{}
 		}
 
 		if v.Driver == "vfs" {
