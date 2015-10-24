@@ -18,6 +18,7 @@ import (
 	"github.com/hyperhq/hyper/storage/vbox"
 	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/hypervisor"
+	"github.com/hyperhq/runv/hypervisor/pod"
 	"github.com/hyperhq/runv/lib/glog"
 )
 
@@ -27,6 +28,7 @@ const (
 	DEFAULT_DM_DATA_LOOP string = "/dev/loop6"
 	DEFAULT_DM_META_LOOP string = "/dev/loop7"
 	DEFAULT_DM_VOL_SIZE  int    = 2 * 1024 * 1024 * 1024
+	DEFAULT_VOL_FS              = "ext4"
 )
 
 type Storage interface {
@@ -54,6 +56,35 @@ func StorageFactory(sysinfo *dockertypes.Info) (Storage, error) {
 		return factory(sysinfo)
 	}
 	return nil, fmt.Errorf("hyperd can not support docker's backing storage: %s", sysinfo.Driver)
+}
+
+func ProbeExistingVolume(v *pod.UserVolume, sharedDir string) (*hypervisor.VolumeInfo, error) {
+	if v == nil || v.Source == "" { //do not create volume in this function, it depends on storage driver.
+		return nil, fmt.Errorf("can not generate volume info from %v", v)
+	}
+
+	var err error = nil
+	vol := &hypervisor.VolumeInfo{
+		Name: v.Name,
+	}
+
+	if v.Driver == "vfs" {
+		vol.Fstype = "dir"
+		vol.Filepath, err = storage.MountVFSVolume(v.Source, sharedDir)
+		if err != nil {
+			return nil, err
+		}
+		glog.V(1).Infof("dir %s is bound to %s", v.Source, vol.Filepath)
+	} else {
+		vol.Fstype, err = dm.ProbeFsType(v.Source)
+		if err != nil {
+			vol.Fstype = DEFAULT_VOL_FS //FIXME: for qcow2, the ProbeFsType doesn't work, should be fix later
+		}
+		vol.Format = v.Driver
+		vol.Filepath = v.Source
+	}
+
+	return vol, nil
 }
 
 type DevMapperStorage struct {
