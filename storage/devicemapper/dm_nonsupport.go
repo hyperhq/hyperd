@@ -14,6 +14,10 @@ func MountContainerToSharedDir(containerId, sharedDir, devPrefix string) (string
 	return "", nil
 }
 
+func InjectFile(src io.Reader, containerId, devPrefix, target, rootPath string, perm, uid, gid int) error {
+	return fmt.Errorf("Unsupported, inject file to %s is not supported in current arch", target)
+}
+
 func CreateNewDevice(containerId, devPrefix, rootPath string) error {
 	return nil
 }

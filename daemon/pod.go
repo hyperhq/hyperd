@@ -495,19 +495,21 @@ func (p *Pod) PrepareVolume(daemon *Daemon, sd Storage) (err error) {
 			v.Source = vol.Filepath
 			if sd.Type() != "devicemapper" {
 				v.Driver = "vfs"
-			} else {
+
+				vol.Filepath, err = storage.MountVFSVolume(v.Source, sharedDir)
+				if err != nil {
+					return
+				}
+				glog.V(1).Infof("dir %s is bound to %s", v.Source, vol.Filepath)
+
+			} else { // type other than doesn't need to be mounted
 				v.Driver = "raw"
 			}
 		} else {
-			vol = &hypervisor.VolumeInfo{}
-		}
-
-		if v.Driver == "vfs" {
-			vol.Filepath, err = storage.MountVFSVolume(v.Source, sharedDir)
+			vol, err = ProbeExistingVolume(&v, sharedDir)
 			if err != nil {
 				return
 			}
-			glog.V(1).Infof("dir %s is bound to %s", v.Source, vol.Filepath)
 		}
 
 		p.volumes = append(p.volumes, vol)
