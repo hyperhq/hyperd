@@ -534,6 +534,16 @@ func (p *Pod) Prepare(daemon *Daemon) (err error) {
 	return nil
 }
 
+func stopLogger(mypod *hypervisor.PodStatus) {
+	for _, c := range mypod.Containers {
+		if c.Logs.Driver == nil {
+			continue
+		}
+
+		c.Logs.Driver.Close()
+	}
+}
+
 func (p *Pod) getLogger(daemon *Daemon) (err error) {
 	if p.spec.LogConfig.Type == "" {
 		p.spec.LogConfig.Type = daemon.DefaultLog.Type
@@ -667,6 +677,12 @@ func (p *Pod) Start(daemon *Daemon, vmId string, lazy, autoremove bool, keep int
 		return nil, err
 	}
 
+	defer func() {
+		if err != nil {
+			stopLogger(p.status)
+		}
+	}()
+
 	if err = p.startLogging(daemon); err != nil {
 		return nil, err
 	}
@@ -687,7 +703,8 @@ func (p *Pod) Start(daemon *Daemon, vmId string, lazy, autoremove bool, keep int
 		return nil, err
 	}
 	// add or update the Vm info for POD
-	if err := daemon.UpdateVmByPod(p.id, p.vm.Id); err != nil {
+	err = daemon.UpdateVmByPod(p.id, p.vm.Id)
+	if err != nil {
 		glog.Error(err.Error())
 		return nil, err
 	}
@@ -760,6 +777,7 @@ func hyperHandlePodEvent(vmResponse *types.VmResponse, data interface{},
 			vm.Status = types.S_VM_IDLE
 			return false
 		}
+		stopLogger(mypod)
 		mypod.SetPodContainerStatus(vmResponse.Data.([]uint32))
 		mypod.Vm = ""
 		vm.Status = types.S_VM_IDLE
@@ -769,6 +787,7 @@ func hyperHandlePodEvent(vmResponse *types.VmResponse, data interface{},
 		}
 	} else if vmResponse.Code == types.E_VM_SHUTDOWN {
 		if mypod.Status == types.S_POD_RUNNING {
+			stopLogger(mypod)
 			mypod.Status = types.S_POD_SUCCEEDED
 			mypod.SetContainerStatus(types.S_POD_SUCCEEDED)
 		}
