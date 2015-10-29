@@ -118,8 +118,7 @@
 		},
 		{
 			"ImportPath": "github.com/tchap/go-patricia/patricia",
-			"Comment": "v2.2.0-3-gdf2b712",
-			"Rev": "df2b712478cafdbfe2d6107b809c8ba9cf67c6d9"
+			"Rev": "42daf53d2c20234572a4640ac642df046505562d"
 		},
 		{
 			"ImportPath": "gopkg.in/fsnotify.v1",

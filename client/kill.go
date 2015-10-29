@@ -29,7 +29,7 @@ func (cli *HyperClient) HyperCmdKill(args ...string) error {
 	vmId := args[1]
 	v := url.Values{}
 	v.Set("vm", vmId)
-	body, _, err := readBody(cli.call("POST", "/vm/kill?"+v.Encode(), nil, nil))
+	body, _, err := readBody(cli.call("DELETE", "/vm?"+v.Encode(), nil, nil))
 	if err != nil {
 		return err
 	}

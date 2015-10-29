@@ -179,8 +179,8 @@ func getInfo(eng *engine.Engine, version version.Version, w http.ResponseWriter,
 }
 
 func getList(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
-	if err := r.ParseForm(); err != nil {
-		return nil
+	if err := parseForm(r); err != nil {
+		return err
 	}
 
 	item := r.Form.Get("item")
@@ -224,8 +224,8 @@ func getList(eng *engine.Engine, version version.Version, w http.ResponseWriter,
 }
 
 func getImages(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
-	if err := r.ParseForm(); err != nil {
-		return nil
+	if err := parseForm(r); err != nil {
+		return err
 	}
 
 	job := eng.Job("images", r.Form.Get("all"))
@@ -251,8 +251,8 @@ func getImages(eng *engine.Engine, version version.Version, w http.ResponseWrite
 }
 
 func getPodInfo(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
-	if err := r.ParseForm(); err != nil {
-		return nil
+	if err := parseForm(r); err != nil {
+		return err
 	}
 
 	job := eng.Job("podInfo", r.Form.Get("podName"))
@@ -276,8 +276,8 @@ func getPodInfo(eng *engine.Engine, version version.Version, w http.ResponseWrit
 }
 
 func getContainerInfo(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
-	if err := r.ParseForm(); err != nil {
-		return nil
+	if err := parseForm(r); err != nil {
+		return err
 	}
 
 	job := eng.Job("containerInfo", r.Form.Get("container"))
@@ -301,8 +301,8 @@ func getContainerInfo(eng *engine.Engine, version version.Version, w http.Respon
 }
 
 func getContainerLogs(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
-	if err := r.ParseForm(); err != nil {
-		return nil
+	if err := parseForm(r); err != nil {
+		return err
 	}
 
 	var args []string = []string{r.Form.Get("container"), r.Form.Get("tail"), r.Form.Get("since")}
@@ -332,8 +332,8 @@ func getContainerLogs(eng *engine.Engine, version version.Version, w http.Respon
 }
 
 func postStop(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
-	if err := r.ParseForm(); err != nil {
-		return nil
+	if err := parseForm(r); err != nil {
+		return err
 	}
 
 	glog.V(1).Infof("Stop the POD name is %s", r.Form.Get("podName"))
@@ -362,8 +362,8 @@ func postStop(eng *engine.Engine, version version.Version, w http.ResponseWriter
 }
 
 func postExec(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
-	if err := r.ParseForm(); err != nil {
-		return nil
+	if err := parseForm(r); err != nil {
+		return err
 	}
 
 	var (
@@ -398,8 +398,8 @@ func postExec(eng *engine.Engine, version version.Version, w http.ResponseWriter
 }
 
 func postAttach(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
-	if err := r.ParseForm(); err != nil {
-		return nil
+	if err := parseForm(r); err != nil {
+		return err
 	}
 
 	var (
@@ -455,8 +455,8 @@ func postAuth(eng *engine.Engine, version version.Version, w http.ResponseWriter
 }
 
 func postContainerCreate(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
-	if err := r.ParseForm(); err != nil {
-		return nil
+	if err := parseForm(r); err != nil {
+		return err
 	}
 
 	glog.V(1).Infof("Image name is %s", r.Form.Get("imageName"))
@@ -485,8 +485,8 @@ func postContainerCreate(eng *engine.Engine, version version.Version, w http.Res
 }
 
 func postContainerCommit(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
-	if err := r.ParseForm(); err != nil {
-		return nil
+	if err := parseForm(r); err != nil {
+		return err
 	}
 
 	glog.V(1).Infof("container ID is %s", r.Form.Get("container"))
@@ -515,8 +515,8 @@ func postContainerCommit(eng *engine.Engine, version version.Version, w http.Res
 }
 
 func postContainerRename(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
-	if err := r.ParseForm(); err != nil {
-		return nil
+	if err := parseForm(r); err != nil {
+		return err
 	}
 
 	job := eng.Job("rename", r.Form.Get("oldName"), r.Form.Get("newName"))
@@ -544,14 +544,22 @@ func postContainerRename(eng *engine.Engine, version version.Version, w http.Res
 }
 
 func postPodCreate(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
-	if err := r.ParseForm(); err != nil {
-		return nil
+	if err := parseForm(r); err != nil {
+		return err
 	}
 
-	podArgs := r.Form.Get("podArgs")
+	if r.Body != nil && (r.ContentLength > 0 || r.ContentLength == -1) {
+		if err := checkForJson(r); err != nil {
+			return err
+		}
+	} else {
+		return fmt.Errorf("no provided podfile data")
+	}
+
+	podArgs, _ := ioutil.ReadAll(r.Body)
 	autoRemove := r.Form.Get("remove")
-	glog.V(1).Infof("Args string is %s, %s", podArgs, autoRemove)
-	job := eng.Job("podCreate", podArgs, autoRemove)
+	glog.V(1).Infof("Args string is %s, %s", string(podArgs), autoRemove)
+	job := eng.Job("podCreate", string(podArgs), autoRemove)
 	stdoutBuf := bytes.NewBuffer(nil)
 
 	job.Stdout.Add(stdoutBuf)
@@ -578,8 +586,8 @@ func postPodCreate(eng *engine.Engine, version version.Version, w http.ResponseW
 }
 
 func postPodStart(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
-	if err := r.ParseForm(); err != nil {
-		return nil
+	if err := parseForm(r); err != nil {
+		return err
 	}
 
 	ttyTag := r.Form.Get("tag")
@@ -641,11 +649,19 @@ func postPodStart(eng *engine.Engine, version version.Version, w http.ResponseWr
 }
 
 func postPodRun(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
-	if err := r.ParseForm(); err != nil {
-		return nil
+	if err := parseForm(r); err != nil {
+		return err
+	}
+	if r.Body != nil && (r.ContentLength > 0 || r.ContentLength == -1) {
+		if err := checkForJson(r); err != nil {
+			return err
+		}
+	} else {
+		return fmt.Errorf("no provided podfile data")
 	}
 
-	job := eng.Job("podRun", r.Form.Get("podArgs"), r.Form.Get("remove"))
+	podArgs, _ := ioutil.ReadAll(r.Body)
+	job := eng.Job("podRun", string(podArgs), r.Form.Get("remove"))
 	stdoutBuf := bytes.NewBuffer(nil)
 	job.Stdout.Add(stdoutBuf)
 
@@ -671,8 +687,8 @@ func postPodRun(eng *engine.Engine, version version.Version, w http.ResponseWrit
 }
 
 func postVmCreate(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
-	if err := r.ParseForm(); err != nil {
-		return nil
+	if err := parseForm(r); err != nil {
+		return err
 	}
 
 	job := eng.Job("vmCreate", r.Form.Get("cpu"), r.Form.Get("mem"))
@@ -701,9 +717,9 @@ func postVmCreate(eng *engine.Engine, version version.Version, w http.ResponseWr
 	return writeJSONEnv(w, http.StatusOK, env)
 }
 
-func postVmKill(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
-	if err := r.ParseForm(); err != nil {
-		return nil
+func delVm(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+	if err := parseForm(r); err != nil {
+		return err
 	}
 
 	job := eng.Job("vmKill", r.Form.Get("vm"))
@@ -733,9 +749,10 @@ func postVmKill(eng *engine.Engine, version version.Version, w http.ResponseWrit
 }
 
 func postImageCreate(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
-	if err := r.ParseForm(); err != nil {
-		return nil
+	if err := parseForm(r); err != nil {
+		return err
 	}
+
 	authEncoded := r.Header.Get("X-Registry-Auth")
 	authConfig := &cliconfig.AuthConfig{}
 	if authEncoded != "" {
@@ -772,11 +789,11 @@ func postImageCreate(eng *engine.Engine, version version.Version, w http.Respons
 }
 
 func postImageBuild(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
-	if err := r.ParseForm(); err != nil {
-		return nil
+	if err := parseForm(r); err != nil {
+		return err
 	}
-	w.Header().Set("Content-Type", "application/json")
 
+	w.Header().Set("Content-Type", "application/json")
 	glog.V(1).Infof("Image name is %s", r.Form.Get("name"))
 	job := eng.Job("build", r.Form.Get("name"))
 	stdoutBuf := bytes.NewBuffer(nil)
@@ -850,9 +867,10 @@ func postImagePush(eng *engine.Engine, version version.Version, w http.ResponseW
 }
 
 func postTtyResize(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
-	if err := r.ParseForm(); err != nil {
-		return nil
+	if err := parseForm(r); err != nil {
+		return err
 	}
+
 	job := eng.Job("tty", r.Form.Get("id"), r.Form.Get("tag"), r.Form.Get("h"), r.Form.Get("w"))
 	if err := job.Run(); err != nil {
 		return err
@@ -860,9 +878,9 @@ func postTtyResize(eng *engine.Engine, version version.Version, w http.ResponseW
 	return nil
 }
 
-func postPodRemove(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
-	if err := r.ParseForm(); err != nil {
-		return nil
+func delPod(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+	if err := parseForm(r); err != nil {
+		return err
 	}
 
 	glog.V(1).Infof("Pod(%s) is process to be removed", r.Form.Get("podId"))
@@ -892,9 +910,9 @@ func postPodRemove(eng *engine.Engine, version version.Version, w http.ResponseW
 	return writeJSONEnv(w, http.StatusOK, env)
 }
 
-func postImagesRemove(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
-	if err := r.ParseForm(); err != nil {
-		return nil
+func delImages(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+	if err := parseForm(r); err != nil {
+		return err
 	}
 
 	glog.V(1).Infof("Image(%s) is process to be removed", r.Form.Get("imageId"))
@@ -931,8 +949,8 @@ func postImagesRemove(eng *engine.Engine, version version.Version, w http.Respon
 }
 
 func getServices(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
-	if err := r.ParseForm(); err != nil {
-		return nil
+	if err := parseForm(r); err != nil {
+		return err
 	}
 
 	job := eng.Job("serviceList", r.Form.Get("podId"))
@@ -956,8 +974,8 @@ func getServices(eng *engine.Engine, version version.Version, w http.ResponseWri
 }
 
 func postServiceAdd(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
-	if err := r.ParseForm(); err != nil {
-		return nil
+	if err := parseForm(r); err != nil {
+		return err
 	}
 
 	job := eng.Job("serviceAdd", r.Form.Get("podId"), r.Form.Get("services"))
@@ -975,8 +993,8 @@ func postServiceAdd(eng *engine.Engine, version version.Version, w http.Response
 }
 
 func postServiceUpdate(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
-	if err := r.ParseForm(); err != nil {
-		return nil
+	if err := parseForm(r); err != nil {
+		return err
 	}
 
 	job := eng.Job("serviceUpdate", r.Form.Get("podId"), r.Form.Get("services"))
@@ -993,9 +1011,9 @@ func postServiceUpdate(eng *engine.Engine, version version.Version, w http.Respo
 	return writeJSONEnv(w, http.StatusOK, env)
 }
 
-func postServiceDelete(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
-	if err := r.ParseForm(); err != nil {
-		return nil
+func delService(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+	if err := parseForm(r); err != nil {
+		return err
 	}
 
 	job := eng.Job("serviceDelete", r.Form.Get("podId"), r.Form.Get("services"))
@@ -1097,39 +1115,40 @@ func createRouter(eng *engine.Engine, logging, enableCors bool, corsHeaders stri
 	}
 	m := map[string]map[string]HttpApiFunc{
 		"GET": {
-			"/info":           getInfo,
-			"/pod/info":       getPodInfo,
 			"/container/info": getContainerInfo,
 			"/container/logs": getContainerLogs,
-			"/version":        getVersion,
-			"/list":           getList,
+			"/info":           getInfo,
 			"/images/get":     getImages,
+			"/list":           getList,
+			"/pod/info":       getPodInfo,
 			"/service/list":   getServices,
+			"/version":        getVersion,
 		},
 		"POST": {
 			"/auth":             postAuth,
+			"/attach":           postAttach,
 			"/container/create": postContainerCreate,
 			"/container/commit": postContainerCommit,
 			"/container/rename": postContainerRename,
+			"/exec":             postExec,
 			"/image/create":     postImageCreate,
 			"/image/build":      postImageBuild,
 			"/image/push":       postImagePush,
 			"/pod/create":       postPodCreate,
 			"/pod/start":        postPodStart,
-			"/pod/remove":       postPodRemove,
 			"/pod/run":          postPodRun,
 			"/pod/stop":         postStop,
-			"/vm/create":        postVmCreate,
-			"/vm/kill":          postVmKill,
-			"/exec":             postExec,
-			"/attach":           postAttach,
-			"/tty/resize":       postTtyResize,
-			"/images/remove":    postImagesRemove,
 			"/service/add":      postServiceAdd,
 			"/service/update":   postServiceUpdate,
-			"/service/delete":   postServiceDelete,
+			"/tty/resize":       postTtyResize,
+			"/vm/create":        postVmCreate,
 		},
-		"DELETE": {},
+		"DELETE": {
+			"/image":   delImages,
+			"/pod":     delPod,
+			"/service": delService,
+			"/vm":      delVm,
+		},
 		"OPTIONS": {
 			"": optionsHandler,
 		},

@@ -1,6 +1,7 @@
 package client
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/url"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/runv/hypervisor/pod"
 	"github.com/hyperhq/runv/hypervisor/types"
 
 	gflag "github.com/jessevdk/go-flags"
@@ -52,16 +54,19 @@ func (cli *HyperClient) HyperCmdPod(args ...string) error {
 
 func (cli *HyperClient) CreatePod(jsonbody string, remove bool) (string, error) {
 	v := url.Values{}
-	v.Set("podArgs", jsonbody)
 	if remove {
 		v.Set("remove", "yes")
 	}
-	body, statusCode, err := readBody(cli.call("POST", "/pod/create?"+v.Encode(), nil, nil))
+	var tmpPod pod.UserPod
+	if err := json.Unmarshal([]byte(jsonbody), &tmpPod); err != nil {
+		return "", err
+	}
+	body, statusCode, err := readBody(cli.call("POST", "/pod/create?"+v.Encode(), tmpPod, nil))
 	if statusCode == 404 {
 		if err := cli.PullImages(jsonbody); err != nil {
 			return "", fmt.Errorf("failed to pull images: %s", err.Error())
 		}
-		if body, _, err = readBody(cli.call("POST", "/pod/create?"+v.Encode(), nil, nil)); err != nil {
+		if body, _, err = readBody(cli.call("POST", "/pod/create?"+v.Encode(), tmpPod, nil)); err != nil {
 			return "", err
 		}
 	} else if err != nil {
@@ -219,18 +224,21 @@ func (cli *HyperClient) startPodWithoutTty(v *url.Values) (string, error) {
 
 func (cli *HyperClient) RunPod(podstring string, autoremove bool) (string, error) {
 	v := url.Values{}
-	v.Set("podArgs", podstring)
 	if autoremove == true {
 		v.Set("remove", "yes")
 	} else {
 		v.Set("remove", "no")
 	}
-	body, statusCode, err := readBody(cli.call("POST", "/pod/run?"+v.Encode(), nil, nil))
+	var tmpPod pod.UserPod
+	if err := json.Unmarshal([]byte(podstring), &tmpPod); err != nil {
+		return "", err
+	}
+	body, statusCode, err := readBody(cli.call("POST", "/pod/run?"+v.Encode(), tmpPod, nil))
 	if statusCode == 404 {
 		if err := cli.PullImages(podstring); err != nil {
 			return "", fmt.Errorf("failed to pull images: %s", err.Error())
 		}
-		if body, _, err = readBody(cli.call("POST", "/pod/run?"+v.Encode(), nil, nil)); err != nil {
+		if body, _, err = readBody(cli.call("POST", "/pod/run?"+v.Encode(), tmpPod, nil)); err != nil {
 			return "", err
 		}
 	} else if err != nil {

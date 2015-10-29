@@ -45,7 +45,7 @@ func (cli *HyperClient) HyperCmdRmi(args ...string) error {
 		v.Set("imageId", imageId)
 		v.Set("noprune", noprune)
 		v.Set("force", force)
-		body, _, err := readBody(cli.call("POST", "/images/remove?"+v.Encode(), nil, nil))
+		body, _, err := readBody(cli.call("DELETE", "/image?"+v.Encode(), nil, nil))
 		if err != nil {
 			fmt.Fprintf(cli.err, "Error remove the image(%s): %s\n", imageId, err.Error())
 			continue
