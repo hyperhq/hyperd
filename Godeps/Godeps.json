@@ -1,6 +1,6 @@
 {
 	"ImportPath": "github.com/hyperhq/hyper",
-	"GoVersion": "go1.4.2",
+	"GoVersion": "go1.5",
 	"Deps": [
 		{
 			"ImportPath": "code.google.com/p/gosqlite/sqlite3",
@@ -106,6 +106,10 @@
 			"ImportPath": "github.com/jessevdk/go-flags",
 			"Comment": "v1-302-g1acbbaf",
 			"Rev": "1acbbaff2f347c412a0c7884873bd72cc9c1f5b4"
+		},
+		{
+			"ImportPath": "github.com/kardianos/osext",
+			"Rev": "6e7f843663477789fac7c02def0d0909e969b4e5"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/specs",
