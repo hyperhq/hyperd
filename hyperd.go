@@ -4,13 +4,12 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"os/exec"
 	"os/signal"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
 
+	"github.com/Unknwon/goconfig"
 	"github.com/hyperhq/hyper/daemon"
 	"github.com/hyperhq/hyper/docker"
 	"github.com/hyperhq/hyper/engine"
@@ -20,8 +19,8 @@ import (
 	"github.com/hyperhq/runv/driverloader"
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/lib/glog"
-
-	"github.com/Unknwon/goconfig"
+	runvutils "github.com/hyperhq/runv/lib/utils"
+	"github.com/kardianos/osext"
 )
 
 func main() {
@@ -43,29 +42,15 @@ func main() {
 	}
 
 	if !*fnd {
-		cmd, err := exec.LookPath(os.Args[0])
+		path, err := osext.Executable()
 		if err != nil {
-			fmt.Println("cannot find path of arg0 ", os.Args[0])
-			os.Exit(-1)
-		}
-		cmd, err = filepath.Abs(cmd)
-		if err != nil {
-			fmt.Println("cannot find absolute path of arg0 ", os.Args[0])
+			fmt.Printf("cannot find self executable path for %s: %v\n", os.Args[0], err)
 			os.Exit(-1)
 		}
 
-		pid, err := utils.Daemonize()
+		_, err = runvutils.ExecInDaemon(path, append(os.Args, "--nondaemon"))
 		if err != nil {
 			fmt.Println("faile to daemonize hyperd")
-			os.Exit(-1)
-		}
-		if pid > 0 {
-			return
-		}
-
-		err = syscall.Exec(cmd, append(os.Args, "--nondaemon"), os.Environ())
-		if err != nil {
-			fmt.Println("fail to exec in nondaemon mode: ", err.Error())
 			os.Exit(-1)
 		}
 
