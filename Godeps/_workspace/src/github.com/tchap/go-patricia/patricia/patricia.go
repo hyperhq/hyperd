@@ -263,7 +263,12 @@ func (trie *Trie) Delete(key Prefix) (deleted bool) {
 
 	// Remove the node if it has no items.
 	if node.empty() {
-		parent.children.remove(node)
+		// If at the root of the trie, reset
+		if parent == nil {
+			node.reset()
+		} else {
+			parent.children.remove(node)
+		}
 	}
 
 	return true
@@ -291,8 +296,7 @@ func (trie *Trie) DeleteSubtree(prefix Prefix) (deleted bool) {
 
 	// If we are in the root of the trie, reset the trie.
 	if parent == nil {
-		root.prefix = nil
-		root.children = newSparseChildList(trie.maxPrefixPerNode)
+		root.reset()
 		return true
 	}
 
@@ -312,6 +316,11 @@ func (trie *Trie) empty() bool {
 	})
 
 	return isEmpty
+}
+
+func (trie *Trie) reset() {
+	trie.prefix = nil
+	trie.children = newSparseChildList(trie.maxPrefixPerNode)
 }
 
 func (trie *Trie) put(key Prefix, item Item, replace bool) (inserted bool) {

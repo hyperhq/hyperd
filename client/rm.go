@@ -40,7 +40,7 @@ func (cli *HyperClient) HyperCmdRm(args ...string) error {
 func (cli *HyperClient) RmPod(id string) error {
 	v := url.Values{}
 	v.Set("podId", id)
-	body, _, err := readBody(cli.call("POST", "/pod/remove?"+v.Encode(), nil, nil))
+	body, _, err := readBody(cli.call("DELETE", "/pod?"+v.Encode(), nil, nil))
 	if err != nil {
 		return fmt.Errorf("Error to remove pod(%s), %s", id, err.Error())
 	}

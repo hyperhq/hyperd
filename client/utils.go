@@ -50,7 +50,7 @@ func (cli *HyperClient) encodeData(data interface{}) (*bytes.Buffer, error) {
 }
 
 func (cli *HyperClient) clientRequest(method, path string, in io.Reader, headers map[string][]string) (io.ReadCloser, string, int, error) {
-	expectedPayload := (method == "POST" || method == "PUT")
+	expectedPayload := (method == "POST" || method == "PUT" || method == "DELETE")
 	if expectedPayload && in == nil {
 		in = bytes.NewReader([]byte{})
 	}

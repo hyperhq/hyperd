@@ -90,3 +90,21 @@ func TestTrie_RandomKitchenSink(t *testing.T) {
 		getAndDelete(k, v)
 	}
 }
+
+// Make sure Delete that affects the root node works.
+// This was panicking when Delete was broken.
+func TestTrie_DeleteRoot(t *testing.T) {
+	trie := NewTrie()
+
+	v := testData{"aba", 0, success}
+
+	t.Logf("INSERT prefix=%v, item=%v, success=%v", v.key, v.value, v.retVal)
+	if ok := trie.Insert(Prefix(v.key), v.value); ok != v.retVal {
+		t.Errorf("Unexpected return value, expected=%v, got=%v", v.retVal, ok)
+	}
+
+	t.Logf("DELETE prefix=%v, item=%v, success=%v", v.key, v.value, v.retVal)
+	if ok := trie.Delete(Prefix(v.key)); ok != v.retVal {
+		t.Errorf("Unexpected return value, expected=%v, got=%v", v.retVal, ok)
+	}
+}

@@ -79,7 +79,9 @@ func (list *sparseChildList) replace(b byte, child *Trie) {
 func (list *sparseChildList) remove(child *Trie) {
 	for i, node := range list.children {
 		if node.prefix[0] == child.prefix[0] {
-			list.children = append(list.children[:i], list.children[i+1:]...)
+			list.children, list.children[len(list.children)-1] =
+				append(list.children[:i], list.children[i+1:]...),
+				nil
 			return
 		}
 	}
