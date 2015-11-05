@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/hyperhq/hyper/engine"
 
@@ -74,6 +75,7 @@ func (cli *HyperClient) HyperCmdList(args ...string) error {
 		return fmt.Errorf("Found an error while getting %s list: %s", item, remoteInfo.Get("Error"))
 	}
 
+	w := tabwriter.NewWriter(cli.out, 20, 1, 3, ' ', 0)
 	if item == "vm" {
 		vmResponse = remoteInfo.GetList("vmData")
 	}
@@ -86,27 +88,23 @@ func (cli *HyperClient) HyperCmdList(args ...string) error {
 
 	//fmt.Printf("Item is %s\n", item)
 	if item == "vm" {
-		fmt.Printf("%15s%20s\n", "VM name", "Status")
+		fmt.Fprintln(w, "VM name\tStatus")
 		for _, vm := range vmResponse {
 			fields := strings.Split(vm, ":")
-			fmt.Printf("%15s%20s\n", fields[0], fields[2])
+			fmt.Fprintf(w, "%s\t%s\n", fields[0], fields[2])
 		}
 	}
 
 	if item == "pod" {
-		fmt.Printf("%15s%30s%20s%10s\n", "POD ID", "POD Name", "VM name", "Status")
+		fmt.Fprintln(w, "POD ID\tPOD Name\tVM name\tStatus")
 		for _, p := range podResponse {
 			fields := strings.Split(p, ":")
-			var podName = fields[1]
-			if len(fields[1]) > 27 {
-				podName = fields[1][:27]
-			}
-			fmt.Printf("%15s%30s%20s%10s\n", fields[0], podName, fields[2], fields[3])
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", fields[0], fields[1], fields[2], fields[3])
 		}
 	}
 
 	if item == "container" {
-		fmt.Printf("%-66s%-20s%15s%10s\n", "Container ID", "Name", "POD ID", "Status")
+		fmt.Fprintln(w, "Container ID\tName\tPOD ID\tStatus")
 		for _, c := range containerResponse {
 			fields := strings.Split(c, ":")
 			name := fields[1]
@@ -115,8 +113,9 @@ func (cli *HyperClient) HyperCmdList(args ...string) error {
 					name = name[1:]
 				}
 			}
-			fmt.Printf("%-66s%-20s%15s%10s\n", fields[0], name, fields[2], fields[3])
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", fields[0], name, fields[2], fields[3])
 		}
 	}
+	w.Flush()
 	return nil
 }
