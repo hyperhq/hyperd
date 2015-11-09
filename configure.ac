@@ -24,6 +24,12 @@ fi
 
 # Platform specific setup
 AC_CANONICAL_HOST
+
+case $host_os in
+	linux*) AM_CONDITIONAL([ON_LINUX], [ true  ]) ;;
+	*)      AM_CONDITIONAL([ON_LINUX], [ false ]) ;;
+esac
+
 # Check for which host we are on and setup a few things
 # specifically based on the host
 AC_CHECK_PROG([has_virtualbox], [vboxmanage], [yes], [no])
