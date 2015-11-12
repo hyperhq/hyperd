@@ -65,7 +65,7 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 		podJson, err = cli.JsonFromFile(opts.PodFile, opts.Yaml, false)
 	} else if opts.K8s != "" {
 		attach = opts.Attach
-		podJson, err = cli.JsonFromFile(opts.K8s, opts.Yaml, false)
+		podJson, err = cli.JsonFromFile(opts.K8s, opts.Yaml, true)
 	} else {
 		if len(args) == 0 {
 			return fmt.Errorf("%s: \"run\" requires a minimum of 1 argument, please provide the image.", os.Args[0])
