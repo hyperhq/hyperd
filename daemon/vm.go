@@ -13,9 +13,10 @@ import (
 
 func (daemon *Daemon) CmdVmCreate(job *engine.Job) (err error) {
 	var (
-		vm  *hypervisor.Vm
-		cpu = 1
-		mem = 128
+		vm    *hypervisor.Vm
+		cpu   = 1
+		mem   = 128
+		async = false
 	)
 
 	if job.Args[0] != "" {
@@ -32,20 +33,28 @@ func (daemon *Daemon) CmdVmCreate(job *engine.Job) (err error) {
 		}
 	}
 
+	if job.Args[2] == "yes" { //async
+		async = true
+	}
+
 	vm, err = daemon.StartVm("", cpu, mem, false, 0)
 	if err != nil {
 		return err
 	}
 
-	defer func() {
+	cleanup := func() {
 		if err != nil {
 			daemon.KillVm(vm.Id)
 		}
-	}()
+	}
 
-	err = daemon.WaitVmStart(vm)
-	if err != nil {
-		return err
+	defer cleanup()
+
+	if !async {
+		err = daemon.WaitVmStart(vm)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Prepare the VM status to client

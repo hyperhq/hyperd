@@ -691,7 +691,7 @@ func postVmCreate(eng *engine.Engine, version version.Version, w http.ResponseWr
 		return err
 	}
 
-	job := eng.Job("vmCreate", r.Form.Get("cpu"), r.Form.Get("mem"))
+	job := eng.Job("vmCreate", r.Form.Get("cpu"), r.Form.Get("mem"), r.Form.Get("async"))
 	stdoutBuf := bytes.NewBuffer(nil)
 
 	job.Stdout.Add(stdoutBuf)

@@ -2,6 +2,8 @@ package client
 
 import (
 	"fmt"
+	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/hyperhq/hyper/engine"
@@ -22,36 +24,62 @@ func (cli *HyperClient) HyperCmdVm(args ...string) error {
 		}
 	}
 
-	// Only run a new VM
-	body, _, err := readBody(cli.call("POST", "/vm/create", nil, nil))
-	if err != nil {
-		return err
-	}
-	out := engine.NewOutput()
-	remoteInfo, err := out.AddEnv()
+	id, err := cli.CreateVm(0, 0, false)
 	if err != nil {
 		return err
 	}
 
-	if _, err := out.Write(body); err != nil {
-		return fmt.Errorf("Error reading remote info: %s", err)
+	fmt.Printf("New VM id is %s\n", id)
+
+	return nil
+}
+
+func (cli *HyperClient) CreateVm(cpu, mem int, async bool) (id string, err error) {
+	id = ""
+	err = nil
+	var (
+		body       []byte
+		remoteInfo *engine.Env
+	)
+
+	v := url.Values{}
+	if cpu > 0 {
+		v.Set("cpu", strconv.Itoa(cpu))
+	}
+	if mem > 0 {
+		v.Set("mem", strconv.Itoa(mem))
+	}
+	if async {
+		v.Set("async", "yes")
+	}
+
+	body, _, err = readBody(cli.call("POST", "/vm/create?"+v.Encode(), nil, nil))
+	if err != nil {
+		return
+	}
+
+	out := engine.NewOutput()
+	remoteInfo, err = out.AddEnv()
+	if err != nil {
+		return
+	}
+
+	if _, err = out.Write(body); err != nil {
+		err = fmt.Errorf("Error reading remote info: %v", err)
+		return
 	}
 	out.Close()
 	errCode := remoteInfo.GetInt("Code")
-	if errCode == types.E_OK {
-		//fmt.Println("VM is successful to start!")
-	} else {
-		// case types.E_CONTEXT_INIT_FAIL:
-		// case types.E_DEVICE_FAIL:
-		// case types.E_QMP_INIT_FAIL:
-		// case types.E_QMP_COMMAND_FAIL:
+	if errCode != types.E_OK {
 		if errCode != types.E_BAD_REQUEST &&
 			errCode != types.E_FAILED {
-			return fmt.Errorf("Error code is %d", errCode)
+			err = fmt.Errorf("Error code is %d", errCode)
 		} else {
-			return fmt.Errorf("Cause is %s", remoteInfo.Get("Cause"))
+			err = fmt.Errorf("Cause is %s", remoteInfo.Get("Cause"))
 		}
+	} else {
+		id = remoteInfo.Get("ID")
 	}
-	fmt.Printf("New VM id is %s\n", remoteInfo.Get("ID"))
-	return nil
+
+	return
 }
