@@ -95,24 +95,39 @@ func (d *Driver) BaseImage() string {
 	return d.baseVdi
 }
 
-func (d *Driver) Setup() error {
+func (d *Driver) Setup() (err error) {
+	var (
+		vm        *hypervisor.Vm
+		ids       []string
+		parentIds []string
+	)
 	if d.daemon == nil {
-		daemon, err := GetDaemon()
+		d.daemon, err = GetDaemon()
 		if err != nil {
 			return err
 		}
-		d.daemon = daemon
 	}
-	if _, err := d.daemon.StartVm(d.pullVm, 1, 64, false, types.VM_KEEP_AFTER_SHUTDOWN); err != nil {
+	vm, err = d.daemon.StartVm(d.pullVm, 1, 64, false, types.VM_KEEP_AFTER_SHUTDOWN)
+	if err != nil {
 		glog.Errorf(err.Error())
+		return err
+	}
+	defer func() {
+		if err != nil {
+			d.daemon.KillVm(vm.Id)
+		}
+	}()
+
+	if err = d.daemon.WaitVmStart(vm); err != nil {
+		glog.Error(err)
 		return err
 	}
 
-	if err := virtualbox.RegisterDisk(d.pullVm, d.pullVm, d.BaseImage(), 4); err != nil {
+	if err = virtualbox.RegisterDisk(d.pullVm, d.pullVm, d.BaseImage(), 4); err != nil {
 		glog.Errorf(err.Error())
 		return err
 	}
-	ids, err := loadIds(path.Join(d.RootPath(), "layers"))
+	ids, err = loadIds(path.Join(d.RootPath(), "layers"))
 	if err != nil {
 		return err
 	}
@@ -121,7 +136,7 @@ func (d *Driver) Setup() error {
 		if d.disks[id] == true {
 			continue
 		}
-		parentIds, err := getParentIds(d.RootPath(), id)
+		parentIds, err = getParentIds(d.RootPath(), id)
 		if err != nil {
 			glog.Warningf(err.Error())
 			continue
