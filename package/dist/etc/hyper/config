@@ -1,0 +1,5 @@
+Kernel=/var/lib/hyper/kernel
+Initrd=/var/lib/hyper/hyper-initrd.img
+Bios=/var/lib/hyper/bios-qboot.bin
+Cbfs=/var/lib/hyper/cbfs-qboot.rom
+#StorageDriver=overlay
