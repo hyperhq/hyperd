@@ -1,0 +1,25 @@
+{
+        "id": "centos-rpm-build",
+        "containers" : [{
+            "name": "centos",
+            "image": "hyperhq/centos_builder:latest",
+            "command": ["su", "makerpm", "-c", "rpmbuild -ba hyper.spec"],
+            "workdir": "/home/makerpm/rpmbuild/SPECS",
+            "volumes": [{
+                "volume": "rpmroot",
+                "path": "/home/makerpm/rpmbuild",
+                "readOnly": false
+             }]
+        }],
+        "resource": {
+            "vcpu": 2,
+            "memory": 1024
+        },
+        "files": [],
+        "volumes": [{
+            "name": "rpmroot",
+            "source": "%PROJECT_ROOT%/package/centos/rpm",
+            "driver": "vfs"
+        }],
+        "tty": true
+}
