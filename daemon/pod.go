@@ -724,6 +724,10 @@ func (daemon *Daemon) StartPod(podId, podArgs, vmId string, config interface{}, 
 		return -1, "", err
 	}
 
+	if p.vm != nil {
+		return -1, "", fmt.Errorf("pod %s is already running", podId)
+	}
+
 	vmResponse, err := p.Start(daemon, vmId, lazy, autoremove, keep, streams)
 	if err != nil {
 		return -1, "", err

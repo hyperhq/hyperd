@@ -64,6 +64,6 @@ func (daemon *Daemon) StopPod(podId, stopVm string) (int, string, error) {
 	if pod.status.Autoremove == true {
 		daemon.CleanPod(podId)
 	}
-
+	pod.vm = nil
 	return vmResponse.Code, vmResponse.Cause, nil
 }
