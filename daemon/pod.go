@@ -476,6 +476,20 @@ func (p *Pod) PrepareServices() error {
 	return err
 }
 
+/***
+  PrepareDNS() Set the resolv.conf of host to each container, except the following cases:
+
+  - if the pod has a `dns` field with values, the pod will follow the dns setup, and daemon
+    won't insert resolv.conf file into any containers
+  - if the pod has a `file` which source is uri "file:///etc/resolv.conf", this mean the user
+    will handle this file by himself/herself, daemon won't touch the dns setting even if the file
+    is not referenced by any containers. This could be a method to prevent the daemon from unwanted
+    setting the dns configuration
+  - if a container has a file config in the pod spec with `/etc/resolv.conf` as target `path`,
+    then this container won't be set as the file from hosts. Then a user can specify the content
+    of the file.
+
+ */
 func (p *Pod) PrepareDNS() (err error) {
 	err = nil
 	var (
