@@ -476,6 +476,67 @@ func (p *Pod) PrepareServices() error {
 	return err
 }
 
+func (p *Pod) PrepareDNS() (err error) {
+	err = nil
+	var (
+		resolvconf = "/etc/resolv.conf"
+		fileId     = p.id + "-resolvconf"
+	)
+
+	if p.spec == nil {
+		estr := "No Spec available for insert a DNS configuration"
+		glog.V(1).Info(estr)
+		err = fmt.Errorf(estr)
+		return
+	}
+
+	if len(p.spec.Dns) > 0 {
+		glog.V(1).Info("Already has DNS config, bypass DNS insert")
+		return
+	}
+
+	if stat, e := os.Stat(resolvconf); e != nil || !stat.Mode().IsRegular() {
+		glog.V(1).Info("Host resolv.conf is not exist or not a regular file, do not insert DNS conf")
+		return
+	}
+
+	for _, src := range p.spec.Files {
+		if src.Uri == "file:///etc/resolv.conf" {
+			glog.V(1).Info("Already has resolv.conf configured, bypass DNS insert")
+			return
+		}
+	}
+
+	p.spec.Files = append(p.spec.Files, pod.UserFile{
+		Name:     fileId,
+		Encoding: "raw",
+		Uri:      "file://" + resolvconf,
+	})
+
+	for idx, c := range p.spec.Containers {
+		insert := true
+
+		for _, f := range c.Files {
+			if f.Path == resolvconf {
+				insert = false
+				break
+			}
+		}
+
+		if !insert {
+			continue
+		}
+
+		p.spec.Containers[idx].Files = append(c.Files, pod.UserFileReference{
+			Path:     resolvconf,
+			Filename: fileId,
+			Perm:     "0644",
+		})
+	}
+
+	return
+}
+
 func (p *Pod) PrepareVolume(daemon *Daemon, sd Storage) (err error) {
 	err = nil
 	p.volumes = []*hypervisor.VolumeInfo{}
@@ -520,6 +581,11 @@ func (p *Pod) PrepareVolume(daemon *Daemon, sd Storage) (err error) {
 
 func (p *Pod) Prepare(daemon *Daemon) (err error) {
 	if err = p.PrepareServices(); err != nil {
+		return
+	}
+
+	if err = p.PrepareDNS(); err != nil {
+		glog.Warning("Fail to prepare DNS for %s: %v", p.id, err)
 		return
 	}
 
