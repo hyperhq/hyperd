@@ -84,7 +84,6 @@ func (daemon *Daemon) Install(eng *engine.Engine) error {
 		"containerInfo":     daemon.CmdContainerInfo,
 		"containerLogs":     daemon.CmdLogs,
 		"podRm":             daemon.CmdPodRm,
-		"podRun":            daemon.CmdPodRun,
 		"podStop":           daemon.CmdPodStop,
 		"vmCreate":          daemon.CmdVmCreate,
 		"vmKill":            daemon.CmdVmKill,
