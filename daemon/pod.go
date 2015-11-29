@@ -489,7 +489,7 @@ func (p *Pod) PrepareServices() error {
     then this container won't be set as the file from hosts. Then a user can specify the content
     of the file.
 
- */
+*/
 func (p *Pod) PrepareDNS() (err error) {
 	err = nil
 	var (
