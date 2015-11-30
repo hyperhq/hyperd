@@ -35,8 +35,6 @@ func (cli *HyperClient) HyperCmdVm(args ...string) error {
 }
 
 func (cli *HyperClient) CreateVm(cpu, mem int, async bool) (id string, err error) {
-	id = ""
-	err = nil
 	var (
 		body       []byte
 		remoteInfo *engine.Env
@@ -55,18 +53,18 @@ func (cli *HyperClient) CreateVm(cpu, mem int, async bool) (id string, err error
 
 	body, _, err = readBody(cli.call("POST", "/vm/create?"+v.Encode(), nil, nil))
 	if err != nil {
-		return
+		return id, err
 	}
 
 	out := engine.NewOutput()
 	remoteInfo, err = out.AddEnv()
 	if err != nil {
-		return
+		return id, err
 	}
 
 	if _, err = out.Write(body); err != nil {
 		err = fmt.Errorf("Error reading remote info: %v", err)
-		return
+		return id, err
 	}
 	out.Close()
 	errCode := remoteInfo.GetInt("Code")
@@ -81,5 +79,5 @@ func (cli *HyperClient) CreateVm(cpu, mem int, async bool) (id string, err error
 		id = remoteInfo.Get("ID")
 	}
 
-	return
+	return id, err
 }
