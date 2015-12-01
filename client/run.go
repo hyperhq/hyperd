@@ -81,6 +81,14 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 
 	t1 := time.Now()
 
+	var (
+		spec  pod.UserPod
+		async = true
+	)
+	json.Unmarshal([]byte(podJson), &spec)
+
+	vmId, err := cli.CreateVm(spec.Resource.Vcpu, spec.Resource.Memory, async)
+
 	podId, err := cli.CreatePod(podJson, opts.Remove)
 	if err != nil {
 		return err
@@ -88,7 +96,7 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 
 	fmt.Printf("POD id is %s\n", podId)
 
-	_, err = cli.StartPod(podId, "", attach)
+	_, err = cli.StartPod(podId, vmId, attach)
 	if err != nil {
 		return err
 	}

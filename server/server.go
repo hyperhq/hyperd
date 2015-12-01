@@ -648,50 +648,12 @@ func postPodStart(eng *engine.Engine, version version.Version, w http.ResponseWr
 	}
 }
 
-func postPodRun(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
-	if err := parseForm(r); err != nil {
-		return err
-	}
-	if r.Body != nil && (r.ContentLength > 0 || r.ContentLength == -1) {
-		if err := checkForJson(r); err != nil {
-			return err
-		}
-	} else {
-		return fmt.Errorf("no provided podfile data")
-	}
-
-	podArgs, _ := ioutil.ReadAll(r.Body)
-	job := eng.Job("podRun", string(podArgs), r.Form.Get("remove"))
-	stdoutBuf := bytes.NewBuffer(nil)
-	job.Stdout.Add(stdoutBuf)
-
-	if err := job.Run(); err != nil {
-		return err
-	}
-
-	var (
-		env             engine.Env
-		dat             map[string]interface{}
-		returnedJSONstr string
-	)
-	returnedJSONstr = engine.Tail(stdoutBuf, 1)
-	if err := json.Unmarshal([]byte(returnedJSONstr), &dat); err != nil {
-		return err
-	}
-
-	env.Set("ID", dat["ID"].(string))
-	env.SetInt("Code", (int)(dat["Code"].(float64)))
-	env.Set("Cause", dat["Cause"].(string))
-
-	return writeJSONEnv(w, http.StatusOK, env)
-}
-
 func postVmCreate(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
 	if err := parseForm(r); err != nil {
 		return err
 	}
 
-	job := eng.Job("vmCreate", r.Form.Get("cpu"), r.Form.Get("mem"))
+	job := eng.Job("vmCreate", r.Form.Get("cpu"), r.Form.Get("mem"), r.Form.Get("async"))
 	stdoutBuf := bytes.NewBuffer(nil)
 
 	job.Stdout.Add(stdoutBuf)
@@ -1136,7 +1098,6 @@ func createRouter(eng *engine.Engine, logging, enableCors bool, corsHeaders stri
 			"/image/push":       postImagePush,
 			"/pod/create":       postPodCreate,
 			"/pod/start":        postPodStart,
-			"/pod/run":          postPodRun,
 			"/pod/stop":         postStop,
 			"/service/add":      postServiceAdd,
 			"/service/update":   postServiceUpdate,

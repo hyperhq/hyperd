@@ -125,69 +125,6 @@ func (daemon *Daemon) CmdPodStart(job *engine.Job) error {
 	return nil
 }
 
-func (daemon *Daemon) CmdPodRun(job *engine.Job) error {
-	// we can only support 1024 Pods
-	if daemon.GetRunningPodNum() >= 1024 {
-		return fmt.Errorf("Pod full, the maximum Pod is 1024!")
-	}
-	var (
-		autoremove  bool                = false
-		tag         string              = ""
-		ttys        []*hypervisor.TtyIO = []*hypervisor.TtyIO{}
-		ttyCallback chan *types.VmResponse
-	)
-	podArgs := job.Args[0]
-	if job.Args[1] == "yes" {
-		autoremove = true
-	}
-	if len(job.Args) > 2 {
-		tag = job.Args[2]
-	}
-
-	if tag != "" {
-		glog.V(1).Info("Pod Run with client terminal tag: ", tag)
-		ttyCallback = make(chan *types.VmResponse, 1)
-		ttys = append(ttys, &hypervisor.TtyIO{
-			Stdin:     job.Stdin,
-			Stdout:    job.Stdout,
-			ClientTag: tag,
-			Callback:  ttyCallback,
-		})
-	}
-
-	podId := fmt.Sprintf("pod-%s", pod.RandStr(10, "alpha"))
-
-	glog.Info(podArgs)
-
-	var lazy bool = hypervisor.HDriver.SupportLazyMode()
-
-	daemon.PodList.Lock()
-	glog.V(2).Infof("lock PodList")
-	defer glog.V(2).Infof("unlock PodList")
-	defer daemon.PodList.Unlock()
-	code, cause, err := daemon.StartPod(podId, podArgs, "", nil, lazy, autoremove, types.VM_KEEP_NONE, ttys)
-	if err != nil {
-		glog.Error(err.Error())
-		return err
-	}
-
-	if len(ttys) > 0 {
-		<-ttyCallback
-		return nil
-	}
-
-	// Prepare the VM status to client
-	v := &engine.Env{}
-	v.Set("ID", podId)
-	v.SetInt("Code", code)
-	v.Set("Cause", cause)
-	if _, err := v.WriteTo(job.Stdout); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // I'd like to move the remain part of this file to another file.
 type Pod struct {
 	id         string
