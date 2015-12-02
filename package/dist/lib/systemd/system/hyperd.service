@@ -1,0 +1,15 @@
+[Unit]
+Description=hyperd
+Documentation=http://docs.hyper.sh
+After=network.target
+Requires=
+
+[Service]
+ExecStart=/usr/bin/hyperd
+MountFlags=slave
+LimitNOFILE=1048576
+LimitNPROC=1048576
+LimitCORE=infinity
+
+[Install]
+WantedBy=multi-user.target

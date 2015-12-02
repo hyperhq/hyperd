@@ -1,0 +1,21 @@
+# Boot kernel for KVM/XEN
+Kernel=/var/lib/hyper/kernel
+# Boot initrd for KVM/XEN
+Initrd=/var/lib/hyper/hyper-initrd.img
+# BIOS image, qboot bios will accelarate the bootup
+Bios=/var/lib/hyper/bios-qboot.bin
+# CBFS coreboot fs for boot image, if this is proviced, kernel and initrd will be ignored
+Cbfs=/var/lib/hyper/cbfs-qboot.rom
+# storage driver for hyper, valid value includes devicemapper, overlay, and aufs
+#StorageDriver=overlay
+# Bridge device for hyper, default is hyper0
+#Bridge=
+# Bridge ip address for the bridge device
+#BridgeIP=
+# if the host IP is provided, a TCP port will be listened for, same as the '--host' option
+#Host=
+# Specify the hypervisor to be kvm or xen
+#Hypervisor=kvm
+# This is only useful for hypernetes, to disable the iptables setup by hyperd
+#DisableIptables=false
+
