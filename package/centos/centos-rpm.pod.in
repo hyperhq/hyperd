@@ -3,7 +3,7 @@
         "containers" : [{
             "name": "centos",
             "image": "hyperhq/centos_builder:latest",
-            "command": ["su", "makerpm", "-c", "rpmbuild -ba hyper.spec"],
+            "command": ["bash", "/home/makerpm/rpmbuild/build.sh"],
             "workdir": "/home/makerpm/rpmbuild/SPECS",
             "volumes": [{
                 "volume": "rpmroot",
