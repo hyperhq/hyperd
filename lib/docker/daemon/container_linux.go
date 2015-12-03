@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/links"
 	"github.com/hyperhq/hyper/lib/docker/pkg/archive"
 	"github.com/hyperhq/hyper/lib/docker/pkg/directory"
@@ -16,7 +17,6 @@ import (
 	"github.com/hyperhq/hyper/lib/docker/pkg/stringid"
 	"github.com/hyperhq/hyper/lib/docker/runconfig"
 	"github.com/hyperhq/hyper/lib/docker/utils"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 const DefaultPathEnv = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"

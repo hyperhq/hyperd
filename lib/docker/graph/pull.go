@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/docker/distribution/digest"
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/cliconfig"
 	"github.com/hyperhq/hyper/lib/docker/image"
 	"github.com/hyperhq/hyper/lib/docker/pkg/progressreader"
@@ -19,7 +20,6 @@ import (
 	"github.com/hyperhq/hyper/lib/docker/pkg/transport"
 	"github.com/hyperhq/hyper/lib/docker/registry"
 	"github.com/hyperhq/hyper/lib/docker/utils"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 type ImagePullConfig struct {

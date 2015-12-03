@@ -18,6 +18,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/golang/glog"
 	hyperdaemon "github.com/hyperhq/hyper/daemon"
 	"github.com/hyperhq/hyper/lib/docker/builder/parser"
 	"github.com/hyperhq/hyper/lib/docker/daemon"
@@ -37,7 +38,6 @@ import (
 	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/types"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 func (b *Builder) readContext(context io.Reader) error {

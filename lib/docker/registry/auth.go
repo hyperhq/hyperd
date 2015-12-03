@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/cliconfig"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 type RequestAuthorization struct {

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/api/types"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 func (s *TagStore) LookupRaw(name string) ([]byte, error) {

@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/docker/docker/daemon/logger"
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/engine"
 	"github.com/hyperhq/runv/hypervisor/types"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 type logsCmdConfig struct {

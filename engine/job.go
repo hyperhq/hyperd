@@ -3,7 +3,7 @@ package engine
 import (
 	"bytes"
 	"fmt"
-	"github.com/hyperhq/runv/lib/glog"
+	"github.com/golang/glog"
 	"io"
 	"strings"
 	"sync"

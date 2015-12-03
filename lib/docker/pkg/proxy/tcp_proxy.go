@@ -5,7 +5,7 @@ import (
 	"net"
 	"syscall"
 
-	"github.com/hyperhq/runv/lib/glog"
+	"github.com/golang/glog"
 )
 
 type TCPProxy struct {

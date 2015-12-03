@@ -7,11 +7,11 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/daemon"
 	"github.com/hyperhq/hyper/lib/docker/pkg/stringid"
 	"github.com/hyperhq/hyper/lib/docker/runconfig"
 	"github.com/hyperhq/hyper/utils"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 func fixPermissions(source, destination string, uid, gid int, destExisted bool) error {

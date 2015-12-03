@@ -5,7 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/hyperhq/runv/lib/glog"
+	"github.com/golang/glog"
 )
 
 func GetTotalUsedFds() int {

@@ -1,8 +1,8 @@
 package daemon
 
 import (
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/engine"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 func (daemon *Daemon) CmdBuild(job *engine.Job) error {

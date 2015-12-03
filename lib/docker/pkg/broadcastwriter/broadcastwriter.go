@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/pkg/jsonlog"
 	"github.com/hyperhq/hyper/lib/docker/pkg/timeutils"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 // BroadcastWriter accumulate multiple io.WriteCloser by stream.

@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/graph"
 	"github.com/hyperhq/hyper/lib/docker/image"
 	"github.com/hyperhq/hyper/lib/docker/pkg/parsers"
 	"github.com/hyperhq/hyper/lib/docker/runconfig"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 func (daemon *Daemon) ContainerCreate(name string, config *runconfig.Config, hostConfig *runconfig.HostConfig) (string, []string, error) {

@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/hyperhq/runv/lib/glog"
+	"github.com/golang/glog"
 )
 
 type DevmapperLogger interface {

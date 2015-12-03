@@ -26,6 +26,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/golang/glog"
 	hyperdaemon "github.com/hyperhq/hyper/daemon"
 	"github.com/hyperhq/hyper/lib/docker/api"
 	"github.com/hyperhq/hyper/lib/docker/builder/command"
@@ -39,7 +40,6 @@ import (
 	"github.com/hyperhq/hyper/lib/docker/pkg/tarsum"
 	"github.com/hyperhq/hyper/lib/docker/runconfig"
 	"github.com/hyperhq/hyper/lib/docker/utils"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 // Environment variable interpolation will happen on these statements only.

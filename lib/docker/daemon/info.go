@@ -5,6 +5,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/api/types"
 	"github.com/hyperhq/hyper/lib/docker/dockerversion"
 	"github.com/hyperhq/hyper/lib/docker/pkg/fileutils"
@@ -13,7 +14,6 @@ import (
 	"github.com/hyperhq/hyper/lib/docker/pkg/system"
 	"github.com/hyperhq/hyper/lib/docker/registry"
 	"github.com/hyperhq/hyper/lib/docker/utils"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 func (daemon *Daemon) SystemInfo() (*types.Info, error) {

@@ -10,6 +10,7 @@ import (
 
 	"github.com/Unknwon/goconfig"
 	"github.com/docker/docker/daemon/logger/jsonfilelog"
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/engine"
 	dockertypes "github.com/hyperhq/hyper/lib/docker/api/types"
 	"github.com/hyperhq/hyper/lib/docker/graph"
@@ -19,7 +20,6 @@ import (
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/pod"
 	"github.com/hyperhq/runv/hypervisor/types"
-	"github.com/hyperhq/runv/lib/glog"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
 )

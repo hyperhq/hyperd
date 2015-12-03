@@ -5,13 +5,13 @@ import (
 	"os"
 	"strings"
 
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/engine"
 	"github.com/hyperhq/hyper/lib/sysinfo"
 	"github.com/hyperhq/hyper/types"
 	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/hypervisor"
 	runvtypes "github.com/hyperhq/runv/hypervisor/types"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 func (daemon *Daemon) CmdInfo(job *engine.Job) error {

@@ -2,9 +2,9 @@ package daemon
 
 import (
 	"fmt"
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/engine"
 	"github.com/hyperhq/runv/hypervisor/types"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 func (daemon *Daemon) CmdPodStop(job *engine.Job) error {

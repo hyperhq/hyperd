@@ -16,10 +16,10 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/nat"
 	flag "github.com/hyperhq/hyper/lib/docker/pkg/mflag"
 	"github.com/hyperhq/hyper/lib/docker/runconfig"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 const (

@@ -4,7 +4,7 @@ import (
 	"os/exec"
 	"syscall"
 
-	"github.com/hyperhq/runv/lib/glog"
+	"github.com/golang/glog"
 )
 
 const MsRemount = syscall.MS_REMOUNT

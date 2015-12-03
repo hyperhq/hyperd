@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/api/types"
 	"github.com/hyperhq/hyper/lib/docker/graph"
 	"github.com/hyperhq/hyper/lib/docker/image"
 	"github.com/hyperhq/hyper/lib/docker/pkg/parsers"
 	"github.com/hyperhq/hyper/lib/docker/pkg/stringid"
 	"github.com/hyperhq/hyper/lib/docker/utils"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 // FIXME: remove ImageDelete's dependency on Daemon, then move to graph/

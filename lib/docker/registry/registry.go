@@ -17,12 +17,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/dockerversion"
 	"github.com/hyperhq/hyper/lib/docker/pkg/parsers/kernel"
 	"github.com/hyperhq/hyper/lib/docker/pkg/timeoutconn"
 	"github.com/hyperhq/hyper/lib/docker/pkg/transport"
 	"github.com/hyperhq/hyper/lib/docker/pkg/useragent"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 var (

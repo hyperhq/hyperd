@@ -6,9 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/pkg/archive"
 	"github.com/hyperhq/hyper/lib/docker/pkg/system"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 var chrootArchiver = &archive.Archiver{Untar: Untar}

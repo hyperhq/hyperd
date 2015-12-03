@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/api"
 	"github.com/hyperhq/hyper/lib/docker/builder/parser"
 	"github.com/hyperhq/hyper/lib/docker/cliconfig"
@@ -23,7 +24,6 @@ import (
 	"github.com/hyperhq/hyper/lib/docker/runconfig"
 	"github.com/hyperhq/hyper/lib/docker/utils"
 	rand "github.com/hyperhq/hyper/utils"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 // whitelist of commands allowed for a commit/import

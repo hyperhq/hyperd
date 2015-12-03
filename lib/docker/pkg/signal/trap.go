@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"syscall"
 
-	"github.com/hyperhq/runv/lib/glog"
+	"github.com/golang/glog"
 )
 
 // Trap sets up a simplified signal "trap", appropriate for common

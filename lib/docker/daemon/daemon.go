@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/api"
 	"github.com/hyperhq/hyper/lib/docker/daemon/events"
 	"github.com/hyperhq/hyper/lib/docker/daemon/graphdriver"
@@ -33,7 +34,6 @@ import (
 	"github.com/hyperhq/hyper/lib/docker/registry"
 	"github.com/hyperhq/hyper/lib/docker/runconfig"
 	"github.com/hyperhq/hyper/lib/docker/trust"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 var (

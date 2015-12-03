@@ -7,12 +7,12 @@ import (
 	"path"
 	"strings"
 
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/daemon"
 	"github.com/hyperhq/hyper/lib/docker/daemon/graphdriver"
 	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/types"
-	"github.com/hyperhq/runv/lib/glog"
 	"github.com/hyperhq/runv/lib/govbox"
 )
 

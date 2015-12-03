@@ -19,11 +19,11 @@ import (
 	"time"
 
 	"github.com/docker/libcontainer/label"
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/daemon/graphdriver"
 	"github.com/hyperhq/hyper/lib/docker/pkg/devicemapper"
 	"github.com/hyperhq/hyper/lib/docker/pkg/parsers"
 	"github.com/hyperhq/hyper/lib/docker/pkg/units"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 var (

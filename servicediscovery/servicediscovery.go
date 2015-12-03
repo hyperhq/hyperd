@@ -10,10 +10,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/pod"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 var (

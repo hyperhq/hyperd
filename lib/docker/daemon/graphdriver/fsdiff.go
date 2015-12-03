@@ -3,10 +3,10 @@ package graphdriver
 import (
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/pkg/archive"
 	"github.com/hyperhq/hyper/lib/docker/pkg/chrootarchive"
 	"github.com/hyperhq/hyper/lib/docker/pkg/ioutils"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 // naiveDiffDriver takes a ProtoDriver and adds the

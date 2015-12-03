@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/docker/docker/pkg/term/winconsole"
-	"github.com/hyperhq/runv/lib/glog"
+	"github.com/golang/glog"
 )
 
 // State holds the console mode for the terminal.

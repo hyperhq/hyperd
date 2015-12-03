@@ -18,7 +18,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/hyperhq/hyper/lib/docker/opts"
 
-	"github.com/hyperhq/runv/lib/glog"
+	"github.com/golang/glog"
 )
 
 var (

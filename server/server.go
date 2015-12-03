@@ -18,6 +18,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/engine"
 	dockertypes "github.com/hyperhq/hyper/lib/docker/api/types"
 	"github.com/hyperhq/hyper/lib/docker/cliconfig"
@@ -27,7 +28,6 @@ import (
 	"github.com/hyperhq/hyper/lib/version"
 	"github.com/hyperhq/hyper/types"
 	"github.com/hyperhq/hyper/utils"
-	"github.com/hyperhq/runv/lib/glog"
 
 	"github.com/gorilla/mux"
 )

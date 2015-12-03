@@ -5,10 +5,10 @@ import (
 	"os"
 	"path"
 
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/engine"
 	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/hypervisor/types"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 func (daemon *Daemon) CmdPodRm(job *engine.Job) (err error) {

@@ -10,8 +10,8 @@ import (
 	"strings"
 
 	"github.com/docker/distribution/registry/api/v2"
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/pkg/transport"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 // for mocking in unit tests

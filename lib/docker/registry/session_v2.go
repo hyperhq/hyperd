@@ -11,8 +11,8 @@ import (
 
 	"github.com/docker/distribution/digest"
 	"github.com/docker/distribution/registry/api/v2"
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/pkg/httputils"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 const DockerDigestHeader = "Docker-Content-Digest"

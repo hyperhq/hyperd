@@ -3,10 +3,10 @@
 package daemon
 
 import (
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/daemon/graphdriver"
 	"github.com/hyperhq/hyper/lib/docker/daemon/graphdriver/aufs"
 	"github.com/hyperhq/hyper/lib/docker/graph"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 // Given the graphdriver ad, if it is aufs, then migrate it.

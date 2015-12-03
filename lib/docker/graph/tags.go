@@ -14,6 +14,7 @@ import (
 	"sync"
 
 	"github.com/docker/libtrust"
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/daemon/events"
 	"github.com/hyperhq/hyper/lib/docker/graph/tags"
 	"github.com/hyperhq/hyper/lib/docker/image"
@@ -22,7 +23,6 @@ import (
 	"github.com/hyperhq/hyper/lib/docker/registry"
 	"github.com/hyperhq/hyper/lib/docker/trust"
 	"github.com/hyperhq/hyper/lib/docker/utils"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 const DEFAULTTAG = "latest"

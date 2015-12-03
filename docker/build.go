@@ -4,10 +4,10 @@ import (
 	"io"
 	"os"
 
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/builder"
 	"github.com/hyperhq/hyper/lib/docker/cliconfig"
 	"github.com/hyperhq/hyper/lib/docker/pkg/ioutils"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 func (cli Docker) SendImageBuild(name string, context io.ReadCloser) ([]byte, int, error) {

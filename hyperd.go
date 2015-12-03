@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	"github.com/Unknwon/goconfig"
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/daemon"
 	"github.com/hyperhq/hyper/docker"
 	"github.com/hyperhq/hyper/engine"
@@ -18,7 +19,6 @@ import (
 	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/driverloader"
 	"github.com/hyperhq/runv/hypervisor"
-	"github.com/hyperhq/runv/lib/glog"
 	runvutils "github.com/hyperhq/runv/lib/utils"
 	"github.com/kardianos/osext"
 )
@@ -33,7 +33,7 @@ func main() {
 	flConfig := flag.String("config", "", "Config file for hyperd")
 	flHost := flag.String("host", "", "Host for hyperd")
 	flHelp := flag.Bool("help", false, "Print help message for Hyperd daemon")
-	glog.Init()
+	os.MkdirAll("/var/log/hyper/", 0755)
 	flag.Usage = func() { printHelp() }
 	flag.Parse()
 	if *flHelp == true {
@@ -48,7 +48,7 @@ func main() {
 			os.Exit(-1)
 		}
 
-		_, err = runvutils.ExecInDaemon(path, append(os.Args, "--nondaemon"))
+		_, err = runvutils.ExecInDaemon(path, append([]string{os.Args[0], "--nondaemon", "--log_dir=/var/log/hyper/"}, os.Args[1:]...))
 		if err != nil {
 			fmt.Println("faile to daemonize hyperd")
 			os.Exit(-1)

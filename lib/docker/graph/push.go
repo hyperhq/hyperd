@@ -12,6 +12,7 @@ import (
 
 	"github.com/docker/distribution/digest"
 	"github.com/docker/libtrust"
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/cliconfig"
 	"github.com/hyperhq/hyper/lib/docker/image"
 	"github.com/hyperhq/hyper/lib/docker/pkg/ioutils"
@@ -22,7 +23,6 @@ import (
 	"github.com/hyperhq/hyper/lib/docker/registry"
 	"github.com/hyperhq/hyper/lib/docker/runconfig"
 	"github.com/hyperhq/hyper/lib/docker/utils"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 var ErrV2RegistryUnavailable = errors.New("error v2 registry unavailable")

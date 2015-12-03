@@ -8,11 +8,11 @@ import (
 	"os"
 	"path"
 
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/daemon/graphdriver"
 	"github.com/hyperhq/hyper/lib/docker/pkg/devicemapper"
 	"github.com/hyperhq/hyper/lib/docker/pkg/mount"
 	"github.com/hyperhq/hyper/lib/docker/pkg/units"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 func init() {
