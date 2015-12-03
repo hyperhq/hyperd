@@ -13,8 +13,8 @@ import (
 	"os"
 	"path"
 
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/pkg/archive"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 var (

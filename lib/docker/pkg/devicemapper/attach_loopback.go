@@ -7,7 +7,7 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/hyperhq/runv/lib/glog"
+	"github.com/golang/glog"
 )
 
 func stringToLoopName(src string) [LoNameSize]uint8 {

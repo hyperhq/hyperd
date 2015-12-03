@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/glog"
 	dockertypes "github.com/hyperhq/hyper/lib/docker/api/types"
 	"github.com/hyperhq/hyper/storage"
 	"github.com/hyperhq/hyper/storage/aufs"
@@ -19,7 +20,6 @@ import (
 	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/pod"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 const (

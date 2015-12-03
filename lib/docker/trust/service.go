@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/docker/libtrust"
-	"github.com/hyperhq/runv/lib/glog"
+	"github.com/golang/glog"
 )
 
 type NotVerifiedError string

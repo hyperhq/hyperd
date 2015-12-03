@@ -7,13 +7,13 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/golang/glog"
 	hyperd "github.com/hyperhq/hyper/daemon"
 	"github.com/hyperhq/hyper/lib/docker/daemon"
 	"github.com/hyperhq/hyper/lib/docker/pkg/homedir"
 	"github.com/hyperhq/hyper/lib/docker/pkg/system"
 	"github.com/hyperhq/hyper/lib/docker/registry"
 	"github.com/hyperhq/hyper/utils"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 var (

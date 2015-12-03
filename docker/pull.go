@@ -1,11 +1,11 @@
 package docker
 
 import (
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/graph"
 	"github.com/hyperhq/hyper/lib/docker/graph/tags"
 	"github.com/hyperhq/hyper/lib/docker/pkg/parsers"
 	"github.com/hyperhq/hyper/lib/docker/registry"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 func (cli Docker) SendCmdPull(image string, imagePullConfig *graph.ImagePullConfig) ([]byte, int, error) {

@@ -7,10 +7,10 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/pkg/archive"
 	"github.com/hyperhq/hyper/lib/docker/pkg/parsers"
 	"github.com/hyperhq/hyper/lib/docker/registry"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 // CmdImageExport exports all images with the given tag. All versions

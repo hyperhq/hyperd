@@ -1,8 +1,8 @@
 package docker
 
 import (
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/api/types"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 func (cli *Docker) GetContainerInfo(args ...string) (*types.ContainerJSONRaw, error) {

@@ -19,13 +19,13 @@ import (
 	"syscall"
 
 	"github.com/docker/libcontainer/label"
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/daemon/graphdriver"
 	"github.com/hyperhq/hyper/lib/docker/pkg/archive"
 	"github.com/hyperhq/hyper/lib/docker/pkg/chrootarchive"
 	"github.com/hyperhq/hyper/lib/docker/pkg/directory"
 	mountpk "github.com/hyperhq/hyper/lib/docker/pkg/mount"
 	"github.com/hyperhq/hyper/lib/docker/pkg/stringid"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 var (

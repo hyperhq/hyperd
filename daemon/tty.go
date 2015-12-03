@@ -2,8 +2,8 @@ package daemon
 
 import (
 	"fmt"
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/engine"
-	"github.com/hyperhq/runv/lib/glog"
 	"strconv"
 	"strings"
 )

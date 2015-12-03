@@ -1,9 +1,9 @@
 package daemon
 
 import (
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/image"
 	"github.com/hyperhq/hyper/lib/docker/runconfig"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 type ContainerCommitConfig struct {

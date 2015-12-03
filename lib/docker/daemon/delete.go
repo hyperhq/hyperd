@@ -6,7 +6,7 @@ import (
 	"path"
 	"runtime"
 
-	"github.com/hyperhq/runv/lib/glog"
+	"github.com/golang/glog"
 )
 
 type ContainerRmConfig struct {

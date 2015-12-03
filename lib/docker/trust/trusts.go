@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/docker/libtrust/trustgraph"
-	"github.com/hyperhq/runv/lib/glog"
+	"github.com/golang/glog"
 )
 
 type TrustStore struct {

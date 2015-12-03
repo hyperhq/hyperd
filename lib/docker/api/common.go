@@ -8,10 +8,10 @@ import (
 	"strings"
 
 	"github.com/docker/libtrust"
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/api/types"
 	"github.com/hyperhq/hyper/lib/docker/pkg/system"
 	"github.com/hyperhq/hyper/lib/docker/pkg/version"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 // Common constants for daemon and client.

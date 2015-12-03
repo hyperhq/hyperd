@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/pkg/archive"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 type FsMagic uint32

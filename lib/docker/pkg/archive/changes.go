@@ -12,9 +12,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/pkg/pools"
 	"github.com/hyperhq/hyper/lib/docker/pkg/system"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 type ChangeType int

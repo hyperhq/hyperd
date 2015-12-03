@@ -6,9 +6,9 @@ import (
 
 	"github.com/docker/distribution/digest"
 	"github.com/docker/libtrust"
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/registry"
 	"github.com/hyperhq/hyper/lib/docker/trust"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 // loadManifest loads a manifest from a byte array and verifies its content,

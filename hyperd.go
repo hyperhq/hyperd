@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	"github.com/Unknwon/goconfig"
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/daemon"
 	"github.com/hyperhq/hyper/docker"
 	"github.com/hyperhq/hyper/engine"
@@ -18,7 +19,6 @@ import (
 	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/driverloader"
 	"github.com/hyperhq/runv/hypervisor"
-	"github.com/hyperhq/runv/lib/glog"
 	runvutils "github.com/hyperhq/runv/lib/utils"
 	"github.com/kardianos/osext"
 )
@@ -34,7 +34,6 @@ func main() {
 	flHost := flag.String("host", "", "Host for hyperd")
 	flHelp := flag.Bool("help", false, "Print help message for Hyperd daemon")
 	os.MkdirAll("/var/log/hyper/", 0755)
-	glog.Init()
 	flag.Usage = func() { printHelp() }
 	flag.Parse()
 	if *flHelp == true {

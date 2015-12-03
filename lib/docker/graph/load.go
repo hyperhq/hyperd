@@ -7,10 +7,10 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/image"
 	"github.com/hyperhq/hyper/lib/docker/pkg/archive"
 	"github.com/hyperhq/hyper/lib/docker/pkg/chrootarchive"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 // Loads a set of images into the repository. This is the complementary of ImageExport.

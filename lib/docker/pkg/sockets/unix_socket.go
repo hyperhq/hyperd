@@ -10,8 +10,8 @@ import (
 	"syscall"
 
 	"github.com/docker/libcontainer/user"
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/pkg/listenbuffer"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 func NewUnixSocket(path, group string, activate <-chan struct{}) (net.Listener, error) {

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"io"
 
-	"github.com/hyperhq/runv/lib/glog"
+	"github.com/golang/glog"
 )
 
 const (

@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/hyperhq/runv/lib/glog"
+	"github.com/golang/glog"
 )
 
 type resumableRequestReader struct {

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/docker/distribution/digest"
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/daemon/graphdriver"
 	"github.com/hyperhq/hyper/lib/docker/dockerversion"
 	"github.com/hyperhq/hyper/lib/docker/image"
@@ -24,7 +25,6 @@ import (
 	"github.com/hyperhq/hyper/lib/docker/pkg/system"
 	"github.com/hyperhq/hyper/lib/docker/pkg/truncindex"
 	"github.com/hyperhq/hyper/lib/docker/runconfig"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 // A Graph is a store for versioned filesystem images and the relationship between them.

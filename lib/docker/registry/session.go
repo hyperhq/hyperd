@@ -19,11 +19,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/cliconfig"
 	"github.com/hyperhq/hyper/lib/docker/pkg/httputils"
 	"github.com/hyperhq/hyper/lib/docker/pkg/tarsum"
 	"github.com/hyperhq/hyper/lib/docker/pkg/transport"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 type Session struct {

@@ -12,8 +12,8 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/utils"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 /*

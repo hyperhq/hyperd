@@ -13,10 +13,10 @@ import (
 	"syscall"
 
 	"github.com/docker/libcontainer/label"
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/daemon/graphdriver"
 	"github.com/hyperhq/hyper/lib/docker/pkg/archive"
 	"github.com/hyperhq/hyper/lib/docker/pkg/chrootarchive"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 // This is a small wrapper over the NaiveDiffWriter that lets us have a custom

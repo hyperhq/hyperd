@@ -14,6 +14,7 @@ import (
 
 	"github.com/docker/libcontainer/label"
 
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/lib/docker/daemon/network"
 	"github.com/hyperhq/hyper/lib/docker/image"
 	"github.com/hyperhq/hyper/lib/docker/nat"
@@ -22,7 +23,6 @@ import (
 	"github.com/hyperhq/hyper/lib/docker/pkg/ioutils"
 	"github.com/hyperhq/hyper/lib/docker/pkg/symlink"
 	"github.com/hyperhq/hyper/lib/docker/runconfig"
-	"github.com/hyperhq/runv/lib/glog"
 )
 
 var (

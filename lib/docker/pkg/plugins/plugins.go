@@ -4,7 +4,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/hyperhq/runv/lib/glog"
+	"github.com/golang/glog"
 )
 
 var (
