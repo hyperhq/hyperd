@@ -11,7 +11,7 @@ import (
 	"github.com/hyperhq/hyper/lib/docker/api/types"
 	"github.com/hyperhq/hyper/lib/docker/cliconfig"
 	"github.com/hyperhq/hyper/lib/docker/registry"
-	"github.com/hyperhq/hyper/lib/term"
+	"github.com/hyperhq/runv/lib/term"
 
 	gflag "github.com/jessevdk/go-flags"
 )

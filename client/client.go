@@ -16,7 +16,7 @@ import (
 
 	"github.com/hyperhq/hyper/lib/docker/cliconfig"
 	"github.com/hyperhq/hyper/lib/docker/pkg/homedir"
-	"github.com/hyperhq/hyper/lib/term"
+	"github.com/hyperhq/runv/lib/term"
 )
 
 type HyperClient struct {
