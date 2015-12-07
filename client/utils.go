@@ -20,9 +20,9 @@ import (
 	"github.com/hyperhq/hyper/lib/docker/pkg/jsonmessage"
 	"github.com/hyperhq/hyper/lib/docker/pkg/stdcopy"
 	"github.com/hyperhq/hyper/lib/docker/registry"
-	"github.com/hyperhq/hyper/lib/term"
 	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/hypervisor/pod"
+	"github.com/hyperhq/runv/lib/term"
 
 	"gopkg.in/yaml.v2"
 )
