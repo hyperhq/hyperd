@@ -186,9 +186,10 @@ func getList(eng *engine.Engine, version version.Version, w http.ResponseWriter,
 	item := r.Form.Get("item")
 	auxiliary := r.Form.Get("auxiliary")
 	pod := r.Form.Get("pod")
+	vm := r.Form.Get("vm")
 
-	glog.V(1).Infof("List type is %s, specified pod: [%s], list auxiliary pod: %s", item, pod, auxiliary)
-	job := eng.Job("list", item, pod, auxiliary)
+	glog.V(1).Infof("List type is %s, specified pod: [%s], specified vm: [%s], list auxiliary pod: %s", item, pod, vm, auxiliary)
+	job := eng.Job("list", item, pod, vm, auxiliary)
 
 	stdoutBuf := bytes.NewBuffer(nil)
 
