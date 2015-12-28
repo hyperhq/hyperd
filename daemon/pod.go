@@ -813,7 +813,7 @@ func hyperHandlePodEvent(vmResponse *types.VmResponse, data interface{},
 			mypod.SetContainerStatus(types.S_POD_SUCCEEDED)
 		}
 		mypod.Vm = ""
-		daemon.RemoveVm(vm.Id)
+		daemon.PodStopped(mypod.Id)
 		if mypod.Type == "kubernetes" {
 			switch mypod.Status {
 			case types.S_POD_SUCCEEDED:

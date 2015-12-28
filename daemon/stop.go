@@ -34,6 +34,26 @@ func (daemon *Daemon) CmdPodStop(job *engine.Job) error {
 	return nil
 }
 
+func (daemon *Daemon) PodStopped(podId string) {
+	// find the vm id which running POD, and stop it
+	pod, ok := daemon.PodList.Get(podId)
+	if !ok {
+		glog.Errorf("Can not find pod(%s)", podId)
+		return
+	}
+
+	if pod.vm == nil {
+		return
+	}
+
+	daemon.DeleteVmByPod(podId)
+	daemon.RemoveVm(pod.vm.Id)
+	if pod.status.Autoremove == true {
+		daemon.CleanPod(podId)
+	}
+	pod.vm = nil
+}
+
 func (daemon *Daemon) StopPod(podId, stopVm string) (int, string, error) {
 	glog.V(1).Infof("Prepare to stop the POD: %s", podId)
 	// find the vm id which running POD, and stop it
