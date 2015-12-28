@@ -12,13 +12,16 @@ import (
 func (daemon *Daemon) CmdList(job *engine.Job) error {
 	var (
 		item                  string
-		dedicade              bool   = false
-		podId                 string = ""
-		auxiliary             bool   = false
-		pod                   *Pod   = nil
-		vmJsonResponse               = []string{}
-		podJsonResponse              = []string{}
-		containerJsonResponse        = []string{}
+		dedicadedPod          bool           = false
+		podId                 string         = ""
+		dedicadedVM           bool           = false
+		vmId                  string         = ""
+		auxiliary             bool           = false
+		pod                   *Pod           = nil
+		vm                    *hypervisor.Vm = nil
+		vmJsonResponse                       = []string{}
+		podJsonResponse                      = []string{}
+		containerJsonResponse                = []string{}
 	)
 	if len(job.Args) == 0 {
 		item = "pod"
@@ -30,11 +33,16 @@ func (daemon *Daemon) CmdList(job *engine.Job) error {
 	}
 
 	if len(job.Args) > 1 && (job.Args[1] != "") {
-		dedicade = true
+		dedicadedPod = true
 		podId = job.Args[1]
 	}
 
-	if len(job.Args) > 2 && (job.Args[2] == "yes" || job.Args[2] == "true") {
+	if len(job.Args) > 2 && (job.Args[2] != "") {
+		dedicadedVM = true
+		vmId = job.Args[2]
+	}
+
+	if len(job.Args) > 3 && (job.Args[3] == "yes" || job.Args[3] == "true") {
 		auxiliary = true
 	}
 
@@ -43,7 +51,7 @@ func (daemon *Daemon) CmdList(job *engine.Job) error {
 	defer glog.Infof("unlock read of PodList")
 	defer daemon.PodList.RUnlock()
 
-	if dedicade {
+	if dedicadedPod {
 		var ok bool
 		pod, ok = daemon.PodList.Get(podId)
 		if !ok || (pod == nil) {
@@ -51,42 +59,78 @@ func (daemon *Daemon) CmdList(job *engine.Job) error {
 		}
 	}
 
+	if dedicadedVM {
+		var ok bool
+		vm, ok = daemon.VmList[vmId]
+		if !ok || (vm == nil) {
+			return fmt.Errorf("Cannot find specified vm %s", vmId)
+		}
+	}
+
 	// Prepare the VM status to client
 	v := &engine.Env{}
 	v.Set("item", item)
 	if item == "vm" {
-		if !dedicade {
-			for vm, v := range daemon.VmList {
-				vmJsonResponse = append(vmJsonResponse, vm+":"+showVM(v))
+		if !dedicadedPod && !dedicadedVM {
+			for v, info := range daemon.VmList {
+				vmJsonResponse = append(vmJsonResponse, v+":"+showVM(info))
 			}
-		} else {
+		} else if dedicadedPod && !dedicadedVM {
 			if v, ok := daemon.VmList[pod.status.Vm]; ok {
 				vmJsonResponse = append(vmJsonResponse, pod.status.Vm+":"+showVM(v))
+			}
+		} else if !dedicadedPod && dedicadedVM {
+			vmJsonResponse = append(vmJsonResponse, vmId+":"+showVM(vm))
+		} else {
+			if pod.status.Vm == vmId {
+				vmJsonResponse = append(vmJsonResponse, vmId+":"+showVM(vm))
 			}
 		}
 		v.SetList("vmData", vmJsonResponse)
 	}
 
 	if item == "pod" {
-		if !dedicade {
+		if !dedicadedPod && !dedicadedVM {
 			daemon.PodList.Foreach(func(p *Pod) error {
 				podJsonResponse = append(podJsonResponse, p.id+":"+showPod(p.status))
 				return nil
 			})
-		} else {
+		} else if dedicadedPod && !dedicadedVM {
 			podJsonResponse = append(podJsonResponse, pod.id+":"+showPod(pod.status))
+		} else if !dedicadedPod && dedicadedVM {
+			daemon.PodList.Foreach(func(p *Pod) error {
+				if p.status.Vm == vmId {
+					podJsonResponse = append(podJsonResponse, p.id+":"+showPod(p.status))
+				}
+				return nil
+			})
+		} else {
+			if pod.status.Vm == vmId {
+				podJsonResponse = append(podJsonResponse, pod.id+":"+showPod(pod.status))
+			}
 		}
 		v.SetList("podData", podJsonResponse)
 	}
 
 	if item == "container" {
-		if !dedicade {
+		if !dedicadedPod && !dedicadedVM {
 			daemon.PodList.Foreach(func(p *Pod) error {
 				containerJsonResponse = append(containerJsonResponse, showPodContainers(p.status, auxiliary)...)
 				return nil
 			})
-		} else {
+		} else if dedicadedPod && !dedicadedVM {
 			containerJsonResponse = append(containerJsonResponse, showPodContainers(pod.status, auxiliary)...)
+		} else if !dedicadedPod && dedicadedVM {
+			daemon.PodList.Foreach(func(p *Pod) error {
+				if p.status.Vm == vmId {
+					containerJsonResponse = append(containerJsonResponse, showPodContainers(p.status, auxiliary)...)
+				}
+				return nil
+			})
+		} else {
+			if pod.status.Vm == vmId {
+				containerJsonResponse = append(containerJsonResponse, showPodContainers(pod.status, auxiliary)...)
+			}
 		}
 		v.SetList("cData", containerJsonResponse)
 	}

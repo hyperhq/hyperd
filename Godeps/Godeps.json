@@ -13,6 +13,11 @@
 			"Rev": "418b41d23a1bf978c06faea5313ba194650ac088"
 		},
 		{
+			"ImportPath": "github.com/alexzorin/libvirt-go",
+			"Comment": "v2.12.0-2-g3793956",
+			"Rev": "379395637960a7e11936e61344ab761aedcdb44e"
+		},
+		{
 			"ImportPath": "github.com/Unknwon/goconfig",
 			"Rev": "5cfc02f2789e6e98d8546e40b29d907aedc4c590"
 		},
