@@ -33,6 +33,8 @@ func main() {
 	flConfig := flag.String("config", "", "Config file for hyperd")
 	flHost := flag.String("host", "", "Host for hyperd")
 	flHelp := flag.Bool("help", false, "Print help message for Hyperd daemon")
+	flag.Set("alsologtostderr", "true")
+	flag.Set("log_dir", "/var/log/hyper/")
 	os.MkdirAll("/var/log/hyper/", 0755)
 	flag.Usage = func() { printHelp() }
 	flag.Parse()
@@ -48,7 +50,7 @@ func main() {
 			os.Exit(-1)
 		}
 
-		_, err = runvutils.ExecInDaemon(path, append([]string{os.Args[0], "--nondaemon", "--log_dir=/var/log/hyper/"}, os.Args[1:]...))
+		_, err = runvutils.ExecInDaemon(path, append([]string{os.Args[0], "--nondaemon"}, os.Args[1:]...))
 		if err != nil {
 			fmt.Println("faile to daemonize hyperd")
 			os.Exit(-1)
