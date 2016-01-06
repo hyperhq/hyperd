@@ -197,11 +197,11 @@ func (cli *HyperClient) JsonFromCmdline(cmdArgs, cmdEnvs, cmdPortmaps []string, 
 	}
 
 	for _, v := range cmdLabels {
-		eql := strings.Index(v, "=")
-		if eql > 0 {
-			labels[v[:eql]] = v[eql+1:]
+		label := strings.Split(v, "=")
+		if len(label) == 2 {
+			labels[label[0]] = label[1]
 		} else {
-			labels[v] = ""
+			return "", fmt.Errorf("Label '%s' is not in 'k=v' format", v)
 		}
 	}
 
