@@ -177,6 +177,7 @@ func (daemon *Daemon) CmdPodInfo(job *engine.Job) error {
 	spec := types.PodSpec{
 		Volumes:    podVoumes,
 		Containers: containers,
+		Labels:     pod.spec.Labels,
 	}
 	podIPs := []string{}
 	if pod.vm != nil {
