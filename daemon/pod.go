@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -48,6 +49,78 @@ func (daemon *Daemon) CmdPodCreate(job *engine.Job) error {
 	// Prepare the VM status to client
 	v := &engine.Env{}
 	v.Set("ID", podId)
+	v.SetInt("Code", 0)
+	v.Set("Cause", "")
+	if _, err := v.WriteTo(job.Stdout); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// CmdPodLabels updates labels of the specified pod
+func (daemon *Daemon) CmdPodLabels(job *engine.Job) error {
+	override := false
+	if job.Args[1] == "true" || job.Args[1] == "yes" {
+		override = true
+	}
+
+	labels := make(map[string]string)
+	if len(job.Args[2]) == 0 {
+		return fmt.Errorf("labels can't be null")
+	}
+	if err := json.Unmarshal([]byte(job.Args[2]), &labels); err != nil {
+		return err
+	}
+
+	daemon.PodList.RLock()
+	glog.V(2).Infof("lock read of PodList")
+	defer daemon.PodList.RUnlock()
+	defer glog.V(2).Infof("unlock read of PodList")
+
+	var (
+		pod *Pod
+		ok  bool
+	)
+	if strings.Contains(job.Args[0], "pod-") {
+		podId := job.Args[0]
+		pod, ok = daemon.PodList.Get(podId)
+		if !ok {
+			return fmt.Errorf("Can not get Pod info with pod ID(%s)", podId)
+		}
+	} else {
+		pod = daemon.PodList.GetByName(job.Args[0])
+		if pod == nil {
+			return fmt.Errorf("Can not get Pod info with pod name(%s)", job.Args[0])
+		}
+	}
+
+	if pod.spec.Labels == nil {
+		pod.spec.Labels = make(map[string]string)
+	}
+
+	for k := range labels {
+		if _, ok := pod.spec.Labels[k]; ok && !override {
+			return fmt.Errorf("Can't update label %s without override", k)
+		}
+	}
+
+	for k, v := range labels {
+		pod.spec.Labels[k] = v
+	}
+
+	spec, err := json.Marshal(pod.spec)
+	if err != nil {
+		return err
+	}
+
+	if err := daemon.WritePodToDB(pod.id, spec); err != nil {
+		return err
+	}
+
+	// Prepare the VM status to client
+	v := &engine.Env{}
+	v.Set("ID", pod.id)
 	v.SetInt("Code", 0)
 	v.Set("Cause", "")
 	if _, err := v.WriteTo(job.Stdout); err != nil {
