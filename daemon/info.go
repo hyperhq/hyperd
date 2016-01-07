@@ -314,6 +314,7 @@ func (daemon *Daemon) CmdContainerInfo(job *engine.Job) error {
 	container := types.ContainerInfo{
 		Name:            c.Name,
 		ContainerID:     c.Id,
+		PodID:           pod.id,
 		Image:           c.Image,
 		ImageID:         imageid,
 		Commands:        pod.spec.Containers[i].Command,
