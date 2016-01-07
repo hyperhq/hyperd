@@ -86,8 +86,8 @@ runTests() {
   execdriver="$1"
   stordriver="$2"
   echo "Testing hyperd with execdriver: $1, storage driver: $2"
-  if [[ -z "${execdriver}" || -z "${stordriver}" ]]; then
-    echo "no execdriver or storage driver provided!"
+  if [ -z "${stordriver}" ]; then
+    echo "no storage driver provided!"
     return 1
   else
     # add the execdriver and storage driver items into configuration file
@@ -126,7 +126,8 @@ hyper_storage_drivers=(
 )
 
 hyper_exec_drivers=(
-  "kvm"
+  ""
+  "qemu"
 )
 for sdriver in "${hyper_storage_drivers[@]}"; do
   for edriver in "${hyper_exec_drivers[@]}"; do
