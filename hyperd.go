@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"runtime"
 	"strings"
 	"syscall"
 
@@ -130,33 +129,15 @@ func mainDaemon(config, host string, flDisableIptables bool) {
 		return
 	}
 
-	var drivers []string
-	if runtime.GOOS == "darwin" {
-		drivers = []string{"vbox"}
-	} else {
-		driver, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Hypervisor")
-		if driver != "" {
-			drivers = []string{driver}
-		} else {
-			drivers = []string{"xen", "kvm", "vbox"}
-		}
-	}
-
-	for _, dri := range drivers {
-		driver := strings.ToLower(dri)
-		if hypervisor.HDriver, err = driverloader.Probe(driver); err != nil {
-			glog.Warningf("%s", err.Error())
-			continue
-		} else {
-			d.Hypervisor = driver
-			glog.Infof("The hypervisor's driver is %s", driver)
-			break
-		}
-	}
-
-	if hypervisor.HDriver == nil {
-		glog.Errorf("Please specify the exec driver, such as 'kvm', 'xen' or 'vbox'")
+	driver, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Hypervisor")
+	driver = strings.ToLower(driver)
+	if hypervisor.HDriver, err = driverloader.Probe(driver); err != nil {
+		glog.Warningf("%s", err.Error())
+		glog.Errorf("Please specify the correct and available hypervisor, such as 'kvm', 'qemu-kvm',  'libvirt', 'xen', 'qemu', 'vbox' or ''")
 		return
+	} else {
+		d.Hypervisor = driver
+		glog.Infof("The hypervisor's driver is %s", driver)
 	}
 
 	disableIptables := cfg.MustBool(goconfig.DEFAULT_SECTION, "DisableIptables", false)
