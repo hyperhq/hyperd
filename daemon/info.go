@@ -178,6 +178,8 @@ func (daemon *Daemon) CmdPodInfo(job *engine.Job) error {
 		Volumes:    podVoumes,
 		Containers: containers,
 		Labels:     pod.spec.Labels,
+		Vcpu:       pod.spec.Resource.Vcpu,
+		Memory:     pod.spec.Resource.Memory,
 	}
 	podIPs := []string{}
 	if pod.vm != nil {
