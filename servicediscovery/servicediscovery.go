@@ -18,7 +18,7 @@ import (
 
 var (
 	ServiceVolume string = "/usr/local/etc/haproxy/"
-	ServiceImage  string = "haproxy:latest"
+	ServiceImage  string = "haproxy:1.4"
 	ServiceConfig string = "haproxy.cfg"
 )
 
