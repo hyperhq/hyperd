@@ -42,6 +42,7 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 		LogOpts       []string `long:"log-opt" description:"Log driver options"`
 		Remove        bool     `long:"rm" default:"false" value-name:"" default-mask:"-" description:"Automatically remove the pod when it exits"`
 		Portmap       []string `long:"publish" value-name:"[]" default-mask:"-" description:"Publish a container's port to the host, format: --publish [tcp/udp:]hostPort:containerPort"`
+		Labels        []string `long:"label" value-name:"[]" default-mask:"-" description:"Add labels for Pod, format: --label key=value"`
 	}
 
 	var parser = gflag.NewParser(&opts, gflag.Default|gflag.IgnoreUnknown)
@@ -72,7 +73,7 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 		}
 		attach = !opts.Detach
 		podJson, err = cli.JsonFromCmdline(args[1:], opts.Env, opts.Portmap, opts.LogDriver, opts.LogOpts,
-			opts.Name, opts.Workdir, opts.RestartPolicy, opts.Cpu, opts.Memory, opts.Tty)
+			opts.Name, opts.Workdir, opts.RestartPolicy, opts.Cpu, opts.Memory, opts.Tty, opts.Labels)
 	}
 
 	if err != nil {
@@ -146,7 +147,7 @@ func (cli *HyperClient) JsonFromFile(filename string, yaml, k8s bool) (string, e
 
 // cmdArgs: args[1:]
 func (cli *HyperClient) JsonFromCmdline(cmdArgs, cmdEnvs, cmdPortmaps []string, cmdLogDriver string, cmdLogOpts []string,
-	cmdName, cmdWorkdir, cmdRestartPolicy string, cpu, memory int, tty bool) (string, error) {
+	cmdName, cmdWorkdir, cmdRestartPolicy string, cpu, memory int, tty bool, cmdLabels []string) (string, error) {
 
 	var (
 		name    = cmdName
@@ -155,6 +156,7 @@ func (cli *HyperClient) JsonFromCmdline(cmdArgs, cmdEnvs, cmdPortmaps []string, 
 		env     = []pod.UserEnvironmentVar{}
 		ports   = []pod.UserContainerPort{}
 		logOpts = make(map[string]string)
+		labels  = make(map[string]string)
 	)
 	if len(cmdArgs) > 1 {
 		command = cmdArgs[1:]
@@ -194,6 +196,15 @@ func (cli *HyperClient) JsonFromCmdline(cmdArgs, cmdEnvs, cmdPortmaps []string, 
 		ports = append(ports, *p)
 	}
 
+	for _, v := range cmdLabels {
+		label := strings.Split(v, "=")
+		if len(label) == 2 {
+			labels[label[0]] = label[1]
+		} else {
+			return "", fmt.Errorf("Label '%s' is not in 'k=v' format", v)
+		}
+	}
+
 	containerList := []pod.UserContainer{{
 		Name:          name,
 		Image:         image,
@@ -210,6 +221,7 @@ func (cli *HyperClient) JsonFromCmdline(cmdArgs, cmdEnvs, cmdPortmaps []string, 
 	userPod := &pod.UserPod{
 		Name:       name,
 		Containers: containerList,
+		Labels:     labels,
 		Resource:   pod.UserResource{Vcpu: cpu, Memory: memory},
 		Files:      []pod.UserFile{},
 		Volumes:    []pod.UserVolume{},

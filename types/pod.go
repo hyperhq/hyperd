@@ -33,8 +33,9 @@ type PodVolume struct {
 }
 
 type PodSpec struct {
-	Volumes    []PodVolume `json:"volumes"`
-	Containers []Container `json:"containers"`
+	Volumes    []PodVolume       `json:"volumes"`
+	Containers []Container       `json:"containers"`
+	Labels     map[string]string `json:"labels"`
 }
 
 type PodStatus struct {
