@@ -1,10 +1,17 @@
 export GOPATH:=$(abs_top_srcdir)/Godeps/_workspace:$(GOPATH)
 if WITH_XEN
-HYPER_BULD_TAGS=with_xen libdm_no_deferred_remove
+XEN_BUILD_TAG=with_xen
 else
-HYPER_BULD_TAGS=libdm_no_deferred_remove
+XEN_BUILD_TAG=
 endif
 
+if WITH_LIBVIRT
+LIBVIRT_BUILD_TAG=with_libvirt
+else
+LIBVIRT_BUILD_TAG=
+endif
+
+HYPER_BULD_TAGS=$(XEN_BUILD_TAG) $(LIBVIRT_BUILD_TAG) libdm_no_deferred_remove
 if ON_DARWIN
 SUBDIRS=mac_installer
 endif

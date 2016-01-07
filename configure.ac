@@ -72,6 +72,19 @@ AC_TYPE_UINT8_T
 AC_FUNC_MALLOC
 AC_CHECK_FUNCS([strdup])
 
+LIBVIRT_REQUIRED="1.2.2"
+
+AC_ARG_WITH([libvirt],
+            [AS_HELP_STRING([--without-libvirt],
+                            [run hyperd with libvirt])],
+            [with_libvirt=no],[with_libvirt=yes])
+
+if test "$with_libvirt" = yes; then
+	PKG_CHECK_MODULES([libvirt], [libvirt >= $LIBVIRT_REQUIRED], [], [with_libvirt=no])
+fi
+
+AM_CONDITIONAL([WITH_LIBVIRT], [test "x$with_libvirt" == "xyes"])
+
 AC_ARG_WITH([xen],
             [AS_HELP_STRING([--without-xen],
                             [run hyperd with xen (libxl, need xen 4.5 or higher)])],
@@ -108,6 +121,8 @@ AC_MSG_RESULT([
 	has go:     ${has_go}
 
 	with xen:   ${with_xen}
+
+	with libvirt: ${with_libvirt}
 
 	has sqlite3: ${has_sqlite3}
 	has virtualbox: ${has_virtualbox}
