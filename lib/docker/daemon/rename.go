@@ -27,10 +27,10 @@ func (daemon *Daemon) ContainerRename(oldName, newName string) error {
 	undo := func() {
 		container.Name = oldName
 		daemon.reserveName(container.ID, oldName)
-		daemon.containerGraph.Delete(newName)
+		daemon.containerGraph().Delete(newName)
 	}
 
-	if err := daemon.containerGraph.Delete(oldName); err != nil {
+	if err := daemon.containerGraph().Delete(oldName); err != nil {
 		undo()
 		return fmt.Errorf("Failed to delete container %q: %v", oldName, err)
 	}
@@ -40,6 +40,5 @@ func (daemon *Daemon) ContainerRename(oldName, newName string) error {
 		return err
 	}
 
-	container.LogEvent("rename")
 	return nil
 }

@@ -10,16 +10,16 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hyperhq/hyper/lib/docker/api"
-	"github.com/hyperhq/hyper/lib/docker/graph/tags"
-	"github.com/hyperhq/hyper/lib/docker/pkg/archive"
-	"github.com/hyperhq/hyper/lib/docker/pkg/fileutils"
-	"github.com/hyperhq/hyper/lib/docker/pkg/parsers"
-	"github.com/hyperhq/hyper/lib/docker/pkg/progressreader"
-	"github.com/hyperhq/hyper/lib/docker/pkg/streamformatter"
-	"github.com/hyperhq/hyper/lib/docker/pkg/symlink"
-	"github.com/hyperhq/hyper/lib/docker/registry"
-	"github.com/hyperhq/hyper/lib/docker/utils"
+	"github.com/docker/docker/api"
+	"github.com/docker/docker/graph/tags"
+	"github.com/docker/docker/pkg/archive"
+	"github.com/docker/docker/pkg/fileutils"
+	"github.com/docker/docker/pkg/parsers"
+	"github.com/docker/docker/pkg/progressreader"
+	"github.com/docker/docker/pkg/streamformatter"
+	"github.com/docker/docker/pkg/symlink"
+	"github.com/docker/docker/registry"
+	"github.com/docker/docker/utils"
 	rand "github.com/hyperhq/hyper/utils"
 
 	gflag "github.com/jessevdk/go-flags"
@@ -109,9 +109,22 @@ func (cli *HyperClient) HyperCmdBuild(args ...string) error {
 	}
 	var includes = []string{"."}
 
-	excludes, err := utils.ReadDockerIgnore(path.Join(root, ".dockerignore"))
-	if err != nil {
+	f, err := os.Open(filepath.Join(root, ".dockerignore"))
+	if err != nil && !os.IsNotExist(err) {
 		return err
+	}
+	defer f.Close()
+
+	var excludes []string
+	if err == nil {
+		excludes, err = utils.ReadDockerIgnore(f)
+		if err != nil {
+			return err
+		}
+	}
+
+	if err := utils.ValidateContextDirectory(root, excludes); err != nil {
+		return fmt.Errorf("Error checking context: '%s'.", err)
 	}
 
 	// If .dockerignore mentions .dockerignore or the Dockerfile

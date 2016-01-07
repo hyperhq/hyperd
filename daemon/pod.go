@@ -11,11 +11,11 @@ import (
 	"strings"
 	"time"
 
+	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/daemon/logger"
 	"github.com/docker/docker/daemon/logger/jsonfilelog"
 	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/engine"
-	dockertypes "github.com/hyperhq/hyper/lib/docker/api/types"
 	"github.com/hyperhq/hyper/servicediscovery"
 	"github.com/hyperhq/hyper/storage"
 	"github.com/hyperhq/hyper/utils"
@@ -244,7 +244,7 @@ func (p *Pod) InitContainers(daemon *Daemon, dclient DockerInterface) (err error
 
 		var (
 			cId []byte
-			rsp *dockertypes.ContainerJSONRaw
+			rsp *dockertypes.ContainerJSON
 		)
 
 		cId, _, err = dclient.SendCmdCreate(c.Name, c.Image, []string{}, nil)
@@ -291,7 +291,7 @@ func (p *Pod) PrepareContainers(sd Storage, dclient DockerInterface) (err error)
 
 	for i, c := range p.status.Containers {
 		var (
-			info *dockertypes.ContainerJSONRaw
+			info *dockertypes.ContainerJSON
 			ci   *hypervisor.ContainerInfo
 		)
 		info, err = getContinerInfo(dclient, c)
@@ -327,7 +327,7 @@ func (p *Pod) PrepareContainers(sd Storage, dclient DockerInterface) (err error)
 	return nil
 }
 
-func getContinerInfo(dclient DockerInterface, container *hypervisor.Container) (info *dockertypes.ContainerJSONRaw, err error) {
+func getContinerInfo(dclient DockerInterface, container *hypervisor.Container) (info *dockertypes.ContainerJSON, err error) {
 	info, err = dclient.GetContainerInfo(container.Id)
 	if err != nil {
 		glog.Error("got error when get container Info ", err.Error())
@@ -384,7 +384,7 @@ func processInjectFiles(container *pod.UserContainer, files map[string]pod.UserF
 	return nil
 }
 
-func processImageVolumes(config *dockertypes.ContainerJSONRaw, id string, userPod *pod.UserPod, container *pod.UserContainer) {
+func processImageVolumes(config *dockertypes.ContainerJSON, id string, userPod *pod.UserPod, container *pod.UserContainer) {
 	if config.Config.Volumes == nil {
 		return
 	}

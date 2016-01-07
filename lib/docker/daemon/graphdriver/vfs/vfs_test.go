@@ -1,10 +1,13 @@
+// +build linux
+
 package vfs
 
 import (
 	"testing"
 
 	"github.com/hyperhq/hyper/lib/docker/daemon/graphdriver/graphtest"
-	"github.com/hyperhq/hyper/lib/docker/pkg/reexec"
+
+	"github.com/docker/docker/pkg/reexec"
 )
 
 func init() {

@@ -1,3 +1,3 @@
 From busybox
 
-COPY *.pod /opt/
+COPY *.pod /root/

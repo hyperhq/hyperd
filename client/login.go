@@ -8,9 +8,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/hyperhq/hyper/lib/docker/api/types"
-	"github.com/hyperhq/hyper/lib/docker/cliconfig"
-	"github.com/hyperhq/hyper/lib/docker/registry"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/cliconfig"
+	"github.com/docker/docker/registry"
 	"github.com/hyperhq/runv/lib/term"
 
 	gflag "github.com/jessevdk/go-flags"
@@ -28,7 +28,7 @@ func (cli *HyperClient) HyperCmdLogin(args ...string) error {
 		Password string `short:"p" long:"password" default:"" value-name:"\"\"" description:"Password"`
 	}
 	var parser = gflag.NewParser(&opts, gflag.Default)
-	parser.Usage = "login [SERVER]\n\nRegister or log in to a Docker registry server, if no server is\nspecified \"" + registry.IndexServerAddress() + "\" is the default."
+	parser.Usage = "login [SERVER]\n\nRegister or log in to a Docker registry server, if no server is\nspecified \"" + registry.IndexServer + "\" is the default."
 	args, err := parser.Parse()
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {
@@ -40,7 +40,7 @@ func (cli *HyperClient) HyperCmdLogin(args ...string) error {
 	username := opts.Username
 	password := opts.Password
 	email := opts.Email
-	serverAddress := registry.IndexServerAddress()
+	serverAddress := registry.IndexServer
 	if len(args) > 1 {
 		serverAddress = args[1]
 	}

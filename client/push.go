@@ -5,8 +5,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/hyperhq/hyper/lib/docker/pkg/parsers"
-	"github.com/hyperhq/hyper/lib/docker/registry"
+	"github.com/docker/docker/pkg/parsers"
+	"github.com/docker/docker/registry"
 
 	gflag "github.com/jessevdk/go-flags"
 )

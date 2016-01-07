@@ -7,6 +7,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/docker/docker/pkg/idtools"
 	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/daemon"
 	"github.com/hyperhq/hyper/lib/docker/daemon/graphdriver"
@@ -25,12 +26,14 @@ type Driver struct {
 	baseVdi  string
 	pullVm   string
 	disks    map[string]bool
+	uidMaps  []idtools.IDMap
+	gidMaps  []idtools.IDMap
 	daemon   *daemon.Daemon
 }
 
 var backingFs = "<unknown>"
 
-func Init(root string, options []string) (graphdriver.Driver, error) {
+func Init(root string, options []string, uidMaps, gidMaps []idtools.IDMap) (graphdriver.Driver, error) {
 	if err := supportsVbox(); err != nil {
 		return nil, graphdriver.ErrNotSupported
 	}
@@ -73,6 +76,8 @@ func Init(root string, options []string) (graphdriver.Driver, error) {
 	d.baseVdi = vdi
 	d.pullVm = "hyper-mac-pull-vm"
 	d.disks = make(map[string]bool, 1024)
+	d.uidMaps = uidMaps
+	d.gidMaps = gidMaps
 
 	return d, nil
 }
@@ -166,6 +171,11 @@ func (d *Driver) Status() [][2]string {
 	return status
 }
 
+// GetMetadata not implemented
+func (a *Driver) GetMetadata(id string) (map[string]string, error) {
+	return nil, nil
+}
+
 func (d *Driver) Exists(id string) bool {
 	disk := fmt.Sprintf("%s/%s.vdi", path.Join(d.RootPath(), "images"), id)
 	if _, err := os.Lstat(disk); err != nil {
@@ -179,7 +189,7 @@ func (d *Driver) Exists(id string) bool {
 	return true
 }
 
-func (d *Driver) Create(id, parent string) error {
+func (d *Driver) Create(id, parent, mountLabel string) error {
 	if err := d.createDirsFor(id); err != nil {
 		glog.Error(err.Error())
 		return err

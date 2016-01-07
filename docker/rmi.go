@@ -1,7 +1,7 @@
 package docker
 
 import (
-	"github.com/hyperhq/hyper/lib/docker/api/types"
+	"github.com/docker/docker/api/types"
 )
 
 func (cli Docker) SendImageDelete(args ...string) ([]types.ImageDelete, error) {

@@ -1,6 +1,6 @@
 package daemon
 
-import "github.com/hyperhq/hyper/lib/docker/pkg/archive"
+import "github.com/docker/docker/pkg/archive"
 
 // ContainerChanges returns a list of container fs changes
 func (daemon *Daemon) ContainerChanges(name string) ([]archive.Change, error) {

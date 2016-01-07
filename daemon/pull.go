@@ -1,8 +1,8 @@
 package daemon
 
 import (
+	"github.com/docker/docker/graph"
 	"github.com/hyperhq/hyper/engine"
-	"github.com/hyperhq/hyper/lib/docker/graph"
 	"github.com/hyperhq/hyper/types"
 )
 

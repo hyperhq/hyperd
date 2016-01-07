@@ -3,9 +3,8 @@ package docker
 import (
 	"encoding/json"
 
-	"github.com/hyperhq/hyper/lib/docker/builder"
-	"github.com/hyperhq/hyper/lib/docker/daemon"
-	"github.com/hyperhq/hyper/lib/docker/pkg/parsers"
+	"github.com/docker/docker/pkg/parsers"
+	"github.com/hyperhq/hyper/lib/docker/builder/dockerfile"
 )
 
 func (cli Docker) SendContainerCommit(args ...string) ([]byte, int, error) {
@@ -30,7 +29,7 @@ func (cli Docker) SendContainerCommit(args ...string) ([]byte, int, error) {
 	if t == "" {
 		t = "latest"
 	}
-	containerCommitConfig := &daemon.ContainerCommitConfig{
+	containerCommitConfig := &dockerfile.CommitConfig{
 		Pause:   pause,
 		Repo:    r,
 		Tag:     t,
@@ -39,7 +38,8 @@ func (cli Docker) SendContainerCommit(args ...string) ([]byte, int, error) {
 		Changes: changes,
 		Config:  container.Config,
 	}
-	imgID, err := builder.Commit(cli.daemon, containerId, containerCommitConfig)
+
+	imgID, err := dockerfile.Commit(containerId, cli.daemon, containerCommitConfig)
 	if err != nil {
 		return nil, -1, err
 	}

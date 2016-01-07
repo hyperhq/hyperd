@@ -1,9 +1,11 @@
 // +build linux
+
 package overlay
 
 import (
-	"github.com/hyperhq/lib/docker/daemon/graphdriver/graphtest"
 	"testing"
+
+	"github.com/hyperhq/hyper/lib/docker/daemon/graphdriver/graphtest"
 )
 
 // This avoids creating a new driver for each test if all tests are run

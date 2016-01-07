@@ -3,9 +3,9 @@ package daemon
 import (
 	"fmt"
 
+	"github.com/docker/docker/pkg/archive"
+	"github.com/docker/docker/pkg/ioutils"
 	"github.com/golang/glog"
-	"github.com/hyperhq/hyper/lib/docker/pkg/archive"
-	"github.com/hyperhq/hyper/lib/docker/pkg/ioutils"
 )
 
 const DefaultPathEnv = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"

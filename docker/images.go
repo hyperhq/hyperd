@@ -1,9 +1,6 @@
 package docker
 
-import (
-	"github.com/hyperhq/hyper/lib/docker/api/types"
-	"github.com/hyperhq/hyper/lib/docker/graph"
-)
+import "github.com/docker/docker/api/types"
 
 func (cli Docker) SendCmdImages(all string) ([]*types.Image, error) {
 	var (
@@ -12,10 +9,7 @@ func (cli Docker) SendCmdImages(all string) ([]*types.Image, error) {
 	if all == "yes" {
 		allBoolValue = true
 	}
-	imagesConfig := graph.ImagesConfig{
-		All: allBoolValue,
-	}
-	images, err := cli.daemon.Repositories().Images(&imagesConfig)
+	images, err := cli.daemon.ListImages("", "", allBoolValue)
 	if err != nil {
 		return nil, err
 	}
