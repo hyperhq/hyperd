@@ -1,21 +1,45 @@
-# Boot kernel for KVM/XEN
+# configurations for hyperd
+
+# Root directory for hyperd
+# Root=/var/lib/hyper/
+
+# Specify the hypervisor: libvirt, qemu, qemu-kvm, kvm, xen, vbox (for linux)
+#                         vbox (for mac).
+# "kvm"  is equivalent to "qemu-kvm" which uses qemu with kvm acceleration.
+# "qemu" is equivalent to "qemu-kvm" when the system enables kvm, otherwise
+#        the hypervisor is "qemu-tcg" (qemu without kvm acceleration).
+# When Hypervisor is not set, the hyperd will try to probe "qemu-kvm" or "xen"
+# as the containers' hypervisor according to the host, if the host doesn't
+# support any hardware-assisted technology, it will use "qemu-tcg".
+#
+# Hypervisor=qemu
+
+# Boot kernel
 Kernel=/var/lib/hyper/kernel
-# Boot initrd for KVM/XEN
+
+# Boot initrd
 Initrd=/var/lib/hyper/hyper-initrd.img
+
 # BIOS image, qboot bios will accelarate the bootup
 Bios=/var/lib/hyper/bios-qboot.bin
-# CBFS coreboot fs for boot image, if this is proviced, kernel and initrd will be ignored
-Cbfs=/var/lib/hyper/cbfs-qboot.rom
-# storage driver for hyper, valid value includes devicemapper, overlay, and aufs
-#StorageDriver=overlay
-# Bridge device for hyper, default is hyper0
-#Bridge=
-# Bridge ip address for the bridge device
-#BridgeIP=
-# if the host IP is provided, a TCP port will be listened for, same as the '--host' option
-#Host=
-# Specify the hypervisor to be kvm or xen
-#Hypervisor=kvm
-# This is only useful for hypernetes, to disable the iptables setup by hyperd
-#DisableIptables=false
 
+# CBFS coreboot fs for boot image, if it is set, Kernel and Initrd will be ignored
+Cbfs=/var/lib/hyper/cbfs-qboot.rom
+
+# Boot CDROOM for "vbox" hypervisor (for mac only)
+# Vbox=/opt/hyper/static/iso/hyper-vbox-boot.iso
+
+# Storage driver for hyperd, valid value includes devicemapper, overlay, and aufs
+# StorageDriver=overlay
+
+# Bridge device for hyperd, default is hyper0
+# Bridge=
+
+# Bridge ip address for the bridge device
+# BridgeIP=
+
+# If the host IP is provided, a TCP port will be listened for, same as the '--host' option
+# Host=
+
+# This is only useful for hypernetes, to disable the iptables setup by hyperd
+# DisableIptables=false
