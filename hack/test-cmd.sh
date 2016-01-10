@@ -137,6 +137,8 @@ __EOF__
   # POD creation / deletion #
   ###########################
 
+  hyper::test::insert_file
+
   stop_hyperd
 }
 
