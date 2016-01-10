@@ -120,6 +120,18 @@ __EOF__
   # API status check    #
   #######################
 
+  ######################
+  # Image management   #
+  ######################
+
+  hyper::test::check_image busybox || hyper::test::pull_image busybox
+  hyper::test::check_image busybox
+
+  hyper::test::remove_image busybox
+  ! hyper::test::check_image busybox
+
+  hyper::test::pull_image busybox
+  hyper::test::check_image busybox
 
   ###########################
   # POD creation / deletion #
