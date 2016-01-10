@@ -7,7 +7,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-HYPER_ROOT=$(dirname "${BASH_SOURCE}")/..
+HYPER_ROOT=$(readlink -f $(dirname "${BASH_SOURCE}")/..)
 source "${HYPER_ROOT}/hack/lib/init.sh"
 
 function cleanup()
@@ -63,6 +63,9 @@ function start_hyperd()
 
 function stop_hyperd()
 {
+  if ps --ppid ${HYPERD_PID} > /dev/null 2>&1  ; then
+    read  HYPERD_PID other < <(ps --ppid ${HYPERD_PID}|grep hyperd)
+  fi
   [[ -n "${HYPERD_PID-}" ]] && sudo kill "${HYPERD_PID}" 1>&2 2>/dev/null
   HYPERD_PID=
 }
@@ -78,9 +81,14 @@ HOME="${HYPER_TEMP}"
 # Expose hyperctl directly for readability
 PATH="${HYPER_OUTPUT_HOSTBIN}":$PATH
 
-# build hyperstart Kernel and Initrd
-echo "Build Kernel and Initrd by hyperstart"
-hyper::hyperstart::build
+if [ "x${HYPER_RUNTIME:-}" = "x" ] ; then
+  # build hyperstart Kernel and Initrd
+  echo "Build Kernel and Initrd by hyperstart"
+  hyper::hyperstart::build
+else
+  KERNEL_PATH=${HYPER_RUNTIME}/kernel
+  INITRD_PATH=${HYPER_RUNTIME}/hyper-initrd.img
+fi
 
 runTests() {
   execdriver="$1"
