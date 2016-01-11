@@ -32,7 +32,7 @@ func ProbeFsType(device string) (string, error) {
 	// will be used to test the type of filesystem which the device located.
 	cmd := fmt.Sprintf("file -sL %s", device)
 	command := exec.Command("/bin/sh", "-c", cmd)
-	fileCmdOutput, err := command.Output()
+	fileCmdOutput, err := command.CombinedOutput()
 	if err != nil {
 		return "", nil
 	}
