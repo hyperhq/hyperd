@@ -167,9 +167,8 @@ func (daemon *Daemon) CmdPodStart(job *engine.Job) error {
 		daemon.PodList.Unlock()
 		return fmt.Errorf("The pod(%s) can not be found, please create it first", podId)
 	}
-	var lazy bool = hypervisor.HDriver.SupportLazyMode() && vmId == ""
 
-	code, cause, err := daemon.StartPod(podId, "", vmId, nil, lazy, false, types.VM_KEEP_NONE, ttys)
+	code, cause, err := daemon.StartPod(podId, "", vmId, nil, false, types.VM_KEEP_NONE, ttys)
 	if err != nil {
 		glog.Error(err.Error())
 		glog.V(2).Infof("unlock PodList")
@@ -208,11 +207,11 @@ type Pod struct {
 	volumes    []*hypervisor.VolumeInfo
 }
 
-func (p *Pod) GetVM(daemon *Daemon, id string, lazy bool, keep int) (err error) {
+func (p *Pod) GetVM(daemon *Daemon, id string, keep int) (err error) {
 	if p == nil || p.spec == nil {
 		return errors.New("Pod: unable to create VM without resource info.")
 	}
-	p.vm, err = daemon.GetVM(id, &p.spec.Resource, lazy, keep)
+	p.vm, err = daemon.GetVM(id, &p.spec.Resource, keep)
 	return
 }
 
@@ -749,11 +748,11 @@ func (p *Pod) AttachTtys(streams []*hypervisor.TtyIO) (err error) {
 	return nil
 }
 
-func (p *Pod) Start(daemon *Daemon, vmId string, lazy, autoremove bool, keep int, streams []*hypervisor.TtyIO) (*types.VmResponse, error) {
+func (p *Pod) Start(daemon *Daemon, vmId string, autoremove bool, keep int, streams []*hypervisor.TtyIO) (*types.VmResponse, error) {
 
 	var err error = nil
 
-	if err = p.GetVM(daemon, vmId, lazy, keep); err != nil {
+	if err = p.GetVM(daemon, vmId, keep); err != nil {
 		return nil, err
 	}
 
@@ -802,7 +801,7 @@ func (p *Pod) Start(daemon *Daemon, vmId string, lazy, autoremove bool, keep int
 	return vmResponse, nil
 }
 
-func (daemon *Daemon) StartPod(podId, podArgs, vmId string, config interface{}, lazy, autoremove bool, keep int, streams []*hypervisor.TtyIO) (int, string, error) {
+func (daemon *Daemon) StartPod(podId, podArgs, vmId string, config interface{}, autoremove bool, keep int, streams []*hypervisor.TtyIO) (int, string, error) {
 	glog.V(1).Infof("podArgs: %s", podArgs)
 	var (
 		err error
@@ -818,7 +817,7 @@ func (daemon *Daemon) StartPod(podId, podArgs, vmId string, config interface{}, 
 		return -1, "", fmt.Errorf("pod %s is already running", podId)
 	}
 
-	vmResponse, err := p.Start(daemon, vmId, lazy, autoremove, keep, streams)
+	vmResponse, err := p.Start(daemon, vmId, autoremove, keep, streams)
 	if err != nil {
 		return -1, "", err
 	}
@@ -844,10 +843,9 @@ func (daemon *Daemon) RestartPod(mypod *hypervisor.PodStatus) error {
 	if err != nil {
 		return err
 	}
-	var lazy bool = hypervisor.HDriver.SupportLazyMode()
 
 	// Start the pod
-	_, _, err = daemon.StartPod(mypod.Id, string(podData), "", nil, lazy, false, types.VM_KEEP_NONE, []*hypervisor.TtyIO{})
+	_, _, err = daemon.StartPod(mypod.Id, string(podData), "", nil, false, types.VM_KEEP_NONE, []*hypervisor.TtyIO{})
 	if err != nil {
 		glog.Error(err.Error())
 		return err

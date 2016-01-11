@@ -302,7 +302,7 @@ func (b *Builder) runContextCommand(args []string, allowRemote bool, allowDecomp
 			Vbox:   b.Hyperdaemon.VboxImage,
 		}
 
-		vm = b.Hyperdaemon.NewVm(b.Name, 1, 512, false, types.VM_KEEP_AFTER_FINISH)
+		vm = b.Hyperdaemon.NewVm(b.Name, 1, 512, types.VM_KEEP_AFTER_FINISH)
 
 		err = vm.Launch(bo)
 		if err != nil {
@@ -312,7 +312,7 @@ func (b *Builder) runContextCommand(args []string, allowRemote bool, allowDecomp
 		b.Hyperdaemon.AddVm(vm)
 	}
 	if vm.Status == types.S_VM_IDLE {
-		code, cause, err := b.Hyperdaemon.StartPod(podId, "", b.Name, nil, false, false, types.VM_KEEP_AFTER_FINISH, []*hypervisor.TtyIO{})
+		code, cause, err := b.Hyperdaemon.StartPod(podId, "", b.Name, nil, false, types.VM_KEEP_AFTER_FINISH, []*hypervisor.TtyIO{})
 		if err != nil {
 			glog.Errorf("Code is %d, Cause is %s, %s", code, cause, err.Error())
 			b.Hyperdaemon.KillVm(b.Name)
@@ -730,7 +730,7 @@ func (b *Builder) run(c *daemon.Container) error {
 			Vbox:   b.Hyperdaemon.VboxImage,
 		}
 
-		vm = b.Hyperdaemon.NewVm(b.Name, 1, 512, false, types.VM_KEEP_AFTER_FINISH)
+		vm = b.Hyperdaemon.NewVm(b.Name, 1, 512, types.VM_KEEP_AFTER_FINISH)
 
 		err = vm.Launch(bo)
 		if err != nil {
@@ -740,7 +740,7 @@ func (b *Builder) run(c *daemon.Container) error {
 		b.Hyperdaemon.AddVm(vm)
 	}
 	if vm.Status == types.S_VM_IDLE {
-		code, cause, err = b.Hyperdaemon.StartPod(podId, "", b.Name, nil, false, false, types.VM_KEEP_AFTER_FINISH, []*hypervisor.TtyIO{})
+		code, cause, err = b.Hyperdaemon.StartPod(podId, "", b.Name, nil, false, types.VM_KEEP_AFTER_FINISH, []*hypervisor.TtyIO{})
 		if err != nil {
 			glog.Errorf("Code is %d, Cause is %s, %s", code, cause, err.Error())
 			b.Hyperdaemon.KillVm(b.Name)
