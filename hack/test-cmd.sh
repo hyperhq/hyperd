@@ -138,6 +138,7 @@ __EOF__
   ###########################
 
   hyper::test::insert_file
+  hyper::test::map_file
 
   stop_hyperd
 }
