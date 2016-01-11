@@ -37,11 +37,24 @@ func (daemon *Daemon) CmdPodCreate(job *engine.Job) error {
 	}
 
 	podId := fmt.Sprintf("pod-%s", pod.RandStr(10, "alpha"))
+	glog.V(1).Infof("podArgs: %s", podArgs)
+
+	spec, err := ProcessPodBytes([]byte(podArgs), podId)
+	if err != nil {
+		glog.V(1).Infof("Process POD file error: %s", err.Error())
+		return err
+	}
+
+	if err = spec.Validate(); err != nil {
+		return err
+	}
+
 	daemon.PodList.Lock()
 	glog.V(2).Infof("lock PodList")
 	defer glog.V(2).Infof("unlock PodList")
 	defer daemon.PodList.Unlock()
-	_, err := daemon.CreatePod(podId, podArgs, autoRemove)
+
+	_, err = CreatePod(daemon, daemon.DockerCli, podId, podArgs, spec, autoRemove)
 	if err != nil {
 		return err
 	}
