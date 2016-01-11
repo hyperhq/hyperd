@@ -37,7 +37,7 @@ func (daemon *Daemon) CmdVmCreate(job *engine.Job) (err error) {
 		async = true
 	}
 
-	vm, err = daemon.StartVm("", cpu, mem, false, 0)
+	vm, err = daemon.StartVm("", cpu, mem, 0)
 	if err != nil {
 		return err
 	}
@@ -116,7 +116,7 @@ func (p *Pod) AssociateVm(daemon *Daemon, vmId string) error {
 	}
 	glog.V(1).Infof("The data for vm(%s) is %v", vmId, vmData)
 
-	p.vm = daemon.NewVm(vmId, p.spec.Resource.Vcpu, p.spec.Resource.Memory, false, types.VM_KEEP_NONE)
+	p.vm = daemon.NewVm(vmId, p.spec.Resource.Vcpu, p.spec.Resource.Memory, types.VM_KEEP_NONE)
 	p.status.Vm = vmId
 
 	err = p.vm.AssociateVm(p.status, vmData)
@@ -147,7 +147,7 @@ func (daemon *Daemon) ReleaseAllVms() (int, error) {
 	return ret, err
 }
 
-func (daemon *Daemon) StartVm(vmId string, cpu, mem int, lazy bool, keep int) (*hypervisor.Vm, error) {
+func (daemon *Daemon) StartVm(vmId string, cpu, mem int, keep int) (*hypervisor.Vm, error) {
 	var (
 		DEFAULT_CPU = 1
 		DEFAULT_MEM = 128
@@ -170,7 +170,7 @@ func (daemon *Daemon) StartVm(vmId string, cpu, mem int, lazy bool, keep int) (*
 		Vbox:   daemon.VboxImage,
 	}
 
-	vm := daemon.NewVm(vmId, cpu, mem, lazy, keep)
+	vm := daemon.NewVm(vmId, cpu, mem, keep)
 
 	glog.V(1).Infof("The config: kernel=%s, initrd=%s", daemon.Kernel, daemon.Initrd)
 	err := vm.Launch(b)
@@ -197,9 +197,9 @@ func (daemon *Daemon) WaitVmStart(vm *hypervisor.Vm) error {
 	return nil
 }
 
-func (daemon *Daemon) GetVM(vmId string, resource *pod.UserResource, lazy bool, keep int) (*hypervisor.Vm, error) {
+func (daemon *Daemon) GetVM(vmId string, resource *pod.UserResource, keep int) (*hypervisor.Vm, error) {
 	if vmId == "" {
-		return daemon.StartVm("", resource.Vcpu, resource.Memory, lazy, keep)
+		return daemon.StartVm("", resource.Vcpu, resource.Memory, keep)
 	}
 
 	vm, ok := daemon.VmList[vmId]
@@ -219,7 +219,7 @@ func (daemon *Daemon) GetVM(vmId string, resource *pod.UserResource, lazy bool, 
 	return vm, nil
 }
 
-func (daemon *Daemon) NewVm(id string, cpu, memory int, lazy bool, keep int) *hypervisor.Vm {
+func (daemon *Daemon) NewVm(id string, cpu, memory int, keep int) *hypervisor.Vm {
 	vmId := id
 
 	if vmId == "" {
@@ -230,5 +230,5 @@ func (daemon *Daemon) NewVm(id string, cpu, memory int, lazy bool, keep int) *hy
 			}
 		}
 	}
-	return hypervisor.NewVm(vmId, cpu, memory, lazy, keep)
+	return hypervisor.NewVm(vmId, cpu, memory, keep)
 }

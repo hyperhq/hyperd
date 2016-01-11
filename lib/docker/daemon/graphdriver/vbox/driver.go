@@ -107,7 +107,7 @@ func (d *Driver) Setup() (err error) {
 			return err
 		}
 	}
-	vm, err = d.daemon.StartVm(d.pullVm, 1, 64, false, types.VM_KEEP_AFTER_SHUTDOWN)
+	vm, err = d.daemon.StartVm(d.pullVm, 1, 64, types.VM_KEEP_AFTER_SHUTDOWN)
 	if err != nil {
 		glog.Errorf(err.Error())
 		return err
@@ -334,7 +334,7 @@ func (d *Driver) VmMountLayer(id string) error {
 		return fmt.Errorf("can not find VM(%s)", d.pullVm)
 	}
 	if vm.Status == types.S_VM_IDLE {
-		code, cause, err := d.daemon.StartPod(podId, podstring, d.pullVm, nil, false, true, types.VM_KEEP_AFTER_SHUTDOWN, []*hypervisor.TtyIO{})
+		code, cause, err := d.daemon.StartPod(podId, podstring, d.pullVm, nil, true, types.VM_KEEP_AFTER_SHUTDOWN, []*hypervisor.TtyIO{})
 		if err != nil {
 			glog.Errorf("Code is %d, Cause is %s, %s", code, cause, err.Error())
 			d.daemon.KillVm(d.pullVm)
