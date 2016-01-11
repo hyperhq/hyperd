@@ -222,6 +222,50 @@ func (daemon *Daemon) CmdPodInfo(job *engine.Job) error {
 	return nil
 }
 
+func (daemon *Daemon) CmdPodStats(job *engine.Job) error {
+	if len(job.Args) == 0 {
+		return fmt.Errorf("Can not get Pod stats without Pod ID")
+	}
+	daemon.PodList.RLock()
+	glog.V(2).Infof("lock read of PodList")
+	defer daemon.PodList.RUnlock()
+	defer glog.V(2).Infof("unlock read of PodList")
+	var (
+		pod   *Pod
+		podId string
+		ok    bool
+	)
+	if strings.Contains(job.Args[0], "pod-") {
+		podId = job.Args[0]
+		pod, ok = daemon.PodList.Get(podId)
+		if !ok {
+			return fmt.Errorf("Can not get Pod stats with pod ID(%s)", podId)
+		}
+	} else {
+		pod = daemon.PodList.GetByName(job.Args[0])
+		if pod == nil {
+			return fmt.Errorf("Can not get Pod stats with pod name(%s)", job.Args[0])
+		}
+	}
+
+	if pod.vm == nil || pod.status.Status != runvtypes.S_POD_RUNNING {
+		return fmt.Errorf("Can not get pod stats for non-running pod (%s)", job.Args[0])
+	}
+
+	response := pod.vm.Stats()
+	if response.Data == nil {
+		return fmt.Errorf("Stats for pod %s is nil", job.Args[0])
+	}
+
+	v := &engine.Env{}
+	v.SetJson("data", response.Data)
+	if _, err := v.WriteTo(job.Stdout); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (daemon *Daemon) CmdContainerInfo(job *engine.Job) error {
 	if len(job.Args) == 0 {
 		return fmt.Errorf("Can not get Pod info without Pod ID")

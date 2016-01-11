@@ -548,6 +548,13 @@ func (d *VirDomain) BlockStatsFlags(disk string, params *VirTypedParameters, nPa
 	return int(cParamsLen), nil
 }
 
+type VirDomainBlockStats struct {
+	RdReq   int64
+	WrReq   int64
+	RdBytes int64
+	WrBytes int64
+}
+
 type VirDomainInterfaceStats struct {
 	RxBytes   int64
 	RxPackets int64
@@ -557,6 +564,28 @@ type VirDomainInterfaceStats struct {
 	TxPackets int64
 	TxErrs    int64
 	TxDrop    int64
+}
+
+func (d *VirDomain) BlockStats(path string) (VirDomainBlockStats, error) {
+	cPath := C.CString(path)
+	defer C.free(unsafe.Pointer(cPath))
+
+	size := C.size_t(unsafe.Sizeof(C.struct__virDomainBlockStats{}))
+
+	cStats := (C.virDomainBlockStatsPtr)(C.malloc(size))
+	defer C.free(unsafe.Pointer(cStats))
+
+	result := C.virDomainBlockStats(d.ptr, cPath, (C.virDomainBlockStatsPtr)(cStats), size)
+
+	if result != 0 {
+		return VirDomainBlockStats{}, GetLastError()
+	}
+	return VirDomainBlockStats{
+		WrReq:   int64(cStats.wr_req),
+		RdReq:   int64(cStats.rd_req),
+		RdBytes: int64(cStats.rd_bytes),
+		WrBytes: int64(cStats.wr_bytes),
+	}, nil
 }
 
 func (d *VirDomain) InterfaceStats(path string) (VirDomainInterfaceStats, error) {

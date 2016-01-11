@@ -276,6 +276,31 @@ func getPodInfo(eng *engine.Engine, version version.Version, w http.ResponseWrit
 	return writeJSON(w, http.StatusCreated, dat["data"])
 }
 
+func getPodStats(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+	if err := parseForm(r); err != nil {
+		return err
+	}
+
+	job := eng.Job("podStats", r.Form.Get("podId"))
+	stdoutBuf := bytes.NewBuffer(nil)
+
+	job.Stdout.Add(stdoutBuf)
+	if err := job.Run(); err != nil {
+		return err
+	}
+
+	var (
+		dat             map[string]interface{}
+		returnedJSONstr string
+	)
+	returnedJSONstr = engine.Tail(stdoutBuf, 1)
+	if err := json.Unmarshal([]byte(returnedJSONstr), &dat); err != nil {
+		return err
+	}
+
+	return writeJSON(w, http.StatusCreated, dat["data"])
+}
+
 func getContainerInfo(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
 	if err := parseForm(r); err != nil {
 		return err
@@ -1119,6 +1144,7 @@ func createRouter(eng *engine.Engine, logging, enableCors bool, corsHeaders stri
 			"/images/get":     getImages,
 			"/list":           getList,
 			"/pod/info":       getPodInfo,
+			"/pod/stats":      getPodStats,
 			"/service/list":   getServices,
 			"/version":        getVersion,
 		},
