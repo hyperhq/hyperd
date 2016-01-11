@@ -232,22 +232,10 @@ func (p *Pod) Status() *hypervisor.PodStatus {
 	return p.status
 }
 
-func CreatePod(daemon *Daemon, dclient DockerInterface, podId, podArgs string, autoremove bool) (*Pod, error) {
-	glog.V(1).Infof("podArgs: %s", podArgs)
-
+func CreatePod(daemon *Daemon, dclient DockerInterface, podId, podArgs string, spec *pod.UserPod, autoremove bool) (*Pod, error) {
 	resPath := filepath.Join(DefaultResourcePath, podId)
 	if err := os.MkdirAll(resPath, os.FileMode(0755)); err != nil {
 		glog.Error("cannot create resource dir ", resPath)
-		return nil, err
-	}
-
-	spec, err := ProcessPodBytes([]byte(podArgs), podId)
-	if err != nil {
-		glog.V(1).Infof("Process POD file error: %s", err.Error())
-		return nil, err
-	}
-
-	if err = spec.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -262,7 +250,11 @@ func CreatePod(daemon *Daemon, dclient DockerInterface, podId, podArgs string, a
 		spec:   spec,
 	}
 
-	if err = pod.InitContainers(daemon, dclient); err != nil {
+	if err := pod.InitContainers(daemon, dclient); err != nil {
+		return nil, err
+	}
+
+	if err := daemon.AddPod(pod, podArgs); err != nil {
 		return nil, err
 	}
 
@@ -340,17 +332,19 @@ func (p *Pod) InitContainers(daemon *Daemon, dclient DockerInterface) (err error
 
 //FIXME: there was a `config` argument passed by docker/builder, but we never processed it.
 func (daemon *Daemon) CreatePod(podId, podArgs string, autoremove bool) (*Pod, error) {
+	glog.V(1).Infof("podArgs: %s", podArgs)
 
-	pod, err := CreatePod(daemon, daemon.DockerCli, podId, podArgs, autoremove)
+	spec, err := ProcessPodBytes([]byte(podArgs), podId)
 	if err != nil {
+		glog.V(1).Infof("Process POD file error: %s", err.Error())
 		return nil, err
 	}
 
-	if err = daemon.AddPod(pod, podArgs); err != nil {
+	if err = spec.Validate(); err != nil {
 		return nil, err
 	}
 
-	return pod, nil
+	return CreatePod(daemon, daemon.DockerCli, podId, podArgs, spec, autoremove)
 }
 
 func (p *Pod) PrepareContainers(sd Storage, dclient DockerInterface) (err error) {
