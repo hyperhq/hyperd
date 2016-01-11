@@ -53,9 +53,9 @@ func CreateNewDevice(containerId, devPrefix, rootPath string) error {
 	poolName := fmt.Sprintf("/dev/mapper/%s-pool", devPrefix)
 	createDeviceCmd := fmt.Sprintf("dmsetup create %s --table \"0 %d thin %s %d\"", devName, deviceSize/512, poolName, deviceId)
 	createDeviceCommand := exec.Command("/bin/sh", "-c", createDeviceCmd)
-	output, err := createDeviceCommand.Output()
+	output, err := createDeviceCommand.CombinedOutput()
 	if err != nil {
-		glog.Error(output)
+		glog.Error(string(output))
 		return err
 	}
 	return nil
@@ -115,9 +115,9 @@ func ProbeFsType(device string) (string, error) {
 	// will be used to test the type of filesystem which the device located.
 	cmd := fmt.Sprintf("file -sL %s", device)
 	command := exec.Command("/bin/sh", "-c", cmd)
-	fileCmdOutput, err := command.Output()
+	fileCmdOutput, err := command.CombinedOutput()
 	if err != nil {
-		return "", nil
+		return string(fileCmdOutput), nil
 	}
 
 	if strings.Contains(strings.ToLower(string(fileCmdOutput)), "ext") {
