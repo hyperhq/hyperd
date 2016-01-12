@@ -31,6 +31,14 @@ func main() {
 	}
 
 	if err := cli.Cmd(flag.Args()...); err != nil {
+		if sterr, ok := err.(client.StatusError); ok {
+			if sterr.Status != "" {
+				fmt.Printf("%s ERROR: %s\n", os.Args[0], err.Error())
+				os.Exit(-1)
+			}
+			os.Exit(sterr.StatusCode)
+		}
+
 		fmt.Printf("%s ERROR: %s\n", os.Args[0], err.Error())
 		os.Exit(-1)
 	}

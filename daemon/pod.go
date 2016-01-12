@@ -180,7 +180,7 @@ func (daemon *Daemon) CmdPodStart(job *engine.Job) error {
 	if len(ttys) > 0 {
 		glog.V(2).Infof("unlock PodList")
 		daemon.PodList.Unlock()
-		<-ttyCallback
+		daemon.GetExitCode(podId, tag, ttyCallback)
 		return nil
 	}
 	defer glog.V(2).Infof("unlock PodList")
@@ -802,6 +802,25 @@ func (p *Pod) Start(daemon *Daemon, vmId string, lazy, autoremove bool, keep int
 	return vmResponse, nil
 }
 
+func (daemon *Daemon) GetExitCode(podId, tag string, callback chan *types.VmResponse) error {
+	var (
+		pod *Pod
+		ok  bool
+	)
+
+	daemon.PodList.Lock()
+	if pod, ok = daemon.PodList.Get(podId); !ok {
+		daemon.PodList.Unlock()
+		return fmt.Errorf("Can not find the POD instance of %s", podId)
+	}
+	if pod.vm == nil {
+		daemon.PodList.Unlock()
+		return fmt.Errorf("pod %s is already stopped", podId)
+	}
+	daemon.PodList.Unlock()
+	return pod.vm.GetExitCode(tag, callback)
+}
+
 func (daemon *Daemon) StartPod(podId, podArgs, vmId string, config interface{}, lazy, autoremove bool, keep int, streams []*hypervisor.TtyIO) (int, string, error) {
 	glog.V(1).Infof("podArgs: %s", podArgs)
 	var (
@@ -867,13 +886,11 @@ func hyperHandlePodEvent(vmResponse *types.VmResponse, data interface{},
 
 	if vmResponse.Code == types.E_POD_FINISHED {
 		if vm.Keep != types.VM_KEEP_NONE {
-			mypod.Vm = ""
 			vm.Status = types.S_VM_IDLE
 			return false
 		}
 		stopLogger(mypod)
 		mypod.SetPodContainerStatus(vmResponse.Data.([]uint32))
-		mypod.Vm = ""
 		vm.Status = types.S_VM_IDLE
 		if mypod.Autoremove == true {
 			daemon.CleanPod(mypod.Id)

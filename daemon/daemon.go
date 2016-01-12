@@ -91,6 +91,7 @@ func (daemon *Daemon) Install(eng *engine.Engine) error {
 		"vmKill":            daemon.CmdVmKill,
 		"list":              daemon.CmdList,
 		"exec":              daemon.CmdExec,
+		"exitcode":          daemon.CmdExitCode,
 		"attach":            daemon.CmdAttach,
 		"tty":               daemon.CmdTty,
 		"serviceAdd":        daemon.AddService,

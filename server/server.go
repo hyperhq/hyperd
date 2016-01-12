@@ -251,6 +251,31 @@ func getImages(eng *engine.Engine, version version.Version, w http.ResponseWrite
 	return writeJSONEnv(w, http.StatusOK, env)
 }
 
+func getExitCode(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+	if err := parseForm(r); err != nil {
+		return err
+	}
+
+	job := eng.Job("exitcode", r.Form.Get("container"), r.Form.Get("tag"))
+	stdoutBuf := bytes.NewBuffer(nil)
+
+	job.Stdout.Add(stdoutBuf)
+	if err := job.Run(); err != nil {
+		return err
+	}
+
+	var (
+		dat             map[string]interface{}
+		returnedJSONstr string
+	)
+	returnedJSONstr = engine.Tail(stdoutBuf, 1)
+	if err := json.Unmarshal([]byte(returnedJSONstr), &dat); err != nil {
+		return err
+	}
+
+	return writeJSON(w, http.StatusOK, dat["ExitCode"])
+}
+
 func getPodInfo(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
 	if err := parseForm(r); err != nil {
 		return err
@@ -1146,6 +1171,7 @@ func createRouter(eng *engine.Engine, logging, enableCors bool, corsHeaders stri
 			"/pod/info":       getPodInfo,
 			"/pod/stats":      getPodStats,
 			"/service/list":   getServices,
+			"/exitcode":       getExitCode,
 			"/version":        getVersion,
 		},
 		"POST": {

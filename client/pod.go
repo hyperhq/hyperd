@@ -190,7 +190,18 @@ func (cli *HyperClient) StartPod(podId, vmId string, tty bool) (string, error) {
 	if !tty {
 		return cli.startPodWithoutTty(&v)
 	} else {
-		return "", cli.hijackRequest("pod/start", podId, tag, &v)
+		err := cli.hijackRequest("pod/start", podId, tag, &v)
+		if err != nil {
+			fmt.Printf("StartPod failed: %s\n", err.Error())
+			return "", err
+		}
+
+		containerId, err := cli.GetContainerByPod(podId)
+		if err != nil {
+			return "", err
+		}
+
+		return "", GetExitCode(cli, containerId, tag)
 	}
 }
 

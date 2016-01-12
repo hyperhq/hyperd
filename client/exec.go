@@ -13,6 +13,40 @@ import (
 	gflag "github.com/jessevdk/go-flags"
 )
 
+// An StatusError reports an unsuccessful exit by a command.
+type StatusError struct {
+	Status     string
+	StatusCode int
+}
+
+func (e StatusError) Error() string {
+	return fmt.Sprintf("Status: %s, Code: %d", e.Status, e.StatusCode)
+}
+
+func GetExitCode(cli *HyperClient, container, tag string) error {
+	v := url.Values{}
+	v.Set("container", container)
+	v.Set("tag", tag)
+	code := -1
+
+	stream, _, err := cli.call("GET", "/exitcode?"+v.Encode(), nil, nil)
+	if err != nil {
+		return err
+	}
+
+	err = json.NewDecoder(stream).Decode(&code)
+	if err != nil {
+		fmt.Printf("Error get exit code: %s", err.Error())
+		return err
+	}
+
+	if code != 0 {
+		return StatusError{StatusCode: code}
+	}
+
+	return nil
+}
+
 func (cli *HyperClient) HyperCmdExec(args ...string) error {
 	var opts struct {
 		Attach bool `short:"a" long:"attach" default:"true" value-name:"false" description:"attach current terminal to the stdio of command"`
@@ -108,7 +142,8 @@ func (cli *HyperClient) HyperCmdExec(args ...string) error {
 		fmt.Printf("Error hijack: %s", err.Error())
 		return err
 	}
-	return nil
+
+	return GetExitCode(cli, containerId, tag)
 }
 
 func (cli *HyperClient) GetPodInfo(podName string) (string, error) {
