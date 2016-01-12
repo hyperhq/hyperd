@@ -63,3 +63,11 @@ hyper::test::insert_file() {
   done < <(hyper::test::run_attached_pod ${HYPER_ROOT}/hack/pods/insert-file.pod)
   return $res && $count
 }
+
+hyper::test::map_file() {
+  rslv=$(cat /etc/resolv.conf | md5sum | cut -f1 -d\ )
+  invm=$(hyper::test::run_attached_pod ${HYPER_ROOT}/hack/pods/file-mapping.pod | grep resolv.conf | cut -f1 -d\ )
+  echo "$invm vs. $rslv"
+  test "a$invm" = "a$rslv"
+}
+

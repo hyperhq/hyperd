@@ -1,0 +1,24 @@
+{
+        "id": "test-file-mapping",
+        "containers" : [{
+            "name": "mapping",
+            "image": "busybox",
+            "command": ["/bin/sh", "-c", "md5sum /root/resolv.conf"],
+            "volumes": [{
+                "volume": "resolv.conf",
+                "path": "/root/resolv.conf",
+                "readOnly": false
+             }]
+        }],
+        "resource": {
+            "vcpu": 1,
+            "memory": 256
+        },
+        "files": [],
+        "volumes": [{
+            "name": "resolv.conf",
+            "source": "/etc/resolv.conf",
+            "driver": "vfs"
+        }],
+        "tty": true
+}
