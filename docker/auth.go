@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/hyperhq/hyper/lib/docker/cliconfig"
+	"github.com/docker/docker/cliconfig"
 )
 
 func (cli Docker) SendCmdAuth(body io.ReadCloser) (string, error) {

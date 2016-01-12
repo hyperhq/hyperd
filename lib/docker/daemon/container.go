@@ -9,20 +9,28 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
-	"github.com/docker/libcontainer/label"
-
+	"github.com/Sirupsen/logrus"
+	"github.com/docker/docker/daemon/execdriver"
+	"github.com/docker/docker/daemon/logger"
+	"github.com/docker/docker/daemon/logger/jsonfilelog"
+	"github.com/docker/docker/daemon/network"
+	derr "github.com/docker/docker/errors"
+	"github.com/docker/docker/image"
+	"github.com/docker/docker/pkg/archive"
+	"github.com/docker/docker/pkg/broadcaster"
+	"github.com/docker/docker/pkg/ioutils"
+	"github.com/docker/docker/pkg/nat"
+	"github.com/docker/docker/pkg/promise"
+	"github.com/docker/docker/pkg/signal"
+	"github.com/docker/docker/pkg/symlink"
+	"github.com/docker/docker/runconfig"
+	"github.com/docker/docker/volume"
 	"github.com/golang/glog"
-	"github.com/hyperhq/hyper/lib/docker/daemon/network"
-	"github.com/hyperhq/hyper/lib/docker/image"
-	"github.com/hyperhq/hyper/lib/docker/nat"
-	"github.com/hyperhq/hyper/lib/docker/pkg/archive"
-	"github.com/hyperhq/hyper/lib/docker/pkg/broadcastwriter"
-	"github.com/hyperhq/hyper/lib/docker/pkg/ioutils"
-	"github.com/hyperhq/hyper/lib/docker/pkg/symlink"
-	"github.com/hyperhq/hyper/lib/docker/runconfig"
+	"github.com/opencontainers/runc/libcontainer/label"
 )
 
 var (
@@ -32,9 +40,9 @@ var (
 	ErrContainerStartTimeout = errors.New("The container failed to start due to timed out.")
 )
 
-type StreamConfig struct {
-	stdout    *broadcastwriter.BroadcastWriter
-	stderr    *broadcastwriter.BroadcastWriter
+type streamConfig struct {
+	stdout    *broadcaster.Unbuffered
+	stderr    *broadcaster.Unbuffered
 	stdin     io.ReadCloser
 	stdinPipe io.WriteCloser
 }
@@ -42,12 +50,11 @@ type StreamConfig struct {
 // CommonContainer holds the settings for a container which are applicable
 // across all platforms supported by the daemon.
 type CommonContainer struct {
-	StreamConfig
-
-	*State `json:"State"` // Needed for remote api version <= 1.11
-	root   string         // Path to the "home" of the container, including metadata.
-	basefs string         // Path to the graphdriver mountpoint
-
+	streamConfig
+	// embed for Container to support states directly.
+	*State                   `json:"State"` // Needed for remote api version <= 1.11
+	root                     string         // Path to the "home" of the container, including metadata.
+	basefs                   string         // Path to the graphdriver mountpoint
 	ID                       string
 	Created                  time.Time
 	Path                     string
@@ -61,15 +68,32 @@ type CommonContainer struct {
 	LogPath                  string
 	Name                     string
 	Driver                   string
+	ExecDriver               string
 	MountLabel, ProcessLabel string
 	RestartCount             int
+	HasBeenStartedBefore     bool
+	HasBeenManuallyStopped   bool // used for unless-stopped restart policy
 	UpdateDns                bool
-
-	hostConfig *runconfig.HostConfig
-	daemon     *Daemon
+	MountPoints              map[string]*volume.MountPoint
+	hostConfig               *runconfig.HostConfig
+	command                  *execdriver.Command
+	daemon                   *Daemon
 }
 
-func (container *Container) FromDisk() error {
+// newBaseContainer creates a new container with its
+// basic configuration.
+func newBaseContainer(id, root string) *Container {
+	return &Container{
+		CommonContainer: CommonContainer{
+			ID:          id,
+			State:       NewState(),
+			root:        root,
+			MountPoints: make(map[string]*volume.MountPoint),
+		},
+	}
+}
+
+func (container *Container) fromDisk() error {
 	pth, err := container.jsonPath()
 	if err != nil {
 		return err
@@ -110,10 +134,10 @@ func (container *Container) toDisk() error {
 		return err
 	}
 
-	return container.WriteHostConfig()
+	return container.writeHostConfig()
 }
 
-func (container *Container) ToDisk() error {
+func (container *Container) toDiskLocking() error {
 	container.Lock()
 	err := container.toDisk()
 	container.Unlock()
@@ -144,32 +168,22 @@ func (container *Container) readHostConfig() error {
 	return json.NewDecoder(f).Decode(&container.hostConfig)
 }
 
-func (container *Container) WriteHostConfig() error {
-	data, err := json.Marshal(container.hostConfig)
-	if err != nil {
-		return err
-	}
-
+func (container *Container) writeHostConfig() error {
 	pth, err := container.hostConfigPath()
 	if err != nil {
 		return err
 	}
 
-	return ioutil.WriteFile(pth, data, 0666)
+	f, err := os.Create(pth)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	return json.NewEncoder(f).Encode(&container.hostConfig)
 }
 
-func (container *Container) LogEvent(action string) {
-	/*
-		d := container.daemon
-		d.EventsService.Log(
-			action,
-			container.ID,
-			container.Config.Image,
-		)
-	*/
-}
-
-// Evaluates `path` in the scope of the container's basefs, with proper path
+// GetResourcePath evaluates `path` in the scope of the container's basefs, with proper path
 // sanitisation. Symlinks are all scoped to the basefs of the container, as
 // though the container's basefs was `/`.
 //
@@ -183,8 +197,11 @@ func (container *Container) LogEvent(action string) {
 //       symlinking to a different path) between using this method and using the
 //       path. See symlink.FollowSymlinkInScope for more details.
 func (container *Container) GetResourcePath(path string) (string, error) {
-	cleanPath := filepath.Join("/", path)
-	return symlink.FollowSymlinkInScope(filepath.Join(container.basefs, cleanPath), container.basefs)
+	// IMPORTANT - These are paths on the OS where the daemon is running, hence
+	// any filepath operations must be done in an OS agnostic way.
+	cleanPath := filepath.Join(string(os.PathSeparator), path)
+	r, e := symlink.FollowSymlinkInScope(filepath.Join(container.basefs, cleanPath), container.basefs)
+	return r, e
 }
 
 // Evaluates `path` in the scope of the container's root, with proper path
@@ -199,75 +216,11 @@ func (container *Container) GetResourcePath(path string) (string, error) {
 //       if no component of the returned path changes (such as a component
 //       symlinking to a different path) between using this method and using the
 //       path. See symlink.FollowSymlinkInScope for more details.
-func (container *Container) GetRootResourcePath(path string) (string, error) {
-	cleanPath := filepath.Join("/", path)
+func (container *Container) getRootResourcePath(path string) (string, error) {
+	// IMPORTANT - These are paths on the OS where the daemon is running, hence
+	// any filepath operations must be done in an OS agnostic way.
+	cleanPath := filepath.Join(string(os.PathSeparator), path)
 	return symlink.FollowSymlinkInScope(filepath.Join(container.root, cleanPath), container.root)
-}
-
-func (container *Container) Start() (err error) {
-	container.Lock()
-	defer container.Unlock()
-
-	if container.Running {
-		return nil
-	}
-
-	if container.removalInProgress || container.Dead {
-		return fmt.Errorf("Container is marked for removal and cannot be started.")
-	}
-
-	// if we encounter an error during start we need to ensure that any other
-	// setup has been cleaned up properly
-	defer func() {
-		if err != nil {
-			container.setError(err)
-			// if no one else has set it, make sure we don't leave it at zero
-			if container.ExitCode == 0 {
-				container.ExitCode = 128
-			}
-			container.toDisk()
-			container.cleanup()
-			container.LogEvent("die")
-		}
-	}()
-
-	if err := container.Mount(); err != nil {
-		return err
-	}
-	if err := container.initializeNetworking(); err != nil {
-		return err
-	}
-	linkedEnv, err := container.setupLinkedContainers()
-	if err != nil {
-		return err
-	}
-	if err := container.setupWorkingDirectory(); err != nil {
-		return err
-	}
-	env := container.createDaemonEnvironment(linkedEnv)
-	if err := populateCommand(container, env); err != nil {
-		return err
-	}
-	return container.waitForStart()
-}
-
-func (container *Container) Run() error {
-	if err := container.Start(); err != nil {
-		return err
-	}
-	container.WaitStop(-1 * time.Second)
-	return nil
-}
-
-func (container *Container) Output() (output []byte, err error) {
-	pipe := container.StdoutPipe()
-	defer pipe.Close()
-	if err := container.Start(); err != nil {
-		return nil, err
-	}
-	output, err = ioutil.ReadAll(pipe)
-	container.WaitStop(-1 * time.Second)
-	return output, err
 }
 
 // StreamConfig.StdinPipe returns a WriteCloser which can be used to feed data
@@ -278,48 +231,25 @@ func (container *Container) Output() (output []byte, err error) {
 // copied and delivered to all StdoutPipe and StderrPipe consumers, using
 // a kind of "broadcaster".
 
-func (streamConfig *StreamConfig) StdinPipe() io.WriteCloser {
+func (streamConfig *streamConfig) StdinPipe() io.WriteCloser {
 	return streamConfig.stdinPipe
 }
 
-func (streamConfig *StreamConfig) StdoutPipe() io.ReadCloser {
-	reader, writer := io.Pipe()
-	streamConfig.stdout.AddWriter(writer, "")
-	return ioutils.NewBufReader(reader)
+func (streamConfig *streamConfig) StdoutPipe() io.ReadCloser {
+	bytesPipe := ioutils.NewBytesPipe(nil)
+	streamConfig.stdout.Add(bytesPipe)
+	return bytesPipe
 }
 
-func (streamConfig *StreamConfig) StderrPipe() io.ReadCloser {
-	reader, writer := io.Pipe()
-	streamConfig.stderr.AddWriter(writer, "")
-	return ioutils.NewBufReader(reader)
+func (streamConfig *streamConfig) StderrPipe() io.ReadCloser {
+	bytesPipe := ioutils.NewBytesPipe(nil)
+	streamConfig.stderr.Add(bytesPipe)
+	return bytesPipe
 }
 
-func (streamConfig *StreamConfig) StdoutLogPipe() io.ReadCloser {
-	reader, writer := io.Pipe()
-	streamConfig.stdout.AddWriter(writer, "stdout")
-	return ioutils.NewBufReader(reader)
-}
-
-func (streamConfig *StreamConfig) StderrLogPipe() io.ReadCloser {
-	reader, writer := io.Pipe()
-	streamConfig.stderr.AddWriter(writer, "stderr")
-	return ioutils.NewBufReader(reader)
-}
-
-func (container *Container) isNetworkAllocated() bool {
-	return container.NetworkSettings.IPAddress != ""
-}
-
-// cleanup releases any network resources allocated to the container along with any rules
-// around how containers are linked together.  It also unmounts the container's root filesystem.
-func (container *Container) cleanup() {
-	container.ReleaseNetwork()
-
-	disableAllActiveLinks(container)
-
-	if err := container.Unmount(); err != nil {
-		glog.Errorf("%v: Failed to umount filesystem: %v", container.ID, err)
-	}
+// ExitOnNext signals to the monitor that it should not restart the container
+// after we send the kill signal.
+func (container *Container) ExitOnNext() {
 }
 
 func (container *Container) KillSig(sig int) error {
@@ -350,7 +280,7 @@ func (container *Container) KillSig(sig int) error {
 func (container *Container) killPossiblyDeadProcess(sig int) error {
 	err := container.KillSig(sig)
 	if err == syscall.ESRCH {
-		glog.V(1).Infof("Cannot kill process (pid=%d) with signal %d: no such process.", container.GetPid(), sig)
+		glog.V(1).Infof("Cannot kill process (pid=%d) with signal %d: no such process.", container.GetPID(), sig)
 		return nil
 	}
 	return err
@@ -414,27 +344,6 @@ func (container *Container) Stop(seconds int) error {
 		}
 	}
 
-	container.LogEvent("stop")
-	return nil
-}
-
-func (container *Container) Restart(seconds int) error {
-	// Avoid unnecessarily unmounting and then directly mounting
-	// the container when the container stops and then starts
-	// again
-	if err := container.Mount(); err == nil {
-		defer container.Unmount()
-	}
-
-	if err := container.Stop(seconds); err != nil {
-		return err
-	}
-
-	if err := container.Start(); err != nil {
-		return err
-	}
-
-	container.LogEvent("restart")
 	return nil
 }
 
@@ -460,7 +369,6 @@ func (container *Container) Export() (archive.Archive, error) {
 		container.Unmount()
 		return err
 	})
-	container.LogEvent("export")
 	return arch, err
 }
 
@@ -469,7 +377,7 @@ func (container *Container) Mount() error {
 }
 
 func (container *Container) changes() ([]archive.Change, error) {
-	return container.daemon.Changes(container)
+	return container.daemon.changes(container)
 }
 
 func (container *Container) Changes() ([]archive.Change, error) {
@@ -490,16 +398,16 @@ func (container *Container) Unmount() error {
 }
 
 func (container *Container) hostConfigPath() (string, error) {
-	return container.GetRootResourcePath("hostconfig.json")
+	return container.getRootResourcePath("hostconfig.json")
 }
 
 func (container *Container) jsonPath() (string, error) {
-	return container.GetRootResourcePath("config.json")
+	return container.getRootResourcePath("config.json")
 }
 
 // This method must be exported to be used from the lxc template
 // This directory is only usable when the container is running
-func (container *Container) RootfsPath() string {
+func (container *Container) rootfsPath() string {
 	return container.basefs
 }
 
@@ -508,6 +416,181 @@ func validateID(id string) error {
 		return fmt.Errorf("Invalid empty id")
 	}
 	return nil
+}
+
+// Returns true if the container exposes a certain port
+func (container *Container) exposes(p nat.Port) bool {
+	_, exists := container.Config.ExposedPorts[p]
+	return exists
+}
+
+func (container *Container) getLogConfig(defaultConfig runconfig.LogConfig) runconfig.LogConfig {
+	cfg := container.hostConfig.LogConfig
+	if cfg.Type != "" || len(cfg.Config) > 0 { // container has log driver configured
+		if cfg.Type == "" {
+			cfg.Type = jsonfilelog.Name
+		}
+		return cfg
+	}
+	// Use daemon's default log config for containers
+	return defaultConfig
+}
+
+// StartLogger starts a new logger driver for the container.
+func (container *Container) StartLogger(cfg runconfig.LogConfig) (logger.Logger, error) {
+	c, err := logger.GetLogDriver(cfg.Type)
+	if err != nil {
+		return nil, derr.ErrorCodeLoggingFactory.WithArgs(err)
+	}
+	ctx := logger.Context{
+		Config:              cfg.Config,
+		ContainerID:         container.ID,
+		ContainerName:       container.Name,
+		ContainerEntrypoint: container.Path,
+		ContainerArgs:       container.Args,
+		ContainerImageID:    container.ImageID,
+		ContainerImageName:  container.Config.Image,
+		ContainerCreated:    container.Created,
+		ContainerEnv:        container.Config.Env,
+		ContainerLabels:     container.Config.Labels,
+	}
+
+	// Set logging file for "json-logger"
+	if cfg.Type == jsonfilelog.Name {
+		ctx.LogPath, err = container.getRootResourcePath(fmt.Sprintf("%s-json.log", container.ID))
+		if err != nil {
+			return nil, err
+		}
+	}
+	return c(ctx)
+}
+
+func (container *Container) getProcessLabel() string {
+	// even if we have a process label return "" if we are running
+	// in privileged mode
+	if container.hostConfig.Privileged {
+		return ""
+	}
+	return container.ProcessLabel
+}
+
+func (container *Container) getMountLabel() string {
+	if container.hostConfig.Privileged {
+		return ""
+	}
+	return container.MountLabel
+}
+
+func (container *Container) getExecIDs() []string {
+	return nil
+}
+
+// Attach connects to the container's TTY, delegating to standard
+// streams or websockets depending on the configuration.
+func (container *Container) Attach(stdin io.ReadCloser, stdout io.Writer, stderr io.Writer) chan error {
+	return attach(&container.streamConfig, container.Config.OpenStdin, container.Config.StdinOnce, container.Config.Tty, stdin, stdout, stderr)
+}
+
+func attach(streamConfig *streamConfig, openStdin, stdinOnce, tty bool, stdin io.ReadCloser, stdout io.Writer, stderr io.Writer) chan error {
+	var (
+		cStdout, cStderr io.ReadCloser
+		cStdin           io.WriteCloser
+		wg               sync.WaitGroup
+		errors           = make(chan error, 3)
+	)
+
+	if stdin != nil && openStdin {
+		cStdin = streamConfig.StdinPipe()
+		wg.Add(1)
+	}
+
+	if stdout != nil {
+		cStdout = streamConfig.StdoutPipe()
+		wg.Add(1)
+	}
+
+	if stderr != nil {
+		cStderr = streamConfig.StderrPipe()
+		wg.Add(1)
+	}
+
+	// Connect stdin of container to the http conn.
+	go func() {
+		if stdin == nil || !openStdin {
+			return
+		}
+		logrus.Debugf("attach: stdin: begin")
+		defer func() {
+			if stdinOnce && !tty {
+				cStdin.Close()
+			} else {
+				// No matter what, when stdin is closed (io.Copy unblock), close stdout and stderr
+				if cStdout != nil {
+					cStdout.Close()
+				}
+				if cStderr != nil {
+					cStderr.Close()
+				}
+			}
+			wg.Done()
+			logrus.Debugf("attach: stdin: end")
+		}()
+
+		var err error
+		if tty {
+			_, err = copyEscapable(cStdin, stdin)
+		} else {
+			_, err = io.Copy(cStdin, stdin)
+
+		}
+		if err == io.ErrClosedPipe {
+			err = nil
+		}
+		if err != nil {
+			logrus.Errorf("attach: stdin: %s", err)
+			errors <- err
+			return
+		}
+	}()
+
+	attachStream := func(name string, stream io.Writer, streamPipe io.ReadCloser) {
+		if stream == nil {
+			return
+		}
+		defer func() {
+			// Make sure stdin gets closed
+			if stdin != nil {
+				stdin.Close()
+			}
+			streamPipe.Close()
+			wg.Done()
+			logrus.Debugf("attach: %s: end", name)
+		}()
+
+		logrus.Debugf("attach: %s: begin", name)
+		_, err := io.Copy(stream, streamPipe)
+		if err == io.ErrClosedPipe {
+			err = nil
+		}
+		if err != nil {
+			logrus.Errorf("attach: %s: %v", name, err)
+			errors <- err
+		}
+	}
+
+	go attachStream("stdout", stdout, cStdout)
+	go attachStream("stderr", stderr, cStderr)
+
+	return promise.Go(func() error {
+		wg.Wait()
+		close(errors)
+		for err := range errors {
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func (container *Container) Copy(resource string) (io.ReadCloser, error) {
@@ -552,7 +635,6 @@ func (container *Container) Copy(resource string) (io.ReadCloser, error) {
 		container.Unmount()
 		return err
 	})
-	container.LogEvent("copy")
 	return reader, nil
 }
 
@@ -570,33 +652,8 @@ func (container *Container) SetHostConfig(hostConfig *runconfig.HostConfig) {
 	container.hostConfig = hostConfig
 }
 
-func (container *Container) getLogConfig() runconfig.LogConfig {
-	cfg := container.hostConfig.LogConfig
-	if cfg.Type != "" { // container has log driver configured
-		return cfg
-	}
-	// Use daemon's default log config for containers
-	return container.daemon.defaultLogConfig
-}
-
 func (container *Container) waitForStart() error {
 	return nil
-}
-
-func (container *Container) GetProcessLabel() string {
-	// even if we have a process label return "" if we are running
-	// in privileged mode
-	if container.hostConfig.Privileged {
-		return ""
-	}
-	return container.ProcessLabel
-}
-
-func (container *Container) GetMountLabel() string {
-	if container.hostConfig.Privileged {
-		return ""
-	}
-	return container.MountLabel
 }
 
 func (c *Container) LogDriverType() string {
@@ -654,6 +711,50 @@ func copyEscapable(dst io.Writer, src io.ReadCloser) (written int64, err error) 
 func (container *Container) shouldRestart() bool {
 	return container.hostConfig.RestartPolicy.Name == "always" ||
 		(container.hostConfig.RestartPolicy.Name == "on-failure" && container.ExitCode != 0)
+}
+
+func (container *Container) addBindMountPoint(name, source, destination string, rw bool) {
+	container.MountPoints[destination] = &volume.MountPoint{
+		Name:        name,
+		Source:      source,
+		Destination: destination,
+		RW:          rw,
+	}
+}
+
+func (container *Container) addLocalMountPoint(name, destination string, rw bool) {
+	container.MountPoints[destination] = &volume.MountPoint{
+		Name:        name,
+		Driver:      volume.DefaultDriverName,
+		Destination: destination,
+		RW:          rw,
+	}
+}
+
+func (container *Container) addMountPointWithVolume(destination string, vol volume.Volume, rw bool) {
+	container.MountPoints[destination] = &volume.MountPoint{
+		Name:        vol.Name(),
+		Driver:      vol.DriverName(),
+		Destination: destination,
+		RW:          rw,
+		Volume:      vol,
+	}
+}
+
+func (container *Container) isDestinationMounted(destination string) bool {
+	return container.MountPoints[destination] != nil
+}
+
+func (container *Container) stopSignal() int {
+	var stopSignal syscall.Signal
+	if container.Config.StopSignal != "" {
+		stopSignal, _ = signal.ParseSignal(container.Config.StopSignal)
+	}
+
+	if int(stopSignal) == 0 {
+		stopSignal, _ = signal.ParseSignal(signal.DefaultStopSignal)
+	}
+	return int(stopSignal)
 }
 
 func (container *Container) GetDaemon() *Daemon {

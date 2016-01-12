@@ -1,7 +1,7 @@
 package docker
 
 import (
-	"github.com/hyperhq/hyper/lib/docker/graph"
+	"github.com/docker/docker/graph"
 )
 
 func (cli Docker) SendCmdPush(remote string, imagePushConfig *graph.ImagePushConfig) error {

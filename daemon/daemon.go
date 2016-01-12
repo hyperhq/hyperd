@@ -9,11 +9,11 @@ import (
 	"strings"
 
 	"github.com/Unknwon/goconfig"
+	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/daemon/logger/jsonfilelog"
+	"github.com/docker/docker/graph"
 	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/engine"
-	dockertypes "github.com/hyperhq/hyper/lib/docker/api/types"
-	"github.com/hyperhq/hyper/lib/docker/graph"
 	"github.com/hyperhq/hyper/lib/portallocator"
 	apiserver "github.com/hyperhq/hyper/server"
 	"github.com/hyperhq/hyper/utils"
@@ -33,12 +33,12 @@ type DockerInterface interface {
 	SendCmdDelete(arg ...string) ([]byte, int, error)
 	SendCmdInfo(args ...string) (*dockertypes.Info, error)
 	SendCmdImages(all string) ([]*dockertypes.Image, error)
-	GetContainerInfo(args ...string) (*dockertypes.ContainerJSONRaw, error)
+	GetContainerInfo(args ...string) (*dockertypes.ContainerJSON, error)
 	SendCmdPull(image string, config *graph.ImagePullConfig) ([]byte, int, error)
 	SendCmdAuth(body io.ReadCloser) (string, error)
 	SendCmdPush(remote string, ipconfig *graph.ImagePushConfig) error
 	SendImageDelete(args ...string) ([]dockertypes.ImageDelete, error)
-	SendImageBuild(image string, context io.ReadCloser) ([]byte, int, error)
+	SendImageBuild(image string, size int, context io.ReadCloser) ([]byte, int, error)
 	SendContainerCommit(args ...string) ([]byte, int, error)
 	SendContainerRename(oName, nName string) error
 	Shutdown() error

@@ -8,17 +8,17 @@ import (
 	"path"
 	"time"
 
+	"github.com/docker/docker/pkg/archive"
+	"github.com/docker/docker/pkg/chrootarchive"
+	"github.com/docker/docker/pkg/ioutils"
 	"github.com/golang/glog"
-	"github.com/hyperhq/hyper/lib/docker/pkg/archive"
-	"github.com/hyperhq/hyper/lib/docker/pkg/chrootarchive"
-	"github.com/hyperhq/hyper/lib/docker/pkg/ioutils"
 	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/types"
 	"github.com/hyperhq/runv/lib/govbox"
 )
 
-func (d *Driver) ApplyDiff(id, parent string, diff archive.ArchiveReader) (size int64, err error) {
+func (d *Driver) ApplyDiff(id, parent string, diff archive.Reader) (size int64, err error) {
 	// Mount the root filesystem so we can apply the diff/layer.
 	layerFs, err := d.Get(id, "")
 	if err != nil {

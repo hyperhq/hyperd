@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/hyperhq/hyper/lib/docker/registry"
+	"github.com/docker/docker/registry"
 
 	gflag "github.com/jessevdk/go-flags"
 )
@@ -16,7 +16,7 @@ import (
 // Usage: hyper logout [SERVER]
 func (cli *HyperClient) HyperCmdLogout(args ...string) error {
 	var parser = gflag.NewParser(nil, gflag.Default)
-	parser.Usage = "logout [SERVER]\n\nLog out from a Docker registry, if no server is\nspecified \"" + registry.IndexServerAddress() + "\" is the default."
+	parser.Usage = "logout [SERVER]\n\nLog out from a Docker registry, if no server is\nspecified \"" + registry.IndexServer + "\" is the default."
 	args, err := parser.Parse()
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {
@@ -25,7 +25,7 @@ func (cli *HyperClient) HyperCmdLogout(args ...string) error {
 			return nil
 		}
 	}
-	serverAddress := registry.IndexServerAddress()
+	serverAddress := registry.IndexServer
 	if len(args) > 1 {
 		serverAddress = args[1]
 	}

@@ -3,22 +3,23 @@ package docker
 import (
 	"os"
 	"runtime"
+	"strings"
 	"time"
 
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/dockerversion"
+	"github.com/docker/docker/pkg/fileutils"
+	"github.com/docker/docker/pkg/parsers/kernel"
+	"github.com/docker/docker/pkg/parsers/operatingsystem"
+	"github.com/docker/docker/pkg/system"
+	"github.com/docker/docker/registry"
+	"github.com/docker/docker/utils"
 	"github.com/golang/glog"
-	"github.com/hyperhq/hyper/lib/docker/api/types"
-	"github.com/hyperhq/hyper/lib/docker/dockerversion"
-	"github.com/hyperhq/hyper/lib/docker/pkg/fileutils"
-	"github.com/hyperhq/hyper/lib/docker/pkg/parsers/kernel"
-	"github.com/hyperhq/hyper/lib/docker/pkg/parsers/operatingsystem"
-	"github.com/hyperhq/hyper/lib/docker/pkg/system"
-	"github.com/hyperhq/hyper/lib/docker/registry"
-	"github.com/hyperhq/hyper/lib/docker/utils"
 )
 
 func (cli *Docker) SendCmdInfo(args ...string) (*types.Info, error) {
 	daemon := cli.daemon
-	images, _ := daemon.Graph().Map()
+	images := daemon.Graph().Map()
 	var imgcount int
 	if images == nil {
 		imgcount = 0
@@ -65,8 +66,8 @@ func (cli *Docker) SendCmdInfo(args ...string) (*types.Info, error) {
 		DriverStatus:       daemon.GraphDriver().Status(),
 		MemoryLimit:        daemon.SystemConfig().MemoryLimit,
 		SwapLimit:          daemon.SystemConfig().SwapLimit,
-		CpuCfsPeriod:       daemon.SystemConfig().CpuCfsPeriod,
-		CpuCfsQuota:        daemon.SystemConfig().CpuCfsQuota,
+		CPUCfsPeriod:       daemon.SystemConfig().CPUCfsPeriod,
+		CPUCfsQuota:        daemon.SystemConfig().CPUCfsQuota,
 		IPv4Forwarding:     !daemon.SystemConfig().IPv4ForwardingDisabled,
 		Debug:              os.Getenv("DEBUG") != "",
 		NFd:                fileutils.GetTotalUsedFds(),
@@ -76,29 +77,35 @@ func (cli *Docker) SendCmdInfo(args ...string) (*types.Info, error) {
 		NEventsListener:    daemon.EventsService.SubscribersCount(),
 		KernelVersion:      kernelVersion,
 		OperatingSystem:    operatingSystem,
-		IndexServerAddress: registry.IndexServerAddress(),
+		IndexServerAddress: registry.IndexServer,
 		RegistryConfig:     daemon.RegistryService.Config,
-		InitSha1:           dockerversion.INITSHA1,
+		InitSha1:           dockerversion.InitSHA1,
 		InitPath:           initPath,
 		NCPU:               runtime.NumCPU(),
 		MemTotal:           meminfo.MemTotal,
 		DockerRootDir:      daemon.Config().Root,
 		Labels:             daemon.Config().Labels,
 		ExperimentalBuild:  utils.ExperimentalBuild(),
-	}
-
-	if httpProxy := os.Getenv("http_proxy"); httpProxy != "" {
-		v.HttpProxy = httpProxy
-	}
-	if httpsProxy := os.Getenv("https_proxy"); httpsProxy != "" {
-		v.HttpsProxy = httpsProxy
-	}
-	if noProxy := os.Getenv("no_proxy"); noProxy != "" {
-		v.NoProxy = noProxy
+		ServerVersion:      dockerversion.Version,
+		ClusterStore:       daemon.Config().ClusterStore,
+		ClusterAdvertise:   daemon.Config().ClusterAdvertise,
+		HTTPProxy:          getProxyEnv("http_proxy"),
+		HTTPSProxy:         getProxyEnv("https_proxy"),
+		NoProxy:            getProxyEnv("no_proxy"),
 	}
 	if hostname, err := os.Hostname(); err == nil {
 		v.Name = hostname
 	}
 
 	return v, nil
+}
+
+// The uppercase and the lowercase are available for the proxy settings.
+// See the Go specification for details on these variables. https://golang.org/pkg/net/http/
+func getProxyEnv(key string) string {
+	proxyValue := os.Getenv(strings.ToUpper(key))
+	if proxyValue == "" {
+		return os.Getenv(strings.ToLower(key))
+	}
+	return proxyValue
 }

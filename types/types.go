@@ -1,7 +1,7 @@
 package types
 
 import (
-	"github.com/hyperhq/hyper/lib/docker/cliconfig"
+	"github.com/docker/docker/cliconfig"
 )
 
 type ImagePushConfig struct {

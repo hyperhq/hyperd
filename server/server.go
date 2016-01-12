@@ -18,12 +18,12 @@ import (
 	"strings"
 	"syscall"
 
+	dockertypes "github.com/docker/docker/api/types"
+	"github.com/docker/docker/cliconfig"
+	"github.com/docker/docker/pkg/ioutils"
+	"github.com/docker/docker/pkg/streamformatter"
 	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/engine"
-	dockertypes "github.com/hyperhq/hyper/lib/docker/api/types"
-	"github.com/hyperhq/hyper/lib/docker/cliconfig"
-	"github.com/hyperhq/hyper/lib/docker/pkg/ioutils"
-	"github.com/hyperhq/hyper/lib/docker/pkg/streamformatter"
 	"github.com/hyperhq/hyper/lib/portallocator"
 	"github.com/hyperhq/hyper/lib/version"
 	"github.com/hyperhq/hyper/types"
@@ -818,7 +818,7 @@ func postImageBuild(eng *engine.Engine, version version.Version, w http.Response
 
 	w.Header().Set("Content-Type", "application/json")
 	glog.V(1).Infof("Image name is %s", r.Form.Get("name"))
-	job := eng.Job("build", r.Form.Get("name"))
+	job := eng.Job("build", r.Form.Get("name"), fmt.Sprintf("%d", r.ContentLength))
 	stdoutBuf := bytes.NewBuffer(nil)
 
 	job.Stdout.Add(stdoutBuf)

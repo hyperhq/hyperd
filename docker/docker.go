@@ -7,12 +7,13 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/docker/docker/pkg/homedir"
+	flag "github.com/docker/docker/pkg/mflag"
+	"github.com/docker/docker/pkg/system"
+	"github.com/docker/docker/registry"
 	"github.com/golang/glog"
 	hyperd "github.com/hyperhq/hyper/daemon"
 	"github.com/hyperhq/hyper/lib/docker/daemon"
-	"github.com/hyperhq/hyper/lib/docker/pkg/homedir"
-	"github.com/hyperhq/hyper/lib/docker/pkg/system"
-	"github.com/hyperhq/hyper/lib/docker/registry"
 	"github.com/hyperhq/hyper/utils"
 )
 
@@ -28,6 +29,9 @@ const (
 	defaultCertFile     = "cert.pem"
 )
 
+func presentInHelp(usage string) string { return usage }
+func absentFromHelp(string) string      { return "" }
+
 type Docker struct {
 	daemon *daemon.Daemon
 }
@@ -36,8 +40,10 @@ func Init() {
 	if daemonCfg.LogConfig.Config == nil {
 		daemonCfg.LogConfig.Config = make(map[string]string)
 	}
-	daemonCfg.InstallFlags()
-	registryCfg.InstallFlags()
+	var errhandler flag.ErrorHandling = flag.ContinueOnError
+	flags := flag.NewFlagSet("", errhandler)
+	daemonCfg.InstallFlags(flags, presentInHelp)
+	registryCfg.InstallFlags(flags, absentFromHelp)
 	hyperd.NewDockerImpl = func() (docker hyperd.DockerInterface, e error) {
 		docker, e = NewDocker()
 		if e != nil {
@@ -110,7 +116,7 @@ func getDaemonConfDir() string {
 
 func currentUserIsOwner(f string) bool {
 	if fileInfo, err := system.Stat(f); err == nil && fileInfo != nil {
-		if int(fileInfo.Uid()) == os.Getuid() {
+		if int(fileInfo.UID()) == os.Getuid() {
 			return true
 		}
 	}

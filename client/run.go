@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/docker/docker/pkg/namesgenerator"
 	"github.com/hyperhq/hyper/engine"
-	"github.com/hyperhq/hyper/lib/docker/pkg/namesgenerator"
 	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/hypervisor/pod"
 

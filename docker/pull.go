@@ -1,11 +1,11 @@
 package docker
 
 import (
+	"github.com/docker/docker/graph"
+	"github.com/docker/docker/graph/tags"
+	"github.com/docker/docker/pkg/parsers"
+	"github.com/docker/docker/registry"
 	"github.com/golang/glog"
-	"github.com/hyperhq/hyper/lib/docker/graph"
-	"github.com/hyperhq/hyper/lib/docker/graph/tags"
-	"github.com/hyperhq/hyper/lib/docker/pkg/parsers"
-	"github.com/hyperhq/hyper/lib/docker/registry"
 )
 
 func (cli Docker) SendCmdPull(image string, imagePullConfig *graph.ImagePullConfig) ([]byte, int, error) {
@@ -19,13 +19,12 @@ func (cli Docker) SendCmdPull(image string, imagePullConfig *graph.ImagePullConf
 	if err := registry.ValidateRepositoryName(repository); err != nil {
 		return nil, -1, err
 	}
-	if tag == "" {
-		tag = "latest"
-	}
 	if len(tag) > 0 {
 		if err := tags.ValidateTagName(tag); err != nil {
 			return nil, -1, err
 		}
+	} else {
+		tag = tags.DefaultTag
 	}
 
 	glog.V(3).Infof("The Repository is %s, and the tag is %s", repository, tag)

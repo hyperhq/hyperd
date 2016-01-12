@@ -1,7 +1,7 @@
 package daemon
 
 import (
-	"strconv"
+	"fmt"
 
 	"github.com/hyperhq/hyper/engine"
 )
@@ -16,8 +16,8 @@ func (daemon *Daemon) CmdImages(job *engine.Job) error {
 	}
 	for _, i := range images {
 		id := i.ID
-		created := strconv.Itoa(i.Created)
-		size := strconv.Itoa(i.VirtualSize)
+		created := fmt.Sprintf("%d", i.Created)
+		size := fmt.Sprintf("%d", i.VirtualSize)
 		for _, r := range i.RepoTags {
 			imagesList = append(imagesList, r+":"+id+":"+created+":"+size)
 		}

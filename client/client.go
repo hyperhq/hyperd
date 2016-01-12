@@ -14,8 +14,8 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/hyperhq/hyper/lib/docker/cliconfig"
-	"github.com/hyperhq/hyper/lib/docker/pkg/homedir"
+	"github.com/docker/docker/cliconfig"
+	"github.com/docker/docker/pkg/homedir"
 	"github.com/hyperhq/runv/lib/term"
 )
 

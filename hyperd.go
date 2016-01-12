@@ -9,12 +9,12 @@ import (
 	"syscall"
 
 	"github.com/Unknwon/goconfig"
+	"github.com/docker/docker/pkg/reexec"
 	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/daemon"
 	"github.com/hyperhq/hyper/docker"
 	"github.com/hyperhq/hyper/engine"
 	"github.com/hyperhq/hyper/lib/docker/daemon/graphdriver"
-	"github.com/hyperhq/hyper/lib/docker/pkg/reexec"
 	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/driverloader"
 	"github.com/hyperhq/runv/hypervisor"
