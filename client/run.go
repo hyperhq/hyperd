@@ -90,12 +90,20 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 
 	vmId, err := cli.CreateVm(spec.Resource.Vcpu, spec.Resource.Memory, async)
 
-	podId, err := cli.CreatePod(podJson, opts.Remove)
+	podId, err := cli.CreatePod(podJson, false)
 	if err != nil {
 		return err
 	}
-
 	fmt.Printf("POD id is %s\n", podId)
+
+	if opts.Remove {
+		defer func() {
+			rmerr := cli.RmPod(podId)
+			if rmerr != nil {
+				fmt.Fprintf(cli.out, "failed to rm pod, %v\n", rmerr)
+			}
+		}()
+	}
 
 	_, err = cli.StartPod(podId, vmId, attach)
 	if err != nil {
