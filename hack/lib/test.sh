@@ -26,6 +26,23 @@ hyper::test::remove_image() {
   hyper rmi $@
 }
 
+hyper::test::exitcode() {
+  echo "Pod exit code test"
+  res=$(hyper run --rm busybox sh -c "exit 17" > /dev/null 2>&1 ; echo $?)
+  echo "should return 17, return: $res"
+  test $res -eq 17
+}
+
+hyper::test::exec() {
+  echo "Pod exec and exit code test"
+  id=$(hyper run -t -d busybox /bin/sh | sed -ne "s/POD id is \(pod-[0-9A-Za-z]\{1,\}\)/\1/p")
+  echo "test pod ID is $id"
+  res=$(hyper exec $id sh -c "exit 37" > /dev/null 2>&1 ; echo $?)
+  echo "should return 37, return: $res"
+  test $res -eq 37
+  hyper rm $id
+}
+
 hyper::test::run_attached_pod() {
   hyper run --rm -a -p $1
 }
