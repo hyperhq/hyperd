@@ -49,7 +49,13 @@ func (cli *HyperClient) HyperCmdAttach(args ...string) error {
 	}
 	v.Set("tag", tag)
 
-	return cli.hijackRequest("attach", podName, tag, &v)
+	err = cli.hijackRequest("attach", podName, tag, &v)
+	if err != nil {
+		fmt.Printf("attach failed: %s\n", err.Error())
+		return err
+	}
+
+	return GetExitCode(cli, containerId, tag)
 }
 
 func (cli *HyperClient) hijackRequest(method, pod, tag string, v *url.Values) error {

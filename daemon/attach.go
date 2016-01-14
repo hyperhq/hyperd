@@ -52,7 +52,7 @@ func (daemon *Daemon) CmdAttach(job *engine.Job) (err error) {
 		glog.V(2).Info("Defer function for exec!")
 	}()
 
-	<-ttyCallback
+	vm.GetExitCode(tag, ttyCallback)
 
 	return nil
 }
