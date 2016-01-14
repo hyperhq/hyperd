@@ -137,6 +137,8 @@ __EOF__
   # POD creation / deletion #
   ###########################
 
+  hyper::test::exitcode
+  hyper::test::exec
   hyper::test::insert_file
   hyper::test::map_file
 
