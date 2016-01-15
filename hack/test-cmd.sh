@@ -158,6 +158,7 @@ __EOF__
   hyper::test::exec
   hyper::test::insert_file
   hyper::test::map_file
+  hyper::test::with_volume
   hyper::test::service
 
   stop_hyperd

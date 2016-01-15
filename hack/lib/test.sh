@@ -92,6 +92,17 @@ hyper::test::map_file() {
   test "a$invm" = "a$rslv"
 }
 
+hyper::test::with_volume() {
+  mkdir -p  ${HYPER_TEMP}/tmp
+  echo 'hello, world' > ${HYPER_TEMP}/tmp/with-volume-test-1
+  sed -e "s|TMPDIR|${HYPER_TEMP}/tmp|" ${HYPER_ROOT}/hack/pods/with-volume.pod > ${HYPER_TEMP}/with-volume.pod
+  hyper::test::run_attached_pod ${HYPER_TEMP}/with-volume.pod | grep OK
+  echo "check the out file: ${HYPER_TEMP}/tmp/with-volume-test-2"
+  cat ${HYPER_TEMP}/tmp/with-volume-test-2
+  grep -q OK ${HYPER_TEMP}/tmp/with-volume-test-2
+}
+
 hyper::test::service() {
     hyper::test::run_pod ${HYPER_ROOT}/hack/pods/service.pod
 }
+
