@@ -47,6 +47,7 @@ function start_hyperd()
   hyper::log::status "Starting hyperd"
   sudo "${HYPER_OUTPUT_HOSTBIN}/hyperd" \
     --host="tcp://127.0.0.1:${API_PORT}" \
+    --v=3 \
     --config="${config}" \
     --nondaemon 1>&2 &
   HYPERD_PID=$!
@@ -68,6 +69,16 @@ function stop_hyperd()
   fi
   [[ -n "${HYPERD_PID-}" ]] && sudo kill "${HYPERD_PID}" 1>&2 2>/dev/null
   HYPERD_PID=
+}
+
+function setup_libvirtd() {
+    (cat <<EOF
+user = "root"
+group = "root"
+clear_emulator_capabilities = 0
+EOF
+) | sudo tee /etc/libvirt/qemu.conf
+    sudo /etc/init.d/libvirt-bin restart
 }
 
 hyper::util::trap_add cleanup EXIT SIGINT
@@ -106,6 +117,9 @@ StorageDriver=${stordriver}
 Hypervisor=${execdriver}
 __EOF__
   fi
+
+  # setup libvirtd
+  [ "$execdriver" = "libvirt" ] && setup_libvirtd
 
   # Start 'hyperd'
   start_hyperd "${HYPER_TEMP}/config" $stordriver
@@ -151,8 +165,7 @@ hyper_storage_drivers=(
 )
 
 hyper_exec_drivers=(
-  ""
-  "qemu"
+  "libvirt"
 )
 for sdriver in "${hyper_storage_drivers[@]}"; do
   for edriver in "${hyper_exec_drivers[@]}"; do
