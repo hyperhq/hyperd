@@ -6,7 +6,7 @@ Requires=
 
 [Service]
 ExecStart=/usr/bin/hyperd
-MountFlags=slave
+MountFlags=shared
 LimitNOFILE=1048576
 LimitNPROC=1048576
 LimitCORE=infinity
