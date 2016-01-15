@@ -147,6 +147,9 @@ __EOF__
   hyper::test::pull_image busybox
   hyper::test::check_image busybox
 
+  hyper::test::pull_image "haproxy:1.4"
+  hyper::test::check_image "haproxy" "1.4"
+
   ###########################
   # POD creation / deletion #
   ###########################
@@ -155,6 +158,7 @@ __EOF__
   hyper::test::exec
   hyper::test::insert_file
   hyper::test::map_file
+  hyper::test::service
 
   stop_hyperd
 }

@@ -1,0 +1,26 @@
+{
+            "containers": [
+                {
+                    "image": "busybox:latest",
+                    "name": "service",
+                    "command": ["/bin/sh", "-c", "ps", "aux"]
+                }
+            ],
+            "services": [
+                {
+                        "serviceip": "10.254.0.24",
+                        "serviceport": 2834,
+                        "protocol": "TCP",
+                        "hosts": [
+                                {
+                                        "hostip":"192.168.23.2",
+                                        "hostport":2345
+                                }
+                        ]
+                }
+            ],
+            "id": "service",
+            "dns": ["8.8.8.8"],
+            "tty": true,
+            "type": "pod"
+}
