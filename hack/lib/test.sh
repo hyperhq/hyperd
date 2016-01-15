@@ -43,6 +43,10 @@ hyper::test::exec() {
   hyper rm $id
 }
 
+hyper::test::run_pod() {
+  hyper run --rm -p $1
+}
+
 hyper::test::run_attached_pod() {
   hyper run --rm -a -p $1
 }
@@ -88,3 +92,6 @@ hyper::test::map_file() {
   test "a$invm" = "a$rslv"
 }
 
+hyper::test::service() {
+    hyper::test::run_pod ${HYPER_ROOT}/hack/pods/service.pod
+}
