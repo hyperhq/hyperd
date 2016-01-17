@@ -65,7 +65,6 @@ func (cli *HyperClient) hijackRequest(method, pod, tag string, v *url.Values) er
 	)
 	// Block the return until the chan gets closed
 	defer func() {
-		fmt.Printf("End of CmdExec(), Waiting for hijack to finish.\n")
 		if _, ok := <-hijacked; ok {
 			fmt.Printf("Hijack did not finish (chan still open)\n")
 		}
@@ -100,6 +99,5 @@ func (cli *HyperClient) hijackRequest(method, pod, tag string, v *url.Values) er
 		fmt.Printf("Error hijack: %s", err.Error())
 		return err
 	}
-	fmt.Printf("Successfully attached to pod(%s)\n", pod)
 	return nil
 }
