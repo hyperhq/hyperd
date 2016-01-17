@@ -25,7 +25,7 @@ import (
 	"github.com/hyperhq/runv/hypervisor/types"
 )
 
-func (daemon *Daemon) CmdPodCreate(job *engine.Job) error {
+func (daemon *Daemon) CmdPodCreate(job *engine.Job) (err error) {
 	// we can only support 1024 Pods
 	if daemon.GetRunningPodNum() >= 1024 {
 		return fmt.Errorf("Pod full, the maximum Pod is 1024!")
@@ -34,6 +34,10 @@ func (daemon *Daemon) CmdPodCreate(job *engine.Job) error {
 	autoRemove := false
 	if job.Args[1] == "yes" || job.Args[1] == "true" {
 		autoRemove = true
+	}
+	prefetchVm := false
+	if job.Args[2] == "yes" || job.Args[2] == "true" {
+		prefetchVm = true
 	}
 
 	podId := fmt.Sprintf("pod-%s", pod.RandStr(10, "alpha"))
@@ -49,15 +53,29 @@ func (daemon *Daemon) CmdPodCreate(job *engine.Job) error {
 		return err
 	}
 
+	var prefetchedVm PrefetchedVm
+	if prefetchVm {
+		prefetchedVm, err := daemon.prefetchVm(spec)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if err != nil {
+				prefetchedVm.cancel(daemon)
+			}
+		}()
+	}
+
 	daemon.PodList.Lock()
 	glog.V(2).Infof("lock PodList")
 	defer glog.V(2).Infof("unlock PodList")
 	defer daemon.PodList.Unlock()
 
-	_, err = CreatePod(daemon, daemon.DockerCli, podId, podArgs, spec, autoRemove)
+	pod, err := CreatePod(daemon, daemon.DockerCli, podId, podArgs, spec, autoRemove)
 	if err != nil {
 		return err
 	}
+	pod.prefetchedVm = prefetchedVm
 
 	// Prepare the VM status to client
 	v := &engine.Env{}
@@ -211,19 +229,52 @@ func (daemon *Daemon) CmdPodStart(job *engine.Job) error {
 	return nil
 }
 
+type PrefetchedVm struct {
+	vm *hypervisor.Vm
+}
+
+// dummy implementation of prefetchVm
+func (daemon *Daemon) prefetchVm(spec *pod.UserPod) (PrefetchedVm, error) {
+	glog.V(2).Info("prefetchVm")
+	vm, err := daemon.StartVm("", spec.Resource.Vcpu, spec.Resource.Memory, false, 0)
+	return PrefetchedVm{vm: vm}, err
+}
+
+func (p *PrefetchedVm) cancel(daemon *Daemon) {
+	if p.vm != nil {
+		glog.V(2).Info("cancel PrefetchedVm")
+		daemon.KillVm(p.vm.Id)
+	}
+	p.vm = nil
+}
+
+func (p *PrefetchedVm) get() *hypervisor.Vm {
+	glog.V(2).Info("get PrefetchedVm")
+	vm := p.vm
+	p.vm = nil
+	return vm
+}
+
 // I'd like to move the remain part of this file to another file.
 type Pod struct {
-	id         string
-	status     *hypervisor.PodStatus
-	spec       *pod.UserPod
-	vm         *hypervisor.Vm
-	containers []*hypervisor.ContainerInfo
-	volumes    []*hypervisor.VolumeInfo
+	id           string
+	status       *hypervisor.PodStatus
+	spec         *pod.UserPod
+	vm           *hypervisor.Vm
+	prefetchedVm PrefetchedVm
+	containers   []*hypervisor.ContainerInfo
+	volumes      []*hypervisor.VolumeInfo
 }
 
 func (p *Pod) GetVM(daemon *Daemon, id string, lazy bool, keep int) (err error) {
 	if p == nil || p.spec == nil {
 		return errors.New("Pod: unable to create VM without resource info.")
+	}
+	if id == "" {
+		p.vm = p.prefetchedVm.get()
+		if p.vm != nil {
+			return
+		}
 	}
 	p.vm, err = daemon.GetVM(id, &p.spec.Resource, lazy, keep)
 	return

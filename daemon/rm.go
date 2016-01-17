@@ -50,6 +50,7 @@ func (daemon *Daemon) CleanPod(podId string) (int, string, error) {
 	if !ok {
 		return -1, "", fmt.Errorf("Can not find that Pod(%s)", podId)
 	}
+	pod.prefetchedVm.cancel(daemon)
 	if pod.status.Status != types.S_POD_RUNNING {
 		// If the pod type is kubernetes, we just remove the pod from the pod list.
 		// The persistent data has been removed since we got the E_VM_SHUTDOWN event.
