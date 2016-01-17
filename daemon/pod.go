@@ -41,7 +41,7 @@ func (daemon *Daemon) CmdPodCreate(job *engine.Job) error {
 	glog.V(2).Infof("lock PodList")
 	defer glog.V(2).Infof("unlock PodList")
 	defer daemon.PodList.Unlock()
-	err := daemon.CreatePod(podId, podArgs, autoRemove)
+	_, err := daemon.CreatePod(podId, podArgs, autoRemove)
 	if err != nil {
 		return err
 	}
@@ -339,14 +339,18 @@ func (p *Pod) InitContainers(daemon *Daemon, dclient DockerInterface) (err error
 }
 
 //FIXME: there was a `config` argument passed by docker/builder, but we never processed it.
-func (daemon *Daemon) CreatePod(podId, podArgs string, autoremove bool) error {
+func (daemon *Daemon) CreatePod(podId, podArgs string, autoremove bool) (*Pod, error) {
 
 	pod, err := CreatePod(daemon, daemon.DockerCli, podId, podArgs, autoremove)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return daemon.AddPod(pod, podArgs)
+	if err = daemon.AddPod(pod, podArgs); err != nil {
+		return nil, err
+	}
+
+	return pod, nil
 }
 
 func (p *Pod) PrepareContainers(sd Storage, dclient DockerInterface) (err error) {
