@@ -22,6 +22,14 @@ import (
 	"github.com/kardianos/osext"
 )
 
+type Options struct {
+	DisableIptables    bool
+	Config             string
+	Hosts              string
+	Mirrors            string
+	InsecureRegistries string
+}
+
 func main() {
 	if reexec.Init() {
 		return
@@ -31,6 +39,8 @@ func main() {
 	flDisableIptables := flag.Bool("noniptables", false, "Don't enable iptables rules")
 	flConfig := flag.String("config", "", "Config file for hyperd")
 	flHost := flag.String("host", "", "Host for hyperd")
+	flMirrors := flag.String("registry_mirror", "", "Prefered docker registry mirror")
+	flInsecureRegistries := flag.String("insecure_registry", "", "Enable insecure registry communication")
 	flHelp := flag.Bool("help", false, "Print help message for Hyperd daemon")
 	flag.Set("alsologtostderr", "true")
 	flag.Set("log_dir", "/var/log/hyper/")
@@ -58,7 +68,15 @@ func main() {
 		return
 	}
 
-	mainDaemon(*flConfig, *flHost, *flDisableIptables)
+	var opts = &Options{
+		DisableIptables:    *flDisableIptables,
+		Config:             *flConfig,
+		Hosts:              *flHost,
+		Mirrors:            *flMirrors,
+		InsecureRegistries: *flInsecureRegistries,
+	}
+
+	mainDaemon(opts)
 }
 
 func printHelp() {
@@ -71,6 +89,8 @@ Application Options:
   --v=0                  Log level fro V logs
   --log_dir              Log directory
   --host                 Host address and port for hyperd(such as --host=tcp://127.0.0.1:12345)
+  --registry_mirror      Prefered docker registry mirror, multiple values separated by a comma
+  --insecure_registry    Enable insecure registry communication, multiple values separated by a comma
   --logtostderr          Log to standard error instead of files
   --alsologtostderr      Log to standard error as well as files
 
@@ -81,7 +101,8 @@ Help Options:
 	fmt.Printf(helpMessage, os.Args[0], os.Args[0])
 }
 
-func mainDaemon(config, host string, flDisableIptables bool) {
+func mainDaemon(opts *Options) {
+	config := opts.Config
 	glog.V(1).Infof("The config file is %s", config)
 	if config == "" {
 		config = "/etc/hyper/config"
@@ -120,8 +141,8 @@ func mainDaemon(config, host string, flDisableIptables bool) {
 		graphdriver.DefaultDriver = storageDriver
 	}
 
+	docker.Init(strings.Split(opts.Mirrors, ","), strings.Split(opts.InsecureRegistries, ","))
 	eng := engine.New(config)
-	docker.Init()
 
 	d, err := daemon.NewDaemon(eng)
 	if err != nil {
@@ -141,7 +162,7 @@ func mainDaemon(config, host string, flDisableIptables bool) {
 	}
 
 	disableIptables := cfg.MustBool(goconfig.DEFAULT_SECTION, "DisableIptables", false)
-	if err = hypervisor.InitNetwork(d.BridgeIface, d.BridgeIP, disableIptables || flDisableIptables); err != nil {
+	if err = hypervisor.InitNetwork(d.BridgeIface, d.BridgeIP, disableIptables || opts.DisableIptables); err != nil {
 		glog.Errorf("InitNetwork failed, %s", err.Error())
 		return
 	}
@@ -181,8 +202,8 @@ func mainDaemon(config, host string, flDisableIptables bool) {
 		return
 	}
 	defaultHost := []string{}
-	if host != "" {
-		defaultHost = append(defaultHost, host)
+	if opts.Hosts != "" {
+		defaultHost = append(defaultHost, opts.Hosts)
 	}
 	defaultHost = append(defaultHost, "unix:///var/run/hyper.sock")
 	if d.Host != "" {
