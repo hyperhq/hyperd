@@ -94,7 +94,9 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("POD id is %s\n", podId)
+	if !attach {
+		fmt.Printf("POD id is %s\n", podId)
+	}
 
 	if opts.Remove {
 		defer func() {
