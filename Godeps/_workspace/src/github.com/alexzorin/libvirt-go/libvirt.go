@@ -1,13 +1,14 @@
 package libvirt
 
 import (
+	"encoding/base64"
 	"io/ioutil"
 	"reflect"
 	"unsafe"
 )
 
 /*
-#cgo LDFLAGS: -lvirt 
+#cgo LDFLAGS: -lvirt
 #include <libvirt/libvirt.h>
 #include <libvirt/virterror.h>
 #include <stdlib.h>
@@ -683,6 +684,29 @@ func (c *VirConnection) SecretDefineXML(xmlConfig string, flags uint32) (VirSecr
 		return VirSecret{}, GetLastError()
 	}
 	return VirSecret{ptr: ptr}, nil
+}
+
+func (c *VirConnection) SecretSetValue(uuid, value string) error {
+	cUuid := C.CString(uuid)
+	defer C.free(unsafe.Pointer(cUuid))
+	ptr := C.virSecretLookupByUUIDString(c.ptr, cUuid)
+	if ptr == nil {
+		return GetLastError()
+	}
+
+	secret, err := base64.StdEncoding.DecodeString(value)
+	if err != nil {
+		return err
+	}
+	cSecret := C.CString(string(secret))
+	defer C.free(unsafe.Pointer(cSecret))
+
+	res := C.virSecretSetValue(ptr, (*C.uchar)(unsafe.Pointer(cSecret)), C.size_t(len(secret)), 0)
+	if res != 0 {
+		return GetLastError()
+	}
+
+	return nil
 }
 
 func (c *VirConnection) LookupSecretByUUIDString(uuid string) (VirSecret, error) {
