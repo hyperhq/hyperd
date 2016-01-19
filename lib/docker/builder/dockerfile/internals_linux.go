@@ -59,7 +59,7 @@ func (b *Builder) create() (*daemon.Container, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = b.Hyperdaemon.CreatePod(podId, podString, false)
+	_, err = b.Hyperdaemon.CreatePod(podId, podString, false)
 	if err != nil {
 		return nil, err
 	}

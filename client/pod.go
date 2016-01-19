@@ -52,10 +52,13 @@ func (cli *HyperClient) HyperCmdPod(args ...string) error {
 	return nil
 }
 
-func (cli *HyperClient) CreatePod(jsonbody string, remove bool) (string, error) {
+func (cli *HyperClient) CreatePod(jsonbody string, remove, prefetchVm bool) (string, error) {
 	v := url.Values{}
 	if remove {
 		v.Set("remove", "yes")
+	}
+	if prefetchVm {
+		v.Set("prefetchvm", "yes")
 	}
 	var tmpPod pod.UserPod
 	if err := json.Unmarshal([]byte(jsonbody), &tmpPod); err != nil {

@@ -145,7 +145,7 @@ func (daemon *Daemon) Restore() error {
 	defer daemon.PodList.Unlock()
 
 	for k, v := range podList {
-		err = daemon.CreatePod(k, v, false)
+		p, err := daemon.CreatePod(k, v, false)
 		if err != nil {
 			glog.Warningf("Got a unexpected error, %s", err.Error())
 			continue
@@ -155,7 +155,6 @@ func (daemon *Daemon) Restore() error {
 			glog.V(1).Info(err.Error(), " for ", k)
 			continue
 		}
-		p, _ := daemon.PodList.Get(k)
 		if err := p.AssociateVm(daemon, string(vmId)); err != nil {
 			glog.V(1).Info("Some problem during associate vm %s to pod %s, %v", string(vmId), k, err)
 			// continue to next
@@ -336,16 +335,7 @@ func (daemon *Daemon) GetPod(podId, podArgs string, autoremove bool) (*Pod, erro
 		return pod, nil
 	}
 
-	pod, err := CreatePod(daemon, daemon.DockerCli, podId, podArgs, autoremove)
-	if err != nil {
-		return nil, err
-	}
-
-	if err = daemon.AddPod(pod, podArgs); err != nil {
-		return nil, err
-	}
-
-	return pod, nil
+	return daemon.CreatePod(podId, podArgs, autoremove)
 }
 
 func (daemon *Daemon) GetPodByName(podName string) ([]byte, error) {

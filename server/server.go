@@ -609,8 +609,9 @@ func postPodCreate(eng *engine.Engine, version version.Version, w http.ResponseW
 
 	podArgs, _ := ioutil.ReadAll(r.Body)
 	autoRemove := r.Form.Get("remove")
-	glog.V(1).Infof("Args string is %s, %s", string(podArgs), autoRemove)
-	job := eng.Job("podCreate", string(podArgs), autoRemove)
+	prefetchVm := r.Form.Get("prefetchvm")
+	glog.V(1).Infof("Args string is %s, %s, %s", string(podArgs), autoRemove, prefetchVm)
+	job := eng.Job("podCreate", string(podArgs), autoRemove, prefetchVm)
 	stdoutBuf := bytes.NewBuffer(nil)
 
 	job.Stdout.Add(stdoutBuf)

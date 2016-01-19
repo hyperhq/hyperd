@@ -68,7 +68,7 @@ func (cli *HyperClient) HyperCmdReplace(args ...string) error {
 			return err
 		}
 
-		newPodId, err := cli.CreatePod(jsonbody, false)
+		newPodId, err := cli.CreatePod(jsonbody, false, false)
 		if err != nil {
 			return err
 		}

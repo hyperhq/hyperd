@@ -25,7 +25,7 @@ import (
 	"github.com/hyperhq/runv/hypervisor/types"
 )
 
-func (daemon *Daemon) CmdPodCreate(job *engine.Job) error {
+func (daemon *Daemon) CmdPodCreate(job *engine.Job) (err error) {
 	// we can only support 1024 Pods
 	if daemon.GetRunningPodNum() >= 1024 {
 		return fmt.Errorf("Pod full, the maximum Pod is 1024!")
@@ -35,16 +35,47 @@ func (daemon *Daemon) CmdPodCreate(job *engine.Job) error {
 	if job.Args[1] == "yes" || job.Args[1] == "true" {
 		autoRemove = true
 	}
+	prefetchVm := false
+	if job.Args[2] == "yes" || job.Args[2] == "true" {
+		prefetchVm = true
+	}
 
 	podId := fmt.Sprintf("pod-%s", pod.RandStr(10, "alpha"))
+	glog.V(1).Infof("podArgs: %s", podArgs)
+
+	spec, err := ProcessPodBytes([]byte(podArgs), podId)
+	if err != nil {
+		glog.V(1).Infof("Process POD file error: %s", err.Error())
+		return err
+	}
+
+	if err = spec.Validate(); err != nil {
+		return err
+	}
+
+	var prefetchedVm PrefetchedVm
+	if prefetchVm {
+		prefetchedVm, err := daemon.prefetchVm(spec)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if err != nil {
+				prefetchedVm.cancel(daemon)
+			}
+		}()
+	}
+
 	daemon.PodList.Lock()
 	glog.V(2).Infof("lock PodList")
 	defer glog.V(2).Infof("unlock PodList")
 	defer daemon.PodList.Unlock()
-	err := daemon.CreatePod(podId, podArgs, autoRemove)
+
+	pod, err := CreatePod(daemon, daemon.DockerCli, podId, podArgs, spec, autoRemove)
 	if err != nil {
 		return err
 	}
+	pod.prefetchedVm = prefetchedVm
 
 	// Prepare the VM status to client
 	v := &engine.Env{}
@@ -198,19 +229,52 @@ func (daemon *Daemon) CmdPodStart(job *engine.Job) error {
 	return nil
 }
 
+type PrefetchedVm struct {
+	vm *hypervisor.Vm
+}
+
+// dummy implementation of prefetchVm
+func (daemon *Daemon) prefetchVm(spec *pod.UserPod) (PrefetchedVm, error) {
+	glog.V(2).Info("prefetchVm")
+	vm, err := daemon.StartVm("", spec.Resource.Vcpu, spec.Resource.Memory, false, 0)
+	return PrefetchedVm{vm: vm}, err
+}
+
+func (p *PrefetchedVm) cancel(daemon *Daemon) {
+	if p.vm != nil {
+		glog.V(2).Info("cancel PrefetchedVm")
+		daemon.KillVm(p.vm.Id)
+	}
+	p.vm = nil
+}
+
+func (p *PrefetchedVm) get() *hypervisor.Vm {
+	glog.V(2).Info("get PrefetchedVm")
+	vm := p.vm
+	p.vm = nil
+	return vm
+}
+
 // I'd like to move the remain part of this file to another file.
 type Pod struct {
-	id         string
-	status     *hypervisor.PodStatus
-	spec       *pod.UserPod
-	vm         *hypervisor.Vm
-	containers []*hypervisor.ContainerInfo
-	volumes    []*hypervisor.VolumeInfo
+	id           string
+	status       *hypervisor.PodStatus
+	spec         *pod.UserPod
+	vm           *hypervisor.Vm
+	prefetchedVm PrefetchedVm
+	containers   []*hypervisor.ContainerInfo
+	volumes      []*hypervisor.VolumeInfo
 }
 
 func (p *Pod) GetVM(daemon *Daemon, id string, lazy bool, keep int) (err error) {
 	if p == nil || p.spec == nil {
 		return errors.New("Pod: unable to create VM without resource info.")
+	}
+	if id == "" {
+		p.vm = p.prefetchedVm.get()
+		if p.vm != nil {
+			return
+		}
 	}
 	p.vm, err = daemon.GetVM(id, &p.spec.Resource, lazy, keep)
 	return
@@ -232,22 +296,10 @@ func (p *Pod) Status() *hypervisor.PodStatus {
 	return p.status
 }
 
-func CreatePod(daemon *Daemon, dclient DockerInterface, podId, podArgs string, autoremove bool) (*Pod, error) {
-	glog.V(1).Infof("podArgs: %s", podArgs)
-
+func CreatePod(daemon *Daemon, dclient DockerInterface, podId, podArgs string, spec *pod.UserPod, autoremove bool) (*Pod, error) {
 	resPath := filepath.Join(DefaultResourcePath, podId)
 	if err := os.MkdirAll(resPath, os.FileMode(0755)); err != nil {
 		glog.Error("cannot create resource dir ", resPath)
-		return nil, err
-	}
-
-	spec, err := ProcessPodBytes([]byte(podArgs), podId)
-	if err != nil {
-		glog.V(1).Infof("Process POD file error: %s", err.Error())
-		return nil, err
-	}
-
-	if err = spec.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -262,7 +314,11 @@ func CreatePod(daemon *Daemon, dclient DockerInterface, podId, podArgs string, a
 		spec:   spec,
 	}
 
-	if err = pod.InitContainers(daemon, dclient); err != nil {
+	if err := pod.InitContainers(daemon, dclient); err != nil {
+		return nil, err
+	}
+
+	if err := daemon.AddPod(pod, podArgs); err != nil {
 		return nil, err
 	}
 
@@ -339,14 +395,20 @@ func (p *Pod) InitContainers(daemon *Daemon, dclient DockerInterface) (err error
 }
 
 //FIXME: there was a `config` argument passed by docker/builder, but we never processed it.
-func (daemon *Daemon) CreatePod(podId, podArgs string, autoremove bool) error {
+func (daemon *Daemon) CreatePod(podId, podArgs string, autoremove bool) (*Pod, error) {
+	glog.V(1).Infof("podArgs: %s", podArgs)
 
-	pod, err := CreatePod(daemon, daemon.DockerCli, podId, podArgs, autoremove)
+	spec, err := ProcessPodBytes([]byte(podArgs), podId)
 	if err != nil {
-		return err
+		glog.V(1).Infof("Process POD file error: %s", err.Error())
+		return nil, err
 	}
 
-	return daemon.AddPod(pod, podArgs)
+	if err = spec.Validate(); err != nil {
+		return nil, err
+	}
+
+	return CreatePod(daemon, daemon.DockerCli, podId, podArgs, spec, autoremove)
 }
 
 func (p *Pod) PrepareContainers(sd Storage, dclient DockerInterface) (err error) {

@@ -220,7 +220,7 @@ func (b *Builder) runContextCommand(args []string, allowRemote bool, allowLocalD
 	if err != nil {
 		return err
 	}
-	err = b.Hyperdaemon.CreatePod(podId, podString, false)
+	_, err = b.Hyperdaemon.CreatePod(podId, podString, false)
 	if err != nil {
 		return err
 	}
