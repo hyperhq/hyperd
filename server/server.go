@@ -594,6 +594,34 @@ func postContainerRename(eng *engine.Engine, version version.Version, w http.Res
 	return writeJSONEnv(w, http.StatusOK, env)
 }
 
+func postPodPause(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+	if err := parseForm(r); err != nil {
+		return err
+	}
+
+	job := eng.Job("pause", r.Form.Get("podId"))
+	if err := job.Run(); err != nil {
+		return err
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+	return nil
+}
+
+func postPodUnpause(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+	if err := parseForm(r); err != nil {
+		return err
+	}
+
+	job := eng.Job("unpause", r.Form.Get("podId"))
+	if err := job.Run(); err != nil {
+		return err
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+	return nil
+}
+
 func postPodCreate(eng *engine.Engine, version version.Version, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
 	if err := parseForm(r); err != nil {
 		return err
@@ -1188,6 +1216,8 @@ func createRouter(eng *engine.Engine, logging, enableCors bool, corsHeaders stri
 			"/pod/labels":       postPodLabels,
 			"/pod/start":        postPodStart,
 			"/pod/stop":         postStop,
+			"/pod/pause":        postPodPause,
+			"/pod/unpause":      postPodUnpause,
 			"/service/add":      postServiceAdd,
 			"/service/update":   postServiceUpdate,
 			"/tty/resize":       postTtyResize,

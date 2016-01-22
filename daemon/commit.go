@@ -13,6 +13,11 @@ func (daemon *Daemon) CmdCommit(job *engine.Job) error {
 	message := job.Args[4]
 	pause := job.Args[5]
 
+	if pause != "no" {
+		daemon.PauseContainer(containerId)
+		defer daemon.UnpauseContainer(containerId)
+	}
+
 	cli := daemon.DockerCli
 	imgId, _, err := cli.SendContainerCommit(containerId, repo, author, change, message, pause)
 	if err != nil {

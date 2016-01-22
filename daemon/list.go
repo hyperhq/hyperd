@@ -214,6 +214,8 @@ func showContainer(c *hypervisor.Container) string {
 		status = "failed"
 	case types.S_POD_SUCCEEDED:
 		status = "succeeded"
+	case types.S_POD_PAUSED:
+		status = "paused"
 	default:
 		status = ""
 	}
