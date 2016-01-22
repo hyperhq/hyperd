@@ -52,6 +52,7 @@ type Daemon struct {
 	DockerCli   DockerInterface
 	PodList     *PodList
 	VmList      map[string]*hypervisor.Vm
+	vmCache     VmCache
 	Kernel      string
 	Initrd      string
 	Bios        string
@@ -247,6 +248,7 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 		BridgeIP:    bridgeip,
 		BridgeIface: biface,
 	}
+	daemon.vmCache.daemon = daemon
 
 	// Get the docker daemon info
 	sysinfo, err := dockerCli.SendCmdInfo()
