@@ -164,6 +164,10 @@ __EOF__
   stop_hyperd
 }
 
+mkdir -p ${HYPER_TEMP}/share_dir
+qemu-system-x86_64 -machine pc-i440fx-2.1,usb=off -cpu core2duo -kernel ${KERNEL_PATH} -initrd ${INITRD_PATH} -append "console=ttyS0 panic=1 no_timer_check" -realtime mlock=off -no-user-config -nodefaults -no-hpet -rtc base=utc,driftfix=slew -no-reboot -display none -boot strict=on -m size=128,slots=1,maxmem=32G -smp cpus=1,maxcpus=8 -qmp unix:/${HYPER_TEMP}/qmp.sock,server,nowait -serial unix:/${HYPER_TEMP}/console.sock,server,nowait -device virtio-serial-pci,id=virtio-serial0,bus=pci.0,addr=0x2 -device virtio-scsi-pci,id=scsi0,bus=pci.0,addr=0x3 -chardev socket,id=charch0,path=/${HYPER_TEMP}/hyper.sock,server,nowait -device virtserialport,bus=virtio-serial0.0,nr=1,chardev=charch0,id=channel0,name=sh.hyper.channel.0 -chardev socket,id=charch1,path=/${HYPER_TEMP}/tty.sock,server,nowait -device virtserialport,bus=virtio-serial0.0,nr=2,chardev=charch1,id=channel1,name=sh.hyper.channel.1 -fsdev local,id=virtio9p,path=/${HYPER_TEMP}/share_dir,security_model=none -device virtio-9p-pci,fsdev=virtio9p,mount_tag=share_dir
+pkill qemu
+
 # devicemapper storage driver takes too much time to init
 hyper_storage_drivers=(
   "aufs"
