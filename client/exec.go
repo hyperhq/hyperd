@@ -98,6 +98,7 @@ func (cli *HyperClient) HyperCmdExec(args ...string) error {
 		} else {
 			v.Set("type", "container")
 			v.Set("value", podName)
+			containerId = podName
 		}
 	}
 	v.Set("command", string(command))
