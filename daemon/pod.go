@@ -486,6 +486,62 @@ func (p *Pod) PrepareServices() error {
 	return err
 }
 
+// PrepareEtcHosts sets /etc/hosts for each container
+func (p *Pod) PrepareEtcHosts() (err error) {
+	var (
+		hostsVolumeName = "etchosts-volume"
+		hostVolumePath  = ""
+		hostsPath       = "/etc/hosts"
+	)
+
+	if p.spec == nil {
+		return
+	}
+
+	for idx, c := range p.spec.Containers {
+		insert := true
+
+		for _, v := range c.Volumes {
+			if v.Path == hostsPath {
+				insert = false
+				break
+			}
+		}
+
+		for _, f := range c.Files {
+			if f.Path == hostsPath {
+				insert = false
+				break
+			}
+		}
+
+		if !insert {
+			continue
+		}
+
+		if hostVolumePath == "" {
+			hostVolumePath, err = prepareHosts(p.id)
+			if err != nil {
+				return
+			}
+
+			p.spec.Volumes = append(p.spec.Volumes, pod.UserVolume{
+				Name:   hostsVolumeName,
+				Source: hostVolumePath,
+				Driver: "vfs",
+			})
+		}
+
+		p.spec.Containers[idx].Volumes = append(c.Volumes, pod.UserVolumeReference{
+			Path:     hostsPath,
+			Volume:   hostsVolumeName,
+			ReadOnly: false,
+		})
+	}
+
+	return
+}
+
 /***
   PrepareDNS() Set the resolv.conf of host to each container, except the following cases:
 
@@ -605,6 +661,10 @@ func (p *Pod) PrepareVolume(daemon *Daemon, sd Storage) (err error) {
 
 func (p *Pod) Prepare(daemon *Daemon) (err error) {
 	if err = p.PrepareServices(); err != nil {
+		return
+	}
+
+	if err = p.PrepareEtcHosts(); err != nil {
 		return
 	}
 

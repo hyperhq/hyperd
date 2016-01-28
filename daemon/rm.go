@@ -46,6 +46,7 @@ func (daemon *Daemon) CleanPod(podId string) (int, string, error) {
 		err   error
 	)
 	os.RemoveAll(path.Join(utils.HYPER_ROOT, "services", podId))
+	os.RemoveAll(path.Join(utils.HYPER_ROOT, "hosts", podId))
 	pod, ok := daemon.PodList.Get(podId)
 	if !ok {
 		return -1, "", fmt.Errorf("Can not find that Pod(%s)", podId)
