@@ -4,46 +4,21 @@ import (
 	"fmt"
 
 	"github.com/golang/glog"
-	"github.com/hyperhq/hyper/engine"
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/types"
 )
 
-func (daemon *Daemon) CmdList(job *engine.Job) error {
+func (daemon *Daemon) List(item, podId, vmId string, auxiliary bool) (map[string][]string, error) {
 	var (
-		item                  string
-		dedicadedPod          bool           = false
-		podId                 string         = ""
-		dedicadedVM           bool           = false
-		vmId                  string         = ""
-		auxiliary             bool           = false
 		pod                   *Pod           = nil
 		vm                    *hypervisor.Vm = nil
+		list                                 = make(map[string][]string)
 		vmJsonResponse                       = []string{}
 		podJsonResponse                      = []string{}
 		containerJsonResponse                = []string{}
 	)
-	if len(job.Args) == 0 {
-		item = "pod"
-	} else {
-		item = job.Args[0]
-	}
 	if item != "pod" && item != "container" && item != "vm" {
-		return fmt.Errorf("Can not support %s list!", item)
-	}
-
-	if len(job.Args) > 1 && (job.Args[1] != "") {
-		dedicadedPod = true
-		podId = job.Args[1]
-	}
-
-	if len(job.Args) > 2 && (job.Args[2] != "") {
-		dedicadedVM = true
-		vmId = job.Args[2]
-	}
-
-	if len(job.Args) > 3 && (job.Args[3] == "yes" || job.Args[3] == "true") {
-		auxiliary = true
+		return list, fmt.Errorf("Can not support %s list!", item)
 	}
 
 	daemon.PodList.RLock()
@@ -51,53 +26,51 @@ func (daemon *Daemon) CmdList(job *engine.Job) error {
 	defer glog.Infof("unlock read of PodList")
 	defer daemon.PodList.RUnlock()
 
-	if dedicadedPod {
+	if podId != "" {
 		var ok bool
 		pod, ok = daemon.PodList.Get(podId)
 		if !ok || (pod == nil) {
-			return fmt.Errorf("Cannot find specified pod %s", podId)
+			return list, fmt.Errorf("Cannot find specified pod %s", podId)
 		}
 	}
 
-	if dedicadedVM {
+	if vmId != "" {
 		var ok bool
 		vm, ok = daemon.VmList[vmId]
 		if !ok || (vm == nil) {
-			return fmt.Errorf("Cannot find specified vm %s", vmId)
+			return list, fmt.Errorf("Cannot find specified vm %s", vmId)
 		}
 	}
 
-	// Prepare the VM status to client
-	v := &engine.Env{}
-	v.Set("item", item)
 	if item == "vm" {
-		if !dedicadedPod && !dedicadedVM {
+		if podId == "" && vmId == "" {
 			for v, info := range daemon.VmList {
 				vmJsonResponse = append(vmJsonResponse, v+":"+showVM(info))
 			}
-		} else if dedicadedPod && !dedicadedVM {
+		} else if podId != "" && vmId == "" {
 			if v, ok := daemon.VmList[pod.status.Vm]; ok {
 				vmJsonResponse = append(vmJsonResponse, pod.status.Vm+":"+showVM(v))
 			}
-		} else if !dedicadedPod && dedicadedVM {
+		} else if podId == "" && vmId != "" {
 			vmJsonResponse = append(vmJsonResponse, vmId+":"+showVM(vm))
 		} else {
 			if pod.status.Vm == vmId {
 				vmJsonResponse = append(vmJsonResponse, vmId+":"+showVM(vm))
 			}
 		}
-		v.SetList("vmData", vmJsonResponse)
+
+		list["vmData"] = vmJsonResponse
 	}
 
 	if item == "pod" {
-		if !dedicadedPod && !dedicadedVM {
+		if podId == "" && vmId == "" {
 			daemon.PodList.Foreach(func(p *Pod) error {
 				podJsonResponse = append(podJsonResponse, p.id+":"+showPod(p.status))
 				return nil
 			})
-		} else if dedicadedPod && !dedicadedVM {
+		} else if podId != "" && vmId == "" {
 			podJsonResponse = append(podJsonResponse, pod.id+":"+showPod(pod.status))
-		} else if !dedicadedPod && dedicadedVM {
+		} else if podId == "" && vmId != "" {
 			daemon.PodList.Foreach(func(p *Pod) error {
 				if p.status.Vm == vmId {
 					podJsonResponse = append(podJsonResponse, p.id+":"+showPod(p.status))
@@ -109,18 +82,18 @@ func (daemon *Daemon) CmdList(job *engine.Job) error {
 				podJsonResponse = append(podJsonResponse, pod.id+":"+showPod(pod.status))
 			}
 		}
-		v.SetList("podData", podJsonResponse)
+		list["podData"] = podJsonResponse
 	}
 
 	if item == "container" {
-		if !dedicadedPod && !dedicadedVM {
+		if podId == "" && vmId == "" {
 			daemon.PodList.Foreach(func(p *Pod) error {
 				containerJsonResponse = append(containerJsonResponse, showPodContainers(p.status, auxiliary)...)
 				return nil
 			})
-		} else if dedicadedPod && !dedicadedVM {
+		} else if podId != "" && vmId == "" {
 			containerJsonResponse = append(containerJsonResponse, showPodContainers(pod.status, auxiliary)...)
-		} else if !dedicadedPod && dedicadedVM {
+		} else if podId == "" && vmId != "" {
 			daemon.PodList.Foreach(func(p *Pod) error {
 				if p.status.Vm == vmId {
 					containerJsonResponse = append(containerJsonResponse, showPodContainers(p.status, auxiliary)...)
@@ -132,14 +105,10 @@ func (daemon *Daemon) CmdList(job *engine.Job) error {
 				containerJsonResponse = append(containerJsonResponse, showPodContainers(pod.status, auxiliary)...)
 			}
 		}
-		v.SetList("cData", containerJsonResponse)
+		list["cData"] = containerJsonResponse
 	}
 
-	if _, err := v.WriteTo(job.Stdout); err != nil {
-		return err
-	}
-
-	return nil
+	return list, nil
 }
 
 func showVM(v *hypervisor.Vm) string {
@@ -189,7 +158,6 @@ func showPod(pod *hypervisor.PodStatus) string {
 }
 
 func showPodContainers(pod *hypervisor.PodStatus, aux bool) []string {
-
 	rsp := []string{}
 	filterServiceDiscovery := !aux && (pod.Type == "service-discovery")
 	proxyName := ServiceDiscoveryContainerName(pod.Name)

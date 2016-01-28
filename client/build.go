@@ -11,15 +11,13 @@ import (
 	"strings"
 
 	"github.com/docker/docker/api"
-	"github.com/docker/docker/graph/tags"
+	"github.com/docker/docker/builder/dockerignore"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/docker/docker/pkg/fileutils"
-	"github.com/docker/docker/pkg/parsers"
-	"github.com/docker/docker/pkg/progressreader"
+	"github.com/docker/docker/pkg/progress"
 	"github.com/docker/docker/pkg/streamformatter"
 	"github.com/docker/docker/pkg/symlink"
-	"github.com/docker/docker/registry"
-	"github.com/docker/docker/utils"
+	"github.com/docker/docker/reference"
 	rand "github.com/hyperhq/hyper/utils"
 
 	gflag "github.com/jessevdk/go-flags"
@@ -117,13 +115,13 @@ func (cli *HyperClient) HyperCmdBuild(args ...string) error {
 
 	var excludes []string
 	if err == nil {
-		excludes, err = utils.ReadDockerIgnore(f)
+		excludes, err = dockerignore.ReadAll(f)
 		if err != nil {
 			return err
 		}
 	}
 
-	if err := utils.ValidateContextDirectory(root, excludes); err != nil {
+	if err := ValidateContextDirectory(root, excludes); err != nil {
 		return fmt.Errorf("Error checking context: '%s'.", err)
 	}
 
@@ -139,7 +137,7 @@ func (cli *HyperClient) HyperCmdBuild(args ...string) error {
 		includes = append(includes, ".dockerignore", opts.DockerfileName)
 	}
 
-	if err := utils.ValidateContextDirectory(root, excludes); err != nil {
+	if err := ValidateContextDirectory(root, excludes); err != nil {
 		return fmt.Errorf("Error checking context: '%s'.", err)
 	}
 	options := &archive.TarOptions{
@@ -155,15 +153,11 @@ func (cli *HyperClient) HyperCmdBuild(args ...string) error {
 	// Setup an upload progress bar
 	// FIXME: ProgressReader shouldn't be this annoying to use
 	if context != nil {
-		sf := streamformatter.NewStreamFormatter()
-		body = progressreader.New(progressreader.Config{
-			In:        context,
-			Out:       os.Stdout,
-			Formatter: sf,
-			NewLines:  true,
-			ID:        "",
-			Action:    "Sending build context to Docker daemon",
-		})
+		var progBuff io.Writer = cli.out
+
+		progressOutput := streamformatter.NewStreamFormatter().NewProgressOutput(progBuff, true)
+
+		body = progress.NewProgressReader(context, progressOutput, 0, "", "Sending build context to Docker daemon")
 	}
 
 	if opts.ImageName == "" {
@@ -171,14 +165,8 @@ func (cli *HyperClient) HyperCmdBuild(args ...string) error {
 		name = rand.RandStr(10, "alphanum")
 	} else {
 		name = opts.ImageName
-		repository, tag := parsers.ParseRepositoryTag(name)
-		if err := registry.ValidateRepositoryName(repository); err != nil {
+		if _, err := reference.ParseNamed(name); err != nil {
 			return err
-		}
-		if len(tag) > 0 {
-			if err := tags.ValidateTagName(tag); err != nil {
-				return err
-			}
 		}
 	}
 	v := url.Values{}
@@ -192,4 +180,50 @@ func (cli *HyperClient) HyperCmdBuild(args ...string) error {
 		return err
 	}
 	return nil
+}
+
+// validateContextDirectory checks if all the contents of the directory
+// can be read and returns an error if some files can't be read
+// symlinks which point to non-existing files don't trigger an error
+func ValidateContextDirectory(srcPath string, excludes []string) error {
+	contextRoot := filepath.Join(srcPath, ".")
+
+	return filepath.Walk(contextRoot, func(filePath string, f os.FileInfo, err error) error {
+		// skip this directory/file if it's not in the path, it won't get added to the context
+		if relFilePath, err := filepath.Rel(contextRoot, filePath); err != nil {
+			return err
+		} else if skip, err := fileutils.Matches(relFilePath, excludes); err != nil {
+			return err
+		} else if skip {
+			if f.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		if err != nil {
+			if os.IsPermission(err) {
+				return fmt.Errorf("can't stat '%s'", filePath)
+			}
+			if os.IsNotExist(err) {
+				return nil
+			}
+			return err
+		}
+
+		// skip checking if symlinks point to non-existing files, such symlinks can be useful
+		// also skip named pipes, because they hanging on open
+		if f.Mode()&(os.ModeSymlink|os.ModeNamedPipe) != 0 {
+			return nil
+		}
+
+		if !f.IsDir() {
+			currentFile, err := os.Open(filePath)
+			if err != nil && os.IsPermission(err) {
+				return fmt.Errorf("no permission to read from '%s'", filePath)
+			}
+			currentFile.Close()
+		}
+		return nil
+	})
 }

@@ -2,20 +2,18 @@ package daemon
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"path"
 	"strconv"
 	"strings"
 
 	"github.com/Unknwon/goconfig"
-	dockertypes "github.com/docker/docker/api/types"
+	docker "github.com/docker/docker/daemon"
 	"github.com/docker/docker/daemon/logger/jsonfilelog"
-	"github.com/docker/docker/graph"
+	"github.com/docker/docker/opts"
+	flag "github.com/docker/docker/pkg/mflag"
+	"github.com/docker/docker/registry"
 	"github.com/golang/glog"
-	"github.com/hyperhq/hyper/engine"
-	"github.com/hyperhq/hyper/lib/portallocator"
-	apiserver "github.com/hyperhq/hyper/server"
 	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/pod"
@@ -28,28 +26,10 @@ var (
 	DefaultResourcePath string = "/var/run/hyper/Pods"
 )
 
-type DockerInterface interface {
-	SendCmdCreate(name, image string, cmds []string, config interface{}) ([]byte, int, error)
-	SendCmdDelete(arg ...string) ([]byte, int, error)
-	SendCmdInfo(args ...string) (*dockertypes.Info, error)
-	SendCmdImages(all string) ([]*dockertypes.Image, error)
-	GetContainerInfo(args ...string) (*dockertypes.ContainerJSON, error)
-	SendCmdPull(image string, config *graph.ImagePullConfig) ([]byte, int, error)
-	SendCmdAuth(body io.ReadCloser) (string, error)
-	SendCmdPush(remote string, ipconfig *graph.ImagePushConfig) error
-	SendImageDelete(args ...string) ([]dockertypes.ImageDelete, error)
-	SendImageBuild(image string, size int, context io.ReadCloser) ([]byte, int, error)
-	SendContainerCommit(args ...string) ([]byte, int, error)
-	SendContainerRename(oName, nName string) error
-	Shutdown() error
-	Setup() error
-}
-
 type Daemon struct {
+	*docker.Daemon
 	ID          string
 	db          *leveldb.DB
-	eng         *engine.Engine
-	DockerCli   DockerInterface
 	PodList     *PodList
 	VmList      map[string]*hypervisor.Vm
 	Kernel      string
@@ -63,53 +43,6 @@ type Daemon struct {
 	Storage     Storage
 	Hypervisor  string
 	DefaultLog  *pod.PodLogConfig
-}
-
-// Install installs daemon capabilities to eng.
-func (daemon *Daemon) Install(eng *engine.Engine) error {
-	// Now, we just install a command 'info' to set/get the information of the docker and Hyper daemon
-	for name, method := range map[string]engine.Handler{
-		"auth":              daemon.CmdAuth,
-		"info":              daemon.CmdInfo,
-		"version":           daemon.CmdVersion,
-		"create":            daemon.CmdCreate,
-		"pull":              daemon.CmdPull,
-		"build":             daemon.CmdBuild,
-		"commit":            daemon.CmdCommit,
-		"rename":            daemon.CmdRename,
-		"push":              daemon.CmdPush,
-		"podCreate":         daemon.CmdPodCreate,
-		"podStart":          daemon.CmdPodStart,
-		"podInfo":           daemon.CmdPodInfo,
-		"podStats":          daemon.CmdPodStats,
-		"podLabels":         daemon.CmdPodLabels,
-		"containerInfo":     daemon.CmdContainerInfo,
-		"containerLogs":     daemon.CmdLogs,
-		"podRm":             daemon.CmdPodRm,
-		"podStop":           daemon.CmdPodStop,
-		"vmCreate":          daemon.CmdVmCreate,
-		"vmKill":            daemon.CmdVmKill,
-		"list":              daemon.CmdList,
-		"exec":              daemon.CmdExec,
-		"exitcode":          daemon.CmdExitCode,
-		"attach":            daemon.CmdAttach,
-		"tty":               daemon.CmdTty,
-		"serviceAdd":        daemon.AddService,
-		"serviceList":       daemon.GetServices,
-		"serviceUpdate":     daemon.UpdateService,
-		"serviceDelete":     daemon.DeleteService,
-		"serveapi":          apiserver.ServeApi,
-		"acceptconnections": apiserver.AcceptConnections,
-
-		"images":       daemon.CmdImages,
-		"imagesremove": daemon.CmdImagesRemove,
-	} {
-		glog.V(3).Infof("Engine Register: name= %s", name)
-		if err := eng.Register(name, method); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func (daemon *Daemon) Restore() error {
@@ -145,7 +78,7 @@ func (daemon *Daemon) Restore() error {
 	defer daemon.PodList.Unlock()
 
 	for k, v := range podList {
-		err = daemon.CreatePod(k, v, false)
+		_, err = daemon.CreatePodWithLock(k, v, false)
 		if err != nil {
 			glog.Warningf("Got a unexpected error, %s", err.Error())
 			continue
@@ -165,21 +98,15 @@ func (daemon *Daemon) Restore() error {
 	return nil
 }
 
-func NewDaemon(eng *engine.Engine) (*Daemon, error) {
-	daemon, err := NewDaemonFromDirectory(eng)
+func NewDaemon(cfg *goconfig.ConfigFile) (*Daemon, error) {
+	daemon, err := NewDaemonFromDirectory(cfg)
 	if err != nil {
 		return nil, err
 	}
 	return daemon, nil
 }
 
-func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
-	// register portallocator release on shutdown
-	eng.OnShutdown(func() {
-		if err := portallocator.ReleaseAll(); err != nil {
-			glog.Errorf("portallocator.ReleaseAll(): %s", err.Error())
-		}
-	})
+func NewDaemonFromDirectory(cfg *goconfig.ConfigFile) (*Daemon, error) {
 	if os.Geteuid() != 0 {
 		return nil, fmt.Errorf("The Hyper daemon needs to be run as root")
 	}
@@ -187,11 +114,6 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 		return nil, err
 	}
 
-	cfg, err := goconfig.LoadConfigFile(eng.Config)
-	if err != nil {
-		glog.Errorf("Read config file (%s) failed, %s", eng.Config, err.Error())
-		return nil, err
-	}
 	kernel, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Kernel")
 	initrd, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Initrd")
 	glog.V(0).Infof("The config: kernel=%s, initrd=%s", kernel, initrd)
@@ -225,22 +147,16 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 		glog.Errorf("open leveldb file failed, %s", err.Error())
 		return nil, err
 	}
-	dockerCli, err1 := NewDocker()
-	if err1 != nil {
-		glog.Errorf(err1.Error())
-		return nil, err1
-	}
+
 	vList := map[string]*hypervisor.Vm{}
 	daemon := &Daemon{
 		ID:          fmt.Sprintf("%d", os.Getpid()),
 		db:          db,
-		eng:         eng,
 		Kernel:      kernel,
 		Initrd:      initrd,
 		Bios:        bios,
 		Cbfs:        cbfs,
 		VboxImage:   vboxImage,
-		DockerCli:   dockerCli,
 		PodList:     NewPodList(),
 		VmList:      vList,
 		Host:        host,
@@ -248,8 +164,13 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 		BridgeIface: biface,
 	}
 
+	daemon.Daemon, err = docker.NewDaemon(dockerCfg, registryCfg)
+	if err != nil {
+		return nil, err
+	}
+
 	// Get the docker daemon info
-	sysinfo, err := dockerCli.SendCmdInfo()
+	sysinfo, err := daemon.Daemon.SystemInfo()
 	if err != nil {
 		return nil, err
 	}
@@ -259,13 +180,50 @@ func NewDaemonFromDirectory(eng *engine.Engine) (*Daemon, error) {
 	}
 	daemon.Storage = stor
 	daemon.Storage.Init()
-	eng.OnShutdown(func() {
-		if err := daemon.shutdown(); err != nil {
-			glog.Errorf("Error during daemon.shutdown(): %v", err)
-		}
-	})
 
 	return daemon, nil
+}
+
+var (
+	dockerCfg   = &docker.Config{}
+	registryCfg = &registry.Service{}
+)
+
+func presentInHelp(usage string) string { return usage }
+func absentFromHelp(string) string      { return "" }
+
+func InitDockerCfg(mirrors []string, insecureRegistries []string, graphdriver, root string) {
+	if dockerCfg.LogConfig.Config == nil {
+		dockerCfg.LogConfig.Config = make(map[string]string)
+	}
+
+	dockerCfg.LogConfig.Config = make(map[string]string)
+	var errhandler flag.ErrorHandling = flag.ContinueOnError
+	flags := flag.NewFlagSet("", errhandler)
+	dockerCfg.InstallFlags(flags, presentInHelp)
+	dockerCfg.GraphDriver = graphdriver
+	dockerCfg.Root = root
+	dockerCfg.TrustKeyPath = path.Join(root, "keys")
+	// disable docker network
+	dockerCfg.Bridge.Iface = "none"
+	// disable log driver
+	dockerCfg.LogConfig.Type = "none"
+
+	registryOpts := &registry.Options{
+		Mirrors:            opts.NewListOpts(nil),
+		InsecureRegistries: opts.NewListOpts(nil),
+	}
+	registryOpts.InstallFlags(flags, absentFromHelp)
+
+	for _, m := range mirrors {
+		registryOpts.Mirrors.Set(m)
+	}
+
+	for _, ir := range insecureRegistries {
+		registryOpts.InsecureRegistries.Set(ir)
+	}
+
+	registryCfg = registry.NewService(registryOpts)
 }
 
 func (daemon *Daemon) DefaultLogCfg(driver string, cfg map[string]string) {
@@ -322,8 +280,8 @@ func (daemon *Daemon) WritePodToDB(podName string, podData []byte) error {
 	return nil
 }
 
+// Lock protected
 func (daemon *Daemon) GetPod(podId, podArgs string, autoremove bool) (*Pod, error) {
-
 	var (
 		pod *Pod
 		ok  bool
@@ -336,7 +294,7 @@ func (daemon *Daemon) GetPod(podId, podArgs string, autoremove bool) (*Pod, erro
 		return pod, nil
 	}
 
-	pod, err := CreatePod(daemon, daemon.DockerCli, podId, podArgs, autoremove)
+	pod, err := daemon.CreatePodWithLock(podId, podArgs, autoremove)
 	if err != nil {
 		return nil, err
 	}
@@ -591,7 +549,6 @@ func (daemon *Daemon) AddPod(pod *Pod, podArgs string) (err error) {
 		return
 	}
 
-	pod.status.Handler.Data = daemon
 	return nil
 }
 
@@ -653,7 +610,7 @@ func (daemon *Daemon) DestroyAllVm() error {
 	glog.V(2).Infof("lock PodList")
 
 	daemon.PodList.Foreach(func(p *Pod) error {
-		if _, _, err := daemon.StopPod(p.id, "yes"); err != nil {
+		if _, _, err := daemon.StopPodWithLock(p.id, "yes"); err != nil {
 			glog.V(1).Infof("fail to stop %s: %v", p.id, err)
 		}
 		return nil
@@ -682,7 +639,7 @@ func (daemon *Daemon) DestroyAndKeepVm() error {
 	return nil
 }
 
-func (daemon *Daemon) shutdown() error {
+func (daemon *Daemon) Shutdown() error {
 	glog.V(0).Info("The daemon will be shutdown")
 	glog.V(0).Info("Shutdown all VMs")
 	for vm := range daemon.VmList {
@@ -691,14 +648,6 @@ func (daemon *Daemon) shutdown() error {
 	daemon.db.Close()
 	glog.Flush()
 	return nil
-}
-
-func NewDocker() (DockerInterface, error) {
-	return NewDockerImpl()
-}
-
-var NewDockerImpl = func() (DockerInterface, error) {
-	return nil, fmt.Errorf("no docker create function")
 }
 
 // Now, the daemon can be ran for any linux kernel

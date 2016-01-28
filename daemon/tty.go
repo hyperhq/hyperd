@@ -3,39 +3,31 @@ package daemon
 import (
 	"fmt"
 	"github.com/golang/glog"
-	"github.com/hyperhq/hyper/engine"
-	"strconv"
 	"strings"
 )
 
-func (daemon *Daemon) CmdTty(job *engine.Job) (err error) {
-	if len(job.Args) < 3 {
-		return nil
-	}
+func (daemon *Daemon) TtyResize(podId, tag string, h, w int) error {
 	var (
-		podID     = job.Args[0]
-		tag       = job.Args[1]
-		h         = job.Args[2]
-		w         = job.Args[3]
 		container string
 		vmid      string
+		err       error
 	)
 
-	if strings.Contains(podID, "pod-") {
+	if strings.Contains(podId, "pod-") {
 		container = ""
-		vmid, err = daemon.GetVmByPodId(podID)
+		vmid, err = daemon.GetVmByPodId(podId)
 		if err != nil {
 			return err
 		}
-	} else if strings.Contains(podID, "vm-") {
-		vmid = podID
+	} else if strings.Contains(podId, "vm-") {
+		vmid = podId
 	} else {
-		container = podID
-		podID, err = daemon.GetPodByContainer(container)
+		container = podId
+		podId, err = daemon.GetPodByContainer(container)
 		if err != nil {
 			return err
 		}
-		vmid, err = daemon.GetVmByPodId(podID)
+		vmid, err = daemon.GetVmByPodId(podId)
 		if err != nil {
 			return err
 		}
@@ -46,16 +38,7 @@ func (daemon *Daemon) CmdTty(job *engine.Job) (err error) {
 		return fmt.Errorf("vm %s doesn't exist!")
 	}
 
-	row, err := strconv.Atoi(h)
-	if err != nil {
-		glog.Warningf("Window row %s incorrect!", h)
-	}
-	column, err := strconv.Atoi(w)
-	if err != nil {
-		glog.Warningf("Window column %s incorrect!", h)
-	}
-
-	err = vm.Tty(tag, row, column)
+	err = vm.Tty(tag, h, w)
 	if err != nil {
 		return err
 	}

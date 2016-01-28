@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/docker/docker/pkg/parsers"
+	"github.com/docker/docker/reference"
 	"github.com/docker/docker/registry"
 	"github.com/hyperhq/runv/hypervisor/pod"
 
@@ -31,14 +31,23 @@ func (cli *HyperClient) HyperCmdPull(args ...string) error {
 }
 
 func (cli *HyperClient) PullImage(imageName string) error {
-	remote, _ := parsers.ParseRepositoryTag(imageName)
-	// Resolve the Repository name from fqn to RepositoryInfo
-	repoInfo, err := registry.ParseRepositoryInfo(remote)
+	distributionRef, err := reference.ParseNamed(imageName)
 	if err != nil {
 		return err
 	}
+	if reference.IsNameOnly(distributionRef) {
+		distributionRef = reference.WithDefaultTag(distributionRef)
+		fmt.Fprintf(cli.out, "Using default tag: %s\n", reference.DefaultTag)
+	}
+
+	// Resolve the Repository name from fqn to RepositoryInfo
+	repoInfo, err := registry.ParseRepositoryInfo(distributionRef)
+	if err != nil {
+		return err
+	}
+
 	v := url.Values{}
-	v.Set("imageName", imageName)
+	v.Set("imageName", distributionRef.String())
 	_, _, err = cli.clientRequestAttemptLogin("POST", "/image/create?"+v.Encode(), nil, cli.out, repoInfo.Index, "pull")
 	return err
 }

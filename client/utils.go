@@ -16,10 +16,12 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/docker/docker/cliconfig"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/docker/registry"
+	"github.com/docker/engine-api/types"
+	registrytypes "github.com/docker/engine-api/types/registry"
+
 	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/hypervisor/pod"
 	"github.com/hyperhq/runv/lib/term"
@@ -99,8 +101,8 @@ func (cli *HyperClient) clientRequest(method, path string, in io.Reader, headers
 	return resp.Body, resp.Header.Get("Content-Type"), statusCode, nil
 }
 
-func (cli *HyperClient) clientRequestAttemptLogin(method, path string, in io.Reader, out io.Writer, index *registry.IndexInfo, cmdName string) (io.ReadCloser, int, error) {
-	cmdAttempt := func(authConfig cliconfig.AuthConfig) (io.ReadCloser, int, error) {
+func (cli *HyperClient) clientRequestAttemptLogin(method, path string, in io.Reader, out io.Writer, index *registrytypes.IndexInfo, cmdName string) (io.ReadCloser, int, error) {
+	cmdAttempt := func(authConfig types.AuthConfig) (io.ReadCloser, int, error) {
 		buf, err := json.Marshal(authConfig)
 		if err != nil {
 			return nil, -1, err
@@ -131,14 +133,14 @@ func (cli *HyperClient) clientRequestAttemptLogin(method, path string, in io.Rea
 	}
 
 	// Resolve the Auth config relevant for this server
-	authConfig := registry.ResolveAuthConfig(cli.configFile, index)
+	authConfig := registry.ResolveAuthConfig(cli.configFile.AuthConfigs, index)
 	body, statusCode, err := cmdAttempt(authConfig)
 	if statusCode == http.StatusUnauthorized {
 		fmt.Fprintf(cli.out, "\nPlease login prior to %s:\n", cmdName)
-		if err = cli.HyperCmdLogin(index.GetAuthConfigKey()); err != nil {
+		if err = cli.HyperCmdLogin(registry.GetAuthConfigKey(index)); err != nil {
 			return nil, -1, err
 		}
-		authConfig = registry.ResolveAuthConfig(cli.configFile, index)
+		authConfig = registry.ResolveAuthConfig(cli.configFile.AuthConfigs, index)
 		return cmdAttempt(authConfig)
 	}
 	return body, statusCode, err
@@ -176,7 +178,7 @@ func (cli *HyperClient) streamBody(body io.ReadCloser, contentType string, setRa
 	defer body.Close()
 
 	if utils.MatchesContentType(contentType, "application/json") {
-		return jsonmessage.DisplayJSONMessagesStream(body, stdout, cli.outFd, cli.isTerminalOut)
+		return jsonmessage.DisplayJSONMessagesStream(body, stdout, cli.outFd, cli.isTerminalOut, nil)
 	}
 	if stdout != nil || stderr != nil {
 		// When TTY is ON, use regular copy

@@ -2,93 +2,33 @@ package daemon
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/golang/glog"
-	"github.com/hyperhq/hyper/engine"
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/pod"
 	"github.com/hyperhq/runv/hypervisor/types"
 )
 
-func (daemon *Daemon) CmdVmCreate(job *engine.Job) (err error) {
-	var (
-		vm    *hypervisor.Vm
-		cpu   = 1
-		mem   = 128
-		async = false
-	)
-
-	if job.Args[0] != "" {
-		cpu, err = strconv.Atoi(job.Args[0])
-		if err != nil {
-			return err
-		}
-	}
-
-	if job.Args[1] != "" {
-		mem, err = strconv.Atoi(job.Args[1])
-		if err != nil {
-			return err
-		}
-	}
-
-	if job.Args[2] == "yes" { //async
-		async = true
-	}
-
-	vm, err = daemon.StartVm("", cpu, mem, false, 0)
+func (daemon *Daemon) CreateVm(cpu, mem int, async bool) (*hypervisor.Vm, error) {
+	vm, err := daemon.StartVm("", cpu, mem, false, 0)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	cleanup := func() {
+	defer func() {
 		if err != nil {
 			daemon.KillVm(vm.Id)
 		}
-	}
-
-	defer cleanup()
+	}()
 
 	if !async {
 		err = daemon.WaitVmStart(vm)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	// Prepare the VM status to client
-	v := &engine.Env{}
-	v.Set("ID", vm.Id)
-	v.SetInt("Code", 0)
-	v.Set("Cause", "")
-	if _, err := v.WriteTo(job.Stdout); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (daemon *Daemon) CmdVmKill(job *engine.Job) error {
-	vmId := job.Args[0]
-	if _, ok := daemon.VmList[vmId]; !ok {
-		return fmt.Errorf("Can not find the VM(%s)", vmId)
-	}
-	code, cause, err := daemon.KillVm(vmId)
-	if err != nil {
-		return err
-	}
-
-	// Prepare the VM status to client
-	v := &engine.Env{}
-	v.Set("ID", vmId)
-	v.SetInt("Code", code)
-	v.Set("Cause", cause)
-	if _, err := v.WriteTo(job.Stdout); err != nil {
-		return err
-	}
-
-	return nil
+	return vm, nil
 }
 
 func (daemon *Daemon) KillVm(vmId string) (int, string, error) {
@@ -96,11 +36,12 @@ func (daemon *Daemon) KillVm(vmId string) (int, string, error) {
 	if !ok {
 		return 0, "", nil
 	}
-	ret1, ret2, err := vm.Kill()
+	code, cause, err := vm.Kill()
 	if err == nil {
 		daemon.RemoveVm(vmId)
 	}
-	return ret1, ret2, err
+
+	return code, cause, err
 }
 
 func (p *Pod) AssociateVm(daemon *Daemon, vmId string) error {
