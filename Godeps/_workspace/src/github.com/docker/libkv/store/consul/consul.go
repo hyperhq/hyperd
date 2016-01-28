@@ -445,14 +445,9 @@ func (s *Consul) AtomicPut(key string, value []byte, previous *store.KVPair, opt
 		p.ModifyIndex = previous.LastIndex
 	}
 
-	ok, _, err := s.client.KV().CAS(p, nil)
-	if err != nil {
+	if work, _, err := s.client.KV().CAS(p, nil); err != nil {
 		return false, nil, err
-	}
-	if !ok {
-		if previous == nil {
-			return false, nil, store.ErrKeyExists
-		}
+	} else if !work {
 		return false, nil, store.ErrKeyModified
 	}
 

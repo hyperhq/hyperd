@@ -9,17 +9,17 @@ keywords = ["registry, on-prem, images, tags, repository, distribution, nginx, p
 # Authenticating proxy with nginx
 
 
-## Use-case
+## Use-case
 
 People already relying on a nginx proxy to authenticate their users to other services might want to leverage it and have Registry communications tunneled through the same pipeline.
 
 Usually, that includes enterprise setups using LDAP/AD on the backend and a SSO mechanism fronting their internal http portal.
 
-### Alternatives
+### Alternatives
 
 If you just want authentication for your registry, and are happy maintaining users access separately, you should really consider sticking with the native [basic auth registry feature](deploying.md#native-basic-auth).
 
-### Solution
+### Solution
 
 With the method presented here, you implement basic authentication for docker engines in a reverse proxy that sits in front of your registry.
 
@@ -57,13 +57,19 @@ Read again [the requirements](recipes.md#requirements).
 
 Ready?
 
-Run the following:
+--
+
+Create the required directories
 
 ```
 mkdir -p auth
 mkdir -p data
+```
 
-# This is the main nginx configuration you will use
+Create the main nginx configuration you will use.
+
+```
+
 cat <<EOF > auth/nginx.conf
 upstream docker-registry {
   server registry:5000;
@@ -87,7 +93,7 @@ server {
   ssl_certificate /etc/nginx/conf.d/domain.crt;
   ssl_certificate_key /etc/nginx/conf.d/domain.key;
 
-  # Recommendations from https://raymii.org/s/tutorials/Strong_SSL_Security_On_nginx.html
+  # Recommendations from https://raymii.org/s/tutorials/Strong_SSL_Security_On_nginx.html
   ssl_protocols TLSv1.1 TLSv1.2;
   ssl_ciphers 'EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH';
   ssl_prefer_server_ciphers on;
@@ -123,16 +129,24 @@ server {
   }
 }
 EOF
+```
 
-# Now, create a password file for "testuser" and "testpassword"
+Now, create a password file for "testuser" and "testpassword"
+
+```
 docker run --entrypoint htpasswd httpd:2.4 -bn testuser testpassword > auth/nginx.htpasswd
+```
 
-# Copy over your certificate files
+Copy over your certificate files
+
+```
 cp domain.crt auth
 cp domain.key auth
+```
 
-# Now create your compose file
+Now create your compose file
 
+```
 cat <<EOF > docker-compose.yml
 nginx:
   image: "nginx:1.9"

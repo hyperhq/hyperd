@@ -335,10 +335,6 @@ func (s *Etcd) AtomicPut(key string, value []byte, previous *store.KVPair, opts 
 			if etcdError.Code == etcd.ErrorCodeTestFailed {
 				return false, nil, store.ErrKeyModified
 			}
-			// Node exists error (when PrevNoExist)
-			if etcdError.Code == etcd.ErrorCodeNodeExist {
-				return false, nil, store.ErrKeyExists
-			}
 		}
 		return false, nil, err
 	}

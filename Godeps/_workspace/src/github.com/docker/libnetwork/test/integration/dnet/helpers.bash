@@ -18,8 +18,17 @@ function get_sbox_id() {
 }
 
 function net_connect() {
-	dnet_cmd $(inst_id2port ${1}) service publish ${2}.${3}
-	dnet_cmd $(inst_id2port ${1}) service attach ${2} ${2}.${3}
+        local al gl
+        if [ -n "$4" ]; then
+            if [ "${4}" != ":" ]; then
+                al="--alias=${4}"
+            fi
+        fi
+        if [ -n "$5" ]; then
+            gl="--alias=${5}"
+        fi
+        dnet_cmd $(inst_id2port ${1}) service publish $gl ${2}.${3}
+        dnet_cmd $(inst_id2port ${1}) service attach $al ${2} ${2}.${3}
 }
 
 function net_disconnect() {
@@ -349,84 +358,6 @@ function check_etchosts() {
     done
 
     echo ${retval}
-}
-
-function test_overlay_etchosts() {
-    local clist dnet_suffix
-
-    dnet_suffix=$1
-    shift
-
-    echo $(docker ps)
-
-    start=1
-    end=3
-    # Setup overlay network and connect containers ot it
-    dnet_cmd $(inst_id2port 1) network create -d overlay multihost
-
-    for iter in `seq 1 2`;
-    do
-	for i in `seq ${start} ${end}`;
-	do
-	    dnet_cmd $(inst_id2port $i) container create container_${iter}_${i}
-	    net_connect ${i} container_${iter}_${i} multihost
-	done
-
-	# Now test the /etc/hosts content of all the containers
-	for i in `seq ${start} ${end}`;
-	do
-	    clist=""
-	    oldclist=""
-	    for j in `seq ${start} ${end}`;
-	    do
-		if [ "$i" -eq "$j" ]; then
-		    continue
-		fi
-		clist="$clist container_${iter}_$j"
-		oldclist="$oldclist container_1_$j"
-	    done
-	    rv=$(check_etchosts $(dnet_container_name $i $dnet_suffix) \
-				$(get_sbox_id ${i} container_${iter}_${i}) \
-				${clist})
-	    [ "$rv" = "true" ]
-
-	    # check to see the containers don't have stale entries from previous iteration
-	    if [ "$iter" -eq 2 ]; then
-		rv=$(check_etchosts $(dnet_container_name $i $dnet_suffix) \
-				    $(get_sbox_id ${i} container_${iter}_${i}) \
-				    ${oldclist})
-		[ "$rv" = "false" ]
-	    fi
-	done
-
-	# Teardown the container connections and the network
-	clist=""
-	for i in `seq ${start} ${end}`;
-	do
-	    net_disconnect ${i} container_${iter}_${i} multihost
-	    dnet_cmd $(inst_id2port $i) container rm container_${iter}_${i}
-
-	    #check if the /etc/hosts of other containers does not contain this container
-	    for j in `seq ${start} ${end}`;
-	    do
-		if [ "$i" -eq "$j" ]; then
-		    continue
-		fi
-
-		if [[ "${clist}" =~ .*container_${iter}_${j}.* ]]; then
-		    continue
-		fi
-
-		rv=$(check_etchosts $(dnet_container_name $j $dnet_suffix) \
-				    $(get_sbox_id ${j} container_${iter}_${j}) \
-				    container_${iter}_${i})
-		[ "$rv" = "false" ]
-	    done
-	    clist="${clist} container_${iter}_${i}"
-	done
-    done
-
-    dnet_cmd $(inst_id2port 2) network rm multihost
 }
 
 function test_overlay_singlehost() {

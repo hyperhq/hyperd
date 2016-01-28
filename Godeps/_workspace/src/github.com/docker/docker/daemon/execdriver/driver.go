@@ -91,6 +91,9 @@ type Driver interface {
 	// Stats returns resource stats for a running container
 	Stats(id string) (*ResourceStats, error)
 
+	// Update updates resource configs for a container
+	Update(c *Command) error
+
 	// SupportsHooks refers to the driver capability to exploit pre/post hook functionality
 	SupportsHooks() bool
 }
@@ -137,4 +140,5 @@ type CommonCommand struct {
 	Resources     *Resources    `json:"resources"`
 	Rootfs        string        `json:"rootfs"` // root fs of the container
 	WorkingDir    string        `json:"working_dir"`
+	TmpDir        string        `json:"tmpdir"` // Directory used to store docker tmpdirs.
 }

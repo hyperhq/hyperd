@@ -20,8 +20,10 @@ function test_single_network_connectivity() {
     # Now test connectivity between all the containers using service names
     for i in `seq ${start} ${end}`;
     do
-	runc $(dnet_container_name 1 bridge) $(get_sbox_id 1 container_${i}) \
-	     "ping -c 1 www.google.com"
+    if [ "${nw_name}" != "internal" ]; then
+		runc $(dnet_container_name 1 bridge) $(get_sbox_id 1 container_${i}) \
+		     "ping -c 1 www.google.com"
+    fi
 	for j in `seq ${start} ${end}`;
 	do
 	    if [ "$i" -eq "$j" ]; then
@@ -179,6 +181,23 @@ function test_single_network_connectivity() {
 	done
     done
 
+    svcs=(
+	0,0
+	2,3
+	1,3
+	1,2
+    )
+
+    echo "Test connectivity failure"
+    for i in `seq ${start} ${end}`;
+    do
+	IFS=, read a b <<<"${svcs[$i]}"
+	osvc="svc${a}${b}"
+	echo "pinging ${osvc}"
+	runc_nofail $(dnet_container_name 1 bridge) $(get_sbox_id 1 container_${i}) "ping -c 1 ${osvc}"
+	[ "${status}" -ne 0 ]
+    done
+
     for i in `seq ${start} ${end}`;
     do
 	for j in `seq ${start} ${end}`;
@@ -215,4 +234,72 @@ function test_single_network_connectivity() {
 	done
     done
 
+}
+
+@test "Test bridge network alias support" {
+    skip_for_circleci
+    dnet_cmd $(inst_id2port 1) network create -d bridge br1
+    dnet_cmd $(inst_id2port 1) container create container_1
+    net_connect 1 container_1 br1 container_2:c2 
+    dnet_cmd $(inst_id2port 1) container create container_2
+    net_connect 1 container_2 br1
+    runc $(dnet_container_name 1 bridge) $(get_sbox_id 1 container_1) "ping -c 1 container_2"
+    runc $(dnet_container_name 1 bridge) $(get_sbox_id 1 container_1) "ping -c 1 c2"
+    net_disconnect 1 container_1 br1
+    net_disconnect 1 container_2 br1
+    dnet_cmd $(inst_id2port 1) container rm container_1
+    dnet_cmd $(inst_id2port 1) container rm container_2
+    dnet_cmd $(inst_id2port 1) network rm br1
+}
+
+
+@test "Test bridge network global alias support" {
+    skip_for_circleci
+    dnet_cmd $(inst_id2port 1) network create -d bridge br1
+    dnet_cmd $(inst_id2port 1) network create -d bridge br2
+    dnet_cmd $(inst_id2port 1) container create container_1
+    net_connect 1 container_1 br1 : c1
+    dnet_cmd $(inst_id2port 1) container create container_2
+    net_connect 1 container_2 br1 : shared
+    dnet_cmd $(inst_id2port 1) container create container_3
+    net_connect 1 container_3 br1 : shared
+
+    runc $(dnet_container_name 1 bridge) $(get_sbox_id 1 container_2) "ping -c 1 container_1"
+    runc $(dnet_container_name 1 bridge) $(get_sbox_id 1 container_2) "ping -c 1 c1"
+    runc $(dnet_container_name 1 bridge) $(get_sbox_id 1 container_1) "ping -c 1 container_2"
+    runc $(dnet_container_name 1 bridge) $(get_sbox_id 1 container_1) "ping -c 1 shared"
+
+    net_disconnect 1 container_2 br1
+    dnet_cmd $(inst_id2port 1) container rm container_2
+
+    runc $(dnet_container_name 1 bridge) $(get_sbox_id 1 container_1) "ping -c 1 container_3"
+    runc $(dnet_container_name 1 bridge) $(get_sbox_id 1 container_1) "ping -c 1 shared"
+
+    net_disconnect 1 container_1 br1
+    dnet_cmd $(inst_id2port 1) container rm container_1
+    net_disconnect 1 container_3 br1
+    dnet_cmd $(inst_id2port 1) container rm container_3
+
+    dnet_cmd $(inst_id2port 1) network rm br1
+}
+
+@test "Test bridge network internal network" {
+    skip_for_circleci
+
+    echo $(docker ps)
+    dnet_cmd $(inst_id2port 1) network create -d bridge --internal internal
+    dnet_cmd $(inst_id2port 1) container create container_1
+    # connects to internal network, confirm it can't conmunicate with outside world
+    net_connect 1 container_1 internal
+    run runc $(dnet_container_name 1 bridge) $(get_sbox_id 1 container_1) "ping -c 1 www.google.com"
+    [[ "$output" == *"1 packets transmitted, 0 packets received, 100% packet loss"* ]]
+    net_disconnect 1 container_1 internal
+    # connects to bridge network, confirm it can conmunicate with outside world
+    net_connect 1 container_1 bridge
+    runc $(dnet_container_name 1 bridge) $(get_sbox_id 1 container_1) "ping -c 1 www.google.com"
+    net_disconnect 1 container_1 bridge
+    dnet_cmd $(inst_id2port 1) container rm container_1
+    # test conmunications within internal network
+    test_single_network_connectivity internal 3
+    dnet_cmd $(inst_id2port 1) network rm internal
 }

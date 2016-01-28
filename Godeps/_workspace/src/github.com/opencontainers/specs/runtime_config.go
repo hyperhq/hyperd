@@ -1,6 +1,8 @@
 package specs
 
-// RuntimeSpec is the generic runtime state information on a running container
+// RuntimeSpec contains host-specific configuration information for
+// a container. This information must not be included when the bundle
+// is packaged for distribution.
 type RuntimeSpec struct {
 	// Mounts is a mapping of names to mount configurations.
 	// Which mounts will be mounted and where should be chosen with MountPoints
@@ -22,6 +24,8 @@ type Hooks struct {
 	// Prestart is a list of hooks to be run before the container process is executed.
 	// On Linux, they are run after the container namespaces are created.
 	Prestart []Hook `json:"prestart"`
+	// Poststart is a list of hooks to be run after the container process is started.
+	Poststart []Hook `json:"poststart"`
 	// Poststop is a list of hooks to be run after the container process exits.
 	Poststop []Hook `json:"poststop"`
 }

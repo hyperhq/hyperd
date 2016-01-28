@@ -25,10 +25,6 @@ import (
 )
 
 type Memberlist struct {
-	sequenceNum uint32 // Local sequence number
-	incarnation uint32 // Local incarnation number
-	numNodes    uint32 // Number of known nodes (estimate)
-
 	config         *Config
 	shutdown       bool
 	shutdownCh     chan struct{}
@@ -38,6 +34,9 @@ type Memberlist struct {
 	udpListener *net.UDPConn
 	tcpListener *net.TCPListener
 	handoff     chan msgHandoff
+
+	sequenceNum uint32 // Local sequence number
+	incarnation uint32 // Local incarnation number
 
 	nodeLock sync.RWMutex
 	nodes    []*nodeState          // Known nodes
@@ -52,6 +51,8 @@ type Memberlist struct {
 	ackHandlers map[uint32]*ackHandler
 
 	broadcasts *TransmitLimitedQueue
+
+	startStopLock sync.Mutex
 
 	logger *log.Logger
 }
@@ -89,9 +90,6 @@ func newMemberlist(conf *Config) (*Memberlist, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Failed to start TCP listener. Err: %s", err)
 	}
-	if conf.BindPort == 0 {
-		conf.BindPort = tcpLn.Addr().(*net.TCPAddr).Port
-	}
 
 	udpAddr := &net.UDPAddr{IP: net.ParseIP(conf.BindAddr), Port: conf.BindPort}
 	udpLn, err := net.ListenUDP("udp", udpAddr)
@@ -103,19 +101,10 @@ func newMemberlist(conf *Config) (*Memberlist, error) {
 	// Set the UDP receive window size
 	setUDPRecvBuf(udpLn)
 
-	if conf.LogOutput != nil && conf.Logger != nil {
-		return nil, fmt.Errorf("Cannot specify both LogOutput and Logger. Please choose a single log configuration setting.")
+	if conf.LogOutput == nil {
+		conf.LogOutput = os.Stderr
 	}
-
-	logDest := conf.LogOutput
-	if logDest == nil {
-		logDest = os.Stderr
-	}
-
-	logger := conf.Logger
-	if logger == nil {
-		logger = log.New(logDest, "", log.LstdFlags)
-	}
+	logger := log.New(conf.LogOutput, "", log.LstdFlags)
 
 	m := &Memberlist{
 		config:         conf,
@@ -129,9 +118,7 @@ func newMemberlist(conf *Config) (*Memberlist, error) {
 		broadcasts:     &TransmitLimitedQueue{RetransmitMult: conf.RetransmitMult},
 		logger:         logger,
 	}
-	m.broadcasts.NumNodes = func() int {
-		return m.estNumNodes()
-	}
+	m.broadcasts.NumNodes = func() int { return len(m.nodes) }
 	go m.tcpListen()
 	go m.udpListen()
 	go m.udpHandler()
@@ -238,6 +225,7 @@ func (m *Memberlist) resolveAddr(hostStr string) ([][]byte, uint16, error) {
 // as if we received an alive notification our own network channel for
 // ourself.
 func (m *Memberlist) setAlive() error {
+
 	var advertiseAddr []byte
 	var advertisePort int
 	if m.config.AdvertiseAddr != "" {
@@ -298,9 +286,7 @@ func (m *Memberlist) setAlive() error {
 			addr := m.tcpListener.Addr().(*net.TCPAddr)
 			advertiseAddr = addr.IP
 		}
-
-		// Use the port we are bound to.
-		advertisePort = m.tcpListener.Addr().(*net.TCPAddr).Port
+		advertisePort = m.config.BindPort
 	}
 
 	// Check if this is a public address without encryption
@@ -399,8 +385,7 @@ func (m *Memberlist) UpdateNode(timeout time.Duration) error {
 // user-data message, which a delegate will receive through NotifyMsg
 // The actual data is transmitted over UDP, which means this is a
 // best-effort transmission mechanism, and the maximum size of the
-// message is the size of a single UDP datagram, after compression.
-// This method is DEPRECATED in favor or SendToUDP
+// message is the size of a single UDP datagram, after compression
 func (m *Memberlist) SendTo(to net.Addr, msg []byte) error {
 	// Encode as a user message
 	buf := make([]byte, 1, len(msg)+1)
@@ -408,36 +393,7 @@ func (m *Memberlist) SendTo(to net.Addr, msg []byte) error {
 	buf = append(buf, msg...)
 
 	// Send the message
-	return m.rawSendMsgUDP(to, buf)
-}
-
-// SendToUDP is used to directly send a message to another node, without
-// the use of the gossip mechanism. This will encode the message as a
-// user-data message, which a delegate will receive through NotifyMsg
-// The actual data is transmitted over UDP, which means this is a
-// best-effort transmission mechanism, and the maximum size of the
-// message is the size of a single UDP datagram, after compression
-func (m *Memberlist) SendToUDP(to *Node, msg []byte) error {
-	// Encode as a user message
-	buf := make([]byte, 1, len(msg)+1)
-	buf[0] = byte(userMsg)
-	buf = append(buf, msg...)
-
-	// Send the message
-	destAddr := &net.UDPAddr{IP: to.Addr, Port: int(to.Port)}
-	return m.rawSendMsgUDP(destAddr, buf)
-}
-
-// SendToTCP is used to directly send a message to another node, without
-// the use of the gossip mechanism. This will encode the message as a
-// user-data message, which a delegate will receive through NotifyMsg
-// The actual data is transmitted over TCP, which means delivery
-// is guaranteed if no error is returned. There is no limit
-// to the size of the message
-func (m *Memberlist) SendToTCP(to *Node, msg []byte) error {
-	// Send the message
-	destAddr := &net.TCPAddr{IP: to.Addr, Port: int(to.Port)}
-	return m.sendTCPUserMsg(destAddr, msg)
+	return m.rawSendMsg(to, buf)
 }
 
 // Members returns a list of all known live nodes. The node structures
@@ -485,12 +441,10 @@ func (m *Memberlist) NumMembers() (alive int) {
 // This method is safe to call multiple times, but must not be called
 // after the cluster is already shut down.
 func (m *Memberlist) Leave(timeout time.Duration) error {
-	m.nodeLock.Lock()
-	// We can't defer m.nodeLock.Unlock() because m.deadNode will also try to
-	// acquire a lock so we need to Unlock before that.
+	m.startStopLock.Lock()
+	defer m.startStopLock.Unlock()
 
 	if m.shutdown {
-		m.nodeLock.Unlock()
 		panic("leave after shutdown")
 	}
 
@@ -498,7 +452,6 @@ func (m *Memberlist) Leave(timeout time.Duration) error {
 		m.leave = true
 
 		state, ok := m.nodeMap[m.config.Name]
-		m.nodeLock.Unlock()
 		if !ok {
 			m.logger.Printf("[WARN] memberlist: Leave but we're not in the node map.")
 			return nil
@@ -522,8 +475,6 @@ func (m *Memberlist) Leave(timeout time.Duration) error {
 				return fmt.Errorf("timeout waiting for leave broadcast")
 			}
 		}
-	} else {
-		m.nodeLock.Unlock()
 	}
 
 	return nil
@@ -558,8 +509,8 @@ func (m *Memberlist) ProtocolVersion() uint8 {
 //
 // This method is safe to call multiple times.
 func (m *Memberlist) Shutdown() error {
-	m.nodeLock.Lock()
-	defer m.nodeLock.Unlock()
+	m.startStopLock.Lock()
+	defer m.startStopLock.Unlock()
 
 	if m.shutdown {
 		return nil

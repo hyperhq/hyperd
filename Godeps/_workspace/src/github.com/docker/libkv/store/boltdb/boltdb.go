@@ -381,7 +381,7 @@ func (b *BoltDB) AtomicPut(key string, value []byte, previous *store.KVPair, opt
 		// doesn't exist in the DB.
 		val = bucket.Get([]byte(key))
 		if previous == nil && len(val) != 0 {
-			return store.ErrKeyExists
+			return store.ErrKeyModified
 		}
 		if previous != nil {
 			if len(val) == 0 {
