@@ -161,12 +161,16 @@ func (pbs *proxyBlobStore) Put(ctx context.Context, mediaType string, p []byte) 
 	return distribution.Descriptor{}, distribution.ErrUnsupported
 }
 
-func (pbs *proxyBlobStore) Create(ctx context.Context) (distribution.BlobWriter, error) {
+func (pbs *proxyBlobStore) Create(ctx context.Context, options ...distribution.BlobCreateOption) (distribution.BlobWriter, error) {
 	return nil, distribution.ErrUnsupported
 }
 
 func (pbs *proxyBlobStore) Resume(ctx context.Context, id string) (distribution.BlobWriter, error) {
 	return nil, distribution.ErrUnsupported
+}
+
+func (pbs *proxyBlobStore) Mount(ctx context.Context, sourceRepo string, dgst digest.Digest) (distribution.Descriptor, error) {
+	return distribution.Descriptor{}, distribution.ErrUnsupported
 }
 
 func (pbs *proxyBlobStore) Open(ctx context.Context, dgst digest.Digest) (distribution.ReadSeekCloser, error) {

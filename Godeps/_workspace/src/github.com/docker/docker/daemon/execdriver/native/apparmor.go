@@ -4,7 +4,6 @@ package native
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -12,6 +11,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/docker/docker/pkg/aaparser"
 	"github.com/opencontainers/runc/libcontainer/apparmor"
 )
 
@@ -21,8 +21,11 @@ const (
 
 type data struct {
 	Name         string
+	ExecPath     string
 	Imports      []string
 	InnerImports []string
+	MajorVersion int
+	MinorVersion int
 }
 
 const baseTemplate = `
@@ -40,7 +43,11 @@ profile {{.Name}} flags=(attach_disconnected,mediate_deleted) {
   file,
   umount,
 
-  deny @{PROC}/{*,**^[0-9*],sys/kernel/shm*} wkx,
+  deny @{PROC}/* w,   # deny write for all files directly in /proc (not in a subdir)
+  # deny write to files not in /proc/<number>/** or /proc/sys/**
+  deny @{PROC}/{[^1-9],[^1-9][^0-9],[^1-9s][^0-9y][^0-9s],[^1-9][^0-9][^0-9][^0-9]*}/** w,
+  deny @{PROC}/sys/[^k]** w,  # deny /proc/sys except /proc/sys/k* (effectively /proc/sys/kernel)
+  deny @{PROC}/sys/kernel/{?,??,[^s][^h][^m]**} w,  # deny everything except shm* in /proc/sys/kernel/
   deny @{PROC}/sysrq-trigger rwklx,
   deny @{PROC}/mem rwklx,
   deny @{PROC}/kmem rwklx,
@@ -55,6 +62,15 @@ profile {{.Name}} flags=(attach_disconnected,mediate_deleted) {
   deny /sys/fs/cg[^r]*/** wklx,
   deny /sys/firmware/efi/efivars/** rwklx,
   deny /sys/kernel/security/** rwklx,
+
+{{if ge .MajorVersion 2}}{{if ge .MinorVersion 8}}
+  # suppress ptrace denials when using 'docker ps' or using 'ps' inside a container
+  ptrace (trace,read) peer=docker-default,
+{{end}}{{end}}
+{{if ge .MajorVersion 2}}{{if ge .MinorVersion 9}}
+  # docker daemon confinement requires explict allow rule for signal
+  signal (receive) set=(kill,term) peer={{.ExecPath}},
+{{end}}{{end}}
 }
 `
 
@@ -73,6 +89,14 @@ func generateProfile(out io.Writer) error {
 	}
 	if abstractionsExists() {
 		data.InnerImports = append(data.InnerImports, "#include <abstractions/base>")
+	}
+	data.MajorVersion, data.MinorVersion, err = aaparser.GetVersion()
+	if err != nil {
+		return err
+	}
+	data.ExecPath, err = exec.LookPath("docker")
+	if err != nil {
+		return err
 	}
 	if err := compiled.Execute(out, data); err != nil {
 		return err
@@ -112,15 +136,10 @@ func installAppArmorProfile() error {
 	}
 	f.Close()
 
-	cmd := exec.Command("/sbin/apparmor_parser", "-r", "-W", "docker")
-	// to use the parser directly we have to make sure we are in the correct
-	// dir with the profile
-	cmd.Dir = "/etc/apparmor.d"
-
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("Error loading docker apparmor profile: %s (%s)", err, output)
+	if err := aaparser.LoadProfile(apparmorProfilePath); err != nil {
+		return err
 	}
+
 	return nil
 }
 

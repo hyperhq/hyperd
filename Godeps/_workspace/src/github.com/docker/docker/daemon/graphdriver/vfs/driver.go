@@ -1,5 +1,3 @@
-// +build daemon
-
 package vfs
 
 import (
@@ -12,6 +10,11 @@ import (
 	"github.com/docker/docker/pkg/idtools"
 
 	"github.com/opencontainers/runc/libcontainer/label"
+)
+
+var (
+	// CopyWithTar defines the copy method to use.
+	CopyWithTar = chrootarchive.CopyWithTar
 )
 
 func init() {
@@ -89,7 +92,7 @@ func (d *Driver) Create(id, parent, mountLabel string) error {
 	if err != nil {
 		return fmt.Errorf("%s: %s", parent, err)
 	}
-	if err := chrootarchive.CopyWithTar(parentDir, dir); err != nil {
+	if err := CopyWithTar(parentDir, dir); err != nil {
 		return err
 	}
 	return nil
@@ -101,10 +104,10 @@ func (d *Driver) dir(id string) string {
 
 // Remove deletes the content from the directory for a given id.
 func (d *Driver) Remove(id string) error {
-	if _, err := os.Stat(d.dir(id)); err != nil {
+	if err := os.RemoveAll(d.dir(id)); err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	return os.RemoveAll(d.dir(id))
+	return nil
 }
 
 // Get returns the directory for the given id.

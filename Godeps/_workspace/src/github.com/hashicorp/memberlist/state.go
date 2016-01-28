@@ -44,18 +44,8 @@ type nodeState struct {
 
 // ackHandler is used to register handlers for incoming acks
 type ackHandler struct {
-	handler func([]byte, time.Time)
+	handler func()
 	timer   *time.Timer
-}
-
-// NoPingResponseError is used to indicate a 'ping' packet was
-// successfully issued but no response was received
-type NoPingResponseError struct {
-	node string
-}
-
-func (f NoPingResponseError) Error() string {
-	return fmt.Sprintf("No response from node %s", f.node)
 }
 
 // Schedule is used to ensure the Tick is performed periodically. This
@@ -138,7 +128,9 @@ func (m *Memberlist) pushPullTrigger(stop <-chan struct{}) {
 
 	// Tick using a dynamic timer
 	for {
-		tickTime := pushPullScale(interval, m.estNumNodes())
+		m.nodeLock.RLock()
+		tickTime := pushPullScale(interval, len(m.nodes))
+		m.nodeLock.RUnlock()
 		select {
 		case <-time.After(tickTime):
 			m.pushPull()
@@ -215,55 +207,46 @@ START:
 	m.probeNode(&node)
 }
 
-// probeNode handles a single round of failure checking on a node.
+// probeNode handles a single round of failure checking on a node
 func (m *Memberlist) probeNode(node *nodeState) {
 	defer metrics.MeasureSince([]string{"memberlist", "probeNode"}, time.Now())
 
-	// Prepare a ping message and setup an ack handler.
+	// Send a ping to the node
 	ping := ping{SeqNo: m.nextSeqNo(), Node: node.Name}
-	ackCh := make(chan ackMessage, m.config.IndirectChecks+1)
+	destAddr := &net.UDPAddr{IP: node.Addr, Port: int(node.Port)}
+
+	// Setup an ack handler
+	ackCh := make(chan bool, m.config.IndirectChecks+1)
 	m.setAckChannel(ping.SeqNo, ackCh, m.config.ProbeInterval)
 
-	// Send a ping to the node.
-	deadline := time.Now().Add(m.config.ProbeInterval)
-	destAddr := &net.UDPAddr{IP: node.Addr, Port: int(node.Port)}
+	// Send the ping message
 	if err := m.encodeAndSendMsg(destAddr, pingMsg, &ping); err != nil {
 		m.logger.Printf("[ERR] memberlist: Failed to send ping: %s", err)
 		return
 	}
 
-	// Mark the sent time here, which should be after any pre-processing and
-	// system calls to do the actual send. This probably under-reports a bit,
-	// but it's the best we can do.
-	sent := time.Now()
-
-	// Wait for response or round-trip-time.
+	// Wait for response or round-trip-time
 	select {
 	case v := <-ackCh:
-		if v.Complete == true {
-			if m.config.Ping != nil {
-				rtt := v.Timestamp.Sub(sent)
-				m.config.Ping.NotifyPingComplete(&node.Node, rtt, v.Payload)
-			}
+		if v == true {
 			return
 		}
 
 		// As an edge case, if we get a timeout, we need to re-enqueue it
-		// here to break out of the select below.
-		if v.Complete == false {
+		// here to break out of the select below
+		if v == false {
 			ackCh <- v
 		}
 	case <-time.After(m.config.ProbeTimeout):
-		m.logger.Printf("[DEBUG] memberlist: Failed UDP ping: %v (timeout reached)", node.Name)
 	}
 
-	// Get some random live nodes.
+	// Get some random live nodes
 	m.nodeLock.RLock()
 	excludes := []string{m.config.Name, node.Name}
 	kNodes := kRandomNodes(m.config.IndirectChecks, excludes, m.nodes)
 	m.nodeLock.RUnlock()
 
-	// Attempt an indirect ping.
+	// Attempt an indirect ping
 	ind := indirectPingReq{SeqNo: ping.SeqNo, Target: node.Addr, Port: node.Port, Node: node.Name}
 	for _, peer := range kNodes {
 		destAddr := &net.UDPAddr{IP: peer.Addr, Port: int(peer.Port)}
@@ -272,49 +255,10 @@ func (m *Memberlist) probeNode(node *nodeState) {
 		}
 	}
 
-	// Also make an attempt to contact the node directly over TCP. This
-	// helps prevent confused clients who get isolated from UDP traffic
-	// but can still speak TCP (which also means they can possibly report
-	// misinformation to other nodes via anti-entropy), avoiding flapping in
-	// the cluster.
-	//
-	// This is a little unusual because we will attempt a TCP ping to any
-	// member who understands version 3 of the protocol, regardless of
-	// which protocol version we are speaking. That's why we've included a
-	// config option to turn this off if desired.
-	fallbackCh := make(chan bool)
-	if (!m.config.DisableTcpPings) && (node.PMax >= 3) {
-		destAddr := &net.TCPAddr{IP: node.Addr, Port: int(node.Port)}
-		go func() {
-			defer close(fallbackCh)
-			didContact, err := m.sendPingAndWaitForAck(destAddr, ping, deadline)
-			if err != nil {
-				m.logger.Printf("[ERR] memberlist: Failed TCP fallback ping: %s", err)
-			} else {
-				fallbackCh <- didContact
-			}
-		}()
-	} else {
-		close(fallbackCh)
-	}
-
-	// Wait for the acks or timeout. Note that we don't check the fallback
-	// channel here because we want to issue a warning below if that's the
-	// *only* way we hear back from the peer, so we have to let this time
-	// out first to allow the normal UDP-based acks to come in.
+	// Wait for the acks or timeout
 	select {
 	case v := <-ackCh:
-		if v.Complete == true {
-			return
-		}
-	}
-
-	// Finally, poll the fallback channel. The timeouts are set such that
-	// the channel will have something or be closed without having to wait
-	// any additional time here.
-	for didContact := range fallbackCh {
-		if didContact {
-			m.logger.Printf("[WARN] memberlist: Was able to reach %s via TCP but not UDP, network may be misconfigured and not allowing bidirectional UDP", node.Name)
+		if v == true {
 			return
 		}
 	}
@@ -323,37 +267,6 @@ func (m *Memberlist) probeNode(node *nodeState) {
 	m.logger.Printf("[INFO] memberlist: Suspect %s has failed, no acks received", node.Name)
 	s := suspect{Incarnation: node.Incarnation, Node: node.Name, From: m.config.Name}
 	m.suspectNode(&s)
-}
-
-// Ping initiates a ping to the node with the specified name.
-func (m *Memberlist) Ping(node string, addr net.Addr) (time.Duration, error) {
-	// Prepare a ping message and setup an ack handler.
-	ping := ping{SeqNo: m.nextSeqNo(), Node: node}
-	ackCh := make(chan ackMessage, m.config.IndirectChecks+1)
-	m.setAckChannel(ping.SeqNo, ackCh, m.config.ProbeInterval)
-
-	// Send a ping to the node.
-	if err := m.encodeAndSendMsg(addr, pingMsg, &ping); err != nil {
-		return 0, err
-	}
-
-	// Mark the sent time here, which should be after any pre-processing and
-	// system calls to do the actual send. This probably under-reports a bit,
-	// but it's the best we can do.
-	sent := time.Now()
-
-	// Wait for response or timeout.
-	select {
-	case v := <-ackCh:
-		if v.Complete == true {
-			return v.Timestamp.Sub(sent), nil
-		}
-	case <-time.After(m.config.ProbeTimeout):
-		// Timeout, return an error below.
-	}
-
-	m.logger.Printf("[DEBUG] memberlist: Failed UDP ping: %v (timeout reached)", node)
-	return 0, NoPingResponseError{ping.Node}
 }
 
 // resetNodes is used when the tick wraps around. It will reap the
@@ -373,9 +286,6 @@ func (m *Memberlist) resetNodes() {
 
 	// Trim the nodes to exclude the dead nodes
 	m.nodes = m.nodes[0:deadIdx]
-
-	// Update numNodes after we've trimmed the dead nodes
-	atomic.StoreUint32(&m.numNodes, uint32(deadIdx))
 
 	// Shuffle live nodes
 	shuffleNodes(m.nodes)
@@ -410,7 +320,7 @@ func (m *Memberlist) gossip() {
 
 		// Send the compound message
 		destAddr := &net.UDPAddr{IP: node.Addr, Port: int(node.Port)}
-		if err := m.rawSendMsgUDP(destAddr, compound.Bytes()); err != nil {
+		if err := m.rawSendMsg(destAddr, compound.Bytes()); err != nil {
 			m.logger.Printf("[ERR] memberlist: Failed to send gossip to %s: %s", destAddr, err)
 		}
 	}
@@ -449,8 +359,39 @@ func (m *Memberlist) pushPullNode(addr []byte, port uint16, join bool) error {
 		return err
 	}
 
-	if err := m.mergeRemoteState(join, remote, userState); err != nil {
+	if err := m.verifyProtocol(remote); err != nil {
 		return err
+	}
+
+	// Invoke the merge delegate if any
+	if join && m.config.Merge != nil {
+		nodes := make([]*Node, len(remote))
+		for idx, n := range remote {
+			nodes[idx] = &Node{
+				Name: n.Name,
+				Addr: n.Addr,
+				Port: n.Port,
+				Meta: n.Meta,
+				PMin: n.Vsn[0],
+				PMax: n.Vsn[1],
+				PCur: n.Vsn[2],
+				DMin: n.Vsn[3],
+				DMax: n.Vsn[4],
+				DCur: n.Vsn[5],
+			}
+		}
+		if m.config.Merge.NotifyMerge(nodes) {
+			m.logger.Printf("[WARN] memberlist: Cluster merge canceled")
+			return fmt.Errorf("Merge canceled")
+		}
+	}
+
+	// Merge the state
+	m.mergeState(remote)
+
+	// Invoke the delegate
+	if m.config.Delegate != nil {
+		m.config.Delegate.MergeRemoteState(userState, join)
 	}
 	return nil
 }
@@ -584,24 +525,14 @@ func (m *Memberlist) nextIncarnation() uint32 {
 	return atomic.AddUint32(&m.incarnation, 1)
 }
 
-// estNumNodes is used to get the current estimate of the number of nodes
-func (m *Memberlist) estNumNodes() int {
-	return int(atomic.LoadUint32(&m.numNodes))
-}
-
-type ackMessage struct {
-	Complete  bool
-	Payload   []byte
-	Timestamp time.Time
-}
-
-// setAckChannel is used to attach a channel to receive a message when an ack with a given
-// sequence number is received. The `complete` field of the message will be false on timeout
-func (m *Memberlist) setAckChannel(seqNo uint32, ch chan ackMessage, timeout time.Duration) {
+// setAckChannel is used to attach a channel to receive a message when
+// an ack with a given sequence number is received. The channel gets sent
+// false on timeout
+func (m *Memberlist) setAckChannel(seqNo uint32, ch chan bool, timeout time.Duration) {
 	// Create a handler function
-	handler := func(payload []byte, timestamp time.Time) {
+	handler := func() {
 		select {
-		case ch <- ackMessage{true, payload, timestamp}:
+		case ch <- true:
 		default:
 		}
 	}
@@ -618,7 +549,7 @@ func (m *Memberlist) setAckChannel(seqNo uint32, ch chan ackMessage, timeout tim
 		delete(m.ackHandlers, seqNo)
 		m.ackLock.Unlock()
 		select {
-		case ch <- ackMessage{false, nil, time.Now()}:
+		case ch <- false:
 		default:
 		}
 	})
@@ -627,7 +558,7 @@ func (m *Memberlist) setAckChannel(seqNo uint32, ch chan ackMessage, timeout tim
 // setAckHandler is used to attach a handler to be invoked when an
 // ack with a given sequence number is received. If a timeout is reached,
 // the handler is deleted
-func (m *Memberlist) setAckHandler(seqNo uint32, handler func([]byte, time.Time), timeout time.Duration) {
+func (m *Memberlist) setAckHandler(seqNo uint32, handler func(), timeout time.Duration) {
 	// Add the handler
 	ah := &ackHandler{handler, nil}
 	m.ackLock.Lock()
@@ -643,16 +574,16 @@ func (m *Memberlist) setAckHandler(seqNo uint32, handler func([]byte, time.Time)
 }
 
 // Invokes an Ack handler if any is associated, and reaps the handler immediately
-func (m *Memberlist) invokeAckHandler(ack ackResp, timestamp time.Time) {
+func (m *Memberlist) invokeAckHandler(seqNo uint32) {
 	m.ackLock.Lock()
-	ah, ok := m.ackHandlers[ack.SeqNo]
-	delete(m.ackHandlers, ack.SeqNo)
+	ah, ok := m.ackHandlers[seqNo]
+	delete(m.ackHandlers, seqNo)
 	m.ackLock.Unlock()
 	if !ok {
 		return
 	}
 	ah.timer.Stop()
-	ah.handler(ack.Payload, timestamp)
+	ah.handler()
 }
 
 // aliveNode is invoked by the network layer when we get a message about a
@@ -668,30 +599,6 @@ func (m *Memberlist) aliveNode(a *alive, notify chan struct{}, bootstrap bool) {
 	// ensures that we don't.
 	if m.leave && a.Node == m.config.Name {
 		return
-	}
-
-	// Invoke the Alive delegate if any. This can be used to filter out
-	// alive messages based on custom logic. For example, using a cluster name.
-	// Using a merge delegate is not enough, as it is possible for passive
-	// cluster merging to still occur.
-	if m.config.Alive != nil {
-		node := &Node{
-			Name: a.Node,
-			Addr: a.Addr,
-			Port: a.Port,
-			Meta: a.Meta,
-			PMin: a.Vsn[0],
-			PMax: a.Vsn[1],
-			PCur: a.Vsn[2],
-			DMin: a.Vsn[3],
-			DMax: a.Vsn[4],
-			DCur: a.Vsn[5],
-		}
-		if err := m.config.Alive.NotifyAlive(node); err != nil {
-			m.logger.Printf("[WARN] memberlist: ignoring alive message for '%s': %s",
-				a.Node, err)
-			return
-		}
 	}
 
 	// Check if we've never seen this node before, and if not, then
@@ -720,9 +627,6 @@ func (m *Memberlist) aliveNode(a *alive, notify chan struct{}, bootstrap bool) {
 		// Add at the end and swap with the node at the offset
 		m.nodes = append(m.nodes, state)
 		m.nodes[offset], m.nodes[n] = m.nodes[n], m.nodes[offset]
-
-		// Update numNodes after we've added a new node
-		atomic.AddUint32(&m.numNodes, 1)
 	}
 
 	// Check if this address is different than the existing node
@@ -753,6 +657,9 @@ func (m *Memberlist) aliveNode(a *alive, notify chan struct{}, bootstrap bool) {
 	if a.Incarnation < state.Incarnation && isLocalNode {
 		return
 	}
+
+	// Update metrics
+	metrics.IncrCounter([]string{"memberlist", "msg", "alive"}, 1)
 
 	// Store the old state and meta data
 	oldState := state.State
@@ -820,9 +727,6 @@ func (m *Memberlist) aliveNode(a *alive, notify chan struct{}, bootstrap bool) {
 			state.StateChange = time.Now()
 		}
 	}
-
-	// Update metrics
-	metrics.IncrCounter([]string{"memberlist", "msg", "alive"}, 1)
 
 	// Notify the delegate of any relevant updates
 	if m.config.Events != nil {
@@ -895,7 +799,7 @@ func (m *Memberlist) suspectNode(s *suspect) {
 	state.StateChange = changeTime
 
 	// Setup a timeout for this
-	timeout := suspicionTimeout(m.config.SuspicionMult, m.estNumNodes(), m.config.ProbeInterval)
+	timeout := suspicionTimeout(m.config.SuspicionMult, len(m.nodes), m.config.ProbeInterval)
 	time.AfterFunc(timeout, func() {
 		m.nodeLock.Lock()
 		state, ok := m.nodeMap[s.Node]

@@ -17,7 +17,6 @@ import (
 	"github.com/armon/go-metrics"
 	"github.com/hashicorp/go-msgpack/codec"
 	"github.com/hashicorp/memberlist"
-	"github.com/hashicorp/serf/coordinate"
 )
 
 // These are the protocol versions that Serf can _understand_. These are
@@ -92,10 +91,6 @@ type Serf struct {
 
 	snapshotter *Snapshotter
 	keyManager  *KeyManager
-
-	coordClient    *coordinate.Client
-	coordCache     map[string]*coordinate.Coordinate
-	coordCacheLock sync.RWMutex
 }
 
 // SerfState is the state of the Serf instance.
@@ -215,6 +210,8 @@ type queries struct {
 
 const (
 	UserEventSizeLimit     = 512        // Maximum byte size for event name and payload
+	QuerySizeLimit         = 1024       // Maximum byte size for query
+	QueryResponseSizeLimit = 1024       // Maximum bytes size for response
 	snapshotSizeLimit      = 128 * 1024 // Maximum 128 KB snapshot
 )
 
@@ -277,25 +274,15 @@ func Create(conf *Config) (*Serf, error) {
 	}
 	conf.EventCh = outCh
 
-	// Set up network coordinate client.
-	if !conf.DisableCoordinates {
-		serf.coordClient, err = coordinate.NewClient(coordinate.DefaultConfig())
-		if err != nil {
-			return nil, fmt.Errorf("Failed to create coordinate client: %v", err)
-		}
-	}
-
 	// Try access the snapshot
 	var oldClock, oldEventClock, oldQueryClock LamportTime
 	var prev []*PreviousNode
 	if conf.SnapshotPath != "" {
-		eventCh, snap, err := NewSnapshotter(
-			conf.SnapshotPath,
+		eventCh, snap, err := NewSnapshotter(conf.SnapshotPath,
 			snapshotSizeLimit,
 			conf.RejoinAfterLeave,
 			serf.logger,
 			&serf.clock,
-			serf.coordClient,
 			conf.EventCh,
 			serf.shutdownCh)
 		if err != nil {
@@ -309,13 +296,6 @@ func Create(conf *Config) (*Serf, error) {
 		oldQueryClock = snap.LastQueryClock()
 		serf.eventMinTime = oldEventClock + 1
 		serf.queryMinTime = oldQueryClock + 1
-	}
-
-	// Set up the coordinate cache. We do this after we read the snapshot to
-	// make sure we get a good initial value from there, if we got one.
-	if !conf.DisableCoordinates {
-		serf.coordCache = make(map[string]*coordinate.Coordinate)
-		serf.coordCache[conf.NodeName] = serf.coordClient.GetCoordinate()
 	}
 
 	// Setup the various broadcast queues, which we use to send our own
@@ -367,22 +347,17 @@ func Create(conf *Config) (*Serf, error) {
 	conf.MemberlistConfig.DelegateProtocolMax = ProtocolVersionMax
 	conf.MemberlistConfig.Name = conf.NodeName
 	conf.MemberlistConfig.ProtocolVersion = ProtocolVersionMap[conf.ProtocolVersion]
-	if !conf.DisableCoordinates {
-		conf.MemberlistConfig.Ping = &pingDelegate{serf: serf}
-	}
 
 	// Setup a merge delegate if necessary
 	if conf.Merge != nil {
-		md := &mergeDelegate{serf: serf}
-		conf.MemberlistConfig.Merge = md
-		conf.MemberlistConfig.Alive = md
+		conf.MemberlistConfig.Merge = &mergeDelegate{serf: serf}
 	}
 
 	// Create the underlying memberlist that will manage membership
 	// and failure detection for the Serf instance.
 	memberlist, err := memberlist.Create(conf.MemberlistConfig)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create memberlist: %v", err)
+		return nil, err
 	}
 
 	serf.memberlist = memberlist
@@ -511,8 +486,8 @@ func (s *Serf) Query(name string, payload []byte, params *QueryParam) (*QueryRes
 	}
 
 	// Check the size
-	if len(raw) > s.config.QuerySizeLimit {
-		return nil, fmt.Errorf("query exceeds limit of %d bytes", s.config.QuerySizeLimit)
+	if len(raw) > QuerySizeLimit {
+		return nil, fmt.Errorf("query exceeds limit of %d bytes", QuerySizeLimit)
 	}
 
 	// Register QueryResponse to track acks and responses
@@ -975,19 +950,6 @@ func (s *Serf) handleNodeUpdate(n *memberlist.Node) {
 	member.Port = n.Port
 	member.Tags = s.decodeTags(n.Meta)
 
-	// Snag the latest versions. NOTE - the current memberlist code will NOT
-	// fire an update event if the metadata (for Serf, tags) stays the same
-	// and only the protocol versions change. If we wake any Serf-level
-	// protocol changes where we want to get this event under those
-	// circumstances, we will need to update memberlist to do a check of
-	// versions as well as the metadata.
-	member.ProtocolMin = n.PMin
-	member.ProtocolMax = n.PMax
-	member.ProtocolCur = n.PCur
-	member.DelegateMin = n.DMin
-	member.DelegateMax = n.DMax
-	member.DelegateCur = n.DCur
-
 	// Update some metrics
 	metrics.IncrCounter([]string{"serf", "member", "update"}, 1)
 
@@ -1054,17 +1016,6 @@ func (s *Serf) handleNodeLeaveIntent(leaveMsg *messageLeave) bool {
 		s.failedMembers = removeOldMember(s.failedMembers, member.Name)
 		s.leftMembers = append(s.leftMembers, member)
 
-		// We must push a message indicating the node has now
-		// left to allow higher-level applications to handle the
-		// graceful leave.
-		s.logger.Printf("[INFO] serf: EventMemberLeave (forced): %s %s",
-			member.Member.Name, member.Member.Addr)
-		if s.config.EventCh != nil {
-			s.config.EventCh <- MemberEvent{
-				Type:    EventMemberLeave,
-				Members: []Member{member.Member},
-			}
-		}
 		return true
 	default:
 		return false
@@ -1433,16 +1384,6 @@ func (s *Serf) reap(old []*memberState, timeout time.Duration) []*memberState {
 		// Delete from members
 		delete(s.members, m.Name)
 
-		// Tell the coordinate client the node has gone away and delete
-		// its cached coordinates.
-		if !s.config.DisableCoordinates {
-			s.coordClient.ForgetNode(m.Name)
-
-			s.coordCacheLock.Lock()
-			delete(s.coordCache, m.Name)
-			s.coordCacheLock.Unlock()
-		}
-
 		// Send an event along
 		s.logger.Printf("[INFO] serf: EventMemberReap: %s", m.Name)
 		if s.config.EventCh != nil {
@@ -1654,29 +1595,4 @@ func (s *Serf) writeKeyringFile() error {
 
 	// Success!
 	return nil
-}
-
-// GetCoordinate returns the network coordinate of the local node.
-func (s *Serf) GetCoordinate() (*coordinate.Coordinate, error) {
-	if !s.config.DisableCoordinates {
-		return s.coordClient.GetCoordinate(), nil
-	}
-
-	return nil, fmt.Errorf("Coordinates are disabled")
-}
-
-// GetCachedCoordinate returns the network coordinate for the node with the given
-// name. This will only be valid if DisableCoordinates is set to false.
-func (s *Serf) GetCachedCoordinate(name string) (coord *coordinate.Coordinate, ok bool) {
-	if !s.config.DisableCoordinates {
-		s.coordCacheLock.RLock()
-		defer s.coordCacheLock.RUnlock()
-		if coord, ok = s.coordCache[name]; ok {
-			return coord, true
-		}
-
-		return nil, false
-	}
-
-	return nil, false
 }

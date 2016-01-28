@@ -29,7 +29,6 @@ import (
 
 var (
 	defaultV2MembersPrefix = "/v2/members"
-	defaultLeaderSuffix    = "/leader"
 )
 
 type Member struct {
@@ -106,9 +105,6 @@ type MembersAPI interface {
 
 	// Update instructs etcd to update an existing Member in the cluster.
 	Update(ctx context.Context, mID string, peerURLs []string) error
-
-	// Leader gets current leader of the cluster
-	Leader(ctx context.Context) (*Member, error)
 }
 
 type httpMembersAPI struct {
@@ -203,25 +199,6 @@ func (m *httpMembersAPI) Remove(ctx context.Context, memberID string) error {
 	return assertStatusCode(resp.StatusCode, http.StatusNoContent, http.StatusGone)
 }
 
-func (m *httpMembersAPI) Leader(ctx context.Context) (*Member, error) {
-	req := &membersAPIActionLeader{}
-	resp, body, err := m.client.Do(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := assertStatusCode(resp.StatusCode, http.StatusOK); err != nil {
-		return nil, err
-	}
-
-	var leader Member
-	if err := json.Unmarshal(body, &leader); err != nil {
-		return nil, err
-	}
-
-	return &leader, nil
-}
-
 type membersAPIActionList struct{}
 
 func (l *membersAPIActionList) HTTPRequest(ep url.URL) *http.Request {
@@ -276,15 +253,6 @@ func assertStatusCode(got int, want ...int) (err error) {
 		}
 	}
 	return fmt.Errorf("unexpected status code %d", got)
-}
-
-type membersAPIActionLeader struct{}
-
-func (l *membersAPIActionLeader) HTTPRequest(ep url.URL) *http.Request {
-	u := v2MembersURL(ep)
-	u.Path = path.Join(u.Path, defaultLeaderSuffix)
-	req, _ := http.NewRequest("GET", u.String(), nil)
-	return req
 }
 
 // v2MembersURL add the necessary path to the provided endpoint

@@ -14,7 +14,7 @@ var (
 	// name or ID and we can't find it.
 	ErrorCodeNoSuchContainer = errcode.Register(errGroup, errcode.ErrorDescriptor{
 		Value:          "NOSUCHCONTAINER",
-		Message:        "no such id: %s",
+		Message:        "No such container: %s",
 		Description:    "The specified container can not be found",
 		HTTPStatusCode: http.StatusNotFound,
 	})
@@ -43,6 +43,15 @@ var (
 		Value:          "UNPAUSECONTAINER",
 		Message:        "Container %s is paused. Unpause the container before stopping",
 		Description:    "The specified container is paused, before it can be stopped it must be unpaused",
+		HTTPStatusCode: http.StatusInternalServerError,
+	})
+
+	// ErrorCodeRemovalContainer is generated when we attempt to connect or disconnect a
+	// container but it's marked for removal.
+	ErrorCodeRemovalContainer = errcode.Register(errGroup, errcode.ErrorDescriptor{
+		Value:          "REMOVALCONTAINER",
+		Message:        "Container %s is marked for removal and cannot be connected or disconnected to the network",
+		Description:    "The specified container is marked for removal and cannot be connected or disconnected to the network",
 		HTTPStatusCode: http.StatusInternalServerError,
 	})
 
@@ -81,7 +90,7 @@ var (
 		HTTPStatusCode: http.StatusInternalServerError,
 	})
 
-	// ErrorCodeEmptyID is generated when an ID is the emptry string.
+	// ErrorCodeEmptyID is generated when an ID is the empty string.
 	ErrorCodeEmptyID = errcode.Register(errGroup, errcode.ErrorDescriptor{
 		Value:          "EMPTYID",
 		Message:        "Invalid empty id",
@@ -444,12 +453,12 @@ var (
 		HTTPStatusCode: http.StatusInternalServerError,
 	})
 
-	// ErrorCodeVolumeDup is generated when we try to mount two volumes
+	// ErrorCodeMountDup is generated when we try to mount two mounts points
 	// to the same path.
-	ErrorCodeVolumeDup = errcode.Register(errGroup, errcode.ErrorDescriptor{
-		Value:          "VOLUMEDUP",
-		Message:        "Duplicate bind mount '%s'",
-		Description:    "An attempt was made to mount a volume but the specified destination location is already used in a previous mount",
+	ErrorCodeMountDup = errcode.Register(errGroup, errcode.ErrorDescriptor{
+		Value:          "MOUNTDUP",
+		Message:        "Duplicate mount point '%s'",
+		Description:    "An attempt was made to mount a content but the specified destination location is already used in a previous mount",
 		HTTPStatusCode: http.StatusInternalServerError,
 	})
 
@@ -733,6 +742,15 @@ var (
 		HTTPStatusCode: http.StatusInternalServerError,
 	})
 
+	// ErrorCodeExecExited is generated when we try to start an exec
+	// but its already running.
+	ErrorCodeExecExited = errcode.Register(errGroup, errcode.ErrorDescriptor{
+		Value:          "EXECEXITED",
+		Message:        "Error: Exec command %s has already run",
+		Description:    "An attempt to start an 'exec' was made, but 'exec' was already run",
+		HTTPStatusCode: http.StatusConflict,
+	})
+
 	// ErrorCodeExecCantRun is generated when we try to start an exec
 	// but it failed for some reason.
 	ErrorCodeExecCantRun = errcode.Register(errGroup, errcode.ErrorDescriptor{
@@ -832,15 +850,6 @@ var (
 		HTTPStatusCode: http.StatusInternalServerError,
 	})
 
-	// ErrorCodeRmInit is generated when we try to delete a container
-	// but failed deleting its init filesystem.
-	ErrorCodeRmInit = errcode.Register(errGroup, errcode.ErrorDescriptor{
-		Value:          "RMINIT",
-		Message:        "Driver %s failed to remove init filesystem %s: %s",
-		Description:    "While trying to delete a container, the driver failed to remove the init filesystem",
-		HTTPStatusCode: http.StatusInternalServerError,
-	})
-
 	// ErrorCodeRmFS is generated when we try to delete a container
 	// but failed deleting its filesystem.
 	ErrorCodeRmFS = errcode.Register(errGroup, errcode.ErrorDescriptor{
@@ -917,7 +926,7 @@ var (
 	// trying to create a volume that has existed using different driver.
 	ErrorVolumeNameTaken = errcode.Register(errGroup, errcode.ErrorDescriptor{
 		Value:          "VOLUME_NAME_TAKEN",
-		Message:        "A volume named %q already exists with the %q driver. Choose a different volume name.",
+		Message:        "A volume named %s already exists. Choose a different volume name.",
 		Description:    "An attempt to create a volume using a driver but the volume already exists with a different driver",
 		HTTPStatusCode: http.StatusInternalServerError,
 	})
@@ -947,5 +956,14 @@ var (
 		Message:        "Cannot start container %s: %s",
 		Description:    "There was an error while trying to start a container",
 		HTTPStatusCode: http.StatusInternalServerError,
+	})
+
+	// ErrorCodeCantDeletePredefinedNetwork is generated when one of the predefined networks
+	// is attempted to be deleted.
+	ErrorCodeCantDeletePredefinedNetwork = errcode.Register(errGroup, errcode.ErrorDescriptor{
+		Value:          "CANT_DELETE_PREDEFINED_NETWORK",
+		Message:        "%s is a pre-defined network and cannot be removed",
+		Description:    "Engine's predefined networks cannot be deleted",
+		HTTPStatusCode: http.StatusForbidden,
 	})
 )
