@@ -19,6 +19,8 @@ before_install:
   - ./configure && make device-mapper && sudo make install
 
 script:
+  - qemu-system-x86_64 -machine help
+  - qemu-system-x86_64 -machine pc-i440fx-2.1
   - cd ${TRAVIS_BUILD_DIR}
   - hack/verify-gofmt.sh
   - ./autogen.sh
