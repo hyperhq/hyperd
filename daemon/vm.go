@@ -37,7 +37,7 @@ func (daemon *Daemon) CmdVmCreate(job *engine.Job) (err error) {
 		async = true
 	}
 
-	vm, err = daemon.StartVm("", cpu, mem, false, 0)
+	vm, err = daemon.vmCache.get(cpu, mem)
 	if err != nil {
 		return err
 	}
@@ -147,7 +147,7 @@ func (daemon *Daemon) ReleaseAllVms() (int, error) {
 	return ret, err
 }
 
-func (daemon *Daemon) StartVm(vmId string, cpu, mem int, lazy bool, keep int) (*hypervisor.Vm, error) {
+func (daemon *Daemon) StartVm(vmId string, cpu, mem int, lazy, cache bool, keep int) (*hypervisor.Vm, error) {
 	var (
 		DEFAULT_CPU = 1
 		DEFAULT_MEM = 128
@@ -161,13 +161,14 @@ func (daemon *Daemon) StartVm(vmId string, cpu, mem int, lazy bool, keep int) (*
 	}
 
 	b := &hypervisor.BootConfig{
-		CPU:    cpu,
-		Memory: mem,
-		Kernel: daemon.Kernel,
-		Initrd: daemon.Initrd,
-		Bios:   daemon.Bios,
-		Cbfs:   daemon.Cbfs,
-		Vbox:   daemon.VboxImage,
+		CPU:          cpu,
+		Memory:       mem,
+		HotAddCpuMem: cache,
+		Kernel:       daemon.Kernel,
+		Initrd:       daemon.Initrd,
+		Bios:         daemon.Bios,
+		Cbfs:         daemon.Cbfs,
+		Vbox:         daemon.VboxImage,
 	}
 
 	vm := daemon.NewVm(vmId, cpu, mem, lazy, keep)
@@ -199,7 +200,7 @@ func (daemon *Daemon) WaitVmStart(vm *hypervisor.Vm) error {
 
 func (daemon *Daemon) GetVM(vmId string, resource *pod.UserResource, lazy bool, keep int) (*hypervisor.Vm, error) {
 	if vmId == "" {
-		return daemon.StartVm("", resource.Vcpu, resource.Memory, lazy, keep)
+		return daemon.StartVm("", resource.Vcpu, resource.Memory, lazy, false, keep)
 	}
 
 	vm, ok := daemon.VmList[vmId]
@@ -231,4 +232,85 @@ func (daemon *Daemon) NewVm(id string, cpu, memory int, lazy bool, keep int) *hy
 		}
 	}
 	return hypervisor.NewVm(vmId, cpu, memory, lazy, keep)
+}
+
+type VmCache struct {
+	daemon     *Daemon
+	lo, hi, nr int
+	cached     []*hypervisor.Vm
+}
+
+func (c *VmCache) get(cpu, mem int) (*hypervisor.Vm, error) {
+	glog.V(2).Info("Try to get cached Vm")
+	defer c.fill()
+	if c.nr == 0 {
+		return c.daemon.StartVm("", cpu, mem, false, false, 0)
+	}
+	c.nr = c.nr - 1
+	vm := c.cached[c.nr]
+	c.cached[c.nr] = nil
+	glog.V(2).Info("Get cached Vm: %s", vm.Id)
+
+	// hotplug add cpu and memory
+	var err error
+	if vm.Cpu < cpu {
+		glog.Info("HotAddCpu for cached Vm")
+		err = vm.AddCpu(cpu)
+		glog.Info("HotAddCpu result %v", err)
+	}
+	if vm.Mem < mem {
+		glog.Info("HotAddMem for cached Vm")
+		err = vm.AddMem(mem)
+		glog.Info("HotAddMem result %v", err)
+	}
+	if err != nil {
+		c.daemon.KillVm(vm.Id)
+		vm = nil
+	}
+	return vm, err
+}
+
+func (c *VmCache) fill() {
+	for c.nr < c.lo {
+		vm, err := c.daemon.StartVm("", 0, 0, false, true, 0)
+		if err != nil {
+			glog.Info("VmCache fills failed:%v", err)
+			return
+		}
+		c.cached[c.nr] = vm
+		c.nr = c.nr + 1
+	}
+}
+
+func (c *VmCache) put(vm *hypervisor.Vm) {
+	if c.nr < c.hi && vm.Cpu == 1 && vm.Mem == 128 { // default VM
+		glog.V(2).Info("VmCache return one vm")
+		c.cached[c.nr] = vm
+		c.nr = c.nr + 1
+	} else {
+		c.daemon.KillVm(vm.Id)
+	}
+}
+
+func (daemon *Daemon) InitVmCache(cache_policy string) error {
+	daemon.vmCache.daemon = daemon
+
+	if hypervisor.HDriver.SupportLazyMode() {
+		cache_policy = "none"
+	}
+
+	switch cache_policy {
+	case "none", "":
+		return nil
+	case "cache":
+		daemon.vmCache.lo = 10
+		daemon.vmCache.hi = 20
+		daemon.vmCache.cached = make([]*hypervisor.Vm, daemon.vmCache.hi)
+		daemon.vmCache.fill()
+		return nil
+	case "clone":
+		return fmt.Errorf("unimplemented cache policy: clone")
+	default:
+		return fmt.Errorf("unknown cache policy: %s", cache_policy)
+	}
 }
