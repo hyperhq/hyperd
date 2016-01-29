@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/hyperhq/hyper.svg)](https://travis-ci.org/hyperhq/hyper)
+[![Build Status](https://travis-ci.org/hyperhq/hyper.svg?branch=master)](https://travis-ci.org/hyperhq/hyper)
 Hyper - Hypervisor-agnostic Docker Runtime
 ====
 
