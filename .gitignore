@@ -54,6 +54,14 @@ mac_installer/dist/opt/hyper/bin/hyper
 mac_installer/dist/opt/hyper/bin/hyperd
 *.bak
 mac_installer/dist/opt/hyper/examples/*
+package/centos/rpm/BUILD/*
+package/centos/rpm/BUILDROOT/*
+package/centos/rpm/SOURCES/*
+package/centos/rpm/RPMS/*
+package/centos/rpm/SRPMS/*
+package/centos/centos-rpm.pod
+package/centos/rpm/SPECS/hyper.spec
+package/centos/rpm/SPECS/hyperstart.spec
 
 # supporting linux container on non-linux platform
 /Godeps/_workspace/src/github.com/opencontainers/specs/config-linux.go
