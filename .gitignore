@@ -62,6 +62,12 @@ package/centos/rpm/SRPMS/*
 package/centos/centos-rpm.pod
 package/centos/rpm/SPECS/hyper.spec
 package/centos/rpm/SPECS/hyperstart.spec
+package/fedora/rpm/BUILD/*
+package/fedora/rpm/BUILDROOT/*
+package/fedora/rpm/SOURCES/*
+package/fedora/rpm/RPMS/*
+package/fedora/rpm/SRPMS/*
+package/fedora/fedora-rpm.pod
 
 # supporting linux container on non-linux platform
 /Godeps/_workspace/src/github.com/opencontainers/specs/config-linux.go

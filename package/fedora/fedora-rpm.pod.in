@@ -1,0 +1,25 @@
+{
+        "id": "fedora-rpm-build",
+        "containers" : [{
+            "name": "fedora",
+            "image": "hyperhq/fedora_builder:latest",
+            "command": ["bash", "/home/makerpm/rpmbuild/build.sh"],
+            "workdir": "/home/makerpm/rpmbuild/SPECS",
+            "volumes": [{
+                "volume": "rpmroot",
+                "path": "/home/makerpm/rpmbuild",
+                "readOnly": false
+             }]
+        }],
+        "resource": {
+            "vcpu": 2,
+            "memory": 2048
+        },
+        "files": [],
+        "volumes": [{
+            "name": "rpmroot",
+            "source": "%PROJECT_ROOT%/package/fedora/rpm",
+            "driver": "vfs"
+        }],
+        "tty": true
+}
