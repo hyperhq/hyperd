@@ -1,7 +1,7 @@
 Summary:            Hyper is a VM based docker runtime
 Name:               hyper
 Version:            %VERSION%
-Release:            2%{?dist}
+Release:            1%{?dist}
 License:            Apache License, Version 2.0
 Group:              System Environment/Base
 # The source for this package was pulled from upstream's git repo. Use the
@@ -14,7 +14,7 @@ Source1:            runv-%{version}.tar.gz
 URL:                https://hyper.sh/
 ExclusiveArch:      x86_64
 Requires:           device-mapper,sqlite
-BuildRequires:      device-mapper-devel,pcre-devel,libsepol-devel,libselinux-devel,systemd-container-devel
+BuildRequires:      device-mapper-devel,pcre-devel,libsepol-devel,libselinux-devel,systemd-devel
 BuildRequires:      sqlite-devel
 #CentOS 7 does not have xen included
 #BuildRequires:      libuuid-devel,xen-devel
@@ -53,6 +53,9 @@ rm -rf %{buildroot}
 /lib/systemd/system/hyperd.service
 
 %changelog
+* Sat Jan 30 2016 Xu Wang <xu@hyper.sh> - 0.5-1
+- update source to 0.5
+- introduce libvirt dependency
 * Wed Dec 2 2015 Xu Wang <xu@hyper.sh> - 0.4-2
 - add hyperstart dependency
 - add systemd service config

@@ -1,7 +1,7 @@
 Summary:            Hyperstart is the initrd for hyper VM
 Name:               hyperstart
 Version:            %VERSION%
-Release:            2%{?dist}
+Release:            1%{?dist}
 License:            Apache License, Version 2.0
 Group:              System Environment/Base
 # The source for this package was pulled from upstream's git repo. Use the
@@ -47,6 +47,8 @@ rm -rf %{buildroot}
 %{_sharedstatedir}/*
 
 %changelog
+* Sat Jan 30 2016 Xu Wang <xu@hyper.sh> - 0.5-1
+- update source to 0.5
 * Fri Jan 29 2016 Xu Wang <xu@hyper.sh> - 0.4-2
 - Fix firmware path
 * Sat Nov 21 2015 Xu Wang <xu@hyper.sh> - 0.4-1

@@ -13,7 +13,7 @@
         }],
         "resource": {
             "vcpu": 2,
-            "memory": 1024
+            "memory": 2048
         },
         "files": [],
         "volumes": [{
