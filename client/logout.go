@@ -17,7 +17,7 @@ import (
 func (cli *HyperClient) HyperCmdLogout(args ...string) error {
 	var parser = gflag.NewParser(nil, gflag.Default)
 	parser.Usage = "logout [SERVER]\n\nLog out from a Docker registry, if no server is\nspecified \"" + registry.IndexServer + "\" is the default."
-	args, err := parser.Parse()
+	args, err := parser.ParseArgs(args)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {
 			return err
@@ -26,8 +26,8 @@ func (cli *HyperClient) HyperCmdLogout(args ...string) error {
 		}
 	}
 	serverAddress := registry.IndexServer
-	if len(args) > 1 {
-		serverAddress = args[1]
+	if len(args) > 0 {
+		serverAddress = args[0]
 	}
 
 	if _, ok := cli.configFile.AuthConfigs[serverAddress]; !ok {

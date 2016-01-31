@@ -27,9 +27,6 @@ import (
 
 // hyper build [OPTIONS] PATH
 func (cli *HyperClient) HyperCmdBuild(args ...string) error {
-	if len(args) == 0 {
-		return fmt.Errorf("%s ERROR: Can not accept the 'run' command without argument!\n", os.Args[0])
-	}
 	var opts struct {
 		ImageName      string `long:"tag" short:"t" default:"" value-name:"\"\"" default-mask:"-" description:"Repository name (and optionally a tag) to be applied to the resulting image in case of success"`
 		DockerfileName string `long:"file" short:"f" default:"" value-name:"\"\"" default-mask:"-" description:"Customized docker file"`
@@ -37,7 +34,7 @@ func (cli *HyperClient) HyperCmdBuild(args ...string) error {
 
 	var parser = gflag.NewParser(&opts, gflag.Default)
 	parser.Usage = "build [OPTIONS] PATH\n\nBuild a new image from the source code at PATH"
-	args, err := parser.Parse()
+	args, err := parser.ParseArgs(args)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {
 			return err
@@ -54,7 +51,7 @@ func (cli *HyperClient) HyperCmdBuild(args ...string) error {
 		context  archive.Archive
 		name     = ""
 	)
-	root := args[1]
+	root := args[0]
 	if _, err := os.Stat(root); err != nil {
 		return err
 	}

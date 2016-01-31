@@ -18,7 +18,7 @@ func (cli *HyperClient) HyperCmdStop(args ...string) error {
 	}
 	var parser = gflag.NewParser(&opts, gflag.Default)
 	parser.Usage = "stop POD_ID\n\nStop a running pod"
-	args, err := parser.Parse()
+	args, err := parser.ParseArgs(args)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {
 			return err
@@ -26,11 +26,11 @@ func (cli *HyperClient) HyperCmdStop(args ...string) error {
 			return nil
 		}
 	}
-	if len(args) == 1 {
+	if len(args) == 0 {
 		return fmt.Errorf("\"stop\" requires a minimum of 1 argument, please provide POD ID.\n")
 	}
 
-	podID := args[1]
+	podID := args[0]
 	stopVm := "yes"
 	if opts.Novm {
 		stopVm = "no"

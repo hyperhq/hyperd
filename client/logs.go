@@ -22,7 +22,7 @@ func (cli *HyperClient) HyperCmdLogs(args ...string) error {
 
 	var parser = gflag.NewParser(&opts, gflag.Default|gflag.IgnoreUnknown)
 	parser.Usage = "logs CONTAINER [OPTIONS...]\n\nFetch the logs of a container"
-	args, err := parser.Parse()
+	args, err := parser.ParseArgs(args)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {
 			return err
@@ -31,12 +31,12 @@ func (cli *HyperClient) HyperCmdLogs(args ...string) error {
 		}
 	}
 
-	if len(args) <= 1 {
+	if len(args) == 0 {
 		return fmt.Errorf("%s ERROR: Can not accept the 'logs' command without argument!\n", os.Args[0])
 	}
 
 	v := url.Values{}
-	v.Set("container", args[1])
+	v.Set("container", args[0])
 	v.Set("stdout", "yes")
 	v.Set("stderr", "yes")
 

@@ -21,7 +21,7 @@ func (cli *HyperClient) HyperCmdImages(args ...string) error {
 	var parser = gflag.NewParser(&opts, gflag.Default)
 
 	parser.Usage = "images [OPTIONS] [REPOSITORY]\n\nList images"
-	args, err := parser.Parse()
+	args, err := parser.ParseArgs(args)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {
 			return err

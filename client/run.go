@@ -21,9 +21,6 @@ import (
 
 // hyper run [OPTIONS] image [COMMAND] [ARGS...]
 func (cli *HyperClient) HyperCmdRun(args ...string) error {
-	if len(args) == 0 {
-		return fmt.Errorf("%s ERROR: Can not accept the 'run' command without argument!\n", os.Args[0])
-	}
 	var opts struct {
 		PodFile       string   `short:"p" long:"podfile" value-name:"\"\"" description:"Create and Run a pod based on the pod file"`
 		K8s           string   `short:"k" long:"kubernetes" value-name:"\"\"" description:"Create and Run a pod based on the kubernetes pod file"`
@@ -47,7 +44,7 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 
 	var parser = gflag.NewParser(&opts, gflag.Default|gflag.IgnoreUnknown)
 	parser.Usage = "run [OPTIONS] IMAGE [COMMAND] [ARG...]\n\nCreate a pod, and launch a new VM to run the pod"
-	args, err := parser.Parse()
+	args, err := parser.ParseArgs(args)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {
 			return err
@@ -72,7 +69,7 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 			return fmt.Errorf("%s: \"run\" requires a minimum of 1 argument, please provide the image.", os.Args[0])
 		}
 		attach = !opts.Detach
-		podJson, err = cli.JsonFromCmdline(args[1:], opts.Env, opts.Portmap, opts.LogDriver, opts.LogOpts,
+		podJson, err = cli.JsonFromCmdline(args, opts.Env, opts.Portmap, opts.LogDriver, opts.LogOpts,
 			opts.Name, opts.Workdir, opts.RestartPolicy, opts.Cpu, opts.Memory, opts.Tty, opts.Labels)
 	}
 
@@ -155,7 +152,6 @@ func (cli *HyperClient) JsonFromFile(filename string, yaml, k8s bool) (string, e
 	return string(jsonbody), nil
 }
 
-// cmdArgs: args[1:]
 func (cli *HyperClient) JsonFromCmdline(cmdArgs, cmdEnvs, cmdPortmaps []string, cmdLogDriver string, cmdLogOpts []string,
 	cmdName, cmdWorkdir, cmdRestartPolicy string, cpu, memory int, tty bool, cmdLabels []string) (string, error) {
 

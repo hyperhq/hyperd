@@ -29,7 +29,7 @@ func (cli *HyperClient) HyperCmdCommit(args ...string) error {
 	var parser = gflag.NewParser(&opts, gflag.Default)
 
 	parser.Usage = "commit [OPTIONS] CONTAINER [REPOSITORY[:TAG]]\n\nCreate a new image from a container's changes"
-	args, err := parser.Parse()
+	args, err := parser.ParseArgs(args)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {
 			return err
@@ -44,11 +44,11 @@ func (cli *HyperClient) HyperCmdCommit(args ...string) error {
 		containerId string = ""
 		repo        string = ""
 	)
-	if len(args) > 1 {
-		containerId = args[1]
+	if len(args) > 0 {
+		containerId = args[0]
 	}
-	if len(args) > 2 {
-		repo = args[2]
+	if len(args) > 1 {
+		repo = args[1]
 	}
 	v := url.Values{}
 	v.Set("author", opts.Author)

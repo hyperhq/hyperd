@@ -21,7 +21,7 @@ func (cli *HyperClient) HyperCmdList(args ...string) error {
 
 	var parser = gflag.NewParser(&opts, gflag.Default|gflag.IgnoreUnknown)
 	parser.Usage = "list [OPTIONS] [pod|container|vm]\n\nlist all pods or container information"
-	args, err := parser.Parse()
+	args, err := parser.ParseArgs(args)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {
 			return err
@@ -30,10 +30,10 @@ func (cli *HyperClient) HyperCmdList(args ...string) error {
 		}
 	}
 	var item string
-	if len(args) == 1 {
+	if len(args) == 0 {
 		item = "pod"
 	} else {
-		item = args[1]
+		item = args[0]
 	}
 
 	if item != "pod" && item != "vm" && item != "container" {

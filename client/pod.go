@@ -21,7 +21,7 @@ func (cli *HyperClient) HyperCmdPod(args ...string) error {
 	t1 := time.Now()
 	var parser = gflag.NewParser(nil, gflag.Default)
 	parser.Usage = "pod POD_FILE\n\nCreate a pod, initialize a pod and run it"
-	args, err := parser.Parse()
+	args, err := parser.ParseArgs(args)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {
 			return err
@@ -29,10 +29,10 @@ func (cli *HyperClient) HyperCmdPod(args ...string) error {
 			return nil
 		}
 	}
-	if len(args) < 2 {
+	if len(args) == 0 {
 		return fmt.Errorf("\"pod\" requires a minimum of 1 argument, please provide POD spec file.\n")
 	}
-	jsonFile := args[1]
+	jsonFile := args[0]
 	if _, err := os.Stat(jsonFile); err != nil {
 		return err
 	}
@@ -108,7 +108,7 @@ func (cli *HyperClient) HyperCmdStart(args ...string) error {
 	}
 	var parser = gflag.NewParser(&opts, gflag.Default)
 	parser.Usage = "start [-c 1 -m 128]| POD_ID \n\nLaunch a 'pending' pod"
-	args, err := parser.Parse()
+	args, err := parser.ParseArgs(args)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {
 			return err
@@ -153,19 +153,15 @@ func (cli *HyperClient) HyperCmdStart(args ...string) error {
 		fmt.Printf("New VM id is %s\n", remoteInfo.Get("ID"))
 		return nil
 	}
-	if len(args) < 2 {
+	if len(args) == 0 {
 		return fmt.Errorf("\"start\" requires a minimum of 1 argument, please provide POD ID.\n")
 	}
 	var (
-		podId string
+		podId = args[0]
 		vmId  string
 	)
-	if len(args) == 2 {
-		podId = args[1]
-	}
-	if len(args) == 3 {
-		podId = args[1]
-		vmId = args[2]
+	if len(args) >= 2 {
+		vmId = args[1]
 	}
 	// fmt.Printf("Pod ID is %s, VM ID is %s\n", podId, vmId)
 	_, err = cli.StartPod(podId, vmId, false)

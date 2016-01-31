@@ -54,7 +54,7 @@ func (cli *HyperClient) HyperCmdExec(args ...string) error {
 	}
 	var parser = gflag.NewParser(&opts, gflag.Default|gflag.IgnoreUnknown)
 	parser.Usage = "exec [OPTIONS] POD|CONTAINER COMMAND [ARGS...]\n\nRun a command in a container of a running pod"
-	args, err := parser.Parse()
+	args, err := parser.ParseArgs(args)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {
 			return err
@@ -62,18 +62,18 @@ func (cli *HyperClient) HyperCmdExec(args ...string) error {
 			return nil
 		}
 	}
-	if len(args) == 1 {
+	if len(args) == 0 {
 		return fmt.Errorf("Can not accept the 'exec' command without POD/Container ID!")
 	}
-	if len(args) == 2 {
+	if len(args) == 1 {
 		return fmt.Errorf("Can not accept the 'exec' command without command!")
 	}
 	var (
-		podName     = args[1]
+		podName     = args[0]
 		tag         = cli.GetTag()
 		containerId string
 	)
-	command, err := json.Marshal(args[2:])
+	command, err := json.Marshal(args[1:])
 	if err != nil {
 		return err
 	}
