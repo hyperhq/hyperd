@@ -29,7 +29,7 @@ func (cli *HyperClient) HyperCmdLogin(args ...string) error {
 	}
 	var parser = gflag.NewParser(&opts, gflag.Default)
 	parser.Usage = "login [SERVER]\n\nRegister or log in to a Docker registry server, if no server is\nspecified \"" + registry.IndexServer + "\" is the default."
-	args, err := parser.Parse()
+	args, err := parser.ParseArgs(args)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {
 			return err
@@ -41,8 +41,8 @@ func (cli *HyperClient) HyperCmdLogin(args ...string) error {
 	password := opts.Password
 	email := opts.Email
 	serverAddress := registry.IndexServer
-	if len(args) > 1 {
-		serverAddress = args[1]
+	if len(args) > 0 {
+		serverAddress = args[0]
 	}
 
 	promptDefault := func(prompt string, configDefault string) {

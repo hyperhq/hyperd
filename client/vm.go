@@ -15,7 +15,7 @@ import (
 func (cli *HyperClient) HyperCmdVm(args ...string) error {
 	var parser = gflag.NewParser(nil, gflag.Default)
 	parser.Usage = "vm\n\nRun a VM, without any Pod running on it"
-	args, err := parser.Parse()
+	args, err := parser.ParseArgs(args)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {
 			return err

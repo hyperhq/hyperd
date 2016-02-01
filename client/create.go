@@ -8,15 +8,12 @@ import (
 )
 
 func (cli *HyperClient) HyperCmdCreate(args ...string) error {
-	if len(args) == 0 {
-		return fmt.Errorf("\"create\" requires a minimum of 1 argument, please provide POD spec file.\n")
-	}
 	var opts struct {
 		Yaml bool `short:"y" long:"yaml" default:"false" default-mask:"-" description:"create a pod based on Yaml file"`
 	}
 	var parser = gflag.NewParser(&opts, gflag.Default)
 	parser.Usage = "create [OPTIONS] POD_FILE\n\nCreate a pod into 'pending' status, but without running it"
-	args, err := parser.Parse()
+	args, err := parser.ParseArgs(args)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {
 			return err
@@ -24,7 +21,10 @@ func (cli *HyperClient) HyperCmdCreate(args ...string) error {
 			return nil
 		}
 	}
-	jsonFile := args[1]
+	if len(args) == 0 {
+		return fmt.Errorf("\"create\" requires a minimum of 1 argument, please provide POD spec file.\n")
+	}
+	jsonFile := args[0]
 
 	jsonbody, err := cli.JsonFromFile(jsonFile, opts.Yaml, false)
 	if err != nil {

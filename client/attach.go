@@ -14,7 +14,7 @@ import (
 func (cli *HyperClient) HyperCmdAttach(args ...string) error {
 	var parser = gflag.NewParser(nil, gflag.Default)
 	parser.Usage = "attach CONTAINER\n\nAttach to the tty of a specified container in a pod"
-	args, err := parser.Parse()
+	args, err := parser.ParseArgs(args)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {
 			return err
@@ -22,11 +22,11 @@ func (cli *HyperClient) HyperCmdAttach(args ...string) error {
 			return nil
 		}
 	}
-	if len(args) == 1 {
+	if len(args) == 0 {
 		return fmt.Errorf("Can not accept the 'attach' command without Container ID!")
 	}
 	var (
-		podName     = args[1]
+		podName     = args[0]
 		tag         = cli.GetTag()
 		containerId = podName
 	)

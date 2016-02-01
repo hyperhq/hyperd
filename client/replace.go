@@ -4,7 +4,6 @@ package client
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/hyperhq/runv/hypervisor/types"
@@ -13,10 +12,6 @@ import (
 )
 
 func (cli *HyperClient) HyperCmdReplace(args ...string) error {
-	if len(args) == 0 {
-		return fmt.Errorf("\"replace\" requires a minimum of 1 argument, \"%s replace --help\" may provide more details.\n", os.Args[0])
-	}
-
 	var opts struct {
 		OldPod  string `short:"o" long:"oldpod" value-name:"\"\"" description:"The Pod which will be replaced, must be 'running' status"`
 		NewPod  string `short:"n" long:"newpod" value-name:"\"\"" description:"The Pod which will be running, must be 'pending' status"`
@@ -25,7 +20,7 @@ func (cli *HyperClient) HyperCmdReplace(args ...string) error {
 	}
 	var parser = gflag.NewParser(&opts, gflag.Default)
 	parser.Usage = "replace --oldpod POD_ID --newpod POD_ID [--file POD_FILE]\n\nReplace the pod in a running VM with a new one"
-	args, err := parser.Parse()
+	args, err := parser.ParseArgs(args)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {
 			return err
@@ -33,6 +28,7 @@ func (cli *HyperClient) HyperCmdReplace(args ...string) error {
 			return nil
 		}
 	}
+
 	oldPodId := opts.OldPod
 	if oldPodId == "" {
 		return fmt.Errorf("Please provide the old pod which you want to replace!")

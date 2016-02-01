@@ -14,7 +14,7 @@ import (
 func (cli *HyperClient) HyperCmdKill(args ...string) error {
 	var parser = gflag.NewParser(nil, gflag.Default)
 	parser.Usage = "kill VM_ID\n\nTerminate a VM instance"
-	args, err := parser.Parse()
+	args, err := parser.ParseArgs(args)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {
 			return err
@@ -22,11 +22,11 @@ func (cli *HyperClient) HyperCmdKill(args ...string) error {
 			return nil
 		}
 	}
-	if len(args) == 1 {
+	if len(args) == 0 {
 		return fmt.Errorf("\"kill\" requires a minimum of 1 argument, please provide VM ID.\n")
 	}
 
-	vmId := args[1]
+	vmId := args[0]
 	v := url.Values{}
 	v.Set("vm", vmId)
 	body, _, err := readBody(cli.call("DELETE", "/vm?"+v.Encode(), nil, nil))

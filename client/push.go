@@ -15,13 +15,9 @@ import (
 //
 // Usage: hyper push NAME[:TAG]
 func (cli *HyperClient) HyperCmdPush(args ...string) error {
-	// we need to get the image name which will be used to create a container
-	if len(args) == 0 {
-		return fmt.Errorf("\"push\" requires a minimum of 1 argument, please provide the image name.")
-	}
 	var parser = gflag.NewParser(nil, gflag.Default)
 	parser.Usage = "push NAME[:TAG]\n\nPush an image to a Docker registry server"
-	args, err := parser.Parse()
+	args, err := parser.ParseArgs(args)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {
 			return err
@@ -29,7 +25,11 @@ func (cli *HyperClient) HyperCmdPush(args ...string) error {
 			return nil
 		}
 	}
-	name := args[1]
+	// we need to get the image name which will be used to create a container
+	if len(args) == 0 {
+		return fmt.Errorf("\"push\" requires a minimum of 1 argument, please provide the image name.")
+	}
+	name := args[0]
 	remote, tag := parsers.ParseRepositoryTag(name)
 
 	// Resolve the Repository name from fqn to RepositoryInfo

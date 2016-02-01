@@ -18,7 +18,7 @@ func (cli *HyperClient) HyperCmdRmi(args ...string) error {
 	}
 	var parser = gflag.NewParser(&opts, gflag.Default)
 	parser.Usage = "rmi [OPTIONS] IMAGE [IMAGE...]\n\nRemove one or more images"
-	args, err := parser.Parse()
+	args, err := parser.ParseArgs(args)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {
 			return err
@@ -30,7 +30,7 @@ func (cli *HyperClient) HyperCmdRmi(args ...string) error {
 		noprune string = "no"
 		force   string = "yes"
 	)
-	if len(args) < 2 {
+	if len(args) == 0 {
 		return fmt.Errorf("\"rmi\" requires a minimum of 1 argument, please provide IMAGE ID.\n")
 	}
 	if opts.Noprune == true {
@@ -39,7 +39,7 @@ func (cli *HyperClient) HyperCmdRmi(args ...string) error {
 	if opts.Force == false {
 		force = "no"
 	}
-	images := args[1:]
+	images := args
 	for _, imageId := range images {
 		v := url.Values{}
 		v.Set("imageId", imageId)

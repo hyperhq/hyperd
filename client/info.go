@@ -13,7 +13,7 @@ import (
 func (cli *HyperClient) HyperCmdInfo(args ...string) error {
 	var parser = gflag.NewParser(nil, gflag.Default)
 	parser.Usage = "info\n\nDisplay system-wide information"
-	args, err := parser.Parse()
+	args, err := parser.ParseArgs(args)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {
 			return err
