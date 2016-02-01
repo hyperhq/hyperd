@@ -9,7 +9,7 @@ import (
 func (daemon *Daemon) CmdCreate(job *engine.Job) error {
 	imgName := job.Args[0]
 	cli := daemon.DockerCli
-	body, _, err := cli.SendCmdCreate("", imgName, []string{}, nil)
+	body, _, err := cli.SendCmdCreate("", imgName, []string{}, []string{}, nil)
 	if err != nil {
 		return err
 	}

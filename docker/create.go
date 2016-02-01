@@ -6,10 +6,11 @@ import (
 	"github.com/hyperhq/hyper/lib/docker/daemon"
 )
 
-func (cli Docker) SendCmdCreate(name, image string, cmds []string, userConfig interface{}) ([]byte, int, error) {
+func (cli Docker) SendCmdCreate(name, image string, entrypoint, cmds []string, userConfig interface{}) ([]byte, int, error) {
 	config := &runconfig.Config{
-		Image: image,
-		Cmd:   stringutils.NewStrSlice(cmds...),
+		Image:      image,
+		Cmd:        stringutils.NewStrSlice(cmds...),
+		Entrypoint: stringutils.NewStrSlice(entrypoint...),
 	}
 	if userConfig != nil {
 		config = userConfig.(*runconfig.Config)

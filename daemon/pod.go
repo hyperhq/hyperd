@@ -320,7 +320,7 @@ func (p *Pod) InitContainers(daemon *Daemon, dclient DockerInterface) (err error
 			rsp *dockertypes.ContainerJSON
 		)
 
-		cId, _, err = dclient.SendCmdCreate(c.Name, c.Image, []string{}, nil)
+		cId, _, err = dclient.SendCmdCreate(c.Name, c.Image, c.Entrypoint, c.Command, nil)
 		if err != nil {
 			glog.Error(err.Error())
 			return
