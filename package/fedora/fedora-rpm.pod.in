@@ -1,8 +1,8 @@
 {
-        "id": "centos-rpm-build",
+        "id": "fedora-rpm-build",
         "containers" : [{
-            "name": "centos",
-            "image": "hyperhq/centos_builder:latest",
+            "name": "fedora",
+            "image": "hyperhq/fedora_builder:latest",
             "command": ["bash", "/home/makerpm/rpmbuild/build.sh"],
             "workdir": "/home/makerpm/rpmbuild/SPECS",
             "volumes": [{
@@ -18,7 +18,7 @@
         "files": [],
         "volumes": [{
             "name": "rpmroot",
-            "source": "%PROJECT_ROOT%/package/centos/rpm",
+            "source": "%PROJECT_ROOT%/package/fedora/rpm",
             "driver": "vfs"
         }],
         "tty": true

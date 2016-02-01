@@ -1,6 +1,6 @@
 Summary:            Hyperstart is the initrd for hyper VM
 Name:               hyperstart
-Version:            %VERSION%
+Version:            0.5
 Release:            1%{?dist}
 License:            Apache License, Version 2.0
 Group:              System Environment/Base
