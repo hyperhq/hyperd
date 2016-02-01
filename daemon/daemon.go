@@ -29,7 +29,7 @@ var (
 )
 
 type DockerInterface interface {
-	SendCmdCreate(name, image string, cmds []string, config interface{}) ([]byte, int, error)
+	SendCmdCreate(name, image string, entripoint, cmds []string, config interface{}) ([]byte, int, error)
 	SendCmdDelete(arg ...string) ([]byte, int, error)
 	SendCmdInfo(args ...string) (*dockertypes.Info, error)
 	SendCmdImages(all string) ([]*dockertypes.Image, error)
