@@ -189,10 +189,9 @@ func showPod(pod *hypervisor.PodStatus) string {
 }
 
 func showPodContainers(pod *hypervisor.PodStatus, aux bool) []string {
-
 	rsp := []string{}
 	filterServiceDiscovery := !aux && (pod.Type == "service-discovery")
-	proxyName := ServiceDiscoveryContainerName(pod.Name)
+	proxyName := "/" + ServiceDiscoveryContainerName(pod.Name)
 
 	for _, c := range pod.Containers {
 		if filterServiceDiscovery && c.Name == proxyName {
