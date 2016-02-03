@@ -4,35 +4,49 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/docker/docker/api"
 	"github.com/docker/docker/builder"
 	"github.com/docker/docker/image"
 	"github.com/docker/docker/pkg/archive"
-	"github.com/docker/docker/pkg/chrootarchive"
 	"github.com/docker/docker/pkg/httputils"
-	"github.com/docker/docker/pkg/idtools"
 	"github.com/docker/docker/pkg/ioutils"
 	"github.com/docker/docker/pkg/urlutil"
 	"github.com/docker/docker/reference"
 	"github.com/docker/docker/registry"
 	"github.com/docker/engine-api/types"
 	"github.com/docker/engine-api/types/container"
-	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/daemon"
-	"github.com/hyperhq/runv/hypervisor/pod"
+	"github.com/hyperhq/runv/hypervisor"
+	hypertypes "github.com/hyperhq/runv/hypervisor/types"
 )
 
 // Docker implements builder.Backend for the docker Daemon object.
 type Docker struct {
 	*daemon.Daemon
+	hyper *Hyper
+}
+
+type Hyper struct {
+	CopyPods  map[string]string
+	BasicPods map[string]string
+	Status    chan *hypertypes.VmResponse
+	Vm        *hypervisor.Vm
 }
 
 // ensure Docker implements builder.Backend
 var _ builder.Backend = Docker{}
+
+func NewDocker(backend *daemon.Daemon) *Docker {
+	return &Docker{
+		Daemon: backend,
+		hyper: &Hyper{
+			make(map[string]string),
+			make(map[string]string),
+			nil, nil,
+		},
+	}
+}
 
 // Pull tells Docker to pull image referenced by `name`.
 func (d Docker) Pull(name string, authConfigs map[string]types.AuthConfig, output io.Writer) (builder.Image, error) {
@@ -81,107 +95,6 @@ func (d Docker) ContainerUpdateCmd(cID string, cmd []string) error {
 	c.Path = cmd[0]
 	c.Args = cmd[1:]
 	return nil
-}
-
-// ContainerAttach attaches streams to the container cID. If stream is true, it streams the output.
-func (d Docker) ContainerAttach(cID string, stdin io.ReadCloser, stdout, stderr io.Writer, stream bool) error {
-	tag := pod.RandStr(8, "alphanum")
-	return d.Daemon.Attach(stdin, stdout.(io.WriteCloser), "container", cID, tag)
-}
-
-// BuilderCopy copies/extracts a source FileInfo to a destination path inside a container
-// specified by a container object.
-// TODO: make sure callers don't unnecessarily convert destPath with filepath.FromSlash (Copy does it already).
-// BuilderCopy should take in abstract paths (with slashes) and the implementation should convert it to OS-specific paths.
-func (d Docker) BuilderCopy(cID string, destPath string, src builder.FileInfo, decompress bool) error {
-	srcPath := src.Path()
-	destExists := true
-	destDir := false
-	rootUID, rootGID := d.Daemon.GetRemappedUIDGID()
-
-	// Work in daemon-local OS specific file paths
-	destPath = filepath.FromSlash(destPath)
-
-	c, err := d.Daemon.GetContainer(cID)
-	if err != nil {
-		return err
-	}
-	err = d.Daemon.Mount(c)
-	if err != nil {
-		return err
-	}
-	defer d.Daemon.Unmount(c)
-
-	dest, err := c.GetResourcePath(destPath)
-	if err != nil {
-		return err
-	}
-
-	// Preserve the trailing slash
-	// TODO: why are we appending another path separator if there was already one?
-	if strings.HasSuffix(destPath, string(os.PathSeparator)) || destPath == "." {
-		destDir = true
-		dest += string(os.PathSeparator)
-	}
-
-	destPath = dest
-
-	destStat, err := os.Stat(destPath)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			glog.Errorf("Error performing os.Stat on %s. %s", destPath, err)
-			return err
-		}
-		destExists = false
-	}
-
-	uidMaps, gidMaps := d.Daemon.GetUIDGIDMaps()
-	archiver := &archive.Archiver{
-		Untar:   chrootarchive.Untar,
-		UIDMaps: uidMaps,
-		GIDMaps: gidMaps,
-	}
-
-	if src.IsDir() {
-		// copy as directory
-		if err := archiver.CopyWithTar(srcPath, destPath); err != nil {
-			return err
-		}
-		return fixPermissions(srcPath, destPath, rootUID, rootGID, destExists)
-	}
-	if decompress && archive.IsArchivePath(srcPath) {
-		// Only try to untar if it is a file and that we've been told to decompress (when ADD-ing a remote file)
-
-		// First try to unpack the source as an archive
-		// to support the untar feature we need to clean up the path a little bit
-		// because tar is very forgiving.  First we need to strip off the archive's
-		// filename from the path but this is only added if it does not end in slash
-		tarDest := destPath
-		if strings.HasSuffix(tarDest, string(os.PathSeparator)) {
-			tarDest = filepath.Dir(destPath)
-		}
-
-		// try to successfully untar the orig
-		err := archiver.UntarPath(srcPath, tarDest)
-		if err != nil {
-			glog.Errorf("Couldn't untar to %s: %v", tarDest, err)
-		}
-		return err
-	}
-
-	// only needed for fixPermissions, but might as well put it before CopyFileWithTar
-	if destDir || (destExists && destStat.IsDir()) {
-		destPath = filepath.Join(destPath, src.Name())
-	}
-
-	if err := idtools.MkdirAllNewAs(filepath.Dir(destPath), 0755, rootUID, rootGID); err != nil {
-		return err
-	}
-	if err := archiver.CopyFileWithTar(srcPath, destPath); err != nil {
-		return err
-	}
-
-	return fixPermissions(srcPath, destPath, rootUID, rootGID, destExists)
 }
 
 // GetCachedImage returns a reference to a cached image whose parent equals `parent`

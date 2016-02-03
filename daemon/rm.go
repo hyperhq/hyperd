@@ -12,16 +12,20 @@ import (
 )
 
 func (daemon *Daemon) CleanPod(podId string) (int, string, error) {
+	daemon.PodList.Lock()
+	glog.V(2).Infof("lock PodList")
+	defer glog.V(2).Infof("unlock PodList")
+	defer daemon.PodList.Unlock()
+
+	return daemon.CleanPodWithLock(podId)
+}
+
+func (daemon *Daemon) CleanPodWithLock(podId string) (int, string, error) {
 	var (
 		code  = 0
 		cause = ""
 		err   error
 	)
-
-	daemon.PodList.Lock()
-	glog.V(2).Infof("lock PodList")
-	defer glog.V(2).Infof("unlock PodList")
-	defer daemon.PodList.Unlock()
 
 	os.RemoveAll(path.Join(utils.HYPER_ROOT, "services", podId))
 	pod, ok := daemon.PodList.Get(podId)

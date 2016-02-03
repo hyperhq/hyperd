@@ -67,19 +67,24 @@ func sanitizeRepoAndTags(names []string) ([]reference.Named, error) {
 }
 
 func newImageBuildOptions(ctx context.Context, r *http.Request) (*types.ImageBuildOptions, error) {
-	version := httputils.VersionFromContext(ctx)
+	//version := httputils.VersionFromContext(ctx)
 	options := &types.ImageBuildOptions{}
-	if httputils.BoolValue(r, "forcerm") && version.GreaterThanOrEqualTo("1.12") {
-		options.Remove = true
-	} else if r.FormValue("rm") == "" && version.GreaterThanOrEqualTo("1.12") {
-		options.Remove = true
-	} else {
-		options.Remove = httputils.BoolValue(r, "rm")
-	}
-	if httputils.BoolValue(r, "pull") && version.GreaterThanOrEqualTo("1.16") {
-		options.PullParent = true
-	}
+	options.Remove = true
+	options.PullParent = true
 
+	/*
+		if httputils.BoolValue(r, "forcerm") && version.GreaterThanOrEqualTo("1.12") {
+			options.Remove = true
+		} else if r.FormValue("rm") == "" && version.GreaterThanOrEqualTo("1.12") {
+			options.Remove = true
+		} else {
+			options.Remove = httputils.BoolValue(r, "rm")
+		}
+
+		if httputils.BoolValue(r, "pull") && version.GreaterThanOrEqualTo("1.16") {
+			options.PullParent = true
+		}
+	*/
 	options.Dockerfile = r.FormValue("dockerfile")
 	options.SuppressOutput = httputils.BoolValue(r, "q")
 	options.NoCache = httputils.BoolValue(r, "nocache")
@@ -204,14 +209,18 @@ func (br *buildRouter) postBuild(ctx context.Context, w http.ResponseWriter, r *
 		buildOptions.Dockerfile = dockerfileName
 	}
 
+	d := daemonbuilder.NewDocker(br.backend)
+	defer d.Cleanup()
+
 	b, err := dockerfile.NewBuilder(
 		buildOptions, // result of newBuildConfig
-		&daemonbuilder.Docker{br.backend},
+		d,
 		builder.DockerIgnoreContext{ModifiableContext: context},
 		nil)
 	if err != nil {
 		return errf(err)
 	}
+
 	if buildOptions.SuppressOutput {
 		b.Output = notVerboseBuffer
 	} else {
