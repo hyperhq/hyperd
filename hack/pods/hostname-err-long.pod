@@ -1,0 +1,16 @@
+{
+	"id": "host-name-tester",
+	"hostname": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
+	"containers" : [{
+	    "name": "file-tester",
+	    "image": "busybox:latest",
+	    "workdir": "/",
+	    "command": ["hostname"]
+	}],
+	"resource": {
+	    "vcpu": 1,
+	    "memory": 512
+	},
+	"volumes": [],
+	"tty": true
+}

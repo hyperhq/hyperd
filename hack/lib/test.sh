@@ -51,6 +51,19 @@ hyper::test::run_attached_pod() {
   hyper run --rm -a -p $1
 }
 
+hyper::test::hostname() {
+  hname=$(hyper::test::run_attached_pod ${HYPER_ROOT}/hack/pods/hostname.pod | tr -d '\r')
+  echo "hostname is ${hname}, expected myname"
+  [ "${hname}x" != "mynamex" ] && return 1
+
+  echo "check long hostname"
+  hyper::test::run_attached_pod ${HYPER_ROOT}/hack/pods/hostname-err-long.pod && return 1
+  echo "check invalid hostname"
+  hyper::test::run_attached_pod ${HYPER_ROOT}/hack/pods/hostname-err-char.pod && return 1
+
+  return 0
+}
+
 hyper::test::insert_file() {
   res=0
   count=5
