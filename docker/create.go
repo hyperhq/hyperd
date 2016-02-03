@@ -8,10 +8,14 @@ import (
 
 func (cli Docker) SendCmdCreate(name, image string, entrypoint, cmds []string, userConfig interface{}) ([]byte, int, error) {
 	config := &runconfig.Config{
-		Image:      image,
-		Cmd:        stringutils.NewStrSlice(cmds...),
-		Entrypoint: stringutils.NewStrSlice(entrypoint...),
+		Image: image,
+		Cmd:   stringutils.NewStrSlice(cmds...),
 	}
+
+	if len(entrypoint) != 0 {
+		config.Entrypoint = stringutils.NewStrSlice(entrypoint...)
+	}
+
 	if userConfig != nil {
 		config = userConfig.(*runconfig.Config)
 	}
