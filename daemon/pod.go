@@ -194,7 +194,8 @@ func (p *Pod) InitContainers(daemon *Daemon) error {
 		}
 
 		config := &container.Config{
-			Image: c.Image,
+			Image:           c.Image,
+			NetworkDisabled: true,
 		}
 
 		ccs, err := daemon.Daemon.ContainerCreate(dockertypes.ContainerCreateConfig{
