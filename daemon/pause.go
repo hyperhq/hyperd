@@ -5,28 +5,43 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/runv/hypervisor/types"
 )
 
-func (daemon *Daemon) CmdPause(job *engine.Job) (err error) {
+func (daemon *Daemon) CmdPause(job *engine.Job) error {
 	if len(job.Args) == 0 {
 		return fmt.Errorf("Can not execute 'pause' command without pod id!")
 	}
 
 	podId := job.Args[0]
-
 	glog.V(1).Infof("Get pod id is %s", podId)
 
-	vmId, err := daemon.GetVmByPodId(podId)
-	if err != nil {
-		return err
+	daemon.PodList.RLock()
+	glog.V(2).Infof("lock read of PodList")
+	pod, ok := daemon.PodList.Get(podId)
+	if !ok {
+		glog.V(2).Infof("unlock read of PodList")
+		daemon.PodList.RUnlock()
+		return fmt.Errorf("Can not get Pod info with pod ID(%s)", podId)
 	}
+	vmId := pod.status.Vm
+	glog.V(2).Infof("unlock read of PodList")
+	daemon.PodList.RUnlock()
 
 	vm, ok := daemon.VmList[vmId]
 	if !ok {
 		return fmt.Errorf("Can not find VM whose Id is %s!", vmId)
 	}
 
-	return vm.Pause(true)
+	if err := vm.Pause(true); err != nil {
+		return err
+	}
+
+	pod.status.SetContainerStatus(types.S_POD_PAUSED)
+	pod.status.Status = types.S_POD_PAUSED
+	vm.Status = types.S_VM_PAUSED
+
+	return nil
 }
 
 func (daemon Daemon) PauseContainer(container string) error {
@@ -56,9 +71,20 @@ func (daemon *Daemon) CmdUnpause(job *engine.Job) error {
 
 	podId := job.Args[0]
 
-	vmId, err := daemon.GetVmByPodId(podId)
-	if err != nil {
-		return err
+	daemon.PodList.RLock()
+	glog.V(2).Infof("lock read of PodList")
+	pod, ok := daemon.PodList.Get(podId)
+	if !ok {
+		glog.V(2).Infof("unlock read of PodList")
+		daemon.PodList.RUnlock()
+		return fmt.Errorf("Can not get Pod info with pod ID(%s)", podId)
+	}
+	vmId := pod.status.Vm
+	glog.V(2).Infof("unlock read of PodList")
+	daemon.PodList.RUnlock()
+
+	if pod.status.Status != types.S_POD_PAUSED {
+		return fmt.Errorf("pod is not paused")
 	}
 
 	vm, ok := daemon.VmList[vmId]
@@ -66,7 +92,15 @@ func (daemon *Daemon) CmdUnpause(job *engine.Job) error {
 		return fmt.Errorf("Can not find VM whose Id is %s!", vmId)
 	}
 
-	return vm.Pause(false)
+	if err := vm.Pause(false); err != nil {
+		return err
+	}
+
+	pod.status.SetContainerStatus(types.S_POD_RUNNING)
+	pod.status.Status = types.S_POD_RUNNING
+	vm.Status = types.S_VM_ASSOCIATED
+
+	return nil
 }
 
 func (daemon *Daemon) UnpauseContainer(container string) error {

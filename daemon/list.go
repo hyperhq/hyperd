@@ -151,6 +151,9 @@ func showVM(v *hypervisor.Vm) string {
 	case types.S_VM_IDLE:
 		status = "idle"
 		break
+	case types.S_VM_PAUSED:
+		status = "pasued"
+		break
 	default:
 		status = ""
 		break
@@ -176,6 +179,8 @@ func showPod(pod *hypervisor.PodStatus) string {
 		if pod.Type == "kubernetes" {
 			status = "failed(kubernetes)"
 		}
+	case types.S_POD_PAUSED:
+		status = "paused"
 	case types.S_POD_SUCCEEDED:
 		status = "succeeded"
 		if pod.Type == "kubernetes" {
