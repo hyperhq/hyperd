@@ -14,8 +14,11 @@ func (daemon *Daemon) CmdPause(job *engine.Job) error {
 	}
 
 	podId := job.Args[0]
-	glog.V(1).Infof("Get pod id is %s", podId)
+	glog.V(1).Infof("Pause pod %s", podId)
+	return daemon.PausePod(podId)
+}
 
+func (daemon Daemon) PausePod(podId string) error {
 	daemon.PodList.RLock()
 	glog.V(2).Infof("lock read of PodList")
 	pod, ok := daemon.PodList.Get(podId)
@@ -51,17 +54,7 @@ func (daemon Daemon) PauseContainer(container string) error {
 		return err
 	}
 
-	vmId, err := daemon.GetVmByPodId(podId)
-	if err != nil {
-		return err
-	}
-
-	vm, ok := daemon.VmList[vmId]
-	if !ok {
-		return fmt.Errorf("Can not find VM whose Id is %s!", vmId)
-	}
-
-	return vm.Pause(true)
+	return daemon.PausePod(podId)
 }
 
 func (daemon *Daemon) CmdUnpause(job *engine.Job) error {
@@ -70,7 +63,11 @@ func (daemon *Daemon) CmdUnpause(job *engine.Job) error {
 	}
 
 	podId := job.Args[0]
+	glog.V(1).Infof("Unpause pod %s", podId)
+	return daemon.UnpausePod(podId)
+}
 
+func (daemon *Daemon) UnpausePod(podId string) error {
 	daemon.PodList.RLock()
 	glog.V(2).Infof("lock read of PodList")
 	pod, ok := daemon.PodList.Get(podId)
@@ -110,15 +107,5 @@ func (daemon *Daemon) UnpauseContainer(container string) error {
 		return err
 	}
 
-	vmId, err := daemon.GetVmByPodId(podId)
-	if err != nil {
-		return err
-	}
-
-	vm, ok := daemon.VmList[vmId]
-	if !ok {
-		return fmt.Errorf("Can not find VM whose Id is %s!", vmId)
-	}
-
-	return vm.Pause(false)
+	return daemon.UnpausePod(podId)
 }
