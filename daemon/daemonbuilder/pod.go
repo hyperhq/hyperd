@@ -13,6 +13,7 @@ import (
 	"github.com/docker/docker/pkg/archive"
 	"github.com/docker/docker/pkg/chrootarchive"
 	"github.com/docker/docker/pkg/idtools"
+	"github.com/docker/docker/pkg/ioutils"
 	"github.com/docker/engine-api/types"
 	containertypes "github.com/docker/engine-api/types/container"
 	"github.com/golang/glog"
@@ -24,9 +25,8 @@ import (
 
 // ContainerAttach attaches streams to the container cID. If stream is true, it streams the output.
 func (d Docker) ContainerAttach(cId string, stdin io.ReadCloser, stdout, stderr io.Writer, stream bool) error {
-	return nil
 	tag := pod.RandStr(8, "alphanum")
-	return d.Daemon.Attach(stdin, stdout.(io.WriteCloser), "container", cId, tag)
+	return d.Daemon.Attach(stdin, ioutils.NopWriteCloser(stdout), "container", cId, tag)
 }
 
 func (d Docker) Commit(cId string, cfg *types.ContainerCommitConfig) (string, error) {
