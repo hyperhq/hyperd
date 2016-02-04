@@ -156,6 +156,7 @@ __EOF__
 
   hyper::test::exitcode
   hyper::test::exec
+  hyper::test::hostname
   hyper::test::insert_file
   hyper::test::map_file
   hyper::test::with_volume
