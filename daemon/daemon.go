@@ -78,6 +78,8 @@ func (daemon *Daemon) Install(eng *engine.Engine) error {
 		"build":             daemon.CmdBuild,
 		"commit":            daemon.CmdCommit,
 		"rename":            daemon.CmdRename,
+		"pause":             daemon.CmdPause,
+		"unpause":           daemon.CmdUnpause,
 		"push":              daemon.CmdPush,
 		"podCreate":         daemon.CmdPodCreate,
 		"podStart":          daemon.CmdPodStart,
