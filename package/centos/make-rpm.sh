@@ -2,7 +2,7 @@
 
 PROJECT=$(readlink -f $(dirname $0)/../..)
 CENTOS_DIR=${PROJECT}/package/centos
-VERSION=0.4
+VERSION=0.5
 
 if [ $# -gt 0 ] ; then
     VERSION=$1
