@@ -356,3 +356,13 @@ func (daemon *Daemon) CmdDeleteService(podId, data string) (*engine.Env, error) 
 func (daemon *Daemon) CmdGetServices(podId string) ([]pod.UserService, error) {
 	return daemon.GetServices(podId)
 }
+
+func (daemon *Daemon) CmdPausePod(podId string) error {
+	glog.V(1).Infof("Pause pod %s", podId)
+	return daemon.pausePod(podId)
+}
+
+func (daemon *Daemon) CmdUnpausePod(podId string) error {
+	glog.V(1).Infof("Unpause pod %s", podId)
+	return daemon.unpausePod(podId)
+}

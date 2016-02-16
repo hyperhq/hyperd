@@ -7,11 +7,6 @@ import (
 	"github.com/hyperhq/runv/hypervisor/types"
 )
 
-func (daemon *Daemon) CmdPausePod(podId string) error {
-	glog.V(1).Infof("Pause pod %s", podId)
-	return daemon.pausePod(podId)
-}
-
 func (daemon Daemon) pausePod(podId string) error {
 	daemon.PodList.RLock()
 	glog.V(2).Infof("lock read of PodList")
@@ -49,11 +44,6 @@ func (daemon Daemon) PauseContainer(container string) error {
 	}
 
 	return daemon.pausePod(podId)
-}
-
-func (daemon *Daemon) CmdUnpausePod(podId string) error {
-	glog.V(1).Infof("Unpause pod %s", podId)
-	return daemon.unpausePod(podId)
 }
 
 func (daemon *Daemon) unpausePod(podId string) error {
