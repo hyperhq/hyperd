@@ -24,7 +24,10 @@ import (
 // Docker implements builder.Backend for the docker Daemon object.
 type Docker struct {
 	*daemon.Daemon
-	hyper *Hyper
+	OutOld      io.Writer
+	AuthConfigs map[string]types.AuthConfig
+	Archiver    *archive.Archiver
+	hyper       *Hyper
 }
 
 type Hyper struct {
@@ -37,19 +40,16 @@ type Hyper struct {
 // ensure Docker implements builder.Backend
 var _ builder.Backend = Docker{}
 
-func NewDocker(backend *daemon.Daemon) *Docker {
-	return &Docker{
-		Daemon: backend,
-		hyper: &Hyper{
-			make(map[string]string),
-			make(map[string]string),
-			nil, nil,
-		},
+func (d *Docker) InitHyper() {
+	d.hyper = &Hyper{
+		make(map[string]string),
+		make(map[string]string),
+		nil, nil,
 	}
 }
 
 // Pull tells Docker to pull image referenced by `name`.
-func (d Docker) Pull(name string, authConfigs map[string]types.AuthConfig, output io.Writer) (builder.Image, error) {
+func (d Docker) Pull(name string) (builder.Image, error) {
 	ref, err := reference.ParseNamed(name)
 	if err != nil {
 		return nil, err
@@ -57,7 +57,7 @@ func (d Docker) Pull(name string, authConfigs map[string]types.AuthConfig, outpu
 	ref = reference.WithDefaultTag(ref)
 
 	pullRegistryAuth := &types.AuthConfig{}
-	if len(authConfigs) > 0 {
+	if len(d.AuthConfigs) > 0 {
 		// The request came with a full auth config file, we prefer to use that
 		repoInfo, err := d.Daemon.RegistryService.ResolveRepository(ref)
 		if err != nil {
@@ -65,13 +65,13 @@ func (d Docker) Pull(name string, authConfigs map[string]types.AuthConfig, outpu
 		}
 
 		resolvedConfig := registry.ResolveAuthConfig(
-			authConfigs,
+			d.AuthConfigs,
 			repoInfo.Index,
 		)
 		pullRegistryAuth = &resolvedConfig
 	}
 
-	if err := d.Daemon.PullImage(ref, nil, pullRegistryAuth, ioutils.NopWriteCloser(output)); err != nil {
+	if err := d.Daemon.PullImage(ref, nil, pullRegistryAuth, ioutils.NopWriteCloser(d.OutOld)); err != nil {
 		return nil, err
 	}
 	return d.GetImage(name)

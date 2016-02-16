@@ -77,8 +77,9 @@ func (cli *DockerCli) CmdBuild(args ...string) error {
 	cmd.ParseFlags(args, true)
 
 	var (
-		context io.ReadCloser
-		err     error
+		context  io.ReadCloser
+		isRemote bool
+		err      error
 	)
 
 	specifiedContext := cmd.Arg(0)
@@ -211,12 +212,18 @@ func (cli *DockerCli) CmdBuild(args ...string) error {
 		}
 	}
 
+	var remoteContext string
+	if isRemote {
+		remoteContext = cmd.Arg(0)
+	}
+
 	options := types.ImageBuildOptions{
 		Context:        body,
 		Memory:         memory,
 		MemorySwap:     memorySwap,
 		Tags:           flTags.GetAll(),
 		SuppressOutput: *suppressOutput,
+		RemoteContext:  remoteContext,
 		NoCache:        *noCache,
 		Remove:         *rm,
 		ForceRemove:    *forceRm,

@@ -14,6 +14,8 @@ import (
 	"github.com/docker/docker/api/server/httputils"
 	"github.com/docker/docker/builder"
 	"github.com/docker/docker/builder/dockerfile"
+	"github.com/docker/docker/pkg/archive"
+	"github.com/docker/docker/pkg/chrootarchive"
 	"github.com/docker/docker/pkg/ioutils"
 	"github.com/docker/docker/pkg/progress"
 	"github.com/docker/docker/pkg/streamformatter"
@@ -209,22 +211,33 @@ func (br *buildRouter) postBuild(ctx context.Context, w http.ResponseWriter, r *
 		buildOptions.Dockerfile = dockerfileName
 	}
 
-	d := daemonbuilder.NewDocker(br.backend)
-	defer d.Cleanup()
+	uidMaps, gidMaps := br.backend.GetUIDGIDMaps()
+	defaultArchiver := &archive.Archiver{
+		Untar:   chrootarchive.Untar,
+		UIDMaps: uidMaps,
+		GIDMaps: gidMaps,
+	}
+
+	docker := &daemonbuilder.Docker{
+		Daemon:      br.backend,
+		OutOld:      output,
+		AuthConfigs: authConfigs,
+		Archiver:    defaultArchiver,
+	}
+	if buildOptions.SuppressOutput {
+		docker.OutOld = notVerboseBuffer
+	}
+
+	docker.InitHyper()
+	defer docker.Cleanup()
 
 	b, err := dockerfile.NewBuilder(
 		buildOptions, // result of newBuildConfig
-		d,
+		docker,
 		builder.DockerIgnoreContext{ModifiableContext: context},
 		nil)
 	if err != nil {
 		return errf(err)
-	}
-
-	if buildOptions.SuppressOutput {
-		b.Output = notVerboseBuffer
-	} else {
-		b.Output = output
 	}
 	b.Stdout = &streamformatter.StdoutFormatter{Writer: output, StreamFormatter: sf}
 	b.Stderr = &streamformatter.StderrFormatter{Writer: output, StreamFormatter: sf}
@@ -236,10 +249,11 @@ func (br *buildRouter) postBuild(ctx context.Context, w http.ResponseWriter, r *
 	if closeNotifier, ok := w.(http.CloseNotifier); ok {
 		finished := make(chan struct{})
 		defer close(finished)
+		clientGone := closeNotifier.CloseNotify()
 		go func() {
 			select {
 			case <-finished:
-			case <-closeNotifier.CloseNotify():
+			case <-clientGone:
 				glog.Infof("Client disconnected, cancelling job: build")
 				b.Cancel()
 			}

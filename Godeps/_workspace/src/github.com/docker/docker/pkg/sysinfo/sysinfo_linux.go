@@ -1,7 +1,6 @@
 package sysinfo
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
@@ -17,37 +16,18 @@ const (
 	SeccompModeFilter = uintptr(2)
 )
 
-func findCgroupMountpoints() (map[string]string, error) {
-	cgMounts, err := cgroups.GetCgroupMounts()
-	if err != nil {
-		return nil, fmt.Errorf("Failed to parse cgroup information: %v", err)
-	}
-	mps := make(map[string]string)
-	for _, m := range cgMounts {
-		for _, ss := range m.Subsystems {
-			mps[ss] = m.Mountpoint
-		}
-	}
-	return mps, nil
-}
-
 // New returns a new SysInfo, using the filesystem to detect which features
 // the kernel supports. If `quiet` is `false` warnings are printed in logs
 // whenever an error occurs or misconfigurations are present.
 func New(quiet bool) *SysInfo {
 	sysInfo := &SysInfo{}
-	cgMounts, err := findCgroupMountpoints()
-	if err != nil {
-		logrus.Warnf("Failed to parse cgroup information: %v", err)
-	} else {
-		sysInfo.cgroupMemInfo = checkCgroupMem(cgMounts, quiet)
-		sysInfo.cgroupCPUInfo = checkCgroupCPU(cgMounts, quiet)
-		sysInfo.cgroupBlkioInfo = checkCgroupBlkioInfo(cgMounts, quiet)
-		sysInfo.cgroupCpusetInfo = checkCgroupCpusetInfo(cgMounts, quiet)
-	}
+	sysInfo.cgroupMemInfo = checkCgroupMem(quiet)
+	sysInfo.cgroupCPUInfo = checkCgroupCPU(quiet)
+	sysInfo.cgroupBlkioInfo = checkCgroupBlkioInfo(quiet)
+	sysInfo.cgroupCpusetInfo = checkCgroupCpusetInfo(quiet)
 
-	_, ok := cgMounts["devices"]
-	sysInfo.CgroupDevicesEnabled = ok
+	_, err := cgroups.FindCgroupMountpoint("devices")
+	sysInfo.CgroupDevicesEnabled = err == nil
 
 	sysInfo.IPv4ForwardingDisabled = !readProcBool("/proc/sys/net/ipv4/ip_forward")
 	sysInfo.BridgeNfCallIptablesDisabled = !readProcBool("/proc/sys/net/bridge/bridge-nf-call-iptables")
@@ -70,11 +50,11 @@ func New(quiet bool) *SysInfo {
 }
 
 // checkCgroupMem reads the memory information from the memory cgroup mount point.
-func checkCgroupMem(cgMounts map[string]string, quiet bool) cgroupMemInfo {
-	mountPoint, ok := cgMounts["memory"]
-	if !ok {
+func checkCgroupMem(quiet bool) cgroupMemInfo {
+	mountPoint, err := cgroups.FindCgroupMountpoint("memory")
+	if err != nil {
 		if !quiet {
-			logrus.Warnf("Your kernel does not support cgroup memory limit")
+			logrus.Warnf("Your kernel does not support cgroup memory limit: %v", err)
 		}
 		return cgroupMemInfo{}
 	}
@@ -111,11 +91,11 @@ func checkCgroupMem(cgMounts map[string]string, quiet bool) cgroupMemInfo {
 }
 
 // checkCgroupCPU reads the cpu information from the cpu cgroup mount point.
-func checkCgroupCPU(cgMounts map[string]string, quiet bool) cgroupCPUInfo {
-	mountPoint, ok := cgMounts["cpu"]
-	if !ok {
+func checkCgroupCPU(quiet bool) cgroupCPUInfo {
+	mountPoint, err := cgroups.FindCgroupMountpoint("cpu")
+	if err != nil {
 		if !quiet {
-			logrus.Warnf("Unable to find cpu cgroup in mounts")
+			logrus.Warn(err)
 		}
 		return cgroupCPUInfo{}
 	}
@@ -142,11 +122,11 @@ func checkCgroupCPU(cgMounts map[string]string, quiet bool) cgroupCPUInfo {
 }
 
 // checkCgroupBlkioInfo reads the blkio information from the blkio cgroup mount point.
-func checkCgroupBlkioInfo(cgMounts map[string]string, quiet bool) cgroupBlkioInfo {
-	mountPoint, ok := cgMounts["blkio"]
-	if !ok {
+func checkCgroupBlkioInfo(quiet bool) cgroupBlkioInfo {
+	mountPoint, err := cgroups.FindCgroupMountpoint("blkio")
+	if err != nil {
 		if !quiet {
-			logrus.Warnf("Unable to find blkio cgroup in mounts")
+			logrus.Warn(err)
 		}
 		return cgroupBlkioInfo{}
 	}
@@ -190,11 +170,11 @@ func checkCgroupBlkioInfo(cgMounts map[string]string, quiet bool) cgroupBlkioInf
 }
 
 // checkCgroupCpusetInfo reads the cpuset information from the cpuset cgroup mount point.
-func checkCgroupCpusetInfo(cgMounts map[string]string, quiet bool) cgroupCpusetInfo {
-	mountPoint, ok := cgMounts["cpuset"]
-	if !ok {
+func checkCgroupCpusetInfo(quiet bool) cgroupCpusetInfo {
+	mountPoint, err := cgroups.FindCgroupMountpoint("cpuset")
+	if err != nil {
 		if !quiet {
-			logrus.Warnf("Unable to find cpuset cgroup in mounts")
+			logrus.Warn(err)
 		}
 		return cgroupCpusetInfo{}
 	}

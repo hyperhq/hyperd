@@ -189,6 +189,7 @@ func (s *Server) addRouter(r router.Router) {
 }
 
 // createMux initializes the main router the server uses.
+// we keep enableCors just for legacy usage, need to be removed in the future
 func (s *Server) createMux() *mux.Router {
 	m := mux.NewRouter()
 	if utils.IsDebugEnabled() {

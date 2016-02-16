@@ -3,12 +3,14 @@
 package term
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/Azure/go-ansiterm/winterm"
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/pkg/system"
 	"github.com/docker/docker/pkg/term/windows"
 )
@@ -30,8 +32,8 @@ type Winsize struct {
 func StdStreams() (stdIn io.ReadCloser, stdOut, stdErr io.Writer) {
 	switch {
 	case os.Getenv("ConEmuANSI") == "ON":
-		// The ConEmu shell emulates ANSI well by default.
-		return os.Stdin, os.Stdout, os.Stderr
+		// The ConEmu terminal emulates ANSI on output streams well.
+		return windows.ConEmuStreams()
 	case os.Getenv("MSYSTEM") != "":
 		// MSYS (mingw) does not emulate ANSI well.
 		return windows.ConsoleStreams()
@@ -119,6 +121,52 @@ func GetWinsize(fd uintptr) (*Winsize, error) {
 	// logrus.Debugf("[windows] GetWinsize: Console(%v)", info.String())
 	// logrus.Debugf("[windows] GetWinsize: Width(%v), Height(%v), x(%v), y(%v)", winsize.Width, winsize.Height, winsize.x, winsize.y)
 	return winsize, nil
+}
+
+// SetWinsize tries to set the specified window size for the specified file descriptor.
+func SetWinsize(fd uintptr, ws *Winsize) error {
+
+	// Ensure the requested dimensions are no larger than the maximum window size
+	info, err := winterm.GetConsoleScreenBufferInfo(fd)
+	if err != nil {
+		return err
+	}
+
+	if ws.Width == 0 || ws.Height == 0 || ws.Width > uint16(info.MaximumWindowSize.X) || ws.Height > uint16(info.MaximumWindowSize.Y) {
+		return fmt.Errorf("Illegal window size: (%v,%v) -- Maximum allow: (%v,%v)",
+			ws.Width, ws.Height, info.MaximumWindowSize.X, info.MaximumWindowSize.Y)
+	}
+
+	// Narrow the sizes to that used by Windows
+	width := winterm.SHORT(ws.Width)
+	height := winterm.SHORT(ws.Height)
+
+	// Set the dimensions while ensuring they remain within the bounds of the backing console buffer
+	// -- Shrinking will always succeed. Growing may push the edges past the buffer boundary. When that occurs,
+	//    shift the upper left just enough to keep the new window within the buffer.
+	rect := info.Window
+	if width < rect.Right-rect.Left+1 {
+		rect.Right = rect.Left + width - 1
+	} else if width > rect.Right-rect.Left+1 {
+		rect.Right = rect.Left + width - 1
+		if rect.Right >= info.Size.X {
+			rect.Left = info.Size.X - width
+			rect.Right = info.Size.X - 1
+		}
+	}
+
+	if height < rect.Bottom-rect.Top+1 {
+		rect.Bottom = rect.Top + height - 1
+	} else if height > rect.Bottom-rect.Top+1 {
+		rect.Bottom = rect.Top + height - 1
+		if rect.Bottom >= info.Size.Y {
+			rect.Top = info.Size.Y - height
+			rect.Bottom = info.Size.Y - 1
+		}
+	}
+	logrus.Debugf("[windows] SetWinsize: Requested((%v,%v)) Actual(%v)", ws.Width, ws.Height, rect)
+
+	return winterm.SetConsoleWindowInfo(fd, true, rect)
 }
 
 // IsTerminal returns true if the given file descriptor is a terminal.

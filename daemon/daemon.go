@@ -208,7 +208,7 @@ func InitDockerCfg(mirrors []string, insecureRegistries []string, graphdriver, r
 	dockerCfg.Root = root
 	dockerCfg.TrustKeyPath = path.Join(root, "keys")
 	// disable docker network
-	dockerCfg.Bridge.Iface = "none"
+	//dockerCfg.bridgeConfig.Iface = "none"
 	// disable log driver
 	dockerCfg.LogConfig.Type = "none"
 
