@@ -6,17 +6,20 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
 	"time"
 
-	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/daemon/logger"
 	"github.com/docker/docker/daemon/logger/jsonfilelog"
+	"github.com/docker/docker/pkg/version"
+	dockertypes "github.com/docker/engine-api/types"
+	"github.com/docker/engine-api/types/container"
+
 	"github.com/golang/glog"
-	"github.com/hyperhq/hyper/engine"
 	"github.com/hyperhq/hyper/servicediscovery"
 	"github.com/hyperhq/hyper/storage"
 	"github.com/hyperhq/hyper/utils"
@@ -25,134 +28,23 @@ import (
 	"github.com/hyperhq/runv/hypervisor/types"
 )
 
-func (daemon *Daemon) CmdPodCreate(job *engine.Job) error {
+func (daemon *Daemon) StartPod(stdin io.ReadCloser, stdout io.WriteCloser, podId, vmId, tag string) (int, string, error) {
 	// we can only support 1024 Pods
 	if daemon.GetRunningPodNum() >= 1024 {
-		return fmt.Errorf("Pod full, the maximum Pod is 1024!")
-	}
-	podArgs := job.Args[0]
-	autoRemove := false
-	if job.Args[1] == "yes" || job.Args[1] == "true" {
-		autoRemove = true
-	}
-
-	podId := fmt.Sprintf("pod-%s", pod.RandStr(10, "alpha"))
-	daemon.PodList.Lock()
-	glog.V(2).Infof("lock PodList")
-	defer glog.V(2).Infof("unlock PodList")
-	defer daemon.PodList.Unlock()
-	err := daemon.CreatePod(podId, podArgs, autoRemove)
-	if err != nil {
-		return err
-	}
-
-	// Prepare the VM status to client
-	v := &engine.Env{}
-	v.Set("ID", podId)
-	v.SetInt("Code", 0)
-	v.Set("Cause", "")
-	if _, err := v.WriteTo(job.Stdout); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// CmdPodLabels updates labels of the specified pod
-func (daemon *Daemon) CmdPodLabels(job *engine.Job) error {
-	override := false
-	if job.Args[1] == "true" || job.Args[1] == "yes" {
-		override = true
-	}
-
-	labels := make(map[string]string)
-	if len(job.Args[2]) == 0 {
-		return fmt.Errorf("labels can't be null")
-	}
-	if err := json.Unmarshal([]byte(job.Args[2]), &labels); err != nil {
-		return err
-	}
-
-	daemon.PodList.RLock()
-	glog.V(2).Infof("lock read of PodList")
-	defer daemon.PodList.RUnlock()
-	defer glog.V(2).Infof("unlock read of PodList")
-
-	var (
-		pod *Pod
-		ok  bool
-	)
-	if strings.Contains(job.Args[0], "pod-") {
-		podId := job.Args[0]
-		pod, ok = daemon.PodList.Get(podId)
-		if !ok {
-			return fmt.Errorf("Can not get Pod info with pod ID(%s)", podId)
-		}
-	} else {
-		pod = daemon.PodList.GetByName(job.Args[0])
-		if pod == nil {
-			return fmt.Errorf("Can not get Pod info with pod name(%s)", job.Args[0])
-		}
-	}
-
-	if pod.spec.Labels == nil {
-		pod.spec.Labels = make(map[string]string)
-	}
-
-	for k := range labels {
-		if _, ok := pod.spec.Labels[k]; ok && !override {
-			return fmt.Errorf("Can't update label %s without override", k)
-		}
-	}
-
-	for k, v := range labels {
-		pod.spec.Labels[k] = v
-	}
-
-	spec, err := json.Marshal(pod.spec)
-	if err != nil {
-		return err
-	}
-
-	if err := daemon.WritePodToDB(pod.id, spec); err != nil {
-		return err
-	}
-
-	// Prepare the VM status to client
-	v := &engine.Env{}
-	v.Set("ID", pod.id)
-	v.SetInt("Code", 0)
-	v.Set("Cause", "")
-	if _, err := v.WriteTo(job.Stdout); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (daemon *Daemon) CmdPodStart(job *engine.Job) error {
-	// we can only support 1024 Pods
-	if daemon.GetRunningPodNum() >= 1024 {
-		return fmt.Errorf("Pod full, the maximum Pod is 1024!")
+		return -1, "", fmt.Errorf("Pod full, the maximum Pod is 1024!")
 	}
 
 	var (
-		tag         string              = ""
 		ttys        []*hypervisor.TtyIO = []*hypervisor.TtyIO{}
 		ttyCallback chan *types.VmResponse
 	)
 
-	podId := job.Args[0]
-	vmId := job.Args[1]
-	if len(job.Args) > 2 {
-		tag = job.Args[2]
-	}
 	if tag != "" {
 		glog.V(1).Info("Pod Run with client terminal tag: ", tag)
 		ttyCallback = make(chan *types.VmResponse, 1)
 		ttys = append(ttys, &hypervisor.TtyIO{
-			Stdin:     job.Stdin,
-			Stdout:    job.Stdout,
+			Stdin:     stdin,
+			Stdout:    stdout,
 			ClientTag: tag,
 			Callback:  ttyCallback,
 		})
@@ -165,37 +57,50 @@ func (daemon *Daemon) CmdPodStart(job *engine.Job) error {
 	if _, ok := daemon.PodList.Get(podId); !ok {
 		glog.V(2).Infof("unlock PodList")
 		daemon.PodList.Unlock()
-		return fmt.Errorf("The pod(%s) can not be found, please create it first", podId)
+		return -1, "", fmt.Errorf("The pod(%s) can not be found, please create it first", podId)
 	}
 	var lazy bool = hypervisor.HDriver.SupportLazyMode() && vmId == ""
 
-	code, cause, err := daemon.StartPod(podId, "", vmId, nil, lazy, false, types.VM_KEEP_NONE, ttys)
+	code, cause, err := daemon.StartPodWithTty(podId, "", vmId, nil, lazy, false, types.VM_KEEP_NONE, ttys)
 	if err != nil {
 		glog.Error(err.Error())
 		glog.V(2).Infof("unlock PodList")
 		daemon.PodList.Unlock()
-		return err
+		return -1, "", err
 	}
+
+	glog.V(2).Infof("unlock PodList")
+	daemon.PodList.Unlock()
 
 	if len(ttys) > 0 {
-		glog.V(2).Infof("unlock PodList")
-		daemon.PodList.Unlock()
 		daemon.GetExitCode(podId, tag, ttyCallback)
-		return nil
-	}
-	defer glog.V(2).Infof("unlock PodList")
-	defer daemon.PodList.Unlock()
-
-	// Prepare the VM status to client
-	v := &engine.Env{}
-	v.Set("ID", vmId)
-	v.SetInt("Code", code)
-	v.Set("Cause", cause)
-	if _, err := v.WriteTo(job.Stdout); err != nil {
-		return err
 	}
 
-	return nil
+	return code, cause, nil
+}
+
+func (daemon *Daemon) StartPodWithTty(podId, podArgs, vmId string, config interface{}, lazy, autoremove bool, keep int, streams []*hypervisor.TtyIO) (int, string, error) {
+	glog.V(1).Infof("podArgs: %s", podArgs)
+	var (
+		err error
+		p   *Pod
+	)
+
+	p, err = daemon.GetPod(podId, podArgs, autoremove)
+	if err != nil {
+		return -1, "", err
+	}
+
+	if p.vm != nil {
+		return -1, "", fmt.Errorf("pod %s is already running", podId)
+	}
+
+	vmResponse, err := p.Start(daemon, vmId, lazy, autoremove, keep, streams)
+	if err != nil {
+		return -1, "", err
+	}
+
+	return vmResponse.Code, vmResponse.Cause, nil
 }
 
 // I'd like to move the remain part of this file to another file.
@@ -232,9 +137,100 @@ func (p *Pod) Status() *hypervisor.PodStatus {
 	return p.status
 }
 
-func CreatePod(daemon *Daemon, dclient DockerInterface, podId, podArgs string, autoremove bool) (*Pod, error) {
-	glog.V(1).Infof("podArgs: %s", podArgs)
+func (p *Pod) InitContainers(daemon *Daemon) error {
+	type cinfo struct {
+		id    string
+		name  string
+		image string
+	}
 
+	var (
+		containers map[string]*cinfo = make(map[string]*cinfo)
+		created    []string          = []string{}
+		err        error
+	)
+
+	// trying load existing containers from db
+	if ids, _ := daemon.GetPodContainersByName(p.id); ids != nil {
+		for _, id := range ids {
+			if rsp, err := daemon.ContainerInspect(id, false, version.Version("1.21")); err == nil {
+				var jsonResponse *dockertypes.ContainerJSON
+				jsonResponse, _ = rsp.(*dockertypes.ContainerJSON)
+
+				n := strings.TrimLeft(jsonResponse.Name, "/")
+				containers[n] = &cinfo{
+					id:    id,
+					name:  jsonResponse.Name,
+					image: jsonResponse.Config.Image,
+				}
+				glog.V(1).Infof("Found exist container %s (%s), image: %s", n, id, jsonResponse.Config.Image)
+			}
+		}
+	}
+
+	defer func() {
+		if err != nil {
+			for _, cid := range created {
+				daemon.Daemon.ContainerRm(cid, &dockertypes.ContainerRmConfig{})
+			}
+		}
+	}()
+
+	glog.V(1).Info("Process the Containers section in POD SPEC")
+	for _, c := range p.spec.Containers {
+
+		glog.V(1).Info("trying to init container ", c.Name)
+
+		if info, ok := containers[c.Name]; ok {
+			p.status.AddContainer(info.id, info.name, info.image, []string{}, types.S_POD_CREATED)
+			continue
+		}
+
+		config := &container.Config{
+			Image: c.Image,
+		}
+
+		ccs, err := daemon.Daemon.ContainerCreate(dockertypes.ContainerCreateConfig{
+			Name:   c.Name,
+			Config: config,
+		})
+
+		if err != nil {
+			glog.Error(err.Error())
+			return err
+		}
+
+		created = append(created, ccs.ID)
+		response, err := daemon.ContainerInspect(ccs.ID, false, version.Version("1.21"))
+		if err != nil {
+			return err
+		}
+
+		var rsp *dockertypes.ContainerJSON
+		rsp, _ = response.(*dockertypes.ContainerJSON)
+		p.status.AddContainer(ccs.ID, rsp.Name, rsp.Config.Image, []string{}, types.S_POD_CREATED)
+	}
+
+	return nil
+}
+
+func (daemon *Daemon) CreatePod(podArgs string, autoremove bool) (*Pod, error) {
+	// we can only support 1024 Pods
+	if daemon.GetRunningPodNum() >= 1024 {
+		return nil, fmt.Errorf("Pod full, the maximum Pod is 1024!")
+	}
+
+	daemon.PodList.Lock()
+	glog.V(2).Infof("lock PodList")
+	defer glog.V(2).Infof("unlock PodList")
+	defer daemon.PodList.Unlock()
+
+	podId := fmt.Sprintf("pod-%s", pod.RandStr(10, "alpha"))
+	return daemon.CreatePodWithLock(podId, podArgs, autoremove)
+}
+
+func (daemon *Daemon) CreatePodWithLock(podId, podArgs string, autoremove bool) (*Pod, error) {
+	glog.V(2).Infof("podArgs: %s", podArgs)
 	resPath := filepath.Join(DefaultResourcePath, podId)
 	if err := os.MkdirAll(resPath, os.FileMode(0755)); err != nil {
 		glog.Error("cannot create resource dir ", resPath)
@@ -253,6 +249,7 @@ func CreatePod(daemon *Daemon, dclient DockerInterface, podId, podArgs string, a
 
 	status := hypervisor.NewPod(podId, spec)
 	status.Handler.Handle = hyperHandlePodEvent
+	status.Handler.Data = daemon
 	status.Autoremove = autoremove
 	status.ResourcePath = resPath
 
@@ -262,94 +259,64 @@ func CreatePod(daemon *Daemon, dclient DockerInterface, podId, podArgs string, a
 		spec:   spec,
 	}
 
-	if err = pod.InitContainers(daemon, dclient); err != nil {
+	if err = pod.InitContainers(daemon); err != nil {
+		return nil, err
+	}
+
+	if err = daemon.AddPod(pod, podArgs); err != nil {
 		return nil, err
 	}
 
 	return pod, nil
 }
 
-func (p *Pod) InitContainers(daemon *Daemon, dclient DockerInterface) (err error) {
+func (daemon *Daemon) SetPodLabels(podId string, override bool, labels map[string]string) error {
+	daemon.PodList.RLock()
+	glog.V(2).Infof("lock read of PodList")
+	defer daemon.PodList.RUnlock()
+	defer glog.V(2).Infof("unlock read of PodList")
 
-	type cinfo struct {
-		id    string
-		name  string
-		image string
-	}
-
-	var (
-		containers map[string]*cinfo = make(map[string]*cinfo)
-		created    []string          = []string{}
-	)
-
-	// trying load existing containers from db
-	if ids, _ := daemon.GetPodContainersByName(p.id); ids != nil {
-		for _, id := range ids {
-			if jsonResponse, err := daemon.DockerCli.GetContainerInfo(id); err == nil {
-				n := strings.TrimLeft(jsonResponse.Name, "/")
-				containers[n] = &cinfo{
-					id:    id,
-					name:  jsonResponse.Name,
-					image: jsonResponse.Config.Image,
-				}
-				glog.V(1).Infof("Found exist container %s (%s), image: %s", n, id, jsonResponse.Config.Image)
-			}
+	var pod *Pod
+	if strings.Contains(podId, "pod-") {
+		var ok bool
+		pod, ok = daemon.PodList.Get(podId)
+		if !ok {
+			return fmt.Errorf("Can not get Pod info with pod ID(%s)", podId)
+		}
+	} else {
+		pod = daemon.PodList.GetByName(podId)
+		if pod == nil {
+			return fmt.Errorf("Can not get Pod info with pod name(%s)", podId)
 		}
 	}
 
-	defer func() {
-		if err != nil {
-			for _, cid := range created {
-				dclient.SendCmdDelete(cid)
-			}
+	if pod.spec.Labels == nil {
+		pod.spec.Labels = make(map[string]string)
+	}
+
+	for k := range labels {
+		if _, ok := pod.spec.Labels[k]; ok && !override {
+			return fmt.Errorf("Can't update label %s without override", k)
 		}
-	}()
+	}
 
-	glog.V(1).Info("Process the Containers section in POD SPEC")
-	for _, c := range p.spec.Containers {
+	for k, v := range labels {
+		pod.spec.Labels[k] = v
+	}
 
-		glog.V(1).Info("trying to init container ", c.Name)
+	spec, err := json.Marshal(pod.spec)
+	if err != nil {
+		return err
+	}
 
-		if info, ok := containers[c.Name]; ok {
-			p.status.AddContainer(info.id, info.name, info.image, []string{}, types.S_POD_CREATED)
-			continue
-		}
-
-		var (
-			cId []byte
-			rsp *dockertypes.ContainerJSON
-		)
-
-		cId, _, err = dclient.SendCmdCreate(c.Name, c.Image, c.Entrypoint, c.Command, nil)
-		if err != nil {
-			glog.Error(err.Error())
-			return
-		}
-
-		created = append(created, string(cId))
-
-		if rsp, err = dclient.GetContainerInfo(string(cId)); err != nil {
-			return
-		}
-
-		p.status.AddContainer(string(cId), rsp.Name, rsp.Config.Image, []string{}, types.S_POD_CREATED)
+	if err := daemon.WritePodToDB(pod.id, spec); err != nil {
+		return err
 	}
 
 	return nil
 }
 
-//FIXME: there was a `config` argument passed by docker/builder, but we never processed it.
-func (daemon *Daemon) CreatePod(podId, podArgs string, autoremove bool) error {
-
-	pod, err := CreatePod(daemon, daemon.DockerCli, podId, podArgs, autoremove)
-	if err != nil {
-		return err
-	}
-
-	return daemon.AddPod(pod, podArgs)
-}
-
-func (p *Pod) PrepareContainers(sd Storage, dclient DockerInterface) (err error) {
+func (p *Pod) PrepareContainers(sd Storage, daemon *Daemon) (err error) {
 	err = nil
 	p.containers = []*hypervisor.ContainerInfo{}
 
@@ -367,12 +334,30 @@ func (p *Pod) PrepareContainers(sd Storage, dclient DockerInterface) (err error)
 			info *dockertypes.ContainerJSON
 			ci   *hypervisor.ContainerInfo
 		)
-		info, err = getContinerInfo(dclient, c)
-
-		ci, err = sd.PrepareContainer(c.Id, sharedDir)
+		// TODO: use daemon.GetContainer
+		rsp, err := daemon.Daemon.ContainerInspect(c.Id, false, version.Version("1.21"))
 		if err != nil {
 			return err
 		}
+		info, _ = rsp.(*dockertypes.ContainerJSON)
+		if c.Name == "" {
+			c.Name = info.Name
+		}
+		if c.Image == "" {
+			c.Image = info.Config.Image
+		}
+		glog.Infof("container name %s, image %s", c.Name, c.Image)
+
+		mountId, err := GetMountIdByContainer(sd.Type(), c.Id)
+		if err != nil {
+			return err
+		}
+		glog.Infof("container ID: %s, mountId %s\n", c.Id, mountId)
+		ci, err = sd.PrepareContainer(mountId, sharedDir)
+		if err != nil {
+			return err
+		}
+		ci.Id = c.Id
 		ci.Workdir = info.Config.WorkingDir
 		ci.Entrypoint = info.Config.Entrypoint.Slice()
 		ci.Cmd = info.Config.Cmd.Slice()
@@ -388,7 +373,7 @@ func (p *Pod) PrepareContainers(sd Storage, dclient DockerInterface) (err error)
 
 		processImageVolumes(info, c.Id, p.spec, &p.spec.Containers[i])
 
-		err = processInjectFiles(&p.spec.Containers[i], files, sd, c.Id, sd.RootPath(), sharedDir)
+		err = processInjectFiles(&p.spec.Containers[i], files, sd, mountId, sd.RootPath(), sharedDir)
 		if err != nil {
 			return err
 		}
@@ -400,19 +385,18 @@ func (p *Pod) PrepareContainers(sd Storage, dclient DockerInterface) (err error)
 	return nil
 }
 
-func getContinerInfo(dclient DockerInterface, container *hypervisor.Container) (info *dockertypes.ContainerJSON, err error) {
-	info, err = dclient.GetContainerInfo(container.Id)
+func GetMountIdByContainer(driver, cid string) (string, error) {
+	idPath := path.Join(utils.HYPER_ROOT, fmt.Sprintf("image/%s/layerdb/mounts/%s/mount-id", driver, cid))
+	if _, err := os.Stat(idPath); err != nil && os.IsNotExist(err) {
+		return "", err
+	}
+
+	id, err := ioutil.ReadFile(idPath)
 	if err != nil {
-		glog.Error("got error when get container Info ", err.Error())
-		return nil, err
+		return "", err
 	}
-	if container.Name == "" {
-		container.Name = info.Name
-	}
-	if container.Image == "" {
-		container.Image = info.Config.Image
-	}
-	return
+
+	return string(id), nil
 }
 
 func processInjectFiles(container *pod.UserContainer, files map[string]pod.UserFile, sd Storage,
@@ -673,7 +657,7 @@ func (p *Pod) Prepare(daemon *Daemon) (err error) {
 		return
 	}
 
-	if err = p.PrepareContainers(daemon.Storage, daemon.DockerCli); err != nil {
+	if err = p.PrepareContainers(daemon.Storage, daemon); err != nil {
 		return
 	}
 
@@ -881,37 +865,14 @@ func (daemon *Daemon) GetExitCode(podId, tag string, callback chan *types.VmResp
 	return pod.vm.GetExitCode(tag, callback)
 }
 
-func (daemon *Daemon) StartPod(podId, podArgs, vmId string, config interface{}, lazy, autoremove bool, keep int, streams []*hypervisor.TtyIO) (int, string, error) {
-	glog.V(1).Infof("podArgs: %s", podArgs)
-	var (
-		err error
-		p   *Pod
-	)
-
-	p, err = daemon.GetPod(podId, podArgs, autoremove)
-	if err != nil {
-		return -1, "", err
-	}
-
-	if p.vm != nil {
-		return -1, "", fmt.Errorf("pod %s is already running", podId)
-	}
-
-	vmResponse, err := p.Start(daemon, vmId, lazy, autoremove, keep, streams)
-	if err != nil {
-		return -1, "", err
-	}
-
-	return vmResponse.Code, vmResponse.Cause, nil
-}
-
 // The caller must make sure that the restart policy and the status is right to restart
 func (daemon *Daemon) RestartPod(mypod *hypervisor.PodStatus) error {
 	// Remove the pod
 	// The pod is stopped, the vm is gone
 	for _, c := range mypod.Containers {
 		glog.V(1).Infof("Ready to rm container: %s", c.Id)
-		if _, _, err := daemon.DockerCli.SendCmdDelete(c.Id); err != nil {
+		// FIXME: pass non-null RmConfig?
+		if err := daemon.Daemon.ContainerRm(c.Id, &dockertypes.ContainerRmConfig{}); err != nil {
 			glog.V(1).Infof("Error to rm container: %s", err.Error())
 		}
 	}
@@ -926,7 +887,7 @@ func (daemon *Daemon) RestartPod(mypod *hypervisor.PodStatus) error {
 	var lazy bool = hypervisor.HDriver.SupportLazyMode()
 
 	// Start the pod
-	_, _, err = daemon.StartPod(mypod.Id, string(podData), "", nil, lazy, false, types.VM_KEEP_NONE, []*hypervisor.TtyIO{})
+	_, _, err = daemon.StartPodWithTty(mypod.Id, string(podData), "", nil, lazy, false, types.VM_KEEP_NONE, []*hypervisor.TtyIO{})
 	if err != nil {
 		glog.Error(err.Error())
 		return err
@@ -974,7 +935,7 @@ func hyperHandlePodEvent(vmResponse *types.VmResponse, data interface{},
 				daemon.DeletePodFromDB(mypod.Id)
 				for _, c := range mypod.Containers {
 					glog.V(1).Infof("Ready to rm container: %s", c.Id)
-					if _, _, err := daemon.DockerCli.SendCmdDelete(c.Id); err != nil {
+					if err := daemon.ContainerRm(c.Id, &dockertypes.ContainerRmConfig{}); err != nil {
 						glog.V(1).Infof("Error to rm container: %s", err.Error())
 					}
 				}
@@ -989,7 +950,7 @@ func hyperHandlePodEvent(vmResponse *types.VmResponse, data interface{},
 				daemon.DeletePodFromDB(mypod.Id)
 				for _, c := range mypod.Containers {
 					glog.V(1).Infof("Ready to rm container: %s", c.Id)
-					if _, _, err := daemon.DockerCli.SendCmdDelete(c.Id); err != nil {
+					if err := daemon.Daemon.ContainerRm(c.Id, &dockertypes.ContainerRmConfig{}); err != nil {
 						glog.V(1).Infof("Error to rm container: %s", err.Error())
 					}
 				}

@@ -2,81 +2,43 @@ package daemon
 
 import (
 	"fmt"
+	"io"
 	"strconv"
 	"time"
 
 	"github.com/docker/docker/daemon/logger"
 	"github.com/golang/glog"
-	"github.com/hyperhq/hyper/engine"
 	"github.com/hyperhq/runv/hypervisor/types"
 )
 
-type logsCmdConfig struct {
-	container  string
-	follow     bool
-	timestamps bool
-	tail       string
-	since      time.Time
-	stdout     bool
-	stderr     bool
+// ContainerLogsConfig holds configs for logging operations. Exists
+// for users of the daemon to to pass it a logging configuration.
+type ContainerLogsConfig struct {
+	// if true stream log output
+	Follow bool
+	// if true include timestamps for each line of log output
+	Timestamps bool
+	// return that many lines of log output from the end
+	Tail string
+	// filter logs by returning on those entries after this time
+	Since time.Time
+	// whether or not to show stdout and stderr as well as log entries.
+	UseStdout, UseStderr bool
+	OutStream            io.Writer
+	Stop                 <-chan bool
 }
 
-func readLogsConfig(args []string) (*logsCmdConfig, error) {
-	if len(args) < 1 {
-		return nil, fmt.Errorf("container id or name must be provided")
-	}
-
-	cfg := &logsCmdConfig{
-		container: args[0],
-	}
-
-	if len(args) > 1 {
-		cfg.tail = args[1]
-	}
-	if len(args) > 2 {
-		s, err := strconv.ParseInt(args[2], 10, 64)
-		if err == nil {
-			cfg.since = time.Unix(s, 0)
-		}
-	}
-
-	for _, s := range args[3:] {
-		switch s {
-		case "follow":
-			cfg.follow = true
-		case "timestamp":
-			cfg.timestamps = true
-		case "stdout":
-			cfg.stdout = true
-		case "stderr":
-			cfg.stderr = true
-		}
-	}
-
-	return cfg, nil
-}
-
-func (daemon *Daemon) CmdLogs(job *engine.Job) (err error) {
+func (daemon *Daemon) GetContainerLogs(container string, config *ContainerLogsConfig) (err error) {
 	var (
-		config    *logsCmdConfig
 		pod       *Pod
 		cidx      int
 		tailLines int
 	)
-	config, err = readLogsConfig(job.Args)
-	if err != nil {
-		glog.Warningf("log args parsing error: %v", err)
-		return
-	}
 
-	if !(config.stdout || config.stderr) {
-		return fmt.Errorf("You must choose at least one stream")
-	}
-
-	outStream := job.Stdout
+	outStream := config.OutStream
 	errStream := outStream
 
-	pod, cidx, err = daemon.GetPodByContainerIdOrName(config.container)
+	pod, cidx, err = daemon.GetPodByContainerIdOrName(container)
 	if err != nil {
 		return err
 	}
@@ -91,14 +53,14 @@ func (daemon *Daemon) CmdLogs(job *engine.Job) (err error) {
 		return fmt.Errorf("logger not suppert read")
 	}
 
-	follow := config.follow && (pod.status.Status == types.S_POD_RUNNING)
-	tailLines, err = strconv.Atoi(config.tail)
+	follow := config.Follow && (pod.status.Status == types.S_POD_RUNNING)
+	tailLines, err = strconv.Atoi(config.Tail)
 	if err != nil {
 		tailLines = -1
 	}
 
 	readConfig := logger.ReadConfig{
-		Since:  config.since,
+		Since:  config.Since,
 		Tail:   tailLines,
 		Follow: follow,
 	}
@@ -115,17 +77,17 @@ func (daemon *Daemon) CmdLogs(job *engine.Job) (err error) {
 				return nil
 			}
 			logLine := msg.Line
-			if config.timestamps {
+			if config.Timestamps {
 				logLine = append([]byte(msg.Timestamp.Format(logger.TimeFormat)+" "), logLine...)
 			}
-			if msg.Source == "stdout" && config.stdout {
+			if msg.Source == "stdout" && config.UseStdout {
 				glog.V(2).Info("print stdout log: ", logLine)
 				_, err := outStream.Write(logLine)
 				if err != nil {
 					return nil
 				}
 			}
-			if msg.Source == "stderr" && config.stderr {
+			if msg.Source == "stderr" && config.UseStderr {
 				glog.V(2).Info("print stderr log: ", logLine)
 				_, err := errStream.Write(logLine)
 				if err != nil {

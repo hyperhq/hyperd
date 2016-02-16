@@ -6,18 +6,14 @@ import (
 	"path"
 
 	"github.com/golang/glog"
-	"github.com/hyperhq/hyper/engine"
 	"github.com/hyperhq/hyper/servicediscovery"
 	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/pod"
 )
 
-func (daemon *Daemon) AddService(job *engine.Job) error {
+func (daemon *Daemon) AddService(podId, data string) error {
 	var srvs []pod.UserService
-
-	podId := job.Args[0]
-	data := job.Args[1]
 
 	vm, container, err := daemon.GetServiceContainerInfo(podId)
 	if err != nil {
@@ -38,14 +34,15 @@ func (daemon *Daemon) AddService(job *engine.Job) error {
 		services = append(services, s)
 	}
 
-	return servicediscovery.ApplyServices(vm, container, services)
+	if err := servicediscovery.ApplyServices(vm, container, services); err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func (daemon *Daemon) UpdateService(job *engine.Job) error {
+func (daemon *Daemon) UpdateService(podId, data string) error {
 	var srv []pod.UserService
-
-	podId := job.Args[0]
-	data := job.Args[1]
 
 	vm, container, err := daemon.GetServiceContainerInfo(podId)
 	if err != nil {
@@ -57,17 +54,18 @@ func (daemon *Daemon) UpdateService(job *engine.Job) error {
 		return err
 	}
 
-	return servicediscovery.ApplyServices(vm, container, srv)
+	if err := servicediscovery.ApplyServices(vm, container, srv); err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func (daemon *Daemon) DeleteService(job *engine.Job) error {
+func (daemon *Daemon) DeleteService(podId, data string) error {
 	var srvs []pod.UserService
 	var services []pod.UserService
 	var services2 []pod.UserService
 	var found int = 0
-
-	podId := job.Args[0]
-	data := job.Args[1]
 
 	vm, container, err := daemon.GetServiceContainerInfo(podId)
 	if err != nil {
@@ -103,29 +101,25 @@ func (daemon *Daemon) DeleteService(job *engine.Job) error {
 		return fmt.Errorf("Pod %s doesn't use this service", podId)
 	}
 
-	return servicediscovery.ApplyServices(vm, container, services2)
-}
-
-func (daemon *Daemon) GetServices(job *engine.Job) error {
-	podId := job.Args[0]
-
-	vm, container, err := daemon.GetServiceContainerInfo(podId)
-	if err != nil {
-		return err
-	}
-
-	services, err := servicediscovery.GetServices(vm, container)
-	if err != nil {
-		return err
-	}
-
-	v := &engine.Env{}
-	v.SetJson("data", services)
-	if _, err := v.WriteTo(job.Stdout); err != nil {
+	if err := servicediscovery.ApplyServices(vm, container, services2); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func (daemon *Daemon) GetServices(podId string) ([]pod.UserService, error) {
+	vm, container, err := daemon.GetServiceContainerInfo(podId)
+	if err != nil {
+		return nil, err
+	}
+
+	services, err := servicediscovery.GetServices(vm, container)
+	if err != nil {
+		return nil, err
+	}
+
+	return services, nil
 }
 
 func (daemon *Daemon) GetServiceContainerInfo(podId string) (*hypervisor.Vm, string, error) {

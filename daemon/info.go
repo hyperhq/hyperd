@@ -2,93 +2,36 @@ package daemon
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
+	"github.com/docker/docker/pkg/version"
+	dockertypes "github.com/docker/engine-api/types"
 	"github.com/golang/glog"
-	"github.com/hyperhq/hyper/engine"
-	"github.com/hyperhq/hyper/lib/sysinfo"
 	"github.com/hyperhq/hyper/types"
 	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/hypervisor"
 	runvtypes "github.com/hyperhq/runv/hypervisor/types"
 )
 
-func (daemon *Daemon) CmdInfo(job *engine.Job) error {
-	cli := daemon.DockerCli
-	sys, err := cli.SendCmdInfo("")
-	if err != nil {
-		return err
-	}
-
-	var num = daemon.PodList.CountContainers()
-
-	glog.V(2).Infof("unlock read of PodList")
-	v := &engine.Env{}
-	v.Set("ID", daemon.ID)
-	v.SetInt("Containers", int(num))
-	v.SetInt("Images", sys.Images)
-	v.Set("Driver", sys.Driver)
-	v.SetJson("DriverStatus", sys.DriverStatus)
-	v.Set("DockerRootDir", sys.DockerRootDir)
-	v.Set("IndexServerAddress", sys.IndexServerAddress)
-	v.Set("ExecutionDriver", daemon.Hypervisor)
-
-	// Get system infomation
-	meminfo, err := sysinfo.GetMemInfo()
-	if err != nil {
-		return err
-	}
-	osinfo, err := sysinfo.GetOSInfo()
-	if err != nil {
-		return err
-	}
-	v.SetInt64("MemTotal", int64(meminfo.MemTotal))
-	v.SetInt64("Pods", daemon.GetPodNum())
-	v.Set("Operating System", osinfo.PrettyName)
-	if hostname, err := os.Hostname(); err == nil {
-		v.SetJson("Name", hostname)
-	}
-	if _, err := v.WriteTo(job.Stdout); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (daemon *Daemon) CmdVersion(job *engine.Job) error {
-	v := &engine.Env{}
-	v.Set("ID", daemon.ID)
-	v.Set("Version", fmt.Sprintf("\"%s\"", utils.VERSION))
-	if _, err := v.WriteTo(job.Stdout); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (daemon *Daemon) CmdPodInfo(job *engine.Job) error {
-	if len(job.Args) == 0 {
-		return fmt.Errorf("Can not get Pod info without Pod ID")
-	}
+func (daemon *Daemon) GetPodInfo(podName string) (types.PodInfo, error) {
 	daemon.PodList.RLock()
 	glog.V(2).Infof("lock read of PodList")
 	defer daemon.PodList.RUnlock()
 	defer glog.V(2).Infof("unlock read of PodList")
 	var (
 		pod     *Pod
-		podId   string
 		ok      bool
 		imageid string
 	)
-	if strings.Contains(job.Args[0], "pod-") {
-		podId = job.Args[0]
-		pod, ok = daemon.PodList.Get(podId)
+	if strings.Contains(podName, "pod-") {
+		pod, ok = daemon.PodList.Get(podName)
 		if !ok {
-			return fmt.Errorf("Can not get Pod info with pod ID(%s)", podId)
+			return types.PodInfo{}, fmt.Errorf("Can not get Pod info with pod ID(%s)", podName)
 		}
 	} else {
-		pod = daemon.PodList.GetByName(job.Args[0])
+		pod = daemon.PodList.GetByName(podName)
 		if pod == nil {
-			return fmt.Errorf("Can not get Pod info with pod name(%s)", job.Args[0])
+			return types.PodInfo{}, fmt.Errorf("Can not get Pod info with pod name(%s)", podName)
 		}
 	}
 
@@ -99,8 +42,11 @@ func (daemon *Daemon) CmdPodInfo(job *engine.Job) error {
 		ports := []types.ContainerPort{}
 		envs := []types.EnvironmentVar{}
 		vols := []types.VolumeMount{}
-		jsonResponse, err := daemon.DockerCli.GetContainerInfo(c.Id)
+		Response, err := daemon.Daemon.ContainerInspect(c.Id, false, version.Version("1.21"))
 		if err == nil {
+			var jsonResponse *dockertypes.ContainerJSON
+			jsonResponse, _ = Response.(*dockertypes.ContainerJSON)
+
 			for _, e := range jsonResponse.Config.Env {
 				envs = append(envs, types.EnvironmentVar{
 					Env:   e[:strings.Index(e, "=")],
@@ -206,83 +152,62 @@ func (daemon *Daemon) CmdPodInfo(job *engine.Job) error {
 		break
 	}
 
-	data := types.PodInfo{
+	return types.PodInfo{
 		Kind:       "Pod",
 		ApiVersion: utils.APIVERSION,
 		Vm:         pod.status.Vm,
 		Spec:       spec,
 		Status:     status,
-	}
-	v := &engine.Env{}
-	v.SetJson("data", data)
-	if _, err := v.WriteTo(job.Stdout); err != nil {
-		return err
-	}
-
-	return nil
+	}, nil
 }
 
-func (daemon *Daemon) CmdPodStats(job *engine.Job) error {
-	if len(job.Args) == 0 {
-		return fmt.Errorf("Can not get Pod stats without Pod ID")
-	}
+func (daemon *Daemon) GetPodStats(podId string) (interface{}, error) {
 	daemon.PodList.RLock()
 	glog.V(2).Infof("lock read of PodList")
 	defer daemon.PodList.RUnlock()
 	defer glog.V(2).Infof("unlock read of PodList")
 	var (
-		pod   *Pod
-		podId string
-		ok    bool
+		pod *Pod
+		ok  bool
 	)
-	if strings.Contains(job.Args[0], "pod-") {
-		podId = job.Args[0]
+	if strings.Contains(podId, "pod-") {
 		pod, ok = daemon.PodList.Get(podId)
 		if !ok {
-			return fmt.Errorf("Can not get Pod stats with pod ID(%s)", podId)
+			return nil, fmt.Errorf("Can not get Pod stats with pod ID(%s)", podId)
 		}
 	} else {
-		pod = daemon.PodList.GetByName(job.Args[0])
+		pod = daemon.PodList.GetByName(podId)
 		if pod == nil {
-			return fmt.Errorf("Can not get Pod stats with pod name(%s)", job.Args[0])
+			return nil, fmt.Errorf("Can not get Pod stats with pod name(%s)", podId)
 		}
 	}
 
 	if pod.vm == nil || pod.status.Status != runvtypes.S_POD_RUNNING {
-		return fmt.Errorf("Can not get pod stats for non-running pod (%s)", job.Args[0])
+		return nil, fmt.Errorf("Can not get pod stats for non-running pod (%s)", podId)
 	}
 
 	response := pod.vm.Stats()
 	if response.Data == nil {
-		return fmt.Errorf("Stats for pod %s is nil", job.Args[0])
+		return nil, fmt.Errorf("Stats for pod %s is nil", podId)
 	}
 
-	v := &engine.Env{}
-	v.SetJson("data", response.Data)
-	if _, err := v.WriteTo(job.Stdout); err != nil {
-		return err
-	}
-
-	return nil
+	return response.Data, nil
 }
 
-func (daemon *Daemon) CmdContainerInfo(job *engine.Job) error {
-	if len(job.Args) == 0 {
-		return fmt.Errorf("Can not get Pod info without Pod ID")
-	}
+func (daemon *Daemon) GetContainerInfo(name string) (types.ContainerInfo, error) {
 	daemon.PodList.RLock()
 	glog.V(2).Infof("lock read of PodList")
 	defer daemon.PodList.RUnlock()
 	defer glog.V(2).Infof("unlock read of PodList")
+
 	var (
 		pod     *Pod
 		c       *hypervisor.Container
 		i       int = 0
 		imageid string
-		name    string = job.Args[0]
 	)
 	if name == "" {
-		return fmt.Errorf("Null container name")
+		return types.ContainerInfo{}, fmt.Errorf("Null container name")
 	}
 	glog.Infof(name)
 	wslash := name
@@ -298,14 +223,17 @@ func (daemon *Daemon) CmdContainerInfo(job *engine.Job) error {
 		return false
 	})
 	if pod == nil {
-		return fmt.Errorf("Can not find container by name(%s)", name)
+		return types.ContainerInfo{}, fmt.Errorf("Can not find container by name(%s)", name)
 	}
 
 	ports := []types.ContainerPort{}
 	envs := []types.EnvironmentVar{}
 	vols := []types.VolumeMount{}
-	jsonResponse, err := daemon.DockerCli.GetContainerInfo(c.Id)
+	rsp, err := daemon.Daemon.ContainerInspect(c.Id, false, version.Version("1.21"))
 	if err == nil {
+		var jsonResponse *dockertypes.ContainerJSON
+		jsonResponse, _ = rsp.(*dockertypes.ContainerJSON)
+
 		for _, e := range jsonResponse.Config.Env {
 			envs = append(envs, types.EnvironmentVar{
 				Env:   e[:strings.Index(e, "=")],
@@ -355,7 +283,7 @@ func (daemon *Daemon) CmdContainerInfo(job *engine.Job) error {
 		s.Terminated.StartedAt = pod.status.StartedAt
 		s.Terminated.FinishedAt = pod.status.FinishedAt
 	}
-	container := types.ContainerInfo{
+	return types.ContainerInfo{
 		Name:            c.Name,
 		ContainerID:     c.Id,
 		PodID:           pod.id,
@@ -369,12 +297,5 @@ func (daemon *Daemon) CmdContainerInfo(job *engine.Job) error {
 		Volume:          vols,
 		ImagePullPolicy: "",
 		Status:          s,
-	}
-	v := &engine.Env{}
-	v.SetJson("data", container)
-	if _, err := v.WriteTo(job.Stdout); err != nil {
-		return err
-	}
-
-	return nil
+	}, nil
 }

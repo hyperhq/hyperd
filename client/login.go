@@ -8,9 +8,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/cliconfig"
 	"github.com/docker/docker/registry"
+	"github.com/docker/engine-api/types"
 	"github.com/hyperhq/runv/lib/term"
 
 	gflag "github.com/jessevdk/go-flags"
@@ -65,7 +64,7 @@ func (cli *HyperClient) HyperCmdLogin(args ...string) error {
 
 	authconfig, ok := cli.configFile.AuthConfigs[serverAddress]
 	if !ok {
-		authconfig = cliconfig.AuthConfig{}
+		authconfig = types.AuthConfig{}
 	}
 
 	if username == "" {

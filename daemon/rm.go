@@ -5,39 +5,11 @@ import (
 	"os"
 	"path"
 
+	dockertypes "github.com/docker/engine-api/types"
 	"github.com/golang/glog"
-	"github.com/hyperhq/hyper/engine"
 	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/hypervisor/types"
 )
-
-func (daemon *Daemon) CmdPodRm(job *engine.Job) (err error) {
-	var (
-		podId = job.Args[0]
-		code  = 0
-		cause = ""
-	)
-
-	daemon.PodList.Lock()
-	glog.V(2).Infof("lock PodList")
-	defer glog.V(2).Infof("unlock PodList")
-	defer daemon.PodList.Unlock()
-	code, cause, err = daemon.CleanPod(podId)
-	if err != nil {
-		return err
-	}
-
-	// Prepare the vm status to client
-	v := &engine.Env{}
-	v.Set("ID", podId)
-	v.SetInt("Code", code)
-	v.Set("Cause", cause)
-	if _, err = v.WriteTo(job.Stdout); err != nil {
-		return err
-	}
-
-	return nil
-}
 
 func (daemon *Daemon) CleanPod(podId string) (int, string, error) {
 	var (
@@ -45,6 +17,12 @@ func (daemon *Daemon) CleanPod(podId string) (int, string, error) {
 		cause = ""
 		err   error
 	)
+
+	daemon.PodList.Lock()
+	glog.V(2).Infof("lock PodList")
+	defer glog.V(2).Infof("unlock PodList")
+	defer daemon.PodList.Unlock()
+
 	os.RemoveAll(path.Join(utils.HYPER_ROOT, "services", podId))
 	os.RemoveAll(path.Join(utils.HYPER_ROOT, "hosts", podId))
 	pod, ok := daemon.PodList.Get(podId)
@@ -61,7 +39,7 @@ func (daemon *Daemon) CleanPod(podId string) (int, string, error) {
 			daemon.DeletePodFromDB(podId)
 			for _, c := range pod.status.Containers {
 				glog.V(1).Infof("Ready to rm container: %s", c.Id)
-				if _, _, err = daemon.DockerCli.SendCmdDelete(c.Id); err != nil {
+				if err = daemon.Daemon.ContainerRm(c.Id, &dockertypes.ContainerRmConfig{}); err != nil {
 					glog.Warningf("Error to rm container: %s", err.Error())
 				}
 			}
@@ -71,15 +49,15 @@ func (daemon *Daemon) CleanPod(podId string) (int, string, error) {
 			code = types.E_OK
 		}
 	} else {
-		code, cause, err = daemon.StopPod(podId, "yes")
+		code, cause, err = daemon.StopPodWithLock(podId, "yes")
 		if err != nil {
-			return -1, "", err
+			return code, cause, err
 		}
 		if code == types.E_VM_SHUTDOWN {
 			daemon.DeletePodFromDB(podId)
 			for _, c := range pod.status.Containers {
 				glog.V(1).Infof("Ready to rm container: %s", c.Id)
-				if _, _, err = daemon.DockerCli.SendCmdDelete(c.Id); err != nil {
+				if err = daemon.Daemon.ContainerRm(c.Id, &dockertypes.ContainerRmConfig{}); err != nil {
 					glog.V(1).Infof("Error to rm container: %s", err.Error())
 				}
 			}

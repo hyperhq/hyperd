@@ -32,6 +32,7 @@ func MountContainerToSharedDir(containerId, sharedDir, devPrefix string) (string
 }
 
 func CreateNewDevice(containerId, devPrefix, rootPath string) error {
+	//TODO use container.Mount or something Other
 	var metadataPath = fmt.Sprintf("%s/metadata/", rootPath)
 	// Get device id from the metadata file
 	idMetadataFile := path.Join(metadataPath, containerId)
@@ -117,7 +118,7 @@ func ProbeFsType(device string) (string, error) {
 	command := exec.Command("/bin/sh", "-c", cmd)
 	fileCmdOutput, err := command.CombinedOutput()
 	if err != nil {
-		return string(fileCmdOutput), nil
+		return string(fileCmdOutput), err
 	}
 
 	if strings.Contains(strings.ToLower(string(fileCmdOutput)), "ext") {
@@ -127,7 +128,7 @@ func ProbeFsType(device string) (string, error) {
 		return "xfs", nil
 	}
 
-	return "", fmt.Errorf("Unknown filesystem type on %s", device)
+	return "", fmt.Errorf("Unknown filesystem type on %s, %s", device, string(fileCmdOutput))
 }
 
 func joinMountOptions(a, b string) string {
