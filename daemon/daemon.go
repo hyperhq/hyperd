@@ -73,6 +73,7 @@ func (daemon *Daemon) Restore() error {
 	if err != nil {
 		return err
 	}
+
 	daemon.PodList.Lock()
 	glog.V(2).Infof("lock PodList")
 	defer glog.V(2).Infof("unlock PodList")

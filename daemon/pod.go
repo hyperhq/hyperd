@@ -54,6 +54,7 @@ func (daemon *Daemon) StartPod(stdin io.ReadCloser, stdout io.WriteCloser, podId
 	// Do the status check for the given pod
 	daemon.PodList.Lock()
 	glog.V(2).Infof("lock PodList")
+
 	if _, ok := daemon.PodList.Get(podId); !ok {
 		glog.V(2).Infof("unlock PodList")
 		daemon.PodList.Unlock()
@@ -200,6 +201,7 @@ func (p *Pod) InitContainers(daemon *Daemon) error {
 			return err
 		}
 
+		glog.Infof("create container %s", ccs.ID)
 		created = append(created, ccs.ID)
 		response, err := daemon.ContainerInspect(ccs.ID, false, version.Version("1.21"))
 		if err != nil {
@@ -214,7 +216,7 @@ func (p *Pod) InitContainers(daemon *Daemon) error {
 	return nil
 }
 
-func (daemon *Daemon) CreatePod(podArgs string, autoremove bool) (*Pod, error) {
+func (daemon *Daemon) CreatePod(podId, podArgs string, autoremove bool) (*Pod, error) {
 	// we can only support 1024 Pods
 	if daemon.GetRunningPodNum() >= 1024 {
 		return nil, fmt.Errorf("Pod full, the maximum Pod is 1024!")
@@ -225,7 +227,9 @@ func (daemon *Daemon) CreatePod(podArgs string, autoremove bool) (*Pod, error) {
 	defer glog.V(2).Infof("unlock PodList")
 	defer daemon.PodList.Unlock()
 
-	podId := fmt.Sprintf("pod-%s", pod.RandStr(10, "alpha"))
+	if podId == "" {
+		podId = fmt.Sprintf("pod-%s", pod.RandStr(10, "alpha"))
+	}
 	return daemon.CreatePodWithLock(podId, podArgs, autoremove)
 }
 
@@ -361,6 +365,8 @@ func (p *Pod) PrepareContainers(sd Storage, daemon *Daemon) (err error) {
 		ci.Workdir = info.Config.WorkingDir
 		ci.Entrypoint = info.Config.Entrypoint.Slice()
 		ci.Cmd = info.Config.Cmd.Slice()
+		ci.Cmd = append(ci.Cmd, info.Args...)
+		glog.Infof("container info config %v, Cmd %v, Args %v", info.Config, info.Config.Cmd.Slice(), info.Args)
 
 		env := make(map[string]string)
 		for _, v := range info.Config.Env {
@@ -853,15 +859,16 @@ func (daemon *Daemon) GetExitCode(podId, tag string, callback chan *types.VmResp
 	)
 
 	daemon.PodList.Lock()
+	glog.V(2).Infof("lock PodList")
+	defer glog.V(2).Infof("unlock PodList")
+	defer daemon.PodList.Unlock()
+
 	if pod, ok = daemon.PodList.Get(podId); !ok {
-		daemon.PodList.Unlock()
 		return fmt.Errorf("Can not find the POD instance of %s", podId)
 	}
 	if pod.vm == nil {
-		daemon.PodList.Unlock()
 		return fmt.Errorf("pod %s is already stopped", podId)
 	}
-	daemon.PodList.Unlock()
 	return pod.vm.GetExitCode(tag, callback)
 }
 

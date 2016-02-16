@@ -36,7 +36,7 @@ func (daemon *Daemon) StopPod(podId, stopVm string) (int, string, error) {
 }
 
 func (daemon *Daemon) StopPodWithLock(podId, stopVm string) (int, string, error) {
-	glog.V(1).Infof("Prepare to stop the POD: %s", podId)
+	glog.Infof("Prepare to stop the POD: %s", podId)
 	// find the vm id which running POD, and stop it
 	pod, ok := daemon.PodList.Get(podId)
 	if !ok {
@@ -63,7 +63,7 @@ func (daemon *Daemon) StopPodWithLock(podId, stopVm string) (int, string, error)
 		daemon.RemoveVm(vmId)
 	}
 	if pod.status.Autoremove == true {
-		daemon.CleanPod(podId)
+		daemon.CleanPodWithLock(podId)
 	}
 	pod.vm = nil
 

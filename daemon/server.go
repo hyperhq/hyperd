@@ -218,7 +218,7 @@ func (daemon *Daemon) CmdStartPod(stdin io.ReadCloser, stdout io.WriteCloser, po
 
 //FIXME: there was a `config` argument passed by docker/builder, but we never processed it.
 func (daemon *Daemon) CmdCreatePod(podArgs string, autoremove bool) (*engine.Env, error) {
-	p, err := daemon.CreatePod(podArgs, autoremove)
+	p, err := daemon.CreatePod("", podArgs, autoremove)
 	if err != nil {
 		return nil, err
 	}
