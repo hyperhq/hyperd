@@ -203,7 +203,9 @@ func InitDockerCfg(mirrors []string, insecureRegistries []string, graphdriver, r
 	dockerCfg.LogConfig.Config = make(map[string]string)
 	var errhandler flag.ErrorHandling = flag.ContinueOnError
 	flags := flag.NewFlagSet("", errhandler)
+
 	dockerCfg.InstallFlags(flags, presentInHelp)
+	flags.Set("-bridge", "none")
 	dockerCfg.GraphDriver = graphdriver
 	dockerCfg.Root = root
 	dockerCfg.TrustKeyPath = path.Join(root, "keys")
