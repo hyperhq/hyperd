@@ -6,7 +6,7 @@ hyper::test::clear_all() {
 }
 
 hyper::test::pull_image() {
-  hyper pull $@
+  sudo hyper pull $@
 }
 
 hyper::test::check_image() {
@@ -18,37 +18,37 @@ hyper::test::check_image() {
   fi
   while read i t o ; do
     [ "$img" = "$i" -a "$tag" = "$t" ] && res=0
-  done < <(hyper images)
+  done < <(sudo hyper images)
   return $res
 }
 
 hyper::test::remove_image() {
-  hyper rmi $@
+  sudo hyper rmi $@
 }
 
 hyper::test::exitcode() {
   echo "Pod exit code test"
-  res=$(hyper run --rm busybox sh -c "exit 17" > /dev/null 2>&1 ; echo $?)
+  res=$(sudo hyper run --rm busybox sh -c "exit 17" > /dev/null 2>&1 ; echo $?)
   echo "should return 17, return: $res"
   test $res -eq 17
 }
 
 hyper::test::exec() {
   echo "Pod exec and exit code test"
-  id=$(hyper run -t -d busybox /bin/sh | sed -ne "s/POD id is \(pod-[0-9A-Za-z]\{1,\}\)/\1/p")
+  id=$(sudo hyper run -t -d busybox /bin/sh | sed -ne "s/POD id is \(pod-[0-9A-Za-z]\{1,\}\)/\1/p")
   echo "test pod ID is $id"
-  res=$(hyper exec $id sh -c "exit 37" > /dev/null 2>&1 ; echo $?)
+  res=$(sudo hyper exec $id sh -c "exit 37" > /dev/null 2>&1 ; echo $?)
   echo "should return 37, return: $res"
   test $res -eq 37
-  hyper rm $id
+  sudo hyper rm $id
 }
 
 hyper::test::run_pod() {
-  hyper run --rm -p $1
+  sudo hyper run --rm -p $1
 }
 
 hyper::test::run_attached_pod() {
-  hyper run --rm -a -p $1
+  sudo hyper run --rm -a -p $1
 }
 
 hyper::test::hostname() {

@@ -89,8 +89,6 @@ API_HOST=${API_HOST:-127.0.0.1}
 HYPER_TEMP=${HYPER_TEMP:-/tmp}
 # ensure ~/.hyper/config isn't loaded by tests
 HOME="${HYPER_TEMP}"
-# Expose hyperctl directly for readability
-PATH="${HYPER_OUTPUT_HOSTBIN}":$PATH
 
 if [ "x${HYPER_RUNTIME:-}" = "x" ] ; then
   # build hyperstart Kernel and Initrd
@@ -125,10 +123,10 @@ __EOF__
   start_hyperd "${HYPER_TEMP}/config" $stordriver
 
   # Passing no arguments to 'create' is an error
-  ! hyper create
+  ! sudo hyper create
 
   # Passing no arguments to 'info' is right
-  hyper info
+  sudo hyper info
 
   #######################
   # API status check    #
