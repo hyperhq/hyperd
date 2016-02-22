@@ -2,17 +2,13 @@ package daemon
 
 import (
 	"github.com/golang/glog"
-	"github.com/hyperhq/hyper/engine"
 )
 
-func (daemon *Daemon) CmdRename(job *engine.Job) error {
-	oldname := job.Args[0]
-	newname := job.Args[1]
-	cli := daemon.DockerCli
-	err := cli.SendContainerRename(oldname, newname)
-	if err != nil {
+func (daemon *Daemon) ContainerRename(oldname, newname string) error {
+	if err := daemon.Daemon.ContainerRename(oldname, newname); err != nil {
 		return err
 	}
+
 	daemon.PodList.RLock()
 	glog.V(2).Infof("lock read of PodList")
 	defer glog.V(2).Infof("unlock read of PodList")
@@ -27,15 +23,6 @@ func (daemon *Daemon) CmdRename(job *engine.Job) error {
 		}
 		return false
 	})
-
-	v := &engine.Env{}
-	v.Set("ID", newname)
-	v.SetInt("Code", 0)
-	v.Set("Cause", "")
-
-	if _, err := v.WriteTo(job.Stdout); err != nil {
-		return err
-	}
 
 	return nil
 }

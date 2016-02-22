@@ -14,8 +14,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/hashicorp/go-cleanhttp"
 )
 
 // QueryOptions are used to parameterize a query
@@ -38,18 +36,12 @@ type QueryOptions struct {
 	WaitIndex uint64
 
 	// WaitTime is used to bound the duration of a wait.
-	// Defaults to that of the Config, but can be overridden.
+	// Defaults to that of the Config, but can be overriden.
 	WaitTime time.Duration
 
 	// Token is used to provide a per-request ACL token
 	// which overrides the agent's default token.
 	Token string
-
-	// Near is used to provide a node name that will sort the results
-	// in ascending order based on the estimated round trip time from
-	// that node. Setting this to "_agent" will use the agent's node
-	// for the sort.
-	Near string
 }
 
 // WriteOptions are used to parameterize a write
@@ -127,7 +119,7 @@ func DefaultConfig() *Config {
 	config := &Config{
 		Address:    "127.0.0.1:8500",
 		Scheme:     "http",
-		HttpClient: cleanhttp.DefaultClient(),
+		HttpClient: http.DefaultClient,
 	}
 
 	if addr := os.Getenv("CONSUL_HTTP_ADDR"); addr != "" {
@@ -172,11 +164,11 @@ func DefaultConfig() *Config {
 		}
 
 		if !doVerify {
-			transport := cleanhttp.DefaultTransport()
-			transport.TLSClientConfig = &tls.Config{
-				InsecureSkipVerify: true,
+			config.HttpClient.Transport = &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: true,
+				},
 			}
-			config.HttpClient.Transport = transport
 		}
 	}
 
@@ -206,12 +198,12 @@ func NewClient(config *Config) (*Client, error) {
 	}
 
 	if parts := strings.SplitN(config.Address, "unix://", 2); len(parts) == 2 {
-		trans := cleanhttp.DefaultTransport()
-		trans.Dial = func(_, _ string) (net.Conn, error) {
-			return net.Dial("unix", parts[1])
-		}
 		config.HttpClient = &http.Client{
-			Transport: trans,
+			Transport: &http.Transport{
+				Dial: func(_, _ string) (net.Conn, error) {
+					return net.Dial("unix", parts[1])
+				},
+			},
 		}
 		config.Address = parts[1]
 	}
@@ -255,9 +247,6 @@ func (r *request) setQueryOptions(q *QueryOptions) {
 	}
 	if q.Token != "" {
 		r.params.Set("token", q.Token)
-	}
-	if q.Near != "" {
-		r.params.Set("near", q.Near)
 	}
 }
 

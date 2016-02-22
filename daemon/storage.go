@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	dockertypes "github.com/docker/docker/api/types"
+	dockertypes "github.com/docker/engine-api/types"
 	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/storage"
 	"github.com/hyperhq/hyper/storage/aufs"

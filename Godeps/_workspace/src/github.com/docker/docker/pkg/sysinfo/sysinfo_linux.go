@@ -5,9 +5,15 @@ import (
 	"os"
 	"path"
 	"strings"
+	"syscall"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
+)
+
+const (
+	// SeccompModeFilter refers to the syscall argument SECCOMP_MODE_FILTER.
+	SeccompModeFilter = uintptr(2)
 )
 
 // New returns a new SysInfo, using the filesystem to detect which features
@@ -30,6 +36,14 @@ func New(quiet bool) *SysInfo {
 	// Check if AppArmor is supported.
 	if _, err := os.Stat("/sys/kernel/security/apparmor"); !os.IsNotExist(err) {
 		sysInfo.AppArmor = true
+	}
+
+	// Check if Seccomp is supported, via CONFIG_SECCOMP.
+	if _, _, err := syscall.RawSyscall(syscall.SYS_PRCTL, syscall.PR_GET_SECCOMP, 0, 0); err != syscall.EINVAL {
+		// Make sure the kernel has CONFIG_SECCOMP_FILTER.
+		if _, _, err := syscall.RawSyscall(syscall.SYS_PRCTL, syscall.PR_SET_SECCOMP, SeccompModeFilter, 0); err != syscall.EINVAL {
+			sysInfo.Seccomp = true
+		}
 	}
 
 	return sysInfo
@@ -126,9 +140,32 @@ func checkCgroupBlkioInfo(quiet bool) cgroupBlkioInfo {
 	if !quiet && !weightDevice {
 		logrus.Warn("Your kernel does not support cgroup blkio weight_device")
 	}
+
+	readBpsDevice := cgroupEnabled(mountPoint, "blkio.throttle.read_bps_device")
+	if !quiet && !readBpsDevice {
+		logrus.Warn("Your kernel does not support cgroup blkio throttle.read_bps_device")
+	}
+
+	writeBpsDevice := cgroupEnabled(mountPoint, "blkio.throttle.write_bps_device")
+	if !quiet && !writeBpsDevice {
+		logrus.Warn("Your kernel does not support cgroup blkio throttle.write_bps_device")
+	}
+	readIOpsDevice := cgroupEnabled(mountPoint, "blkio.throttle.read_iops_device")
+	if !quiet && !readIOpsDevice {
+		logrus.Warn("Your kernel does not support cgroup blkio throttle.read_iops_device")
+	}
+
+	writeIOpsDevice := cgroupEnabled(mountPoint, "blkio.throttle.write_iops_device")
+	if !quiet && !writeIOpsDevice {
+		logrus.Warn("Your kernel does not support cgroup blkio throttle.write_iops_device")
+	}
 	return cgroupBlkioInfo{
-		BlkioWeight:       weight,
-		BlkioWeightDevice: weightDevice,
+		BlkioWeight:          weight,
+		BlkioWeightDevice:    weightDevice,
+		BlkioReadBpsDevice:   readBpsDevice,
+		BlkioWriteBpsDevice:  writeBpsDevice,
+		BlkioReadIOpsDevice:  readIOpsDevice,
+		BlkioWriteIOpsDevice: writeIOpsDevice,
 	}
 }
 

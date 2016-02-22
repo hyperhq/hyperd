@@ -4,16 +4,19 @@ import (
 	"fmt"
 	"net"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libnetwork/driverapi"
 	"github.com/docker/libnetwork/netutils"
+	"github.com/vishvananda/netlink"
 )
 
 type endpointTable map[string]*endpoint
 
 type endpoint struct {
-	id   string
-	mac  net.HardwareAddr
-	addr *net.IPNet
+	id     string
+	ifName string
+	mac    net.HardwareAddr
+	addr   *net.IPNet
 }
 
 func (n *network) endpoint(eid string) *endpoint {
@@ -96,6 +99,20 @@ func (d *driver) DeleteEndpoint(nid, eid string) error {
 	}
 
 	n.deleteEndpoint(eid)
+
+	if ep.ifName == "" {
+		return nil
+	}
+
+	link, err := netlink.LinkByName(ep.ifName)
+	if err != nil {
+		log.Debugf("Failed to retrieve interface (%s)'s link on endpoint (%s) delete: %v", ep.ifName, ep.id, err)
+		return nil
+	}
+	if err := netlink.LinkDel(link); err != nil {
+		log.Debugf("Failed to delete interface (%s)'s link on endpoint (%s) delete: %v", ep.ifName, ep.id, err)
+	}
+
 	return nil
 }
 

@@ -8,8 +8,10 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/docker/docker/opts"
 	flag "github.com/docker/docker/pkg/mflag"
 	"github.com/docker/docker/pkg/stringid"
+	"github.com/docker/libnetwork/netutils"
 )
 
 var (
@@ -161,6 +163,8 @@ func parseServiceName(name string) (string, string) {
 // CmdServicePublish handles service create UI
 func (cli *NetworkCli) CmdServicePublish(chain string, args ...string) error {
 	cmd := cli.Subcmd(chain, "publish", "SERVICE[.NETWORK]", "Publish a new service on a network", false)
+	flAlias := opts.NewListOpts(netutils.ValidateAlias)
+	cmd.Var(&flAlias, []string{"-alias"}, "Add alias to self")
 	cmd.Require(flag.Exact, 1)
 	err := cmd.ParseFlags(args, true)
 	if err != nil {
@@ -168,7 +172,7 @@ func (cli *NetworkCli) CmdServicePublish(chain string, args ...string) error {
 	}
 
 	sn, nn := parseServiceName(cmd.Arg(0))
-	sc := serviceCreate{Name: sn, Network: nn}
+	sc := serviceCreate{Name: sn, Network: nn, MyAliases: flAlias.GetAll()}
 	obj, _, err := readBody(cli.call("POST", "/services", sc, nil))
 	if err != nil {
 		return err
@@ -187,6 +191,7 @@ func (cli *NetworkCli) CmdServicePublish(chain string, args ...string) error {
 // CmdServiceUnpublish handles service delete UI
 func (cli *NetworkCli) CmdServiceUnpublish(chain string, args ...string) error {
 	cmd := cli.Subcmd(chain, "unpublish", "SERVICE[.NETWORK]", "Removes a service", false)
+	force := cmd.Bool([]string{"f", "-force"}, false, "force unpublish service")
 	cmd.Require(flag.Exact, 1)
 	err := cmd.ParseFlags(args, true)
 	if err != nil {
@@ -199,7 +204,8 @@ func (cli *NetworkCli) CmdServiceUnpublish(chain string, args ...string) error {
 		return err
 	}
 
-	_, _, err = readBody(cli.call("DELETE", "/services/"+serviceID, nil, nil))
+	sd := serviceDelete{Name: sn, Force: *force}
+	_, _, err = readBody(cli.call("DELETE", "/services/"+serviceID, sd, nil))
 
 	return err
 }
@@ -319,6 +325,8 @@ func (cli *NetworkCli) CmdServiceInfo(chain string, args ...string) error {
 // CmdServiceAttach handles service attach UI
 func (cli *NetworkCli) CmdServiceAttach(chain string, args ...string) error {
 	cmd := cli.Subcmd(chain, "attach", "CONTAINER SERVICE[.NETWORK]", "Sets a container as a service backend", false)
+	flAlias := opts.NewListOpts(netutils.ValidateAlias)
+	cmd.Var(&flAlias, []string{"-alias"}, "Add alias for another container")
 	cmd.Require(flag.Min, 2)
 	err := cmd.ParseFlags(args, true)
 	if err != nil {
@@ -341,7 +349,7 @@ func (cli *NetworkCli) CmdServiceAttach(chain string, args ...string) error {
 		return err
 	}
 
-	nc := serviceAttach{SandboxID: sandboxID}
+	nc := serviceAttach{SandboxID: sandboxID, Aliases: flAlias.GetAll()}
 
 	_, _, err = readBody(cli.call("POST", "/services/"+serviceID+"/backend", nc, nil))
 

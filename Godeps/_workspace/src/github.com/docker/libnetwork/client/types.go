@@ -43,14 +43,22 @@ type networkCreate struct {
 // serviceCreate represents the body of the "publish service" http request message
 type serviceCreate struct {
 	Name         string                `json:"name"`
+	MyAliases    []string              `json:"my_aliases"`
 	Network      string                `json:"network_name"`
 	ExposedPorts []types.TransportPort `json:"exposed_ports"`
 	PortMapping  []types.PortBinding   `json:"port_mapping"`
 }
 
+// serviceDelete represents the body of the "unpublish service" http request message
+type serviceDelete struct {
+	Name  string `json:"name"`
+	Force bool   `json:"force"`
+}
+
 // serviceAttach represents the expected body of the "attach/detach sandbox to/from service" http request messages
 type serviceAttach struct {
-	SandboxID string `json:"sandbox_id"`
+	SandboxID string   `json:"sandbox_id"`
+	Aliases   []string `json:"aliases"`
 }
 
 // SandboxCreate is the body of the "post /sandboxes" http request message

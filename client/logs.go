@@ -6,9 +6,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"time"
 
-	"github.com/docker/docker/pkg/timeutils"
 	gflag "github.com/jessevdk/go-flags"
 )
 
@@ -39,10 +37,7 @@ func (cli *HyperClient) HyperCmdLogs(args ...string) error {
 	v.Set("container", args[0])
 	v.Set("stdout", "yes")
 	v.Set("stderr", "yes")
-
-	if opts.Since != "" {
-		v.Set("since", timeutils.GetTimestamp(opts.Since, time.Now()))
-	}
+	v.Set("since", opts.Since)
 
 	if opts.Times {
 		v.Set("timestamps", "yes")

@@ -54,7 +54,7 @@ Please see [conf.ini](testdata/conf.ini) as an example.
 
 ## More Information
 
-- All characters are CASE SENSITIVE, BE CAREFULL!
+- All characters are CASE SENSITIVE, BE CAREFUL!
 
 ## Credits
 

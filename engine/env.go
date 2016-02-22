@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -308,4 +309,10 @@ func (env *Env) InitMultiMap(m map[string][]string) {
 			env.Set(k, v)
 		}
 	}
+}
+
+func (env *Env) WriteJSON(w http.ResponseWriter, code int) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	return env.Encode(w)
 }

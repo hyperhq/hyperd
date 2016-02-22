@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/docker/docker/pkg/parsers"
+	"github.com/docker/docker/reference"
 	"github.com/docker/docker/registry"
 
 	gflag "github.com/jessevdk/go-flags"
@@ -30,15 +30,27 @@ func (cli *HyperClient) HyperCmdPush(args ...string) error {
 		return fmt.Errorf("\"push\" requires a minimum of 1 argument, please provide the image name.")
 	}
 	name := args[0]
-	remote, tag := parsers.ParseRepositoryTag(name)
+
+	ref, err := reference.ParseNamed(name)
+	if err != nil {
+		return err
+	}
+
+	var tag string
+	switch x := ref.(type) {
+	case reference.Canonical:
+		return fmt.Errorf("cannot push a digest reference")
+	case reference.NamedTagged:
+		tag = x.Tag()
+	}
 
 	// Resolve the Repository name from fqn to RepositoryInfo
-	repoInfo, err := registry.ParseRepositoryInfo(remote)
+	repoInfo, err := registry.ParseRepositoryInfo(ref)
 	if err != nil {
 		return err
 	}
 	// Resolve the Auth config relevant for this server
-	authConfig := registry.ResolveAuthConfig(cli.configFile, repoInfo.Index)
+	authConfig := registry.ResolveAuthConfig(cli.configFile.AuthConfigs, repoInfo.Index)
 	// If we're not using a custom registry, we know the restrictions
 	// applied to repository names and can warn the user in advance.
 	// Custom repositories can have different rules, and we must also
@@ -48,12 +60,12 @@ func (cli *HyperClient) HyperCmdPush(args ...string) error {
 		if username == "" {
 			username = "<user>"
 		}
-		return fmt.Errorf("You cannot push a \"root\" repository. Please rename your repository to <user>/<repo> (ex: %s/%s)", username, repoInfo.LocalName)
+		return fmt.Errorf("You cannot push a \"root\" repository. Please rename your repository to <user>/<repo> (ex: %s/%s)", username, ref.Name())
 	}
 
 	v := url.Values{}
 	v.Set("tag", tag)
-	v.Set("remote", remote)
+	v.Set("remote", repoInfo.String())
 
 	_, _, err = cli.clientRequestAttemptLogin("POST", "/image/push?"+v.Encode(), nil, cli.out, repoInfo.Index, "push")
 	return err

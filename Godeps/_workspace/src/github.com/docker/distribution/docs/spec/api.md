@@ -3,7 +3,6 @@
 title = "HTTP API V2"
 description = "Specification for the Registry API."
 keywords = ["registry, on-prem, images, tags, repository, distribution, api, advanced"]
-aliases = ["/registry/spec/"]
 [menu.main]
 parent="smn_registry_ref"
 +++
@@ -302,11 +301,6 @@ Some examples of _digests_ include the following:
 digest                                                                            | description                                   |
 ----------------------------------------------------------------------------------|------------------------------------------------
 sha256:6c3c624b58dbbcd3c0dd82b4c53f04194d1247c6eebdaab7c610cf7d66709b3b           | Common sha256 based digest                    |
-tarsum.v1+sha256:6c3c624b58dbbcd3c0dd82b4c53f04194d1247c6eebdaab7c610cf7d66709b3b | Tarsum digest, used for legacy layer digests. |
-
-> __NOTE:__ While we show an example of using a `tarsum` digest, the security
-> of tarsum has not been verified. It is recommended that most implementations
-> use sha256 for interoperability.
 
 While the _algorithm_ does allow one to implement a wide variety of
 algorithms, compliant implementations should use sha256. Heavy processing of
@@ -364,7 +358,7 @@ the relevant manifest fields for the registry are the following:
 ----------|------------------------------------------------|
 name      | The name of the image.                         |
 tag       | The tag for this version of the image.         |
-fsLayers  | A list of layer descriptors (including tarsum) |
+fsLayers  | A list of layer descriptors (including digest) |
 signature | A JWS used to verify the manifest content      |
 
 For more information about the manifest format, please see
@@ -372,8 +366,8 @@ For more information about the manifest format, please see
 
 When the manifest is in hand, the client must verify the signature to ensure
 the names and layers are valid. Once confirmed, the client will then use the
-tarsums to download the individual layers. Layers are stored in as blobs in
-the V2 registry API, keyed by their tarsum digest.
+digests to download the individual layers. Layers are stored in as blobs in
+the V2 registry API, keyed by their digest.
 
 #### Pulling an Image Manifest
 
@@ -396,7 +390,7 @@ for details):
        "tag": <tag>,
        "fsLayers": [
           {
-             "blobSum": <tarsum>
+             "blobSum": <digest>
           },
           ...
         ]
@@ -408,17 +402,38 @@ for details):
 The client should verify the returned manifest signature for authenticity
 before fetching layers.
 
+##### Existing Manifests
+
+The image manifest can be checked for existence with the following url:
+
+```
+HEAD /v2/<name>/manifests/<reference>
+```
+
+The `name` and `reference` parameter identify the image and are required. The
+reference may include a tag or digest.
+
+A `404 Not Found` response will be returned if the image is unknown to the
+registry. If the image exists and the response is successful the response will
+be as follows:
+
+```
+200 OK
+Content-Length: <length of manifest>
+Docker-Content-Digest: <digest>
+```
+
+
 #### Pulling a Layer
 
-Layers are stored in the blob portion of the registry, keyed by tarsum digest.
+Layers are stored in the blob portion of the registry, keyed by digest.
 Pulling a layer is carried out by a standard http request. The URL is as
 follows:
 
-    GET /v2/<name>/blobs/<tarsum>
+    GET /v2/<name>/blobs/<digest>
 
 Access to a layer will be gated by the `name` of the repository but is
-identified uniquely in the registry by `tarsum`. The `tarsum` parameter is an
-opaque field, to be interpreted by the tarsum library.
+identified uniquely in the registry by `digest`.
 
 This endpoint may issue a 307 (302 for <HTTP 1.1) redirect to another service
 for downloading the layer and clients should be prepared to handle redirects.
@@ -469,7 +484,7 @@ API. The request should be formatted as follows:
 HEAD /v2/<name>/blobs/<digest>
 ```
 
-If the layer with the tarsum specified in `digest` is available, a 200 OK
+If the layer with the digest specified in `digest` is available, a 200 OK
 response will be received, with no actual body content (this is according to
 http specification). The response will look as follows:
 
@@ -482,7 +497,7 @@ Docker-Content-Digest: <digest>
 When this response is received, the client can assume that the layer is
 already available in the registry under the given name and should take no
 further action to upload the layer. Note that the binary digests may differ
-for the existing registry layer, but the tarsums will be guaranteed to match.
+for the existing registry layer, but the digests will be guaranteed to match.
 
 ##### Uploading the Layer
 
@@ -549,7 +564,7 @@ carry out a "monolithic" upload, one can simply put the entire content blob to
 the provided URL:
 
 ```
-PUT /v2/<name>/blobs/uploads/<uuid>?digest=<tarsum>[&digest=sha256:<hex digest>]
+PUT /v2/<name>/blobs/uploads/<uuid>?digest=<digest>
 Content-Length: <size of layer>
 Content-Type: application/octet-stream
 
@@ -564,10 +579,10 @@ Additionally, the upload can be completed with a single `POST` request to
 the uploads endpoint, including the "size" and "digest" parameters:
 
 ```
-POST /v2/<name>/blobs/uploads/?digest=<tarsum>[&digest=sha256:<hex digest>]
+POST /v2/<name>/blobs/uploads/?digest=<digest>
 Content-Length: <size of layer>
 Content-Type: application/octet-stream
-  
+
 <Layer Binary Data>
 ```
 
@@ -579,7 +594,7 @@ a place to continue the download.
 
 The single `POST` method is provided for convenience and most clients should
 implement `POST` + `PUT` to support reliable resume of uploads.
-  
+
 ##### Chunked Upload
 
 To carry out an upload of a chunk, the client can specify a range header and
@@ -635,7 +650,7 @@ the upload will not be considered complete. The format for the final chunk
 will be as follows:
 
 ```
-PUT /v2/<name>/blob/uploads/<uuid>?digest=<tarsum>[&digest=sha256:<hex digest>]
+PUT /v2/<name>/blob/uploads/<uuid>?digest=<digest>
 Content-Length: <size of chunk>
 Content-Range: <start of range>-<end of range>
 Content-Type: application/octet-stream
@@ -654,7 +669,7 @@ will receive a `201 Created` response:
 
 ```
 201 Created
-Location: /v2/<name>/blobs/<tarsum>
+Location: /v2/<name>/blobs/<digest>
 Content-Length: 0
 Docker-Content-Digest: <digest>
 ```
@@ -668,28 +683,15 @@ the uploaded blob data.
 ###### Digest Parameter
 
 The "digest" parameter is designed as an opaque parameter to support
-verification of a successful transfer. The initial version of the registry API
-will support a tarsum digest, in the standard tarsum format. For example, a
-HTTP URI parameter might be as follows:
-
-```
-tarsum.v1+sha256:6c3c624b58dbbcd3c0dd82b4c53f04194d1247c6eebdaab7c610cf7d66709b3b
-```
-
-Given this parameter, the registry will verify that the provided content does
-result in this tarsum. Optionally, the registry can support other other digest
-parameters for non-tarfile content stored as a layer. A regular hash digest
-might be specified as follows:
+verification of a successful transfer. For example, a HTTP URI parameter
+might be as follows:
 
 ```
 sha256:6c3c624b58dbbcd3c0dd82b4c53f04194d1247c6eebdaab7c610cf7d66709b3b
 ```
 
-Such a parameter would be used to verify that the binary content (as opposed
-to the tar content) would be verified at the end of the upload process.
-
-For the initial version, registry servers are only required to support the
-tarsum format.
+Given this parameter, the registry will verify that the provided content does
+match this digest.
 
 ##### Canceling an Upload
 
@@ -704,6 +706,53 @@ After this request is issued, the upload uuid will no longer be valid and the
 registry server will dump all intermediate data. While uploads will time out
 if not completed, clients should issue this request if they encounter a fatal
 error but still have the ability to issue an http request.
+
+##### Cross Repository Blob Mount
+
+A blob may be mounted from another repository that the client has read access
+to, removing the need to upload a blob already known to the registry. To issue
+a blob mount instead of an upload, a POST request should be issued in the
+following format:
+
+```
+POST /v2/<name>/blobs/uploads/?mount=<digest>&from=<repository name>
+Content-Length: 0
+```
+
+If the blob is successfully mounted, the client will receive a `201 Created`
+response:
+
+```
+201 Created
+Location: /v2/<name>/blobs/<digest>
+Content-Length: 0
+Docker-Content-Digest: <digest>
+```
+
+The `Location` header will contain the registry URL to access the accepted
+layer file. The `Docker-Content-Digest` header returns the canonical digest of
+the uploaded blob which may differ from the provided digest. Most clients may
+ignore the value but if it is used, the client should verify the value against
+the uploaded blob data.
+
+If a mount fails due to invalid repository or digest arguments, the registry
+will fall back to the standard upload behavior and return a `202 Accepted` with
+the upload URL in the `Location` header:
+
+```
+202 Accepted
+Location: /v2/<name>/blobs/uploads/<uuid>
+Range: bytes=0-<offset>
+Content-Length: 0
+Docker-Upload-UUID: <uuid>
+```
+
+This behavior is consistent with older versions of the registry, which do not
+recognize the repository mount query parameters.
+
+Note: a client may issue a HEAD request to check existence of a blob in a source
+repository to distinguish between the registry not supporting blob mounts and
+the blob not existing in the expected repository.
 
 ##### Errors
 
@@ -751,7 +800,7 @@ image manifest. An image can be pushed using the following request format:
        "tag": <tag>,
        "fsLayers": [
           {
-             "blobSum": <tarsum>
+             "blobSum": <digest>
           },
           ...
         ]
@@ -770,15 +819,15 @@ for details on possible error codes that may be returned.
 
 If one or more layers are unknown to the registry, `BLOB_UNKNOWN` errors are
 returned. The `detail` field of the error response will have a `digest` field
-identifying the missing blob, which will be a tarsum. An error is returned for
-each unknown blob. The response format is as follows:
+identifying the missing blob. An error is returned for each unknown blob. The
+response format is as follows:
 
     {
         "errors:" [{
                 "code": "BLOB_UNKNOWN",
                 "message": "blob unknown to registry",
                 "detail": {
-                    "digest": <tarsum>
+                    "digest": <digest>
                 }
             },
             ...
@@ -1021,7 +1070,7 @@ A list of methods and URIs are covered in the table below:
 |------|----|------|-----------|
 | GET | `/v2/` | Base | Check that the endpoint implements Docker Registry API V2. |
 | GET | `/v2/<name>/tags/list` | Tags | Fetch the tags under the repository identified by `name`. |
-| GET | `/v2/<name>/manifests/<reference>` | Manifest | Fetch the manifest identified by `name` and `reference` where `reference` can be a tag or digest. |
+| GET | `/v2/<name>/manifests/<reference>` | Manifest | Fetch the manifest identified by `name` and `reference` where `reference` can be a tag or digest. A `HEAD` request can also be issued to this endpoint to obtain resource information without receiving all data. |
 | PUT | `/v2/<name>/manifests/<reference>` | Manifest | Put the manifest identified by `name` and `reference` where `reference` can be a tag or digest. |
 | DELETE | `/v2/<name>/manifests/<reference>` | Manifest | Delete the manifest identified by `name` and `reference`. Note that a manifest can _only_ be deleted by `digest`. |
 | GET | `/v2/<name>/blobs/<digest>` | Blob | Retrieve the blob from the registry identified by `digest`. A `HEAD` request can also be issued to this endpoint to obtain resource information without receiving all data. |
@@ -1498,7 +1547,7 @@ Create, update, delete and retrieve manifests.
 
 #### GET Manifest
 
-Fetch the manifest identified by `name` and `reference` where `reference` can be a tag or digest.
+Fetch the manifest identified by `name` and `reference` where `reference` can be a tag or digest. A `HEAD` request can also be issued to this endpoint to obtain resource information without receiving all data.
 
 
 
@@ -3195,6 +3244,204 @@ The error codes that may be included in the response body are enumerated below:
 |----|-------|-----------|
 | `DIGEST_INVALID` | provided digest did not match uploaded content | When a blob is uploaded, the registry will check that the content matches the digest provided by the client. The error may include a detail structure with the key "digest", including the invalid digest string. This error may also be returned when a manifest includes an invalid layer digest. |
 | `NAME_INVALID` | invalid repository name | Invalid repository name encountered either during manifest validation or any API operation. |
+
+
+
+###### On Failure: Authentication Required
+
+```
+401 Unauthorized
+WWW-Authenticate: <scheme> realm="<realm>", ..."
+Content-Length: <length>
+Content-Type: application/json; charset=utf-8
+
+{
+	"errors:" [
+	    {
+            "code": <error code>,
+            "message": "<error message>",
+            "detail": ...
+        },
+        ...
+    ]
+}
+```
+
+The client is not authenticated.
+
+The following headers will be returned on the response:
+
+|Name|Description|
+|----|-----------|
+|`WWW-Authenticate`|An RFC7235 compliant authentication challenge header.|
+|`Content-Length`|Length of the JSON response body.|
+
+
+
+The error codes that may be included in the response body are enumerated below:
+
+|Code|Message|Description|
+|----|-------|-----------|
+| `UNAUTHORIZED` | authentication required | The access controller was unable to authenticate the client. Often this will be accompanied by a Www-Authenticate HTTP response header indicating how to authenticate. |
+
+
+
+###### On Failure: No Such Repository Error
+
+```
+404 Not Found
+Content-Length: <length>
+Content-Type: application/json; charset=utf-8
+
+{
+	"errors:" [
+	    {
+            "code": <error code>,
+            "message": "<error message>",
+            "detail": ...
+        },
+        ...
+    ]
+}
+```
+
+The repository is not known to the registry.
+
+The following headers will be returned on the response:
+
+|Name|Description|
+|----|-----------|
+|`Content-Length`|Length of the JSON response body.|
+
+
+
+The error codes that may be included in the response body are enumerated below:
+
+|Code|Message|Description|
+|----|-------|-----------|
+| `NAME_UNKNOWN` | repository name not known to registry | This is returned if the name used during an operation is unknown to the registry. |
+
+
+
+###### On Failure: Access Denied
+
+```
+403 Forbidden
+Content-Length: <length>
+Content-Type: application/json; charset=utf-8
+
+{
+	"errors:" [
+	    {
+            "code": <error code>,
+            "message": "<error message>",
+            "detail": ...
+        },
+        ...
+    ]
+}
+```
+
+The client does not have required access to the repository.
+
+The following headers will be returned on the response:
+
+|Name|Description|
+|----|-----------|
+|`Content-Length`|Length of the JSON response body.|
+
+
+
+The error codes that may be included in the response body are enumerated below:
+
+|Code|Message|Description|
+|----|-------|-----------|
+| `DENIED` | requested access to the resource is denied | The access controller denied access for the operation on a resource. |
+
+
+
+##### Mount Blob
+
+```
+POST /v2/<name>/blobs/uploads/?mount=<digest>&from=<repository name>
+Host: <registry host>
+Authorization: <scheme> <token>
+Content-Length: 0
+```
+
+Mount a blob identified by the `mount` parameter from another repository.
+
+
+The following parameters should be specified on the request:
+
+|Name|Kind|Description|
+|----|----|-----------|
+|`Host`|header|Standard HTTP Host Header. Should be set to the registry host.|
+|`Authorization`|header|An RFC7235 compliant authorization header.|
+|`Content-Length`|header|The `Content-Length` header must be zero and the body must be empty.|
+|`name`|path|Name of the target repository.|
+|`mount`|query|Digest of blob to mount from the source repository.|
+|`from`|query|Name of the source repository.|
+
+
+
+
+###### On Success: Created
+
+```
+201 Created
+Location: <blob location>
+Content-Length: 0
+Docker-Upload-UUID: <uuid>
+```
+
+The blob has been mounted in the repository and is available at the provided location.
+
+The following headers will be returned with the response:
+
+|Name|Description|
+|----|-----------|
+|`Location`||
+|`Content-Length`|The `Content-Length` header must be zero and the body must be empty.|
+|`Docker-Upload-UUID`|Identifies the docker upload uuid for the current request.|
+
+
+
+
+###### On Failure: Invalid Name or Digest
+
+```
+400 Bad Request
+```
+
+
+
+
+
+The error codes that may be included in the response body are enumerated below:
+
+|Code|Message|Description|
+|----|-------|-----------|
+| `DIGEST_INVALID` | provided digest did not match uploaded content | When a blob is uploaded, the registry will check that the content matches the digest provided by the client. The error may include a detail structure with the key "digest", including the invalid digest string. This error may also be returned when a manifest includes an invalid layer digest. |
+| `NAME_INVALID` | invalid repository name | Invalid repository name encountered either during manifest validation or any API operation. |
+
+
+
+###### On Failure: Not allowed
+
+```
+405 Method Not Allowed
+```
+
+Blob mount is not allowed because the registry is configured as a pull-through cache or for some other reason
+
+
+
+The error codes that may be included in the response body are enumerated below:
+
+|Code|Message|Description|
+|----|-------|-----------|
+| `UNSUPPORTED` | The operation is unsupported. | The operation was unsupported due to a missing implementation or invalid set of parameters. |
 
 
 

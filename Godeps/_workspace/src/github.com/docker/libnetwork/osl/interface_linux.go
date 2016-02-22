@@ -6,7 +6,9 @@ import (
 	"os/exec"
 	"regexp"
 	"sync"
+	"syscall"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libnetwork/types"
 	"github.com/vishvananda/netlink"
 )
@@ -126,7 +128,7 @@ func (i *nwIface) Remove() error {
 
 		err = netlink.LinkSetName(iface, i.SrcName())
 		if err != nil {
-			fmt.Println("LinkSetName failed: ", err)
+			log.Debugf("LinkSetName failed for interface %s: %v", i.SrcName(), err)
 			return err
 		}
 
@@ -138,7 +140,7 @@ func (i *nwIface) Remove() error {
 		} else if !isDefault {
 			// Move the network interface to caller namespace.
 			if err := netlink.LinkSetNsFd(iface, callerFD); err != nil {
-				fmt.Println("LinkSetNsPid failed: ", err)
+				log.Debugf("LinkSetNsPid failed for interface %s: %v", i.SrcName(), err)
 				return err
 			}
 		}
@@ -337,7 +339,7 @@ func setInterfaceIPv6(iface netlink.Link, i *nwIface) error {
 	if i.AddressIPv6() == nil {
 		return nil
 	}
-	ipAddr := &netlink.Addr{IPNet: i.AddressIPv6(), Label: ""}
+	ipAddr := &netlink.Addr{IPNet: i.AddressIPv6(), Label: "", Flags: syscall.IFA_F_NODAD}
 	return netlink.AddrAdd(iface, ipAddr)
 }
 

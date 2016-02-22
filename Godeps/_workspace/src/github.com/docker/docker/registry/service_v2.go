@@ -4,14 +4,15 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/docker/distribution/registry/client/auth"
-	"github.com/docker/docker/pkg/tlsconfig"
+	"github.com/docker/docker/reference"
+	"github.com/docker/go-connections/tlsconfig"
 )
 
-func (s *Service) lookupV2Endpoints(repoName string) (endpoints []APIEndpoint, err error) {
+func (s *Service) lookupV2Endpoints(repoName reference.Named) (endpoints []APIEndpoint, err error) {
 	var cfg = tlsconfig.ServerDefault
 	tlsConfig := &cfg
-	if strings.HasPrefix(repoName, DefaultNamespace+"/") {
+	nameString := repoName.FullName()
+	if strings.HasPrefix(nameString, DefaultNamespace+"/") {
 		// v2 mirrors
 		for _, mirror := range s.Config.Mirrors {
 			mirrorTLSConfig, err := s.tlsConfigForMirror(mirror)
@@ -39,31 +40,23 @@ func (s *Service) lookupV2Endpoints(repoName string) (endpoints []APIEndpoint, e
 		return endpoints, nil
 	}
 
-	slashIndex := strings.IndexRune(repoName, '/')
+	slashIndex := strings.IndexRune(nameString, '/')
 	if slashIndex <= 0 {
-		return nil, fmt.Errorf("invalid repo name: missing '/':  %s", repoName)
+		return nil, fmt.Errorf("invalid repo name: missing '/':  %s", nameString)
 	}
-	hostname := repoName[:slashIndex]
+	hostname := nameString[:slashIndex]
 
 	tlsConfig, err = s.TLSConfig(hostname)
 	if err != nil {
 		return nil, err
 	}
 
-	v2Versions := []auth.APIVersion{
-		{
-			Type:    "registry",
-			Version: "2.0",
-		},
-	}
 	endpoints = []APIEndpoint{
 		{
-			URL:           "https://" + hostname,
-			Version:       APIVersion2,
-			TrimHostname:  true,
-			TLSConfig:     tlsConfig,
-			VersionHeader: DefaultRegistryVersionHeader,
-			Versions:      v2Versions,
+			URL:          "https://" + hostname,
+			Version:      APIVersion2,
+			TrimHostname: true,
+			TLSConfig:    tlsConfig,
 		},
 	}
 
@@ -73,9 +66,7 @@ func (s *Service) lookupV2Endpoints(repoName string) (endpoints []APIEndpoint, e
 			Version:      APIVersion2,
 			TrimHostname: true,
 			// used to check if supposed to be secure via InsecureSkipVerify
-			TLSConfig:     tlsConfig,
-			VersionHeader: DefaultRegistryVersionHeader,
-			Versions:      v2Versions,
+			TLSConfig: tlsConfig,
 		})
 	}
 

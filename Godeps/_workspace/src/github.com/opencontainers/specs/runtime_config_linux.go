@@ -73,11 +73,11 @@ const (
 // IDMapping specifies UID/GID mappings
 type IDMapping struct {
 	// HostID is the UID/GID of the host user or group
-	HostID int32 `json:"hostID"`
+	HostID uint32 `json:"hostID"`
 	// ContainerID is the UID/GID of the container's user or group
-	ContainerID int32 `json:"containerID"`
+	ContainerID uint32 `json:"containerID"`
 	// Size is the length of the range of IDs mapped between the two namespaces
-	Size int32 `json:"size"`
+	Size uint32 `json:"size"`
 }
 
 // Rlimit type and restrictions
@@ -103,7 +103,7 @@ type InterfacePriority struct {
 	// Name is the name of the network interface
 	Name string `json:"name"`
 	// Priority for the interface
-	Priority int64 `json:"priority"`
+	Priority uint32 `json:"priority"`
 }
 
 // blockIODevice holds major:minor format supported in blkio cgroup
@@ -119,7 +119,7 @@ type WeightDevice struct {
 	blockIODevice
 	// Weight is the bandwidth rate for the device, range is from 10 to 1000
 	Weight uint16 `json:"weight"`
-	// LeafWeight is the bandwidth rate for the device while competing with the cgroup's child cgroups, range is from 10 to 1000, cfq scheduler only
+	// LeafWeight is the bandwidth rate for the device while competing with the cgroup's child cgroups, range is from 10 to 1000, CFQ scheduler only
 	LeafWeight uint16 `json:"leafWeight"`
 }
 
@@ -134,7 +134,7 @@ type ThrottleDevice struct {
 type BlockIO struct {
 	// Specifies per cgroup weight, range is from 10 to 1000
 	Weight uint16 `json:"blkioWeight"`
-	// Specifies tasks' weight in the given cgroup while competing with the cgroup's child cgroups, range is from 10 to 1000, cfq scheduler only
+	// Specifies tasks' weight in the given cgroup while competing with the cgroup's child cgroups, range is from 10 to 1000, CFQ scheduler only
 	LeafWeight uint16 `json:"blkioLeafWeight"`
 	// Weight per cgroup per device, can override BlkioWeight
 	WeightDevice []*WeightDevice `json:"blkioWeightDevice"`
@@ -151,29 +151,29 @@ type BlockIO struct {
 // Memory for Linux cgroup 'memory' resource management
 type Memory struct {
 	// Memory limit (in bytes)
-	Limit int64 `json:"limit"`
+	Limit uint64 `json:"limit"`
 	// Memory reservation or soft_limit (in bytes)
-	Reservation int64 `json:"reservation"`
+	Reservation uint64 `json:"reservation"`
 	// Total memory usage (memory + swap); set `-1' to disable swap
-	Swap int64 `json:"swap"`
+	Swap uint64 `json:"swap"`
 	// Kernel memory limit (in bytes)
-	Kernel int64 `json:"kernel"`
+	Kernel uint64 `json:"kernel"`
 	// How aggressive the kernel will swap memory pages. Range from 0 to 100. Set -1 to use system default
-	Swappiness int64 `json:"swappiness"`
+	Swappiness uint64 `json:"swappiness"`
 }
 
 // CPU for Linux cgroup 'cpu' resource management
 type CPU struct {
 	// CPU shares (relative weight vs. other cgroups with cpu shares)
-	Shares int64 `json:"shares"`
+	Shares uint64 `json:"shares"`
 	// CPU hardcap limit (in usecs). Allowed cpu time in a given period
-	Quota int64 `json:"quota"`
+	Quota uint64 `json:"quota"`
 	// CPU period to be used for hardcapping (in usecs). 0 to use system default
-	Period int64 `json:"period"`
+	Period uint64 `json:"period"`
 	// How many time CPU will use in realtime scheduling (in usecs)
-	RealtimeRuntime int64 `json:"realtimeRuntime"`
+	RealtimeRuntime uint64 `json:"realtimeRuntime"`
 	// CPU period to be used for realtime scheduling (in usecs)
-	RealtimePeriod int64 `json:"realtimePeriod"`
+	RealtimePeriod uint64 `json:"realtimePeriod"`
 	// CPU to use within the cpuset
 	Cpus string `json:"cpus"`
 	// MEM to use within the cpuset
@@ -182,14 +182,16 @@ type CPU struct {
 
 // Pids for Linux cgroup 'pids' resource management (Linux 4.3)
 type Pids struct {
-	// Maximum number of PIDs. A value < 0 implies "no limit".
+	// Maximum number of PIDs. A value <= 0 indicates "no limit".
 	Limit int64 `json:"limit"`
 }
 
 // Network identification and priority configuration
 type Network struct {
 	// Set class identifier for container's network packets
-	ClassID string `json:"classId"`
+	// this is actually a string instead of a uint64 to overcome the json
+	// limitation of specifying hex numbers
+	ClassID string `json:"classID"`
 	// Set priority of network traffic for container
 	Priorities []InterfacePriority `json:"priorities"`
 }
@@ -198,6 +200,8 @@ type Network struct {
 type Resources struct {
 	// DisableOOMKiller disables the OOM killer for out of memory conditions
 	DisableOOMKiller bool `json:"disableOOMKiller"`
+	// Specify an oom_score_adj for the container. Optional.
+	OOMScoreAdj int `json:"oomScoreAdj"`
 	// Memory restriction configuration
 	Memory Memory `json:"memory"`
 	// CPU resource restriction configuration
@@ -235,14 +239,51 @@ type Device struct {
 // Seccomp represents syscall restrictions
 type Seccomp struct {
 	DefaultAction Action     `json:"defaultAction"`
+	Architectures []Arch     `json:"architectures"`
 	Syscalls      []*Syscall `json:"syscalls"`
 }
+
+// Additional architectures permitted to be used for system calls
+// By default only the native architecture of the kernel is permitted
+type Arch string
+
+const (
+	ArchX86         Arch = "SCMP_ARCH_X86"
+	ArchX86_64      Arch = "SCMP_ARCH_X86_64"
+	ArchX32         Arch = "SCMP_ARCH_X32"
+	ArchARM         Arch = "SCMP_ARCH_ARM"
+	ArchAARCH64     Arch = "SCMP_ARCH_AARCH64"
+	ArchMIPS        Arch = "SCMP_ARCH_MIPS"
+	ArchMIPS64      Arch = "SCMP_ARCH_MIPS64"
+	ArchMIPS64N32   Arch = "SCMP_ARCH_MIPS64N32"
+	ArchMIPSEL      Arch = "SCMP_ARCH_MIPSEL"
+	ArchMIPSEL64    Arch = "SCMP_ARCH_MIPSEL64"
+	ArchMIPSEL64N32 Arch = "SCMP_ARCH_MIPSEL64N32"
+)
 
 // Action taken upon Seccomp rule match
 type Action string
 
+const (
+	ActKill  Action = "SCMP_ACT_KILL"
+	ActTrap  Action = "SCMP_ACT_TRAP"
+	ActErrno Action = "SCMP_ACT_ERRNO"
+	ActTrace Action = "SCMP_ACT_TRACE"
+	ActAllow Action = "SCMP_ACT_ALLOW"
+)
+
 // Operator used to match syscall arguments in Seccomp
 type Operator string
+
+const (
+	OpNotEqual     Operator = "SCMP_CMP_NE"
+	OpLessThan     Operator = "SCMP_CMP_LT"
+	OpLessEqual    Operator = "SCMP_CMP_LE"
+	OpEqualTo      Operator = "SCMP_CMP_EQ"
+	OpGreaterEqual Operator = "SCMP_CMP_GE"
+	OpGreaterThan  Operator = "SCMP_CMP_GT"
+	OpMaskedEqual  Operator = "SCMP_CMP_MASKED_EQ"
+)
 
 // Arg used for matching specific syscall arguments in Seccomp
 type Arg struct {

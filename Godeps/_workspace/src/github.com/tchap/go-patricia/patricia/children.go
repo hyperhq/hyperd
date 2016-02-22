@@ -5,10 +5,7 @@
 
 package patricia
 
-import (
-	"io"
-	"sort"
-)
+import "sort"
 
 type childList interface {
 	length() int
@@ -18,8 +15,6 @@ type childList interface {
 	remove(child *Trie)
 	next(b byte) *Trie
 	walk(prefix *Prefix, visitor VisitorFunc) error
-	print(w io.Writer, indent int)
-	total() int
 }
 
 type tries []*Trie
@@ -43,7 +38,7 @@ type sparseChildList struct {
 
 func newSparseChildList(maxChildrenPerSparseNode int) childList {
 	return &sparseChildList{
-		children: make(tries, 0, maxChildrenPerSparseNode),
+		children: make(tries, 0, DefaultMaxChildrenPerSparseNode),
 	}
 }
 
@@ -79,9 +74,7 @@ func (list *sparseChildList) replace(b byte, child *Trie) {
 func (list *sparseChildList) remove(child *Trie) {
 	for i, node := range list.children {
 		if node.prefix[0] == child.prefix[0] {
-			list.children, list.children[len(list.children)-1] =
-				append(list.children[:i], list.children[i+1:]...),
-				nil
+			list.children = append(list.children[:i], list.children[i+1:]...)
 			return
 		}
 	}
@@ -125,24 +118,6 @@ func (list *sparseChildList) walk(prefix *Prefix, visitor VisitorFunc) error {
 	}
 
 	return nil
-}
-
-func (list *sparseChildList) total() int {
-	tot := 0
-	for _, child := range list.children {
-		if child != nil {
-			tot = tot + child.total()
-		}
-	}
-	return tot
-}
-
-func (list *sparseChildList) print(w io.Writer, indent int) {
-	for _, child := range list.children {
-		if child != nil {
-			child.print(w, indent)
-		}
-	}
 }
 
 type denseChildList struct {
@@ -266,22 +241,4 @@ func (list *denseChildList) walk(prefix *Prefix, visitor VisitorFunc) error {
 	}
 
 	return nil
-}
-
-func (list *denseChildList) print(w io.Writer, indent int) {
-	for _, child := range list.children {
-		if child != nil {
-			child.print(w, indent)
-		}
-	}
-}
-
-func (list *denseChildList) total() int {
-	tot := 0
-	for _, child := range list.children {
-		if child != nil {
-			tot = tot + child.total()
-		}
-	}
-	return tot
 }

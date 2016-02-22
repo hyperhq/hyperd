@@ -5,6 +5,7 @@ package native
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -38,7 +39,6 @@ const (
 // it implements execdriver.Driver.
 type Driver struct {
 	root             string
-	initPath         string
 	activeContainers map[string]libcontainer.Container
 	machineMemory    int64
 	factory          libcontainer.Factory
@@ -46,7 +46,7 @@ type Driver struct {
 }
 
 // NewDriver returns a new native driver, called from NewDriver of execdriver.
-func NewDriver(root, initPath string, options []string) (*Driver, error) {
+func NewDriver(root string, options []string) (*Driver, error) {
 	meminfo, err := sysinfo.ReadMemInfo()
 	if err != nil {
 		return nil, err
@@ -114,7 +114,6 @@ func NewDriver(root, initPath string, options []string) (*Driver, error) {
 
 	return &Driver{
 		root:             root,
-		initPath:         initPath,
 		activeContainers: make(map[string]libcontainer.Container),
 		machineMemory:    meminfo.MemTotal,
 		factory:          f,
@@ -130,6 +129,13 @@ type execOutput struct {
 // it calls libcontainer APIs to run a container.
 func (d *Driver) Run(c *execdriver.Command, pipes *execdriver.Pipes, hooks execdriver.Hooks) (execdriver.ExitStatus, error) {
 	destroyed := false
+	var err error
+	c.TmpDir, err = ioutil.TempDir("", c.ID)
+	if err != nil {
+		return execdriver.ExitStatus{ExitCode: -1}, err
+	}
+	defer os.RemoveAll(c.TmpDir)
+
 	// take the Command and populate the libcontainer.Config from it
 	container, err := d.createContainer(c, hooks)
 	if err != nil {
@@ -165,7 +171,10 @@ func (d *Driver) Run(c *execdriver.Command, pipes *execdriver.Pipes, hooks execd
 		return execdriver.ExitStatus{ExitCode: -1}, err
 	}
 
+	// 'oom' is used to emit 'oom' events to the eventstream, 'oomKilled' is used
+	// to set the 'OOMKilled' flag in state
 	oom := notifyOnOOM(cont)
+	oomKilled := notifyOnOOM(cont)
 	if hooks.Start != nil {
 		pid, err := p.Pid()
 		if err != nil {
@@ -192,7 +201,21 @@ func (d *Driver) Run(c *execdriver.Command, pipes *execdriver.Pipes, hooks execd
 	}
 	cont.Destroy()
 	destroyed = true
-	_, oomKill := <-oom
+	// oomKilled will have an oom event if any process within the container was
+	// OOM killed at any time, not only if the init process OOMed.
+	//
+	// Perhaps we only want the OOMKilled flag to be set if the OOM
+	// resulted in a container death, but there isn't a good way to do this
+	// because the kernel's cgroup oom notification does not provide information
+	// such as the PID. This could be heuristically done by checking that the OOM
+	// happened within some very small time slice for the container dying (and
+	// optionally exit-code 137), but I don't think the cgroup oom notification
+	// can be used to reliably determine this
+	//
+	// Even if there were multiple OOMs, it's sufficient to read one value
+	// because libcontainer's oom notify will discard the channel after the
+	// cgroup is destroyed
+	_, oomKill := <-oomKilled
 	return execdriver.ExitStatus{ExitCode: utils.ExitStatus(ps.Sys().(syscall.WaitStatus)), OOMKilled: oomKill}, nil
 }
 
@@ -377,7 +400,7 @@ func (d *Driver) Stats(id string) (*execdriver.ResourceStats, error) {
 	if err != nil {
 		return nil, err
 	}
-	memoryLimit := c.Config().Cgroups.Memory
+	memoryLimit := c.Config().Cgroups.Resources.Memory
 	// if the container does not have any memory limit specified set the
 	// limit to the machines memory
 	if memoryLimit == 0 {
@@ -388,6 +411,26 @@ func (d *Driver) Stats(id string) (*execdriver.ResourceStats, error) {
 		Read:        now,
 		MemoryLimit: memoryLimit,
 	}, nil
+}
+
+// Update updates configs for a container
+func (d *Driver) Update(c *execdriver.Command) error {
+	d.Lock()
+	cont := d.activeContainers[c.ID]
+	d.Unlock()
+	if cont == nil {
+		return execdriver.ErrNotRunning
+	}
+	config := cont.Config()
+	if err := execdriver.SetupCgroups(&config, c); err != nil {
+		return err
+	}
+
+	if err := cont.Set(config); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // TtyConsole implements the exec driver Terminal interface.

@@ -37,9 +37,11 @@ func New() *configs.Config {
 			{Type: "NEWUSER"},
 		}),
 		Cgroups: &configs.Cgroup{
-			Parent:           "docker",
-			AllowAllDevices:  false,
-			MemorySwappiness: -1,
+			ScopePrefix: "docker", // systemd only
+			Resources: &configs.Resources{
+				AllowAllDevices:  false,
+				MemorySwappiness: -1,
+			},
 		},
 		Mounts: []*configs.Mount{
 			{
@@ -61,6 +63,12 @@ func New() *configs.Config {
 				Device:      "devpts",
 				Flags:       syscall.MS_NOSUID | syscall.MS_NOEXEC,
 				Data:        "newinstance,ptmxmode=0666,mode=0620,gid=5",
+			},
+			{
+				Source:      "mqueue",
+				Destination: "/dev/mqueue",
+				Device:      "mqueue",
+				Flags:       defaultMountFlags,
 			},
 			{
 				Source:      "sysfs",
