@@ -198,15 +198,22 @@ func (c *VmCache) get(cpu, mem int) (*hypervisor.Vm, error) {
 
 	// hotplug add cpu and memory
 	var err error
+	var needOnline bool = false
 	if vm.Cpu < cpu {
+		needOnline = true
 		glog.Info("HotAddCpu for cached Vm")
 		err = vm.AddCpu(cpu)
 		glog.Info("HotAddCpu result %v", err)
 	}
 	if vm.Mem < mem {
+		needOnline = true
 		glog.Info("HotAddMem for cached Vm")
 		err = vm.AddMem(mem)
 		glog.Info("HotAddMem result %v", err)
+	}
+	if needOnline {
+		glog.Info("OnlineCpuMem for cached Vm")
+		vm.OnlineCpuMem()
 	}
 	if err != nil {
 		c.daemon.KillVm(vm.Id)
