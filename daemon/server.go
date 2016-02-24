@@ -40,14 +40,8 @@ func (daemon *Daemon) CmdImages(args, filter string, all bool) (*engine.Env, err
 
 }
 
-func (daemon *Daemon) CmdAuthenticateToRegistry(config *types.AuthConfig) (*engine.Env, error) {
-	status, err := daemon.Daemon.AuthenticateToRegistry(config)
-	if err != nil {
-		return nil, err
-	}
-	v := &engine.Env{}
-	v.Set("status", status)
-	return v, nil
+func (daemon *Daemon) CmdAuthenticateToRegistry(config *types.AuthConfig) (string, error) {
+	return daemon.Daemon.AuthenticateToRegistry(config)
 }
 
 func (daemon *Daemon) CmdAttach(stdin io.ReadCloser, stdout io.WriteCloser, key, id, tag string) error {
@@ -134,39 +128,16 @@ func (daemon *Daemon) CmdSystemVersion() *engine.Env {
 	return v
 }
 
-func (daemon *Daemon) CmdGetPodInfo(podName string) (*engine.Env, error) {
-	info, err := daemon.GetPodInfo(podName)
-	if err != nil {
-		return nil, err
-	}
-
-	v := &engine.Env{}
-	v.SetJson("data", info)
-
-	return v, nil
+func (daemon *Daemon) CmdGetPodInfo(podName string) (interface{}, error) {
+	return daemon.GetPodInfo(podName)
 }
 
-func (daemon *Daemon) CmdGetPodStats(podId string) (*engine.Env, error) {
-	stats, err := daemon.GetPodStats(podId)
-	if err != nil {
-		return nil, err
-	}
-
-	v := &engine.Env{}
-	v.SetJson("data", stats)
-
-	return v, nil
+func (daemon *Daemon) CmdGetPodStats(podId string) (interface{}, error) {
+	return daemon.GetPodStats(podId)
 }
 
-func (daemon *Daemon) CmdGetContainerInfo(name string) (*engine.Env, error) {
-	info, err := daemon.GetContainerInfo(name)
-	if err != nil {
-		return nil, err
-	}
-
-	v := &engine.Env{}
-	v.SetJson("data", info)
-	return v, nil
+func (daemon *Daemon) CmdGetContainerInfo(name string) (interface{}, error) {
+	return daemon.GetContainerInfo(name)
 }
 
 func (daemon *Daemon) CmdList(item, podId, vmId string, auxiliary bool) (*engine.Env, error) {

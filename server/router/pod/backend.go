@@ -9,8 +9,8 @@ import (
 // Backend is the methods that need to be implemented to provide
 // system specific functionality.
 type Backend interface {
-	CmdGetPodInfo(podName string) (*engine.Env, error)
-	CmdGetPodStats(podId string) (*engine.Env, error)
+	CmdGetPodInfo(podName string) (interface{}, error)
+	CmdGetPodStats(podId string) (interface{}, error)
 	CmdCreatePod(podArgs string, autoremove bool) (*engine.Env, error)
 	CmdSetPodLabels(podId string, override bool, labels map[string]string) (*engine.Env, error)
 	CmdStartPod(in io.ReadCloser, out io.WriteCloser, podId, vmId, tag string) (*engine.Env, error)
