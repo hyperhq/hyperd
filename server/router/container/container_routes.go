@@ -24,12 +24,12 @@ func (c *containerRouter) getContainerInfo(ctx context.Context, w http.ResponseW
 		return err
 	}
 
-	env, err := c.backend.CmdGetContainerInfo(r.Form.Get("container"))
+	data, err := c.backend.CmdGetContainerInfo(r.Form.Get("container"))
 	if err != nil {
 		return err
 	}
 
-	return env.WriteJSON(w, http.StatusOK)
+	return httputils.WriteJSON(w, http.StatusOK, data)
 }
 
 func (c *containerRouter) getContainerLogs(ctx context.Context, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
@@ -131,10 +131,6 @@ func (c *containerRouter) postContainerCreate(ctx context.Context, w http.Respon
 
 func (c *containerRouter) postContainerCommit(ctx context.Context, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
 	if err := httputils.ParseForm(r); err != nil {
-		return err
-	}
-
-	if err := httputils.CheckForJSON(r); err != nil {
 		return err
 	}
 

@@ -10,5 +10,5 @@ import (
 type Backend interface {
 	CmdSystemInfo() (*engine.Env, error)
 	CmdSystemVersion() *engine.Env
-	CmdAuthenticateToRegistry(authConfig *types.AuthConfig) (*engine.Env, error)
+	CmdAuthenticateToRegistry(authConfig *types.AuthConfig) (string, error)
 }

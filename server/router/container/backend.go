@@ -9,7 +9,7 @@ import (
 )
 
 type Backend interface {
-	CmdGetContainerInfo(container string) (*engine.Env, error)
+	CmdGetContainerInfo(container string) (interface{}, error)
 	CmdGetContainerLogs(name string, c *daemon.ContainerLogsConfig) error
 	CmdExitCode(container, tag string) (int, error)
 	CmdCreateContainer(types.ContainerCreateConfig) (*engine.Env, error)

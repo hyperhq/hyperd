@@ -18,12 +18,12 @@ func (p *podRouter) getPodInfo(ctx context.Context, w http.ResponseWriter, r *ht
 		return err
 	}
 
-	env, err := p.backend.CmdGetPodInfo(r.Form.Get("podName"))
+	data, err := p.backend.CmdGetPodInfo(r.Form.Get("podName"))
 	if err != nil {
 		return err
 	}
 
-	return env.WriteJSON(w, http.StatusOK)
+	return httputils.WriteJSON(w, http.StatusOK, data)
 }
 
 func (p *podRouter) getPodStats(ctx context.Context, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
@@ -31,12 +31,12 @@ func (p *podRouter) getPodStats(ctx context.Context, w http.ResponseWriter, r *h
 		return err
 	}
 
-	env, err := p.backend.CmdGetPodStats(r.Form.Get("podId"))
+	data, err := p.backend.CmdGetPodStats(r.Form.Get("podId"))
 	if err != nil {
 		return err
 	}
 
-	return env.WriteJSON(w, http.StatusOK)
+	return httputils.WriteJSON(w, http.StatusOK, data)
 }
 
 func (p *podRouter) getList(ctx context.Context, w http.ResponseWriter, r *http.Request, vars map[string]string) error {

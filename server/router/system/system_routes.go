@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/docker/engine-api/types"
+	"github.com/hyperhq/hyper/server/httputils"
 	"golang.org/x/net/context"
 )
 
@@ -34,10 +35,10 @@ func (s *systemRouter) postAuth(ctx context.Context, w http.ResponseWriter, r *h
 	if err != nil {
 		return err
 	}
-	env, err := s.backend.CmdAuthenticateToRegistry(config)
+	status, err := s.backend.CmdAuthenticateToRegistry(config)
 	if err != nil {
 		return err
 	}
 
-	return env.WriteJSON(w, http.StatusOK)
+	return httputils.WriteJSON(w, http.StatusOK, &types.AuthResponse{Status: status})
 }
