@@ -134,10 +134,6 @@ func (c *containerRouter) postContainerCommit(ctx context.Context, w http.Respon
 		return err
 	}
 
-	if err := httputils.CheckForJSON(r); err != nil {
-		return err
-	}
-
 	cname := r.Form.Get("container")
 	pause := httputils.BoolValue(r, "pause")
 
