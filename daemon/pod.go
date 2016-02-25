@@ -196,9 +196,12 @@ func (p *Pod) InitContainers(daemon *Daemon) error {
 
 		config := &container.Config{
 			Image:           c.Image,
-			Entrypoint:      strslice.New(c.Entrypoint...),
 			Cmd:             strslice.New(c.Command...),
 			NetworkDisabled: true,
+		}
+
+		if len(c.Entrypoint) != 0 {
+			config.Entrypoint = strslice.New(c.Entrypoint...)
 		}
 
 		ccs, err := daemon.Daemon.ContainerCreate(dockertypes.ContainerCreateConfig{
