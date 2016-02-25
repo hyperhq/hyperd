@@ -152,6 +152,7 @@ __EOF__
   # POD creation / deletion #
   ###########################
 
+  hyper::test::command
   hyper::test::exitcode
   hyper::test::exec
   hyper::test::hostname
