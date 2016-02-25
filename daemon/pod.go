@@ -916,22 +916,22 @@ func (daemon *Daemon) RestartPod(mypod *hypervisor.PodStatus) error {
 }
 
 func hyperHandlePodEvent(vmResponse *types.VmResponse, data interface{},
-	mypod *hypervisor.PodStatus, vm *hypervisor.Vm) bool {
+	mypod *hypervisor.PodStatus, vm *hypervisor.Vm) (bool, bool) {
 	daemon := data.(*Daemon)
 
 	if vmResponse.Code == types.E_POD_FINISHED {
 		if vm.Keep != types.VM_KEEP_NONE {
 			vm.Status = types.S_VM_IDLE
-			return false
+			return false, false
 		}
 		stopLogger(mypod)
 		mypod.SetPodContainerStatus(vmResponse.Data.([]uint32))
 		vm.Status = types.S_VM_IDLE
 		if mypod.Autoremove == true {
 			daemon.CleanPod(mypod.Id)
-			return false
+			return false, false
 		}
-	} else if vmResponse.Code == types.E_VM_SHUTDOWN {
+	} else if vmResponse.Code == types.E_VM_SHUTDOWN || vmResponse.Code == types.E_POD_STOPPED {
 		if mypod.Status == types.S_POD_RUNNING {
 			stopLogger(mypod)
 			mypod.Status = types.S_POD_SUCCEEDED
@@ -975,8 +975,15 @@ func hyperHandlePodEvent(vmResponse *types.VmResponse, data interface{},
 				break
 			}
 		}
-		return true
+
+		/* POD_STOPPED event is sent out by stop pod but want to keep the vm.
+		exit event handler but don't close the fanout chan of vm,
+		other pod will run on this vm */
+		if vmResponse.Code == types.E_POD_STOPPED {
+			return true, false
+		}
+		return true, true
 	}
 
-	return false
+	return false, false
 }
