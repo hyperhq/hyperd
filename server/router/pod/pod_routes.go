@@ -192,15 +192,24 @@ func (p *podRouter) postVmCreate(ctx context.Context, w http.ResponseWriter, r *
 		return err
 	}
 
-	cpu, err := strconv.Atoi(r.Form.Get("cpu"))
-	if err != nil {
-		return err
+	var (
+		cpu   = 1
+		mem   = 128
+		async = false
+		err   error
+	)
+	if value := r.Form.Get("cpu"); value != "" {
+		cpu, err = strconv.Atoi(value)
+		if err != nil {
+			return err
+		}
 	}
-	mem, err := strconv.Atoi(r.Form.Get("mem"))
-	if err != nil {
-		return err
+	if value := r.Form.Get("mem"); value != "" {
+		mem, err = strconv.Atoi(value)
+		if err != nil {
+			return err
+		}
 	}
-	async := false
 	if r.Form.Get("async") == "yes" || r.Form.Get("async") == "true" {
 		async = true
 	}
