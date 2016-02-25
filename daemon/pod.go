@@ -18,6 +18,7 @@ import (
 	"github.com/docker/docker/pkg/version"
 	dockertypes "github.com/docker/engine-api/types"
 	"github.com/docker/engine-api/types/container"
+	"github.com/docker/engine-api/types/strslice"
 
 	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/servicediscovery"
@@ -195,7 +196,12 @@ func (p *Pod) InitContainers(daemon *Daemon) error {
 
 		config := &container.Config{
 			Image:           c.Image,
+			Cmd:             strslice.New(c.Command...),
 			NetworkDisabled: true,
+		}
+
+		if len(c.Entrypoint) != 0 {
+			config.Entrypoint = strslice.New(c.Entrypoint...)
 		}
 
 		ccs, err := daemon.Daemon.ContainerCreate(dockertypes.ContainerCreateConfig{

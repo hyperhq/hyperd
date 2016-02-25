@@ -119,3 +119,8 @@ hyper::test::service() {
     hyper::test::run_pod ${HYPER_ROOT}/hack/pods/service.pod
 }
 
+hyper::test::command() {
+  id=$(sudo hyper run -t -d gcr.io/google_containers/etcd:2.0.9 /usr/local/bin/etcd | sed -ne "s/POD id is \(pod-[0-9A-Za-z]\{1,\}\)/\1/p")
+  sudo hyper rm $id
+}
+
