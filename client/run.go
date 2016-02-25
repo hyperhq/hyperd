@@ -20,7 +20,7 @@ import (
 )
 
 // hyper run [OPTIONS] image [COMMAND] [ARGS...]
-func (cli *HyperClient) HyperCmdRun(args ...string) error {
+func (cli *HyperClient) HyperCmdRun(args ...string) (err error) {
 	var opts struct {
 		PodFile       string   `short:"p" long:"podfile" value-name:"\"\"" description:"Create and Run a pod based on the pod file"`
 		K8s           string   `short:"k" long:"kubernetes" value-name:"\"\"" description:"Create and Run a pod based on the kubernetes pod file"`
@@ -42,9 +42,15 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 		Labels        []string `long:"label" value-name:"[]" default-mask:"-" description:"Add labels for Pod, format: --label key=value"`
 	}
 
+	var (
+		podId   string
+		vmId    string
+		podJson string
+		attach  bool = false
+	)
 	var parser = gflag.NewParser(&opts, gflag.Default|gflag.IgnoreUnknown)
 	parser.Usage = "run [OPTIONS] IMAGE [COMMAND] [ARG...]\n\nCreate a pod, and launch a new VM to run the pod"
-	args, err := parser.ParseArgs(args)
+	args, err = parser.ParseArgs(args)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {
 			return err
@@ -52,11 +58,6 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 			return nil
 		}
 	}
-
-	var (
-		podJson string
-		attach  bool = false
-	)
 
 	if opts.PodFile != "" {
 		attach = opts.Attach
@@ -85,11 +86,20 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 	)
 	json.Unmarshal([]byte(podJson), &spec)
 
-	vmId, err := cli.CreateVm(spec.Resource.Vcpu, spec.Resource.Memory, async)
-
-	podId, err := cli.CreatePod(podJson, false)
+	vmId, err = cli.CreateVm(spec.Resource.Vcpu, spec.Resource.Memory, async)
 	if err != nil {
-		return err
+		return
+	}
+
+	defer func() {
+		if err != nil {
+			cli.RmVm(vmId)
+		}
+	}()
+
+	podId, err = cli.CreatePod(podJson, false)
+	if err != nil {
+		return
 	}
 	if !attach {
 		fmt.Printf("POD id is %s\n", podId)
@@ -106,7 +116,7 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 
 	_, err = cli.StartPod(podId, vmId, attach)
 	if err != nil {
-		return err
+		return
 	}
 
 	if !attach {
