@@ -484,20 +484,11 @@ func (daemon *Daemon) GetPodByContainer(containerId string) (string, error) {
 	defer glog.V(2).Infof("unlock read of PodList")
 	defer daemon.PodList.RUnlock()
 
-	pod := daemon.PodList.Find(func(p *Pod) bool {
-		for _, c := range p.status.Containers {
-			if c.Id == containerId {
-				return true
-			}
-		}
-		return false
-	})
-
-	if pod == nil {
+	if pod, ok := daemon.PodList.GetByContainerId(containerId); ok {
+		return pod.id, nil
+	} else {
 		return "", fmt.Errorf("Can not find that container!")
 	}
-
-	return pod.id, nil
 }
 
 func (daemon *Daemon) GetPodByContainerIdOrName(name string) (pod *Pod, idx int, err error) {
@@ -506,28 +497,11 @@ func (daemon *Daemon) GetPodByContainerIdOrName(name string) (pod *Pod, idx int,
 	defer glog.V(2).Infof("unlock read of PodList")
 	defer daemon.PodList.RUnlock()
 
-	err = nil
-	wslash := name
-	if name[0] != '/' {
-		wslash = "/" + name
+	if pod, idx, ok := daemon.PodList.GetByContainerIdOrName(name); ok {
+		return pod, idx, nil
+	} else {
+		return nil, -1, fmt.Errorf("cannot found container %s", name)
 	}
-
-	var c *hypervisor.Container
-	pod = daemon.PodList.Find(func(p *Pod) bool {
-		for idx, c = range p.status.Containers {
-			if c.Name == wslash || c.Id == name {
-				return true
-			}
-		}
-		return false
-	})
-
-	if pod == nil {
-		err = fmt.Errorf("cannot found container %s", name)
-		return
-	}
-
-	return
 }
 
 func (daemon *Daemon) AddPod(pod *Pod, podArgs string) (err error) {

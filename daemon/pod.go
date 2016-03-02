@@ -113,12 +113,12 @@ func (daemon *Daemon) StartPodWithLock(p *Pod, vmId string, config interface{}, 
 
 // I'd like to move the remain part of this file to another file.
 type Pod struct {
-	id         string
-	status     *hypervisor.PodStatus
-	spec       *pod.UserPod
-	vm         *hypervisor.Vm
-	containers []*hypervisor.ContainerInfo
-	volumes    []*hypervisor.VolumeInfo
+	id           string
+	status       *hypervisor.PodStatus
+	spec         *pod.UserPod
+	vm           *hypervisor.Vm
+	ctnStartInfo []*hypervisor.ContainerInfo
+	volumes      []*hypervisor.VolumeInfo
 }
 
 func (p *Pod) GetVM(daemon *Daemon, id string, lazy bool, keep int) (err error) {
@@ -335,7 +335,7 @@ func (daemon *Daemon) SetPodLabels(podId string, override bool, labels map[strin
 
 func (p *Pod) PrepareContainers(sd Storage, daemon *Daemon) (err error) {
 	err = nil
-	p.containers = []*hypervisor.ContainerInfo{}
+	p.ctnStartInfo = []*hypervisor.ContainerInfo{}
 
 	var (
 		sharedDir = path.Join(hypervisor.BaseDir, p.vm.Id, hypervisor.ShareDirTag)
@@ -397,7 +397,7 @@ func (p *Pod) PrepareContainers(sd Storage, daemon *Daemon) (err error) {
 			return err
 		}
 
-		p.containers = append(p.containers, ci)
+		p.ctnStartInfo = append(p.ctnStartInfo, ci)
 		glog.V(1).Infof("Container Info is \n%v", ci)
 	}
 
@@ -740,10 +740,10 @@ func (p *Pod) getLogger(daemon *Daemon) (err error) {
 			ContainerCreated:   time.Now(), //FIXME: should record creation time in PodStatus
 		}
 
-		if p.containers != nil && len(p.containers) > i {
-			ctx.ContainerEntrypoint = p.containers[i].Workdir
-			ctx.ContainerArgs = p.containers[i].Cmd
-			ctx.ContainerImageID = p.containers[i].Image
+		if p.ctnStartInfo != nil && len(p.ctnStartInfo) > i {
+			ctx.ContainerEntrypoint = p.ctnStartInfo[i].Workdir
+			ctx.ContainerArgs = p.ctnStartInfo[i].Cmd
+			ctx.ContainerImageID = p.ctnStartInfo[i].Image
 		}
 
 		if p.spec.LogConfig.Type == jsonfilelog.Name {
@@ -791,9 +791,9 @@ func (p *Pod) startLogging(daemon *Daemon) (err error) {
 
 func (p *Pod) AttachTtys(streams []*hypervisor.TtyIO) (err error) {
 
-	ttyContainers := p.containers
+	ttyContainers := p.ctnStartInfo
 	if p.spec.Type == "service-discovery" {
-		ttyContainers = p.containers[1:]
+		ttyContainers = p.ctnStartInfo[1:]
 	}
 
 	for idx, str := range streams {
@@ -844,7 +844,7 @@ func (p *Pod) Start(daemon *Daemon, vmId string, lazy bool, keep int, streams []
 		return nil, err
 	}
 
-	vmResponse := p.vm.StartPod(p.status, p.spec, p.containers, p.volumes)
+	vmResponse := p.vm.StartPod(p.status, p.spec, p.ctnStartInfo, p.volumes)
 	if vmResponse.Data == nil {
 		err = fmt.Errorf("VM response data is nil")
 		return vmResponse, err
