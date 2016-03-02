@@ -5,58 +5,83 @@ import (
 	"io"
 
 	"github.com/golang/glog"
+	"github.com/hyperhq/runv/hypervisor"
+	"github.com/hyperhq/runv/hypervisor/types"
 )
 
 func (daemon *Daemon) ExitCode(container, tag string) (int, error) {
 	glog.V(1).Infof("Get container id is %s", container)
-	podId, err := daemon.GetPodByContainer(container)
+
+	pod, _, err := daemon.GetPodByContainerIdOrName(container)
 	if err != nil {
 		return -1, err
 	}
 
-	vmId, err := daemon.GetVmByPodId(podId)
-	if err != nil {
-		return -1, err
-	}
+	pod.Lock()
+	tty, ok := pod.ttyList[tag]
+	defer pod.Unlock()
 
-	vm, ok := daemon.VmList[vmId]
 	if !ok {
-		return -1, fmt.Errorf("Can not find VM whose Id is %s!", vmId)
-	}
-
-	if _, ok := vm.ExitCodes[tag]; !ok {
 		return -1, fmt.Errorf("Tag %s incorrect", tag)
 	}
 
-	return int(vm.ExitCodes[tag]), nil
+	delete(pod.ttyList, tty.ClientTag)
+
+	return int(tty.ExitCode), nil
 }
 
 func (daemon *Daemon) Exec(stdin io.ReadCloser, stdout io.WriteCloser, key, id, cmd, tag string) error {
 	var (
 		vmId      string
 		container string
+		err       error
 	)
+
+	tty := &hypervisor.TtyIO{
+		ClientTag: tag,
+		Stdin:     stdin,
+		Stdout:    stdout,
+		Callback:  make(chan *types.VmResponse, 1),
+	}
 
 	// We need find the vm id which running POD, and stop it
 	if key == "pod" {
 		vmId = id
 		container = ""
 	} else {
-		container = id
-		glog.V(1).Infof("Get container id is %s", container)
-		podId, err := daemon.GetPodByContainer(container)
+		glog.V(1).Infof("Get container id is %s", id)
+		pod, _, err := daemon.GetPodByContainerIdOrName(id)
 		if err != nil {
 			return err
 		}
-		vmId, err = daemon.GetVmByPodId(podId)
+
+		container = id
+
+		pod.Lock()
+		pod.ttyList[tag] = tty
+		pod.Unlock()
+
+		defer func() {
+			if err != nil && pod != nil {
+				pod.Lock()
+				delete(pod.ttyList, tag)
+				pod.Unlock()
+			}
+		}()
+
+		vmId, err = daemon.GetVmByPodId(pod.id)
+		if err != nil {
+			return err
+		}
 	}
 
 	vm, ok := daemon.VmList[vmId]
 	if !ok {
-		return fmt.Errorf("Can not find VM whose Id is %s!", vmId)
+		err = fmt.Errorf("Can not find VM whose Id is %s!", vmId)
+		return err
 	}
 
-	if err := vm.Exec(stdin, stdout, cmd, tag, container); err != nil {
+	if err := vm.Exec(tty, container, cmd); err != nil {
 		return err
 	}
 

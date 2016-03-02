@@ -11,6 +11,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/docker/docker/daemon/logger"
@@ -35,19 +36,15 @@ func (daemon *Daemon) StartPod(stdin io.ReadCloser, stdout io.WriteCloser, podId
 		return -1, "", fmt.Errorf("Pod full, the maximum Pod is 1024!")
 	}
 
-	var (
-		ttys        []*hypervisor.TtyIO = []*hypervisor.TtyIO{}
-		ttyCallback chan *types.VmResponse
-	)
+	var ttys []*hypervisor.TtyIO = []*hypervisor.TtyIO{}
 
 	if tag != "" {
 		glog.V(1).Info("Pod Run with client terminal tag: ", tag)
-		ttyCallback = make(chan *types.VmResponse, 1)
 		ttys = append(ttys, &hypervisor.TtyIO{
 			Stdin:     stdin,
 			Stdout:    stdout,
 			ClientTag: tag,
-			Callback:  ttyCallback,
+			Callback:  make(chan *types.VmResponse, 1),
 		})
 	}
 
@@ -76,7 +73,13 @@ func (daemon *Daemon) StartPod(stdin io.ReadCloser, stdout io.WriteCloser, podId
 	daemon.PodList.Unlock()
 
 	if len(ttys) > 0 {
-		daemon.GetExitCode(podId, tag, ttyCallback)
+		p.RLock()
+		tty, ok := p.ttyList[tag]
+		p.RUnlock()
+
+		if ok {
+			tty.WaitForFinish()
+		}
 	}
 
 	return code, cause, nil
@@ -119,6 +122,8 @@ type Pod struct {
 	vm           *hypervisor.Vm
 	ctnStartInfo []*hypervisor.ContainerInfo
 	volumes      []*hypervisor.VolumeInfo
+	ttyList      map[string]*hypervisor.TtyIO
+	sync.RWMutex
 }
 
 func (p *Pod) GetVM(daemon *Daemon, id string, lazy bool, keep int) (err error) {
@@ -271,9 +276,10 @@ func (daemon *Daemon) CreatePodWithLock(podId, podArgs string, autoremove bool) 
 	status.ResourcePath = resPath
 
 	pod := &Pod{
-		id:     podId,
-		status: status,
-		spec:   spec,
+		id:      podId,
+		status:  status,
+		spec:    spec,
+		ttyList: make(map[string]*hypervisor.TtyIO),
 	}
 
 	if err = pod.InitContainers(daemon); err != nil {
@@ -789,7 +795,7 @@ func (p *Pod) startLogging(daemon *Daemon) (err error) {
 	return nil
 }
 
-func (p *Pod) AttachTtys(streams []*hypervisor.TtyIO) (err error) {
+func (p *Pod) AttachTtys(daemon *Daemon, streams []*hypervisor.TtyIO) (err error) {
 
 	ttyContainers := p.ctnStartInfo
 	if p.spec.Type == "service-discovery" {
@@ -801,7 +807,11 @@ func (p *Pod) AttachTtys(streams []*hypervisor.TtyIO) (err error) {
 			break
 		}
 
-		err = p.vm.Attach(str.Stdin, str.Stdout, str.ClientTag, ttyContainers[idx].Id, str.Callback, nil)
+		p.Lock()
+		p.ttyList[str.ClientTag] = str
+		p.Unlock()
+
+		err = p.vm.Attach(str, ttyContainers[idx].Id, nil)
 		if err != nil {
 			glog.Errorf("Failed to attach client %s before start pod", str.ClientTag)
 			return
@@ -840,7 +850,7 @@ func (p *Pod) Start(daemon *Daemon, vmId string, lazy bool, keep int, streams []
 		return nil, err
 	}
 
-	if err = p.AttachTtys(streams); err != nil {
+	if err = p.AttachTtys(daemon, streams); err != nil {
 		return nil, err
 	}
 
@@ -863,26 +873,6 @@ func (p *Pod) Start(daemon *Daemon, vmId string, lazy bool, keep int, streams []
 	}
 
 	return vmResponse, nil
-}
-
-func (daemon *Daemon) GetExitCode(podId, tag string, callback chan *types.VmResponse) error {
-	var (
-		pod *Pod
-		ok  bool
-	)
-
-	daemon.PodList.Lock()
-	glog.V(2).Infof("lock PodList")
-	defer glog.V(2).Infof("unlock PodList")
-	defer daemon.PodList.Unlock()
-
-	if pod, ok = daemon.PodList.Get(podId); !ok {
-		return fmt.Errorf("Can not find the POD instance of %s", podId)
-	}
-	if pod.vm == nil {
-		return fmt.Errorf("pod %s is already stopped", podId)
-	}
-	return pod.vm.GetExitCode(tag, callback)
 }
 
 // The caller must make sure that the restart policy and the status is right to restart

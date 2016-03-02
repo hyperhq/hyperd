@@ -5,12 +5,24 @@ import (
 	"io"
 
 	"github.com/golang/glog"
+	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/types"
 )
 
 func (daemon *Daemon) Attach(stdin io.ReadCloser, stdout io.WriteCloser, key, id, tag string) error {
-	var podId, vmId, container string
-	var err error
+	var (
+		podId     string
+		vmId      string
+		container string
+		err       error
+	)
+
+	tty := &hypervisor.TtyIO{
+		ClientTag: tag,
+		Stdin:     stdin,
+		Stdout:    stdout,
+		Callback:  make(chan *types.VmResponse, 1),
+	}
 
 	// We need find the vm id which running POD, and stop it
 	if key == "pod" {
@@ -18,10 +30,23 @@ func (daemon *Daemon) Attach(stdin io.ReadCloser, stdout io.WriteCloser, key, id
 		container = ""
 	} else {
 		container = id
-		podId, err = daemon.GetPodByContainer(container)
+		pod, _, err := daemon.GetPodByContainerIdOrName(container)
 		if err != nil {
 			return err
 		}
+
+		podId = pod.id
+		pod.RLock()
+		pod.ttyList[tag] = tty
+		pod.RUnlock()
+
+		defer func() {
+			if err != nil && pod != nil {
+				pod.Lock()
+				delete(pod.ttyList, tag)
+				pod.Unlock()
+			}
+		}()
 	}
 
 	vmId, err = daemon.GetVmByPodId(podId)
@@ -31,20 +56,20 @@ func (daemon *Daemon) Attach(stdin io.ReadCloser, stdout io.WriteCloser, key, id
 
 	vm, ok := daemon.VmList[vmId]
 	if !ok {
-		return fmt.Errorf("Can find VM whose Id is %s!", vmId)
+		err = fmt.Errorf("Can find VM whose Id is %s!", vmId)
+		return err
 	}
 
-	ttyCallback := make(chan *types.VmResponse, 1)
-	err = vm.Attach(stdin, stdout, tag, container, ttyCallback, nil)
+	err = vm.Attach(tty, container, nil)
 	if err != nil {
 		return err
 	}
 
 	defer func() {
-		glog.V(2).Info("Defer function for exec!")
+		glog.V(2).Info("Defer function for attach!")
 	}()
 
-	vm.GetExitCode(tag, ttyCallback)
+	err = tty.WaitForFinish()
 
-	return nil
+	return err
 }
