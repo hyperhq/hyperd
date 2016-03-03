@@ -150,7 +150,6 @@ func NewDaemonFromDirectory(cfg *goconfig.ConfigFile) (*Daemon, error) {
 		return nil, err
 	}
 
-	vList := map[string]*hypervisor.Vm{}
 	daemon := &Daemon{
 		ID:          fmt.Sprintf("%d", os.Getpid()),
 		db:          db,
@@ -160,7 +159,7 @@ func NewDaemonFromDirectory(cfg *goconfig.ConfigFile) (*Daemon, error) {
 		Cbfs:        cbfs,
 		VboxImage:   vboxImage,
 		PodList:     NewPodList(),
-		VmList:      vList,
+		VmList:      make(map[string]*hypervisor.Vm),
 		Host:        host,
 		BridgeIP:    bridgeip,
 		BridgeIface: biface,
