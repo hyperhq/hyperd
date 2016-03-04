@@ -72,5 +72,4 @@ func getMemSizeString(s int) string {
 		rtn = float64(s) / (1024.0 * 1024.0 * 1024.0)
 		return fmt.Sprintf("%.1f GB", rtn)
 	}
-	return "0"
 }
