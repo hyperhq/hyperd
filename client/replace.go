@@ -52,7 +52,7 @@ func (cli *HyperClient) HyperCmdReplace(args ...string) error {
 		return fmt.Errorf("Error code is %d, cause is %s", code, cause)
 	}
 	if newPodId != "" {
-		if _, err := cli.StartPod(newPodId, vmId, false); err != nil {
+		if _, err := cli.StartPod(newPodId, vmId, false, false); err != nil {
 			return err
 		}
 		fmt.Printf("Successfully replaced the old pod(%s) with new pod(%s)\n", oldPodId, newPodId)
@@ -68,7 +68,7 @@ func (cli *HyperClient) HyperCmdReplace(args ...string) error {
 		if err != nil {
 			return err
 		}
-		if _, err := cli.StartPod(newPodId, vmId, false); err != nil {
+		if _, err := cli.StartPod(newPodId, vmId, false, false); err != nil {
 			return err
 		}
 		fmt.Printf("Successfully replaced the old pod(%s) with new pod file(%s)\n", oldPodId, newPodFile)

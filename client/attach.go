@@ -49,7 +49,8 @@ func (cli *HyperClient) HyperCmdAttach(args ...string) error {
 	}
 	v.Set("tag", tag)
 
-	err = cli.hijackRequest("attach", podName, tag, &v)
+	tty := true //TODO: get the correct tty value of the pod/container from hyperd
+	err = cli.hijackRequest("attach", podName, tag, &v, tty)
 	if err != nil {
 		fmt.Printf("attach failed: %s\n", err.Error())
 		return err
@@ -58,7 +59,7 @@ func (cli *HyperClient) HyperCmdAttach(args ...string) error {
 	return GetExitCode(cli, containerId, tag)
 }
 
-func (cli *HyperClient) hijackRequest(method, pod, tag string, v *url.Values) error {
+func (cli *HyperClient) hijackRequest(method, pod, tag string, v *url.Values, tty bool) error {
 	var (
 		hijacked = make(chan io.Closer)
 		errCh    chan error
@@ -73,7 +74,7 @@ func (cli *HyperClient) hijackRequest(method, pod, tag string, v *url.Values) er
 	request := fmt.Sprintf("/%s?%s", method, v.Encode())
 
 	errCh = promise.Go(func() error {
-		return cli.hijack("POST", request, true, cli.in, cli.out, cli.out, hijacked, nil, "")
+		return cli.hijack("POST", request, tty, cli.in, cli.out, cli.out, hijacked, nil, "")
 	})
 
 	if err := cli.monitorTtySize(pod, tag); err != nil {
