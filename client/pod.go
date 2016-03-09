@@ -164,7 +164,8 @@ func (cli *HyperClient) HyperCmdStart(args ...string) error {
 		vmId = args[1]
 	}
 	// fmt.Printf("Pod ID is %s, VM ID is %s\n", podId, vmId)
-	_, err = cli.StartPod(podId, vmId, false)
+	tty := true //TODO: get the correct tty value of the pod/container from hyperd
+	_, err = cli.StartPod(podId, vmId, false, tty)
 	if err != nil {
 		return err
 	}
@@ -172,21 +173,21 @@ func (cli *HyperClient) HyperCmdStart(args ...string) error {
 	return nil
 }
 
-func (cli *HyperClient) StartPod(podId, vmId string, tty bool) (string, error) {
+func (cli *HyperClient) StartPod(podId, vmId string, attach, tty bool) (string, error) {
 	var tag string = ""
 	v := url.Values{}
 	v.Set("podId", podId)
 	v.Set("vmId", vmId)
 
-	if tty {
+	if attach {
 		tag = cli.GetTag()
 	}
 	v.Set("tag", tag)
 
-	if !tty {
+	if !attach {
 		return cli.startPodWithoutTty(&v)
 	} else {
-		err := cli.hijackRequest("pod/start", podId, tag, &v)
+		err := cli.hijackRequest("pod/start", podId, tag, &v, tty)
 		if err != nil {
 			fmt.Printf("StartPod failed: %s\n", err.Error())
 			return "", err

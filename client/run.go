@@ -114,7 +114,7 @@ func (cli *HyperClient) HyperCmdRun(args ...string) (err error) {
 		}()
 	}
 
-	_, err = cli.StartPod(podId, vmId, attach)
+	_, err = cli.StartPod(podId, vmId, attach, opts.Tty)
 	if err != nil {
 		return
 	}

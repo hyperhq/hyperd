@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hyperhq/hyper/lib/promise"
 	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/lib/term"
 )
@@ -66,13 +67,73 @@ func (cli *HyperClient) hijack(method, path string, setRawTerminal bool, in io.R
 		fmt.Printf("Client DO: %s\n", err.Error())
 	}
 
-	rwc, _ := clientconn.Hijack()
+	rwc, br := clientconn.Hijack()
 	defer rwc.Close()
 
 	if started != nil {
 		started <- rwc
 	}
 
-	_, err = term.TtySplice(rwc)
-	return err
+	var (
+		receiveStdout chan error
+		oldState      *term.State
+	)
+
+	if in != nil && setRawTerminal {
+		// fmt.Printf("In the Raw Terminal!!!\n")
+		oldState, err = term.SetRawTerminal(cli.inFd)
+		if err != nil {
+			return err
+		}
+		defer term.RestoreTerminal(cli.inFd, oldState)
+	}
+
+	if stdout != nil || stderr != nil {
+		receiveStdout = promise.Go(func() (err error) {
+			defer func() {
+				if in != nil {
+					if setRawTerminal {
+						term.RestoreTerminal(cli.inFd, oldState)
+					}
+				}
+			}()
+
+			_, err = io.Copy(stdout, br)
+			// fmt.Printf("[hijack] End of stdout\n")
+			return err
+		})
+	}
+
+	sendStdin := promise.Go(func() error {
+		if in != nil {
+			io.Copy(rwc, in)
+			// fmt.Printf("[hijack] End of stdin\n")
+		}
+
+		if conn, ok := rwc.(interface {
+			CloseWrite() error
+		}); ok {
+			if err := conn.CloseWrite(); err != nil {
+				fmt.Printf("Couldn't send EOF: %s", err.Error())
+			}
+		}
+		// Discard errors due to pipe interruption
+		return nil
+	})
+
+	if stdout != nil || stderr != nil {
+		if err := <-receiveStdout; err != nil {
+			fmt.Printf("Error receiveStdout: %s\n", err.Error())
+			return err
+		}
+		sendStdin <- nil
+	}
+	if in != nil {
+		if err := <-sendStdin; err != nil {
+			fmt.Printf("Error sendStdin: %s\n", err.Error())
+			return err
+		}
+	}
+
+	return nil
 }
