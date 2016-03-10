@@ -15,16 +15,16 @@ import (
 /*
 	-a, --author=       Author (e.g., "Hello World <hello@a-team.com>")
 	-c, --change=[]     Apply Dockerfile instruction to the created image
-	--help=false        Print usage
 	-m, --message=      Commit message
-	-p, --pause=true    Pause container during Commit
+	-p, --pause         Pause container during Commit
+	-h, --help          Print usage
 */
 func (cli *HyperClient) HyperCmdCommit(args ...string) error {
 	var opts struct {
 		Author  string   `short:"a" long:"author" default:"" value-name:"\"\"" description:"Author (e.g., \"Hello World <hello@a-team.com>\")"`
 		Change  []string `short:"c" long:"change" default:"" value-name:"[]" description:"Apply Dockerfile instruction to the created image"`
 		Message string   `short:"m" long:"message" default:"" value-name:"\"\"" description:"Commit message"`
-		Pause   bool     `short:"p" long:"pause" default:"false" value-name:"true" description:"Pause container during Commit"`
+		Pause   bool     `short:"p" long:"pause" default:"false" description:"Pause container during Commit"`
 	}
 	var parser = gflag.NewParser(&opts, gflag.Default)
 
