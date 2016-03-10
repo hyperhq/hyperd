@@ -49,8 +49,8 @@ func GetExitCode(cli *HyperClient, container, tag string) error {
 
 func (cli *HyperClient) HyperCmdExec(args ...string) error {
 	var opts struct {
-		Attach bool `short:"a" long:"attach" default:"true" value-name:"false" description:"attach current terminal to the stdio of command"`
-		Vm     bool `long:"vm" default:"false" value-name:"false" description:"attach to vm"`
+		Attach bool `short:"a" long:"attach" default:"true" description:"attach current terminal to the stdio of command"`
+		Vm     bool `long:"vm" default:"false" description:"attach to vm"`
 	}
 	var parser = gflag.NewParser(&opts, gflag.Default|gflag.IgnoreUnknown)
 	parser.Usage = "exec [OPTIONS] POD|CONTAINER COMMAND [ARGS...]\n\nRun a command in a container of a running pod"
