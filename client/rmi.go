@@ -14,7 +14,7 @@ import (
 func (cli *HyperClient) HyperCmdRmi(args ...string) error {
 	var opts struct {
 		Noprune bool `long:"no-prune" default:"false" default-mask:"-" description:"Do not delete untagged parents"`
-		Force   bool `short:"f" long:"force" default:"true" default-mask:"-" description:"Force removal of the image"`
+		Force   bool `short:"f" long:"force" default:"false" default-mask:"-" description:"Force removal of the image"`
 	}
 	var parser = gflag.NewParser(&opts, gflag.Default)
 	parser.Usage = "rmi [OPTIONS] IMAGE [IMAGE...]\n\nRemove one or more images"
