@@ -37,7 +37,7 @@ func (cli *HyperClient) HyperCmdRun(args ...string) (err error) {
 		RestartPolicy string   `long:"restart" default:"never" value-name:"\"\"" default-mask:"-" description:"Restart policy to apply when a container exits (never, onFailure, always)"`
 		LogDriver     string   `long:"log-driver" value-name:"\"\"" description:"Logging driver for Pod"`
 		LogOpts       []string `long:"log-opt" description:"Log driver options"`
-		Remove        bool     `long:"rm" default:"false" value-name:"" default-mask:"-" description:"Automatically remove the pod when it exits"`
+		Remove        bool     `long:"rm" default:"false" default-mask:"-" description:"Automatically remove the pod when it exits"`
 		Portmap       []string `long:"publish" value-name:"[]" default-mask:"-" description:"Publish a container's port to the host, format: --publish [tcp/udp:]hostPort:containerPort"`
 		Labels        []string `long:"label" value-name:"[]" default-mask:"-" description:"Add labels for Pod, format: --label key=value"`
 	}

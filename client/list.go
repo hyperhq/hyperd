@@ -14,7 +14,7 @@ import (
 
 func (cli *HyperClient) HyperCmdList(args ...string) error {
 	var opts struct {
-		Aux bool   `short:"x" long:"aux" default:"false" value-name:"false" description:"show the auxiliary containers"`
+		Aux bool   `short:"x" long:"aux" default:"false" description:"show the auxiliary containers"`
 		Pod string `short:"p" long:"pod" value-name:"\"\"" description:"only list the specified pod"`
 		VM  string `short:"m" long:"vm" value-name:"\"\"" description:"only list resources on the specified vm"`
 	}

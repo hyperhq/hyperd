@@ -15,8 +15,8 @@ import (
 
 func (cli *HyperClient) HyperCmdImages(args ...string) error {
 	var opts struct {
-		All bool `short:"a" long:"all" default:"false" value-name:"false" description:"Show all images (by default filter out the intermediate image layers)"`
-		Num bool `short:"q" long:"quiet" default:"false" value-name:"false" description:"Only show numeric IDs"`
+		All bool `short:"a" long:"all" default:"false" description:"Show all images (by default filter out the intermediate image layers)"`
+		Num bool `short:"q" long:"quiet" default:"false" description:"Only show numeric IDs"`
 	}
 	var parser = gflag.NewParser(&opts, gflag.Default)
 

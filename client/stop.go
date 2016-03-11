@@ -14,7 +14,7 @@ import (
 func (cli *HyperClient) HyperCmdStop(args ...string) error {
 
 	var opts struct {
-		Novm bool `long:"onlypod" default:"false" value-name:"false" description:"Stop a Pod, but left the VM running"`
+		Novm bool `long:"onlypod" default:"false" description:"Stop a Pod, but left the VM running"`
 	}
 	var parser = gflag.NewParser(&opts, gflag.Default)
 	parser.Usage = "stop POD_ID\n\nStop a running pod"

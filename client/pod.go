@@ -102,7 +102,7 @@ func (cli *HyperClient) CreatePod(jsonbody string, remove bool) (string, error) 
 
 func (cli *HyperClient) HyperCmdStart(args ...string) error {
 	var opts struct {
-		// OnlyVm    bool     `long:"onlyvm" default:"false" value-name:"false" description:"Only start a new VM"`
+		// OnlyVm    bool     `long:"onlyvm" default:"false" description:"Only start a new VM"`
 		Cpu int `short:"c" long:"cpu" default:"1" value-name:"1" description:"CPU number for the VM"`
 		Mem int `short:"m" long:"memory" default:"128" value-name:"128" description:"Memory size (MB) for the VM"`
 	}
