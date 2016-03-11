@@ -125,6 +125,22 @@ func (s *router) postImagesCreate(ctx context.Context, w http.ResponseWriter, r 
 	return nil
 }
 
+func (s *router) postImagesLoad(ctx context.Context, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+	w.Header().Set("Content-Type", "application/json")
+	output := ioutils.NewWriteFlusher(w)
+	defer output.Close()
+	err := s.daemon.LoadImage(r.Body, output)
+	if err != nil {
+		if !output.Flushed() {
+			return err
+		}
+		sf := streamformatter.NewJSONStreamFormatter()
+		output.Write(sf.FormatError(err))
+	}
+
+	return nil
+}
+
 func (s *router) postImagesPush(ctx context.Context, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
 	metaHeaders := map[string][]string{}
 	for k, v := range r.Header {

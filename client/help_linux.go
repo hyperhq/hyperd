@@ -18,6 +18,7 @@ Command:
   images                 List images
   info                   Display system-wide information
   list                   List all pods or containers
+  load                   Load a image from STDIN or tar archive file
   login                  Register or log in to a Docker registry server
   logout                 Log out from a Docker registry server
   pull                   Pull an image from a Docker registry server
