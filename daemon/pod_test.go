@@ -82,7 +82,7 @@ func TestDNSInsertRegular(t *testing.T) {
 			_ = json.Unmarshal([]byte(input), &spec)
 			p.spec = &spec
 		}
-		err := p.PrepareDNS()
+		err := p.setupDNS()
 		if (errs[tag] != nil && (err == nil || errs[tag].Error() != err.Error())) || (err != nil && errs[tag] == nil) {
 			t.Logf("error should be %v, but is %v", errs[tag], err)
 			t.Fail()

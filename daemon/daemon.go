@@ -80,7 +80,7 @@ func (daemon *Daemon) Restore() error {
 	defer daemon.PodList.Unlock()
 
 	for k, v := range podList {
-		_, err = daemon.CreatePodWithLock(k, v, false)
+		_, err = daemon.createPodInternal(k, v, false, true)
 		if err != nil {
 			glog.Warningf("Got a unexpected error, %s", err.Error())
 			continue
@@ -298,7 +298,7 @@ func (daemon *Daemon) GetPod(podId, podArgs string, autoremove bool) (*Pod, erro
 		return pod, nil
 	}
 
-	pod, err := daemon.CreatePodWithLock(podId, podArgs, autoremove)
+	pod, err := daemon.createPodInternal(podId, podArgs, autoremove, true)
 	if err != nil {
 		return nil, err
 	}
