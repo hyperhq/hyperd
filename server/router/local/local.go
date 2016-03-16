@@ -92,6 +92,7 @@ func (r *router) initRoutes() {
 		NewGetRoute("/images/get", r.getImagesJSON),
 		// POST
 		NewPostRoute("/image/create", r.postImagesCreate),
+		NewPostRoute("/image/load", r.postImagesLoad),
 		NewPostRoute("/image/push", r.postImagesPush),
 		// DELETE
 		NewDeleteRoute("/image", r.deleteImages),
