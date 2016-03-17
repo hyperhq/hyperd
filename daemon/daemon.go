@@ -203,14 +203,17 @@ func InitDockerCfg(mirrors []string, insecureRegistries []string, graphdriver, r
 	dockerCfg.LogConfig.Config = make(map[string]string)
 	var errhandler flag.ErrorHandling = flag.ContinueOnError
 	flags := flag.NewFlagSet("", errhandler)
-
 	dockerCfg.InstallFlags(flags, presentInHelp)
-	flags.Set("-bridge", "none")
+
 	dockerCfg.GraphDriver = graphdriver
 	dockerCfg.Root = root
 	dockerCfg.TrustKeyPath = path.Join(root, "keys")
+
 	// disable docker network
-	//dockerCfg.bridgeConfig.Iface = "none"
+	flags.Set("-bridge", "none")
+	flags.Set("-iptables", "false")
+	flags.Set("-ipmasq", "false")
+
 	// disable log driver
 	dockerCfg.LogConfig.Type = "none"
 
