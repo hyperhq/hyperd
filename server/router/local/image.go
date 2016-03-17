@@ -168,7 +168,7 @@ func (s *router) postImagesPush(ctx context.Context, w http.ResponseWriter, r *h
 		}
 	}
 
-	ref, err := reference.ParseNamed(vars["name"])
+	ref, err := reference.ParseNamed(r.Form.Get("remote"))
 	if err != nil {
 		return err
 	}
