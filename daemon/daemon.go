@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/Unknwon/goconfig"
 	docker "github.com/docker/docker/daemon"
 	"github.com/docker/docker/daemon/logger/jsonfilelog"
@@ -212,6 +213,11 @@ func InitDockerCfg(mirrors []string, insecureRegistries []string, graphdriver, r
 	//dockerCfg.bridgeConfig.Iface = "none"
 	// disable log driver
 	dockerCfg.LogConfig.Type = "none"
+
+	// debug mode
+	if glog.V(3) {
+		logrus.SetLevel(logrus.DebugLevel)
+	}
 
 	registryOpts := &registry.Options{
 		Mirrors:            opts.NewListOpts(nil),
