@@ -146,23 +146,17 @@ func (daemon *Daemon) GetServiceContainerInfo(podId string) (*hypervisor.Vm, str
 	return pod.vm, container, nil
 }
 
-func ProcessPodBytes(body []byte, podId string) (*pod.UserPod, error) {
+func ParseServiceDiscovery(id string, spec *pod.UserPod) error {
 	var containers []pod.UserContainer
-	var serviceDir string = path.Join(utils.HYPER_ROOT, "services", podId)
+	var serviceDir string = path.Join(utils.HYPER_ROOT, "services", id)
 
-	userPod, err := pod.ProcessPodBytes(body)
-	if err != nil {
-		glog.V(1).Infof("Process POD file error: %s", err.Error())
-		return nil, err
+	if len(spec.Services) == 0 {
+		return nil
 	}
 
-	if len(userPod.Services) == 0 {
-		return userPod, nil
-	}
-
-	userPod.Type = "service-discovery"
+	spec.Type = "service-discovery"
 	serviceContainer := pod.UserContainer{
-		Name:    ServiceDiscoveryContainerName(userPod.Name),
+		Name:    ServiceDiscoveryContainerName(spec.Name),
 		Image:   servicediscovery.ServiceImage,
 		Command: []string{"haproxy", "-D", "-f", "/usr/local/etc/haproxy/haproxy.cfg", "-p", "/var/run/haproxy.pid"},
 	}
@@ -180,19 +174,19 @@ func ProcessPodBytes(body []byte, podId string) (*pod.UserPod, error) {
 		Driver: "vfs",
 	}
 
-	userPod.Volumes = append(userPod.Volumes, serviceVolume)
+	spec.Volumes = append(spec.Volumes, serviceVolume)
 
 	serviceContainer.Volumes = append(serviceContainer.Volumes, serviceVolRef)
 
 	containers = append(containers, serviceContainer)
 
-	for _, c := range userPod.Containers {
+	for _, c := range spec.Containers {
 		containers = append(containers, c)
 	}
 
-	userPod.Containers = containers
+	spec.Containers = containers
 
-	return userPod, nil
+	return nil
 }
 
 func ServiceDiscoveryContainerName(podName string) string {
