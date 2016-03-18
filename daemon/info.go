@@ -42,6 +42,8 @@ func (daemon *Daemon) GetPodInfo(podName string) (types.PodInfo, error) {
 		ports := []types.ContainerPort{}
 		envs := []types.EnvironmentVar{}
 		vols := []types.VolumeMount{}
+		cmd := []string{}
+		args := []string{}
 		Response, err := daemon.Daemon.ContainerInspect(c.Id, false, version.Version("1.21"))
 		if err == nil {
 			var jsonResponse *dockertypes.ContainerJSON
@@ -53,6 +55,11 @@ func (daemon *Daemon) GetPodInfo(podName string) (types.PodInfo, error) {
 					Value: e[strings.Index(e, "=")+1:]})
 			}
 			imageid = jsonResponse.Image
+			cmd = []string{jsonResponse.Path}
+			args = jsonResponse.Args
+		}
+		if len(cmd) == 0 {
+			cmd = pod.spec.Containers[i].Command
 		}
 		for _, port := range pod.spec.Containers[i].Ports {
 			ports = append(ports, types.ContainerPort{
@@ -74,14 +81,15 @@ func (daemon *Daemon) GetPodInfo(podName string) (types.PodInfo, error) {
 		container := types.Container{
 			Name:            c.Name,
 			ContainerID:     c.Id,
-			Image:           c.Image,
+			Image:           pod.spec.Containers[i].Image,
 			ImageID:         imageid,
-			Commands:        pod.spec.Containers[i].Command,
-			Args:            []string{},
+			Commands:        cmd,
+			Args:            args,
 			Workdir:         pod.spec.Containers[i].Workdir,
 			Ports:           ports,
 			Environment:     envs,
 			Volume:          vols,
+			Tty:             pod.spec.Containers[i].Tty,
 			ImagePullPolicy: "",
 		}
 		containers = append(containers, container)
@@ -287,19 +295,21 @@ func (daemon *Daemon) GetContainerInfo(name string) (types.ContainerInfo, error)
 		s.Terminated.FinishedAt = pod.status.FinishedAt
 	}
 	return types.ContainerInfo{
-		Name:            c.Name,
-		ContainerID:     c.Id,
-		PodID:           pod.id,
-		Image:           c.Image,
-		ImageID:         imageid,
-		Commands:        cmd,
-		Args:            args,
-		Workdir:         pod.spec.Containers[i].Workdir,
-		Ports:           ports,
-		Environment:     envs,
-		Volume:          vols,
-		Tty:             pod.spec.Containers[i].Tty,
-		ImagePullPolicy: "",
-		Status:          s,
+		Container: types.Container{
+			Name:            c.Name,
+			ContainerID:     c.Id,
+			Image:           pod.spec.Containers[i].Image,
+			ImageID:         imageid,
+			Commands:        cmd,
+			Args:            args,
+			Workdir:         pod.spec.Containers[i].Workdir,
+			Ports:           ports,
+			Environment:     envs,
+			Volume:          vols,
+			Tty:             pod.spec.Containers[i].Tty,
+			ImagePullPolicy: "",
+		},
+		PodID:  pod.id,
+		Status: s,
 	}, nil
 }
