@@ -71,7 +71,7 @@ func (cli *HyperClient) HyperCmdRun(args ...string) (err error) {
 		}
 		attach = !opts.Detach
 		podJson, err = cli.JsonFromCmdline(args, opts.Env, opts.Portmap, opts.LogDriver, opts.LogOpts,
-			opts.Name, opts.Workdir, opts.RestartPolicy, opts.Cpu, opts.Memory, opts.Tty, opts.Labels)
+			opts.Name, opts.Workdir, opts.RestartPolicy, opts.Cpu, opts.Memory, opts.Tty, opts.Labels, opts.EntryPoint)
 	}
 
 	if err != nil {
@@ -163,7 +163,7 @@ func (cli *HyperClient) JsonFromFile(filename string, yaml, k8s bool) (string, e
 }
 
 func (cli *HyperClient) JsonFromCmdline(cmdArgs, cmdEnvs, cmdPortmaps []string, cmdLogDriver string, cmdLogOpts []string,
-	cmdName, cmdWorkdir, cmdRestartPolicy string, cpu, memory int, tty bool, cmdLabels []string) (string, error) {
+	cmdName, cmdWorkdir, cmdRestartPolicy string, cpu, memory int, tty bool, cmdLabels []string, entrypoint string) (string, error) {
 
 	var (
 		name    = cmdName
@@ -221,12 +221,17 @@ func (cli *HyperClient) JsonFromCmdline(cmdArgs, cmdEnvs, cmdPortmaps []string, 
 		}
 	}
 
+	entrypoints := make([]string, 0, 1)
+	if len(entrypoint) > 0 {
+		entrypoints = append(entrypoints, entrypoint)
+	}
+
 	containerList := []pod.UserContainer{{
 		Name:          name,
 		Image:         image,
 		Command:       command,
 		Workdir:       cmdWorkdir,
-		Entrypoint:    []string{},
+		Entrypoint:    entrypoints,
 		Ports:         ports,
 		Envs:          env,
 		Volumes:       []pod.UserVolumeReference{},
