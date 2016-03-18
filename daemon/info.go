@@ -202,6 +202,8 @@ func (daemon *Daemon) GetContainerInfo(name string) (types.ContainerInfo, error)
 		i       int = 0
 		imageid string
 		ok      bool
+		cmd     []string
+		args    []string
 	)
 	if name == "" {
 		return types.ContainerInfo{}, fmt.Errorf("Null container name")
@@ -235,6 +237,12 @@ func (daemon *Daemon) GetContainerInfo(name string) (types.ContainerInfo, error)
 				Value: e[strings.Index(e, "=")+1:]})
 		}
 		imageid = jsonResponse.Image
+		cmd = []string{jsonResponse.Path}
+		args = jsonResponse.Args
+	}
+	if len(cmd) == 0 {
+		glog.Warning("length of commands in inspect result should not be zero")
+		cmd = pod.spec.Containers[i].Command
 	}
 	for _, port := range pod.spec.Containers[i].Ports {
 		ports = append(ports, types.ContainerPort{
@@ -284,8 +292,8 @@ func (daemon *Daemon) GetContainerInfo(name string) (types.ContainerInfo, error)
 		PodID:           pod.id,
 		Image:           c.Image,
 		ImageID:         imageid,
-		Commands:        pod.spec.Containers[i].Command,
-		Args:            []string{},
+		Commands:        cmd,
+		Args:            args,
 		Workdir:         pod.spec.Containers[i].Workdir,
 		Ports:           ports,
 		Environment:     envs,
