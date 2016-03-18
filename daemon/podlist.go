@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"strings"
 	"sync"
 
 	"github.com/hyperhq/runv/hypervisor"
@@ -93,6 +94,27 @@ func (pl *PodList) GetByContainerIdOrName(cid string) (*Pod, int, bool) {
 		if p, ok := pl.pods[podid]; ok {
 			for idx, c := range p.status.Containers {
 				if c.Id == cid {
+					return p, idx, true
+				}
+			}
+		}
+		return nil, -1, false
+	}
+
+	matchPods := []string{}
+	fullId := ""
+	for c, p := range pl.containers {
+		if strings.HasPrefix(c, cid) {
+			matchPods = append(matchPods, p)
+			fullId = c
+		}
+	}
+	if len(matchPods) > 1 {
+		return nil, -1, false
+	} else if len(matchPods) == 1 {
+		if p, ok := pl.pods[matchPods[0]]; ok {
+			for idx, c := range p.status.Containers {
+				if c.Id == fullId {
 					return p, idx, true
 				}
 			}

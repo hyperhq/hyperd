@@ -57,6 +57,7 @@ type ContainerInfo struct {
 	Ports           []ContainerPort  `json:"ports"`
 	Environment     []EnvironmentVar `json:"env"`
 	Volume          []VolumeMount    `json:"volumeMounts"`
+	Tty             bool             `json:"tty"`
 	ImagePullPolicy string           `json:"imagePullPolicy"`
 	Status          ContainerStatus  `json:"status"`
 }

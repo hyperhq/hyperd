@@ -195,36 +195,33 @@ func (daemon *Daemon) GetPodStats(podId string) (interface{}, error) {
 }
 
 func (daemon *Daemon) GetContainerInfo(name string) (types.ContainerInfo, error) {
-	daemon.PodList.RLock()
-	glog.V(2).Infof("lock read of PodList")
-	defer daemon.PodList.RUnlock()
-	defer glog.V(2).Infof("unlock read of PodList")
 
 	var (
 		pod     *Pod
 		c       *hypervisor.Container
 		i       int = 0
 		imageid string
+		ok      bool
+		cmd     []string
+		args    []string
 	)
 	if name == "" {
 		return types.ContainerInfo{}, fmt.Errorf("Null container name")
 	}
 	glog.Infof(name)
-	wslash := name
-	if name[0] != '/' {
-		wslash = "/" + name
-	}
-	pod = daemon.PodList.Find(func(p *Pod) bool {
-		for i, c = range p.status.Containers {
-			if c.Name == wslash || c.Id == name {
-				return true
-			}
-		}
-		return false
-	})
-	if pod == nil {
+
+	daemon.PodList.RLock()
+	glog.V(2).Infof("lock read of PodList")
+
+	pod, i, ok = daemon.PodList.GetByContainerIdOrName(name)
+	if !ok {
+		daemon.PodList.RUnlock()
+		glog.V(2).Infof("unlock read of PodList")
 		return types.ContainerInfo{}, fmt.Errorf("Can not find container by name(%s)", name)
 	}
+	c = pod.status.Containers[i]
+	daemon.PodList.RUnlock()
+	glog.V(2).Infof("unlock read of PodList")
 
 	ports := []types.ContainerPort{}
 	envs := []types.EnvironmentVar{}
@@ -240,6 +237,12 @@ func (daemon *Daemon) GetContainerInfo(name string) (types.ContainerInfo, error)
 				Value: e[strings.Index(e, "=")+1:]})
 		}
 		imageid = jsonResponse.Image
+		cmd = []string{jsonResponse.Path}
+		args = jsonResponse.Args
+	}
+	if len(cmd) == 0 {
+		glog.Warning("length of commands in inspect result should not be zero")
+		cmd = pod.spec.Containers[i].Command
 	}
 	for _, port := range pod.spec.Containers[i].Ports {
 		ports = append(ports, types.ContainerPort{
@@ -289,12 +292,13 @@ func (daemon *Daemon) GetContainerInfo(name string) (types.ContainerInfo, error)
 		PodID:           pod.id,
 		Image:           c.Image,
 		ImageID:         imageid,
-		Commands:        pod.spec.Containers[i].Command,
-		Args:            []string{},
+		Commands:        cmd,
+		Args:            args,
 		Workdir:         pod.spec.Containers[i].Workdir,
 		Ports:           ports,
 		Environment:     envs,
 		Volume:          vols,
+		Tty:             pod.spec.Containers[i].Tty,
 		ImagePullPolicy: "",
 		Status:          s,
 	}, nil
