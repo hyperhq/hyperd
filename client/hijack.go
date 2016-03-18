@@ -104,7 +104,7 @@ func (cli *HyperClient) hijack(method, path string, setRawTerminal bool, in io.R
 		})
 	}
 
-	sendStdin := promise.Go(func() error {
+	go func() {
 		if in != nil {
 			io.Copy(rwc, in)
 			// fmt.Printf("[hijack] End of stdin\n")
@@ -117,20 +117,11 @@ func (cli *HyperClient) hijack(method, path string, setRawTerminal bool, in io.R
 				fmt.Printf("Couldn't send EOF: %s", err.Error())
 			}
 		}
-		// Discard errors due to pipe interruption
-		return nil
-	})
+	}()
 
 	if stdout != nil || stderr != nil {
 		if err := <-receiveStdout; err != nil {
 			fmt.Printf("Error receiveStdout: %s\n", err.Error())
-			return err
-		}
-		sendStdin <- nil
-	}
-	if in != nil {
-		if err := <-sendStdin; err != nil {
-			fmt.Printf("Error sendStdin: %s\n", err.Error())
 			return err
 		}
 	}
