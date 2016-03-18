@@ -46,18 +46,7 @@ type ContainerStatus struct {
 }
 
 type ContainerInfo struct {
-	Name            string           `json:"name"`
-	ContainerID     string           `json:"containerID"`
-	PodID           string           `json:"podID"`
-	Image           string           `json:"image"`
-	ImageID         string           `json:"imageID"`
-	Commands        []string         `json:"commands"`
-	Args            []string         `json:"args"`
-	Workdir         string           `json:"workingDir"`
-	Ports           []ContainerPort  `json:"ports"`
-	Environment     []EnvironmentVar `json:"env"`
-	Volume          []VolumeMount    `json:"volumeMounts"`
-	Tty             bool             `json:"tty"`
-	ImagePullPolicy string           `json:"imagePullPolicy"`
-	Status          ContainerStatus  `json:"status"`
+	Container
+	PodID  string          `json:"podID"`
+	Status ContainerStatus `json:"status"`
 }
