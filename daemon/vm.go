@@ -87,6 +87,7 @@ func (daemon *Daemon) ReleaseAllVms() (int, error) {
 			/* FIXME: continue to release other vms? */
 			break
 		}
+		daemon.RemoveVm(vm.Id)
 	}
 
 	return ret, err
