@@ -31,55 +31,6 @@ func main() {
 }
 ```
 
-If you wish to initialize a SentryHook with tags, you can use the `NewWithTagsSentryHook` constructor to provide default tags:
-
-```go
-tags := map[string]string{
-  "site": "example.com",
-}
-levels := []logrus.Level{
-  logrus.PanicLevel,
-  logrus.FatalLevel,
-  logrus.ErrorLevel,
-}
-hook, err := logrus_sentry.NewWithTagsSentryHook(YOUR_DSN, tags, levels)
-
-```
-
-If you wish to initialize a SentryHook with an already initialized raven client, you can use 
-the `NewWithClientSentryHook` constructor:
-
-```go
-import (
-  "github.com/Sirupsen/logrus"
-  "github.com/Sirupsen/logrus/hooks/sentry"
-  "github.com/getsentry/raven-go"
-)
-
-func main() {
-  log := logrus.New()
-
-  client, err := raven.New(YOUR_DSN)
-  if err != nil {
-      log.Fatal(err)
-  }
-
-  hook, err := logrus_sentry.NewWithClientSentryHook(client, []logrus.Level{
-    logrus.PanicLevel,
-    logrus.FatalLevel,
-    logrus.ErrorLevel,
-  })
-
-  if err == nil {
-    log.Hooks.Add(hook)
-  }
-}
-
-hook, err := NewWithClientSentryHook(client, []logrus.Level{
-	logrus.ErrorLevel,
-})
-```
-
 ## Special fields
 
 Some logrus fields have a special meaning in this hook,
