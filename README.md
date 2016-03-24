@@ -60,7 +60,7 @@ Clone hyper and runv in GoPath
 	> git clone https://github.com/hyperhq/runv.git runv
 	> git clone https://github.com/hyperhq/hyper.git hyper
 
-And make sure you have `go` (>= 1.4) and `autotools`, go into the `hyper` dir
+And make sure you have `go` (>= 1.4) , `device-mapper-devel`, and `autotools`, go into the `hyper` dir
 
     > ./autogen.sh
     > ./configure
