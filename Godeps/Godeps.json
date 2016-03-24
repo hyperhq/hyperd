@@ -21,8 +21,8 @@
 		},
 		{
 			"ImportPath": "github.com/Sirupsen/logrus",
-			"Comment": "v0.8.7",
-			"Rev": "418b41d23a1bf978c06faea5313ba194650ac088"
+			"Comment": "v0.8.2",
+			"Rev": "98a1428efc3d732f9e377b50c8e2113e070896cf"
 		},
 		{
 			"ImportPath": "github.com/Unknwon/goconfig",
@@ -79,38 +79,38 @@
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/client",
-			"Comment": "v2.3.0-alpha.0-66-g3306573",
-			"Rev": "33065739df8c2f0dc1274222b4c30cc837355bfb"
+			"Comment": "v2.2.0",
+			"Rev": "e4561dd8cfb1163fb51afceca9c78aa89398e731"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/pathutil",
-			"Comment": "v2.3.0-alpha.0-66-g3306573",
-			"Rev": "33065739df8c2f0dc1274222b4c30cc837355bfb"
+			"Comment": "v2.2.0",
+			"Rev": "e4561dd8cfb1163fb51afceca9c78aa89398e731"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/types",
-			"Comment": "v2.3.0-alpha.0-66-g3306573",
-			"Rev": "33065739df8c2f0dc1274222b4c30cc837355bfb"
+			"Comment": "v2.2.0",
+			"Rev": "e4561dd8cfb1163fb51afceca9c78aa89398e731"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-systemd/activation",
-			"Comment": "v4-40-g2ed5b50",
-			"Rev": "2ed5b5012ccde5f057c197890a2c801295941149"
+			"Comment": "v4",
+			"Rev": "b4a58d95188dd092ae20072bac14cece0e67c388"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-systemd/dbus",
-			"Comment": "v4-40-g2ed5b50",
-			"Rev": "2ed5b5012ccde5f057c197890a2c801295941149"
+			"Comment": "v4",
+			"Rev": "b4a58d95188dd092ae20072bac14cece0e67c388"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-systemd/journal",
-			"Comment": "v4-40-g2ed5b50",
-			"Rev": "2ed5b5012ccde5f057c197890a2c801295941149"
+			"Comment": "v4",
+			"Rev": "b4a58d95188dd092ae20072bac14cece0e67c388"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-systemd/util",
-			"Comment": "v4-40-g2ed5b50",
-			"Rev": "2ed5b5012ccde5f057c197890a2c801295941149"
+			"Comment": "v4",
+			"Rev": "b4a58d95188dd092ae20072bac14cece0e67c388"
 		},
 		{
 			"ImportPath": "github.com/deckarep/golang-set",
@@ -119,8 +119,8 @@
 		},
 		{
 			"ImportPath": "github.com/docker/distribution",
-			"Comment": "v2.3.0-alpha-10-gcb08de1",
-			"Rev": "cb08de17d74bef86ce6c5abe8b240e282f5750be"
+			"Comment": "v2.3.0-rc.1-5-g0f2d99b",
+			"Rev": "0f2d99b13ae0cfbcf118eff103e6e680b726b47e"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/api",
@@ -626,7 +626,7 @@
 		},
 		{
 			"ImportPath": "github.com/ugorji/go/codec",
-			"Rev": "646ae4a518c1c3be0739df898118d9bccf993858"
+			"Rev": "5abd4e96a45c386928ed2ca2a7ef63e2533e18ec"
 		},
 		{
 			"ImportPath": "github.com/vaughan0/go-ini",

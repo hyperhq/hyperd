@@ -2,8 +2,8 @@ package logrus_sentry
 
 import (
 	"fmt"
-	"net/http"
 	"time"
+	"net/http"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/getsentry/raven-go"
@@ -68,27 +68,10 @@ type SentryHook struct {
 // and initializes the raven client.
 // This method sets the timeout to 100 milliseconds.
 func NewSentryHook(DSN string, levels []logrus.Level) (*SentryHook, error) {
-	client, err := raven.New(DSN)
+	client, err := raven.NewClient(DSN, nil)
 	if err != nil {
 		return nil, err
 	}
-	return &SentryHook{100 * time.Millisecond, client, levels}, nil
-}
-
-// NewWithTagsSentryHook creates a hook with tags to be added to an instance
-// of logger and initializes the raven client. This method sets the timeout to
-// 100 milliseconds.
-func NewWithTagsSentryHook(DSN string, tags map[string]string, levels []logrus.Level) (*SentryHook, error) {
-	client, err := raven.NewWithTags(DSN, tags)
-	if err != nil {
-		return nil, err
-	}
-	return &SentryHook{100 * time.Millisecond, client, levels}, nil
-}
-
-// NewWithClientSentryHook creates a hook using an initialized raven client.
-// This method sets the timeout to 100 milliseconds.
-func NewWithClientSentryHook(client *raven.Client, levels []logrus.Level) (*SentryHook, error) {
 	return &SentryHook{100 * time.Millisecond, client, levels}, nil
 }
 

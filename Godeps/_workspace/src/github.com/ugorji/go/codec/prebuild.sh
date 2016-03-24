@@ -49,8 +49,7 @@ _build() {
         # [ -e "safe${_gg}" ] && mv safe${_gg} safe${_gg}__${_zts}.bak
         # [ -e "unsafe${_gg}" ] && mv unsafe${_gg} unsafe${_gg}__${_zts}.bak
     else 
-        rm -f fast-path.generated.go gen.generated.go gen-helper.generated.go \
-           *safe.generated.go *_generated_test.go *.generated_ffjson_expose.go
+        rm -f fast-path.generated.go gen.generated.go gen-helper.generated.go *safe.generated.go *_generated_test.go *.generated_ffjson_expose.go
     fi
 
     cat > gen.generated.go <<EOF
@@ -78,15 +77,28 @@ EOF
 \`
 
 EOF
-
-    cat > gen-from-tmpl.codec.generated.go <<EOF
+    # All functions, variables which must exist are put in this file.
+    # This way, build works before we generate the right things.
+    cat > fast-path.generated.go <<EOF
 package codec 
-import "io"
-func GenInternalGoFile(r io.Reader, w io.Writer, safe bool) error {
-return genInternalGoFile(r, w, safe)
+import "reflect"
+// func GenBytesToStringRO(b []byte) string { return string(b) }
+func fastpathDecodeTypeSwitch(iv interface{}, d *Decoder) bool { return false }
+func fastpathEncodeTypeSwitch(iv interface{}, e *Encoder) bool { return false }
+func fastpathEncodeTypeSwitchSlice(iv interface{}, e *Encoder) bool { return false }
+func fastpathEncodeTypeSwitchMap(iv interface{}, e *Encoder) bool { return false }
+type fastpathE struct {
+	rtid uintptr
+	rt reflect.Type 
+	encfn func(encFnInfo, reflect.Value)
+	decfn func(decFnInfo, reflect.Value)
 }
+type fastpathA [0]fastpathE
+func (x fastpathA) index(rtid uintptr) int { return -1 }
+var fastpathAV fastpathA 
+
 EOF
-    
+
     cat > gen-from-tmpl.generated.go <<EOF
 //+build ignore
 
@@ -117,8 +129,8 @@ run("gen-helper.go.tmpl", "gen-helper.generated.go", false)
 }
 
 EOF
-    go run -tags=notfastpath gen-from-tmpl.generated.go && \
-        rm -f gen-from-tmpl.*generated.go 
+    go run gen-from-tmpl.generated.go && \
+        rm -f gen-from-tmpl.generated.go 
 }
 
 _codegenerators() {
@@ -128,35 +140,18 @@ _codegenerators() {
                 "1" == $( _needgen "values_ffjson${zsfx}" ) ||
                 1 == 0 ]] 
     then
-        # codecgen creates some temporary files in the directory (main, pkg).
-        # Consequently, we should start msgp and ffjson first, and also put a small time latency before
-        # starting codecgen.
-        # Without this, ffjson chokes on one of the temporary files from codecgen.
-        if [[ $zexternal == "1" ]]
-        then 
-            echo "ffjson ... " && \
-                ffjson -w values_ffjson${zsfx} $zfin &
-            zzzIdFF=$!
+        true && \
+            echo "codecgen - !unsafe ... " && \
+            codecgen -rt codecgen -t 'x,codecgen,!unsafe' -o values_codecgen${zsfx} $zfin && \
+            echo "codecgen - unsafe ... " && \
+            codecgen -u -rt codecgen -t 'x,codecgen,unsafe' -o values_codecgen_unsafe${zsfx} $zfin && \
             echo "msgp ... " && \
-                msgp -tests=false -o=values_msgp${zsfx} -file=$zfin &
-            zzzIdMsgp=$!
-            
-            sleep 1 # give ffjson and msgp some buffer time. see note above.
-        fi
-        
-        echo "codecgen - !unsafe ... " && \
-            codecgen -rt codecgen -t 'x,codecgen,!unsafe' -o values_codecgen${zsfx} -d 19780 $zfin &
-        zzzIdC=$!
-        echo "codecgen - unsafe ... " && \
-            codecgen  -u -rt codecgen -t 'x,codecgen,unsafe' -o values_codecgen_unsafe${zsfx} -d 19781 $zfin &
-        zzzIdCU=$!
-        wait $zzzIdC $zzzIdCU $zzzIdMsgp $zzzIdFF && \
+            msgp -tests=false -pkg=codec -o=values_msgp${zsfx} -file=$zfin && \
+            echo "ffjson ... " && \
+            ffjson -w values_ffjson${zsfx} $zfin && \
             # remove (M|Unm)arshalJSON implementations, so they don't conflict with encoding/json bench \
-            if [[ $zexternal == "1" ]]
-            then
-                sed -i 's+ MarshalJSON(+ _MarshalJSON(+g' values_ffjson${zsfx} && \
-                    sed -i 's+ UnmarshalJSON(+ _UnmarshalJSON(+g' values_ffjson${zsfx}
-            fi && \
+            sed -i 's+ MarshalJSON(+ _MarshalJSON(+g' values_ffjson${zsfx} && \
+            sed -i 's+ UnmarshalJSON(+ _UnmarshalJSON(+g' values_ffjson${zsfx} && \
             echo "generators done!" && \
             true
     fi 
@@ -165,13 +160,12 @@ _codegenerators() {
 # _init reads the arguments and sets up the flags
 _init() {
 OPTIND=1
-while getopts "fbx" flag
+while getopts "fb" flag
 do
     case "x$flag" in 
         'xf') zforce=1;;
         'xb') zbak=1;;
-        'xx') zexternal=1;;
-        *) echo "prebuild.sh accepts [-fbx] only"; return 1;;
+        *) echo "prebuild.sh accepts [-fb] only"; return 1;;
     esac
 done
 shift $((OPTIND-1))

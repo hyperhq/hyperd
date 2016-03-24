@@ -73,15 +73,14 @@ func (f *TextFormatter) Format(entry *Entry) ([]byte, error) {
 	isColorTerminal := isTerminal && (runtime.GOOS != "windows")
 	isColored := (f.ForceColors || isColorTerminal) && !f.DisableColors
 
-	timestampFormat := f.TimestampFormat
-	if timestampFormat == "" {
-		timestampFormat = DefaultTimestampFormat
+	if f.TimestampFormat == "" {
+		f.TimestampFormat = DefaultTimestampFormat
 	}
 	if isColored {
-		f.printColored(b, entry, keys, timestampFormat)
+		f.printColored(b, entry, keys)
 	} else {
 		if !f.DisableTimestamp {
-			f.appendKeyValue(b, "time", entry.Time.Format(timestampFormat))
+			f.appendKeyValue(b, "time", entry.Time.Format(f.TimestampFormat))
 		}
 		f.appendKeyValue(b, "level", entry.Level.String())
 		f.appendKeyValue(b, "msg", entry.Message)
@@ -94,7 +93,7 @@ func (f *TextFormatter) Format(entry *Entry) ([]byte, error) {
 	return b.Bytes(), nil
 }
 
-func (f *TextFormatter) printColored(b *bytes.Buffer, entry *Entry, keys []string, timestampFormat string) {
+func (f *TextFormatter) printColored(b *bytes.Buffer, entry *Entry, keys []string) {
 	var levelColor int
 	switch entry.Level {
 	case DebugLevel:
@@ -112,11 +111,11 @@ func (f *TextFormatter) printColored(b *bytes.Buffer, entry *Entry, keys []strin
 	if !f.FullTimestamp {
 		fmt.Fprintf(b, "\x1b[%dm%s\x1b[0m[%04d] %-44s ", levelColor, levelText, miniTS(), entry.Message)
 	} else {
-		fmt.Fprintf(b, "\x1b[%dm%s\x1b[0m[%s] %-44s ", levelColor, levelText, entry.Time.Format(timestampFormat), entry.Message)
+		fmt.Fprintf(b, "\x1b[%dm%s\x1b[0m[%s] %-44s ", levelColor, levelText, entry.Time.Format(f.TimestampFormat), entry.Message)
 	}
 	for _, k := range keys {
 		v := entry.Data[k]
-		fmt.Fprintf(b, " \x1b[%dm%s\x1b[0m=%+v", levelColor, k, v)
+		fmt.Fprintf(b, " \x1b[%dm%s\x1b[0m=%v", levelColor, k, v)
 	}
 }
 
@@ -132,28 +131,21 @@ func needsQuoting(text string) bool {
 	return true
 }
 
-func (f *TextFormatter) appendKeyValue(b *bytes.Buffer, key string, value interface{}) {
-
-	b.WriteString(key)
-	b.WriteByte('=')
-
-	switch value := value.(type) {
+func (f *TextFormatter) appendKeyValue(b *bytes.Buffer, key, value interface{}) {
+	switch value.(type) {
 	case string:
-		if needsQuoting(value) {
-			b.WriteString(value)
+		if needsQuoting(value.(string)) {
+			fmt.Fprintf(b, "%v=%s ", key, value)
 		} else {
-			fmt.Fprintf(b, "%q", value)
+			fmt.Fprintf(b, "%v=%q ", key, value)
 		}
 	case error:
-		errmsg := value.Error()
-		if needsQuoting(errmsg) {
-			b.WriteString(errmsg)
+		if needsQuoting(value.(error).Error()) {
+			fmt.Fprintf(b, "%v=%s ", key, value)
 		} else {
-			fmt.Fprintf(b, "%q", value)
+			fmt.Fprintf(b, "%v=%q ", key, value)
 		}
 	default:
-		fmt.Fprint(b, value)
+		fmt.Fprintf(b, "%v=%v ", key, value)
 	}
-
-	b.WriteByte(' ')
 }
