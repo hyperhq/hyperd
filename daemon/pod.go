@@ -85,14 +85,14 @@ func (daemon *Daemon) StartPod(stdin io.ReadCloser, stdout io.WriteCloser, podId
 }
 
 //create pod if not exist
-func (daemon *Daemon) RunPod(podId, podArgs, vmId string, config interface{}, lazy, autoremove bool, keep int, streams []*hypervisor.TtyIO) (int, string, error) {
+func (daemon *Daemon) RunPod(podId, podArgs, vmId string, config interface{}, lazy bool, keep int, streams []*hypervisor.TtyIO) (int, string, error) {
 	daemon.PodList.Lock()
 	glog.V(2).Infof("lock PodList")
 	defer glog.V(2).Infof("unlock PodList")
 	defer daemon.PodList.Unlock()
 	glog.V(1).Infof("podArgs: %s", podArgs)
 
-	p, err := daemon.GetPod(podId, podArgs, autoremove)
+	p, err := daemon.GetPod(podId, podArgs)
 	if err != nil {
 		return -1, "", err
 	}
@@ -125,7 +125,7 @@ type Pod struct {
 	sync.RWMutex
 }
 
-func NewPod(rawSpec []byte, id string, data interface{}, autoremove bool) (*Pod, error) {
+func NewPod(rawSpec []byte, id string, data interface{}) (*Pod, error) {
 	var err error
 
 	p := &Pod{
@@ -138,7 +138,7 @@ func NewPod(rawSpec []byte, id string, data interface{}, autoremove bool) (*Pod,
 		return nil, err
 	}
 
-	if err = p.init(data, autoremove); err != nil {
+	if err = p.init(data); err != nil {
 		return nil, err
 	}
 
@@ -194,7 +194,7 @@ func (p *Pod) DoCreate(daemon *Daemon) error {
 	return nil
 }
 
-func (daemon *Daemon) CreatePod(podId, podArgs string, autoremove bool) (*Pod, error) {
+func (daemon *Daemon) CreatePod(podId, podArgs string) (*Pod, error) {
 	// we can only support 1024 Pods
 	if daemon.GetRunningPodNum() >= 1024 {
 		return nil, fmt.Errorf("Pod full, the maximum Pod is 1024!")
@@ -204,13 +204,13 @@ func (daemon *Daemon) CreatePod(podId, podArgs string, autoremove bool) (*Pod, e
 		podId = fmt.Sprintf("pod-%s", pod.RandStr(10, "alpha"))
 	}
 
-	return daemon.createPodInternal(podId, podArgs, autoremove, false)
+	return daemon.createPodInternal(podId, podArgs, false)
 }
 
-func (daemon *Daemon) createPodInternal(podId, podArgs string, autoremove, withinLock bool) (*Pod, error) {
+func (daemon *Daemon) createPodInternal(podId, podArgs string, withinLock bool) (*Pod, error) {
 	glog.V(2).Infof("podArgs: %s", podArgs)
 
-	pod, err := NewPod([]byte(podArgs), podId, daemon, autoremove)
+	pod, err := NewPod([]byte(podArgs), podId, daemon)
 	if err != nil {
 		return nil, err
 	}
@@ -280,7 +280,7 @@ func (daemon *Daemon) SetPodLabels(podId string, override bool, labels map[strin
 	return nil
 }
 
-func (p *Pod) init(data interface{}, autoremove bool) error {
+func (p *Pod) init(data interface{}) error {
 	if err := p.spec.Validate(); err != nil {
 		return err
 	}
@@ -298,7 +298,6 @@ func (p *Pod) init(data interface{}, autoremove bool) error {
 	status := hypervisor.NewPod(p.id, p.spec)
 	status.Handler.Handle = hyperHandlePodEvent
 	status.Handler.Data = data
-	status.Autoremove = autoremove
 	status.ResourcePath = resPath
 
 	p.status = status
@@ -1047,7 +1046,7 @@ func (daemon *Daemon) RestartPod(mypod *hypervisor.PodStatus) error {
 	var lazy bool = hypervisor.HDriver.SupportLazyMode()
 
 	// Start the pod
-	_, _, err = daemon.RunPod(mypod.Id, string(podData), "", nil, lazy, false, types.VM_KEEP_NONE, []*hypervisor.TtyIO{})
+	_, _, err = daemon.RunPod(mypod.Id, string(podData), "", nil, lazy, types.VM_KEEP_NONE, []*hypervisor.TtyIO{})
 	if err != nil {
 		glog.Error(err.Error())
 		return err
@@ -1073,10 +1072,6 @@ func hyperHandlePodEvent(vmResponse *types.VmResponse, data interface{},
 		stopLogger(mypod)
 		mypod.SetPodContainerStatus(vmResponse.Data.([]uint32))
 		vm.Status = types.S_VM_IDLE
-		if mypod.Autoremove == true {
-			daemon.CleanPod(mypod.Id)
-			return false
-		}
 	} else if vmResponse.Code == types.E_VM_SHUTDOWN {
 		if mypod.Status == types.S_POD_RUNNING {
 			stopLogger(mypod)

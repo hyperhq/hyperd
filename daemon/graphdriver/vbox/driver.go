@@ -342,7 +342,7 @@ func (d *Driver) VmMountLayer(id string) error {
 		return fmt.Errorf("can not find VM(%s)", d.pullVm)
 	}
 	if vm.Status == types.S_VM_IDLE {
-		code, cause, err := daemon.RunPod(podId, podstring, d.pullVm, nil, false, true, types.VM_KEEP_AFTER_SHUTDOWN, []*hypervisor.TtyIO{})
+		code, cause, err := daemon.RunPod(podId, podstring, d.pullVm, nil, false, types.VM_KEEP_AFTER_SHUTDOWN, []*hypervisor.TtyIO{})
 		if err != nil {
 			glog.Errorf("Code is %d, Cause is %s, %s", code, cause, err.Error())
 			d.daemon.KillVm(d.pullVm)
