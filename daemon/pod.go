@@ -337,7 +337,7 @@ func (p *Pod) tryLoadContainers(daemon *Daemon) ([]*dockertypes.ContainerJSON, e
 		ok             bool
 	)
 
-	if ids, _ := daemon.GetPodContainersByName(p.id); ids != nil {
+	if ids, _ := daemon.GetPodContainersByPod(p.id); ids != nil {
 		containerNames := make(map[string]int)
 
 		for idx, c := range p.spec.Containers {
@@ -1039,7 +1039,7 @@ func (daemon *Daemon) RestartPod(mypod *hypervisor.PodStatus) error {
 	daemon.RemovePod(mypod.Id)
 	daemon.DeleteVolumeId(mypod.Id)
 
-	podData, err := daemon.GetPodByName(mypod.Id)
+	podData, err := daemon.GetPodFromDB(mypod.Id)
 	if err != nil {
 		return err
 	}
