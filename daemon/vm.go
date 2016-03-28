@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"fmt"
+	"runtime"
 
 	"github.com/golang/glog"
 	"github.com/hyperhq/runv/hypervisor"
@@ -117,7 +118,11 @@ func (daemon *Daemon) StartVm(vmId string, cpu, mem int, lazy bool, keep int) (v
 	}
 
 	glog.V(1).Infof("The config: kernel=%s, initrd=%s", daemon.Kernel, daemon.Initrd)
-	vm, err = hypervisor.GetVm(vmId, b, false, lazy, keep)
+	if vmId != "" || daemon.Bios != "" || daemon.Cbfs != "" || runtime.GOOS == "darwin" || lazy || keep > 0 {
+		vm, err = hypervisor.GetVm(vmId, b, false, lazy, keep)
+	} else {
+		vm, err = daemon.Factory.GetVm(cpu, mem)
+	}
 	if err == nil {
 		daemon.AddVm(vm)
 	}

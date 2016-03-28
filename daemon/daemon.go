@@ -16,6 +16,7 @@ import (
 	"github.com/docker/docker/registry"
 	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/utils"
+	"github.com/hyperhq/runv/factory"
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/pod"
 	"github.com/hyperhq/runv/hypervisor/types"
@@ -33,6 +34,7 @@ type Daemon struct {
 	db          *leveldb.DB
 	PodList     *PodList
 	VmList      map[string]*hypervisor.Vm
+	Factory     factory.Factory
 	Kernel      string
 	Initrd      string
 	Bios        string
