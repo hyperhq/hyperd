@@ -33,7 +33,6 @@ type Daemon struct {
 	db          *leveldb.DB
 	PodList     *PodList
 	VmList      map[string]*hypervisor.Vm
-	vmCache     VmCache
 	Kernel      string
 	Initrd      string
 	Bios        string
@@ -165,7 +164,6 @@ func NewDaemonFromDirectory(cfg *goconfig.ConfigFile) (*Daemon, error) {
 		BridgeIP:    bridgeip,
 		BridgeIface: biface,
 	}
-	daemon.vmCache.daemon = daemon
 
 	daemon.Daemon, err = docker.NewDaemon(dockerCfg, registryCfg)
 	if err != nil {

@@ -229,9 +229,6 @@ func mainDaemon(opt *Options) {
 		return
 	}
 
-	vmCachePolicy, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "VmCachePolicy")
-	d.InitVmCache(vmCachePolicy)
-
 	// Daemon is fully initialized and handling API traffic
 	// Wait for serve API job to complete
 	select {
