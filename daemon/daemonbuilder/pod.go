@@ -259,7 +259,7 @@ func (d Docker) ContainerCreate(params types.ContainerCreateConfig) (types.Conta
 		return types.ContainerCreateResponse{}, err
 	}
 
-	pod, err := d.Daemon.CreatePod(podId, podString, false)
+	pod, err := d.Daemon.CreatePod(podId, podString)
 	if err != nil {
 		return types.ContainerCreateResponse{}, err
 	}

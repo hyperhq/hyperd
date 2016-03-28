@@ -8,17 +8,11 @@ import (
 )
 
 func (daemon Daemon) pausePod(podId string) error {
-	daemon.PodList.RLock()
-	glog.V(2).Infof("lock read of PodList")
 	pod, ok := daemon.PodList.Get(podId)
 	if !ok {
-		glog.V(2).Infof("unlock read of PodList")
-		daemon.PodList.RUnlock()
 		return fmt.Errorf("Can not get Pod info with pod ID(%s)", podId)
 	}
 	vmId := pod.status.Vm
-	glog.V(2).Infof("unlock read of PodList")
-	daemon.PodList.RUnlock()
 
 	vm, ok := daemon.VmList[vmId]
 	if !ok {
@@ -47,17 +41,11 @@ func (daemon Daemon) PauseContainer(container string) error {
 }
 
 func (daemon *Daemon) unpausePod(podId string) error {
-	daemon.PodList.RLock()
-	glog.V(2).Infof("lock read of PodList")
 	pod, ok := daemon.PodList.Get(podId)
 	if !ok {
-		glog.V(2).Infof("unlock read of PodList")
-		daemon.PodList.RUnlock()
 		return fmt.Errorf("Can not get Pod info with pod ID(%s)", podId)
 	}
 	vmId := pod.status.Vm
-	glog.V(2).Infof("unlock read of PodList")
-	daemon.PodList.RUnlock()
 
 	if pod.status.Status != types.S_POD_PAUSED {
 		return fmt.Errorf("pod is not paused")

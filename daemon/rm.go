@@ -8,16 +8,10 @@ import (
 	dockertypes "github.com/docker/engine-api/types"
 	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/utils"
-	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/types"
 )
 
 func (daemon *Daemon) CleanPod(podId string) (int, string, error) {
-	daemon.PodList.Lock()
-	glog.V(2).Infof("lock PodList")
-	defer glog.V(2).Infof("unlock PodList")
-	defer daemon.PodList.Unlock()
-
 	return daemon.CleanPodWithLock(podId)
 }
 
@@ -46,7 +40,7 @@ func (daemon *Daemon) CleanPodWithLock(podId string) (int, string, error) {
 	daemon.db.DeletePod(podId)
 	daemon.RemovePod(podId)
 	if pod.status.Type != "kubernetes" {
-		daemon.CleanUpContainer(pod.status)
+		daemon.RemovePodContainer(pod)
 	}
 	daemon.DeleteVolumeId(podId)
 	code = types.E_OK
@@ -54,12 +48,12 @@ func (daemon *Daemon) CleanPodWithLock(podId string) (int, string, error) {
 	return code, cause, nil
 }
 
-func (daemon *Daemon) CleanUpContainer(ps *hypervisor.PodStatus) {
-	for _, c := range ps.Containers {
+func (daemon *Daemon) RemovePodContainer(p *Pod) {
+	for _, c := range p.status.Containers {
 		glog.V(1).Infof("Ready to rm container: %s", c.Id)
 		if err := daemon.Daemon.ContainerRm(c.Id, &dockertypes.ContainerRmConfig{}); err != nil {
 			glog.Warningf("Error to rm container: %s", err.Error())
 		}
 	}
-	daemon.db.DeleteP2C(ps.Id)
+	daemon.db.DeleteP2C(p.id)
 }

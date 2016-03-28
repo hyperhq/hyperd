@@ -3,9 +3,9 @@ package daemondb
 import (
 	"strings"
 
+	"github.com/golang/glog"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
-	"github.com/golang/glog"
 )
 
 type DaemonDB struct {
@@ -23,7 +23,7 @@ func NewDaemonDB(db_file string) (*DaemonDB, error) {
 		glog.Errorf("open leveldb file failed, %s", err.Error())
 		return nil, err
 	}
-	return &DaemonDB{ db: db }, nil
+	return &DaemonDB{db: db}, nil
 }
 
 // Composition Process

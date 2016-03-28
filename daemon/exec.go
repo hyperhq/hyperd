@@ -17,9 +17,9 @@ func (daemon *Daemon) ExitCode(container, tag string) (int, error) {
 		return -1, err
 	}
 
-	pod.Lock()
+	pod.RLock()
 	tty, ok := pod.ttyList[tag]
-	defer pod.Unlock()
+	defer pod.RUnlock()
 
 	if !ok {
 		return -1, fmt.Errorf("Tag %s incorrect", tag)

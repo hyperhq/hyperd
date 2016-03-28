@@ -54,8 +54,6 @@ func (daemon *Daemon) Restore() error {
 		return nil
 	}
 
-	podList := map[string]string{}
-
 	ch := daemon.db.GetAllPods()
 	if ch == nil {
 		estr := "Cannot list pods in leveldb"
@@ -77,28 +75,25 @@ func (daemon *Daemon) Restore() error {
 		podId := string(item.K[4:])
 
 		daemon.db.DeletePod(podId)
-		podList[podId] = string(item.V)
-	}
 
-	daemon.PodList.Lock()
-	glog.V(2).Infof("lock PodList")
-	defer glog.V(2).Infof("unlock PodList")
-	defer daemon.PodList.Unlock()
-
-	for k, v := range podList {
-		_, err := daemon.createPodInternal(k, v, true)
+		p, err := daemon.createPodInternal(podId, string(item.V), true)
 		if err != nil {
 			glog.Warningf("Got a unexpected error, %s", err.Error())
 			continue
 		}
-		vmId, err := daemon.db.GetP2V(k)
-		if err != nil {
-			glog.V(1).Info(err.Error(), " for ", k)
+
+		if err = daemon.AddPod(p, string(item.V)); err != nil {
+			//TODO: remove the created
 			continue
 		}
-		p, _ := daemon.PodList.Get(k)
+
+		vmId, err := daemon.db.GetP2V(podId)
+		if err != nil {
+			glog.V(1).Info(err.Error(), " for ", podId)
+			continue
+		}
 		if err := p.AssociateVm(daemon, string(vmId)); err != nil {
-			glog.V(1).Info("Some problem during associate vm %s to pod %s, %v", string(vmId), k, err)
+			glog.V(1).Info("Some problem during associate vm %s to pod %s, %v", string(vmId), podId, err)
 			// continue to next
 		}
 	}
@@ -265,32 +260,6 @@ func (daemon *Daemon) GetRunningPodNum() int64 {
 	return daemon.PodList.CountRunning()
 }
 
-// Lock protected
-func (daemon *Daemon) GetPod(podId, podArgs string) (*Pod, error) {
-	var (
-		pod *Pod
-		ok  bool
-	)
-
-	if podArgs == "" {
-		if pod, ok = daemon.PodList.Get(podId); !ok {
-			return nil, fmt.Errorf("Can not find the POD instance of %s", podId)
-		}
-		return pod, nil
-	}
-
-	pod, err := daemon.createPodInternal(podId, podArgs, true)
-	if err != nil {
-		return nil, err
-	}
-
-	if err = daemon.AddPod(pod, podArgs); err != nil {
-		return nil, err
-	}
-
-	return pod, nil
-}
-
 func (daemon *Daemon) GetVolumeId(podId, volName string) (int, error) {
 	vols, err := daemon.db.ListPodVolumes(podId)
 	if err != nil {
@@ -319,9 +288,7 @@ func (daemon *Daemon) DeleteVolumeId(podId string) error {
 }
 
 func (daemon *Daemon) WritePodAndContainers(podId string) error {
-	daemon.PodList.RLock()
 	p, ok := daemon.PodList.Get(podId)
-	daemon.PodList.RUnlock()
 	if !ok {
 		return fmt.Errorf("Cannot find Pod %s to write", podId)
 	}
@@ -335,10 +302,6 @@ func (daemon *Daemon) WritePodAndContainers(podId string) error {
 }
 
 func (daemon *Daemon) GetVmByPodId(podId string) (string, error) {
-	daemon.PodList.RLock()
-	glog.V(2).Infof("lock read of PodList")
-	defer glog.V(2).Infof("unlock read of PodList")
-	defer daemon.PodList.RUnlock()
 	pod, ok := daemon.PodList.Get(podId)
 	if !ok {
 		return "", fmt.Errorf("Not found Pod %s", podId)
@@ -347,11 +310,6 @@ func (daemon *Daemon) GetVmByPodId(podId string) (string, error) {
 }
 
 func (daemon *Daemon) GetPodByContainer(containerId string) (string, error) {
-	daemon.PodList.RLock()
-	glog.V(2).Infof("lock read of PodList")
-	defer glog.V(2).Infof("unlock read of PodList")
-	defer daemon.PodList.RUnlock()
-
 	if pod, ok := daemon.PodList.GetByContainerId(containerId); ok {
 		return pod.id, nil
 	} else {
@@ -360,11 +318,6 @@ func (daemon *Daemon) GetPodByContainer(containerId string) (string, error) {
 }
 
 func (daemon *Daemon) GetPodByContainerIdOrName(name string) (pod *Pod, idx int, err error) {
-	daemon.PodList.RLock()
-	glog.V(2).Infof("lock read of PodList")
-	defer glog.V(2).Infof("unlock read of PodList")
-	defer daemon.PodList.RUnlock()
-
 	if pod, idx, ok := daemon.PodList.GetByContainerIdOrName(name); ok {
 		return pod, idx, nil
 	} else {
@@ -384,12 +337,10 @@ func (daemon *Daemon) AddPod(pod *Pod, podArgs string) (err error) {
 		}
 	}()
 
-	daemon.PodList.Lock()
 	daemon.PodList.Put(pod)
-	daemon.PodList.Unlock()
 	defer func() {
 		if err != nil {
-			daemon.RemovePod(pod.id)
+			daemon.PodList.Delete(pod.id)
 		}
 	}()
 
@@ -402,9 +353,7 @@ func (daemon *Daemon) AddPod(pod *Pod, podArgs string) (err error) {
 }
 
 func (daemon *Daemon) RemovePod(podId string) {
-	daemon.PodList.Lock()
 	daemon.PodList.Delete(podId)
-	daemon.PodList.Unlock()
 }
 
 func (daemon *Daemon) AddVm(vm *hypervisor.Vm) {
@@ -416,17 +365,12 @@ func (daemon *Daemon) RemoveVm(vmId string) {
 }
 
 func (daemon *Daemon) DestroyAllVm() error {
-	glog.V(0).Info("The daemon will stop all pod")
-	daemon.PodList.Lock()
-	glog.V(2).Infof("lock PodList")
-
 	daemon.PodList.Foreach(func(p *Pod) error {
 		if _, _, err := daemon.StopPodWithLock(p.id, "yes"); err != nil {
 			glog.V(1).Infof("fail to stop %s: %v", p.id, err)
 		}
 		return nil
 	})
-	daemon.PodList.Unlock()
 	glog.V(2).Infof("unlock PodList")
 	return nil
 }

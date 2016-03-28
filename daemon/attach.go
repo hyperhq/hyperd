@@ -36,9 +36,9 @@ func (daemon *Daemon) Attach(stdin io.ReadCloser, stdout io.WriteCloser, key, id
 		}
 
 		podId = pod.id
-		pod.RLock()
+		pod.Lock()
 		pod.ttyList[tag] = tty
-		pod.RUnlock()
+		pod.Unlock()
 
 		defer func() {
 			if err != nil && pod != nil {

@@ -5,16 +5,16 @@ import (
 )
 
 const (
-	VM_KEY = "vmdata-%s"
-	POD_KEY = "pod-%s"
-	POD_VM_KEY = "vm-%s"
+	VM_KEY            = "vmdata-%s"
+	POD_KEY           = "pod-%s"
+	POD_VM_KEY        = "vm-%s"
 	POD_CONTAINER_KEY = "pod-container-%s"
-	POD_VOLUME_KEY = "vol-%s-%s"
+	POD_VOLUME_KEY    = "vol-%s-%s"
 
-	POD_PREFIX = "pod-"
+	POD_PREFIX           = "pod-"
 	POD_CONTAINER_PREFIX = "pod-container-"
-	POD_VOLUME_PREFIX = "vol-%s"
-	POD_VM_PREFIX = "vm-"
+	POD_VOLUME_PREFIX    = "vol-%s"
+	POD_VM_PREFIX        = "vm-"
 )
 
 //the id is a vm id

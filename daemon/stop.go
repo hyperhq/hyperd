@@ -8,14 +8,13 @@ import (
 
 func (daemon *Daemon) PodStopped(podId string) {
 	// find the vm id which running POD, and stop it
-	daemon.PodList.RLock()
 	pod, ok := daemon.PodList.Get(podId)
-	daemon.PodList.RUnlock()
 	if !ok {
 		glog.Errorf("Can not find pod(%s)", podId)
 		return
 	}
 
+	pod.status.Vm = ""
 	if pod.vm == nil {
 		return
 	}
@@ -26,10 +25,6 @@ func (daemon *Daemon) PodStopped(podId string) {
 }
 
 func (daemon *Daemon) StopPod(podId, stopVm string) (int, string, error) {
-	daemon.PodList.Lock()
-	glog.V(2).Infof("lock PodList")
-	defer glog.V(2).Infof("unlock PodList")
-	defer daemon.PodList.Unlock()
 
 	return daemon.StopPodWithLock(podId, stopVm)
 }

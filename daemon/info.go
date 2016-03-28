@@ -14,10 +14,6 @@ import (
 )
 
 func (daemon *Daemon) GetPodInfo(podName string) (types.PodInfo, error) {
-	daemon.PodList.RLock()
-	glog.V(2).Infof("lock read of PodList")
-	defer daemon.PodList.RUnlock()
-	defer glog.V(2).Infof("unlock read of PodList")
 	var (
 		pod     *Pod
 		ok      bool
@@ -170,10 +166,6 @@ func (daemon *Daemon) GetPodInfo(podName string) (types.PodInfo, error) {
 }
 
 func (daemon *Daemon) GetPodStats(podId string) (interface{}, error) {
-	daemon.PodList.RLock()
-	glog.V(2).Infof("lock read of PodList")
-	defer daemon.PodList.RUnlock()
-	defer glog.V(2).Infof("unlock read of PodList")
 	var (
 		pod *Pod
 		ok  bool
@@ -218,18 +210,11 @@ func (daemon *Daemon) GetContainerInfo(name string) (types.ContainerInfo, error)
 	}
 	glog.Infof(name)
 
-	daemon.PodList.RLock()
-	glog.V(2).Infof("lock read of PodList")
-
 	pod, i, ok = daemon.PodList.GetByContainerIdOrName(name)
 	if !ok {
-		daemon.PodList.RUnlock()
-		glog.V(2).Infof("unlock read of PodList")
 		return types.ContainerInfo{}, fmt.Errorf("Can not find container by name(%s)", name)
 	}
 	c = pod.status.Containers[i]
-	daemon.PodList.RUnlock()
-	glog.V(2).Infof("unlock read of PodList")
 
 	ports := []types.ContainerPort{}
 	envs := []types.EnvironmentVar{}

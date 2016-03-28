@@ -2,7 +2,6 @@ package daemon
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -29,91 +28,6 @@ import (
 	"github.com/hyperhq/runv/hypervisor/types"
 )
 
-func (daemon *Daemon) StartPod(stdin io.ReadCloser, stdout io.WriteCloser, podId, vmId, tag string) (int, string, error) {
-	// we can only support 1024 Pods
-	if daemon.GetRunningPodNum() >= 1024 {
-		return -1, "", fmt.Errorf("Pod full, the maximum Pod is 1024!")
-	}
-
-	var ttys []*hypervisor.TtyIO = []*hypervisor.TtyIO{}
-
-	if tag != "" {
-		glog.V(1).Info("Pod Run with client terminal tag: ", tag)
-		ttys = append(ttys, &hypervisor.TtyIO{
-			Stdin:     stdin,
-			Stdout:    stdout,
-			ClientTag: tag,
-			Callback:  make(chan *types.VmResponse, 1),
-		})
-	}
-
-	glog.Infof("pod:%s, vm:%s", podId, vmId)
-	// Do the status check for the given pod
-	daemon.PodList.Lock()
-	glog.V(2).Infof("lock PodList")
-
-	p, ok := daemon.PodList.Get(podId)
-	if !ok {
-		glog.V(2).Infof("unlock PodList")
-		daemon.PodList.Unlock()
-		return -1, "", fmt.Errorf("The pod(%s) can not be found, please create it first", podId)
-	}
-	var lazy bool = hypervisor.HDriver.SupportLazyMode() && vmId == ""
-
-	code, cause, err := daemon.StartPodWithLock(p, vmId, nil, lazy, types.VM_KEEP_NONE, ttys)
-	if err != nil {
-		glog.Error(err.Error())
-		glog.V(2).Infof("unlock PodList")
-		daemon.PodList.Unlock()
-		return -1, "", err
-	}
-
-	glog.V(2).Infof("unlock PodList")
-	daemon.PodList.Unlock()
-
-	if len(ttys) > 0 {
-		p.RLock()
-		tty, ok := p.ttyList[tag]
-		p.RUnlock()
-
-		if ok {
-			tty.WaitForFinish()
-		}
-	}
-
-	return code, cause, nil
-}
-
-//create pod if not exist
-func (daemon *Daemon) RunPod(podId, podArgs, vmId string, config interface{}, lazy bool, keep int, streams []*hypervisor.TtyIO) (int, string, error) {
-	daemon.PodList.Lock()
-	glog.V(2).Infof("lock PodList")
-	defer glog.V(2).Infof("unlock PodList")
-	defer daemon.PodList.Unlock()
-	glog.V(1).Infof("podArgs: %s", podArgs)
-
-	p, err := daemon.GetPod(podId, podArgs)
-	if err != nil {
-		return -1, "", err
-	}
-
-	return daemon.StartPodWithLock(p, vmId, config, lazy, keep, streams)
-}
-
-func (daemon *Daemon) StartPodWithLock(p *Pod, vmId string, config interface{}, lazy bool, keep int, streams []*hypervisor.TtyIO) (int, string, error) {
-	if p.vm != nil {
-		return -1, "", fmt.Errorf("pod %s is already running", p.id)
-	}
-
-	vmResponse, err := p.Start(daemon, vmId, lazy, keep, streams)
-	if err != nil {
-		return -1, "", err
-	}
-
-	return vmResponse.Code, vmResponse.Cause, nil
-}
-
-// I'd like to move the remain part of this file to another file.
 type Pod struct {
 	id           string
 	status       *hypervisor.PodStatus
@@ -188,92 +102,6 @@ func (p *Pod) DoCreate(daemon *Daemon) error {
 	}
 
 	if err = p.updateContainerStatus(jsons); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (daemon *Daemon) CreatePod(podId, podArgs string) (*Pod, error) {
-	// we can only support 1024 Pods
-	if daemon.GetRunningPodNum() >= 1024 {
-		return nil, fmt.Errorf("Pod full, the maximum Pod is 1024!")
-	}
-
-	if podId == "" {
-		podId = fmt.Sprintf("pod-%s", pod.RandStr(10, "alpha"))
-	}
-
-	return daemon.createPodInternal(podId, podArgs, false)
-}
-
-func (daemon *Daemon) createPodInternal(podId, podArgs string, withinLock bool) (*Pod, error) {
-	glog.V(2).Infof("podArgs: %s", podArgs)
-
-	pod, err := NewPod([]byte(podArgs), podId, daemon)
-	if err != nil {
-		return nil, err
-	}
-
-	// Creation
-	if err = pod.DoCreate(daemon); err != nil {
-		return nil, err
-	}
-
-	if !withinLock {
-		daemon.PodList.Lock()
-		glog.V(2).Infof("lock PodList")
-		defer glog.V(2).Infof("unlock PodList")
-		defer daemon.PodList.Unlock()
-	}
-
-	if err = daemon.AddPod(pod, podArgs); err != nil {
-		return nil, err
-	}
-
-	return pod, nil
-}
-
-func (daemon *Daemon) SetPodLabels(podId string, override bool, labels map[string]string) error {
-	daemon.PodList.RLock()
-	glog.V(2).Infof("lock read of PodList")
-	defer daemon.PodList.RUnlock()
-	defer glog.V(2).Infof("unlock read of PodList")
-
-	var pod *Pod
-	if strings.Contains(podId, "pod-") {
-		var ok bool
-		pod, ok = daemon.PodList.Get(podId)
-		if !ok {
-			return fmt.Errorf("Can not get Pod info with pod ID(%s)", podId)
-		}
-	} else {
-		pod = daemon.PodList.GetByName(podId)
-		if pod == nil {
-			return fmt.Errorf("Can not get Pod info with pod name(%s)", podId)
-		}
-	}
-
-	if pod.spec.Labels == nil {
-		pod.spec.Labels = make(map[string]string)
-	}
-
-	for k := range labels {
-		if _, ok := pod.spec.Labels[k]; ok && !override {
-			return fmt.Errorf("Can't update label %s without override", k)
-		}
-	}
-
-	for k, v := range labels {
-		pod.spec.Labels[k] = v
-	}
-
-	spec, err := json.Marshal(pod.spec)
-	if err != nil {
-		return err
-	}
-
-	if err := daemon.db.UpdatePod(pod.id, spec); err != nil {
 		return err
 	}
 
@@ -1032,54 +860,22 @@ func (p *Pod) Start(daemon *Daemon, vmId string, lazy bool, keep int, streams []
 	return vmResponse, nil
 }
 
-// The caller must make sure that the restart policy and the status is right to restart
-func (daemon *Daemon) RestartPod(mypod *hypervisor.PodStatus) error {
-	// Remove the pod
-	// The pod is stopped, the vm is gone
-	daemon.CleanUpContainer(mypod)
-	daemon.RemovePod(mypod.Id)
-	daemon.DeleteVolumeId(mypod.Id)
-
-	podData, err := daemon.db.GetPod(mypod.Id)
-	if err != nil {
-		return err
-	}
-	var lazy bool = hypervisor.HDriver.SupportLazyMode()
-
-	// Start the pod
-	_, _, err = daemon.RunPod(mypod.Id, string(podData), "", nil, lazy, types.VM_KEEP_NONE, []*hypervisor.TtyIO{})
-	if err != nil {
-		glog.Error(err.Error())
-		return err
-	}
-
-	if err := daemon.WritePodAndContainers(mypod.Id); err != nil {
-		glog.Error("Found an error while saving the Containers info")
-		return err
-	}
-
-	return nil
-}
-
 func hyperHandlePodEvent(vmResponse *types.VmResponse, data interface{},
 	mypod *hypervisor.PodStatus, vm *hypervisor.Vm) bool {
 	daemon := data.(*Daemon)
 
-	if vmResponse.Code == types.E_POD_FINISHED {
-		if vm.Keep != types.VM_KEEP_NONE {
-			vm.Status = types.S_VM_IDLE
-			return false
-		}
+	switch vmResponse.Code {
+	case types.E_POD_FINISHED: // successfully exit
 		stopLogger(mypod)
 		mypod.SetPodContainerStatus(vmResponse.Data.([]uint32))
 		vm.Status = types.S_VM_IDLE
-	} else if vmResponse.Code == types.E_VM_SHUTDOWN {
-		if mypod.Status == types.S_POD_RUNNING {
+		return false
+	case types.E_VM_SHUTDOWN: // vm exited, sucessful or not
+		if mypod.Status == types.S_POD_RUNNING { // not received finished pod before
 			stopLogger(mypod)
-			mypod.Status = types.S_POD_SUCCEEDED
-			mypod.SetContainerStatus(types.S_POD_SUCCEEDED)
+			mypod.Status = types.S_POD_FAILED
+			mypod.SetContainerStatus(types.S_POD_FAILED)
 		}
-		mypod.Vm = ""
 		daemon.PodStopped(mypod.Id)
 		if mypod.Type == "kubernetes" {
 			cleanup := false
@@ -1100,12 +896,15 @@ func hyperHandlePodEvent(vmResponse *types.VmResponse, data interface{},
 				break
 			}
 			if cleanup {
-				daemon.CleanUpContainer(mypod)
+				pod, ok := daemon.PodList.Get(mypod.Id)
+				if ok {
+					daemon.RemovePodContainer(pod)
+				}
 				daemon.DeleteVolumeId(mypod.Id)
 			}
 		}
 		return true
+	default:
+		return false
 	}
-
-	return false
 }

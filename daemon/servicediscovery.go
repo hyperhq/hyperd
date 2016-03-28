@@ -123,21 +123,17 @@ func (daemon *Daemon) GetServices(podId string) ([]pod.UserService, error) {
 }
 
 func (daemon *Daemon) GetServiceContainerInfo(podId string) (*hypervisor.Vm, string, error) {
-	daemon.PodList.RLock()
 	pod, ok := daemon.PodList.Get(podId)
 	if !ok {
-		daemon.PodList.RUnlock()
 		return nil, "", fmt.Errorf("Cannot find Pod %s", podId)
 	}
 
 	if pod.status.Type != "service-discovery" || len(pod.status.Containers) <= 1 {
-		daemon.PodList.RUnlock()
 		return nil, "", fmt.Errorf("Pod %s doesn't have services discovery", podId)
 	}
 
 	container := pod.status.Containers[0].Id
 	glog.V(1).Infof("Get container id is %s", container)
-	daemon.PodList.RUnlock()
 
 	if pod.vm == nil {
 		return nil, "", fmt.Errorf("Can find VM for %s!", podId)

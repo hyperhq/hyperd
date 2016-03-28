@@ -342,7 +342,12 @@ func (d *Driver) VmMountLayer(id string) error {
 		return fmt.Errorf("can not find VM(%s)", d.pullVm)
 	}
 	if vm.Status == types.S_VM_IDLE {
-		code, cause, err := daemon.RunPod(podId, podstring, d.pullVm, nil, false, types.VM_KEEP_AFTER_SHUTDOWN, []*hypervisor.TtyIO{})
+		p, err := daemon.CreatePod(podId, podstring)
+		if err != nil {
+			glog.Errorf("can not create pod %s", podstring)
+			return err
+		}
+		code, cause, err := daemon.StartInternal(p, d.pullVm, nil, false, types.VM_KEEP_AFTER_SHUTDOWN, []*hypervisor.TtyIO{})
 		if err != nil {
 			glog.Errorf("Code is %d, Cause is %s, %s", code, cause, err.Error())
 			d.daemon.KillVm(d.pullVm)
@@ -368,12 +373,7 @@ func (d *Driver) VmMountLayer(id string) error {
 			}
 		}
 
-		pod, ok := d.daemon.PodList.Get(podId)
-		if !ok {
-			glog.Errorf("pod %s does not exist", podId)
-			return fmt.Errorf("pod %s does not exist", podId)
-		}
-		pod.SetVM(d.pullVm, vm)
+		p.SetVM(d.pullVm, vm)
 
 		// release pod from VM
 		code, cause, err = d.daemon.StopPod(podId, "no")

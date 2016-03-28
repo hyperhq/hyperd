@@ -81,7 +81,12 @@ func (d *Driver) Diff(id, parent string) (diff archive.Archive, err error) {
 		return nil, fmt.Errorf("can not find VM(%s)", d.pullVm)
 	}
 	if vm.Status == types.S_VM_IDLE {
-		code, cause, err = d.daemon.RunPod(podId, podData, d.pullVm, nil, false, types.VM_KEEP_AFTER_SHUTDOWN, []*hypervisor.TtyIO{})
+		p, err := daemon.CreatePod(podId, podData)
+		if err != nil {
+			glog.Errorf("can not create pod %s", podData)
+			return nil, err
+		}
+		code, cause, err = d.daemon.StartInternal(p, d.pullVm, nil, false, types.VM_KEEP_AFTER_SHUTDOWN, []*hypervisor.TtyIO{})
 		if err != nil {
 			glog.Errorf("Code is %d, Cause is %s, %s", code, cause, err.Error())
 			d.daemon.KillVm(d.pullVm)
@@ -107,12 +112,7 @@ func (d *Driver) Diff(id, parent string) (diff archive.Archive, err error) {
 			}
 		}
 
-		pod, ok := d.daemon.PodList.Get(podId)
-		if !ok {
-			glog.Errorf("pod %s does not exist", podId)
-			return nil, fmt.Errorf("pod %s does not exist", podId)
-		}
-		pod.SetVM(d.pullVm, vm)
+		p.SetVM(d.pullVm, vm)
 
 		// release pod from VM
 		code, cause, err = d.daemon.StopPod(podId, "no")
