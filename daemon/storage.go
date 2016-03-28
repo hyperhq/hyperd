@@ -197,7 +197,7 @@ func (dms *DevMapperStorage) CreateVolume(daemon *Daemon, podId, shortName strin
 		}
 
 		glog.V(3).Infof("device (%d) created (restore:%v) for %s: %s", dev_id, restore, podId, volName)
-		daemon.SetVolumeId(podId, volName, dev_id_str)
+		daemon.db.UpdatePodVolume(podId, volName, []byte(fmt.Sprintf("%s:%s", volName, dev_id_str)))
 		break
 	}
 

@@ -56,7 +56,7 @@ func (p *Pod) AssociateVm(daemon *Daemon, vmId string) error {
 		return nil
 	}
 
-	vmData, err := daemon.GetVmData(vmId)
+	vmData, err := daemon.db.GetVM(vmId)
 	if err != nil {
 		return err
 	}

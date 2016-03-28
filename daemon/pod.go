@@ -273,7 +273,7 @@ func (daemon *Daemon) SetPodLabels(podId string, override bool, labels map[strin
 		return err
 	}
 
-	if err := daemon.WritePodToDB(pod.id, spec); err != nil {
+	if err := daemon.db.UpdatePod(pod.id, spec); err != nil {
 		return err
 	}
 
@@ -337,7 +337,7 @@ func (p *Pod) tryLoadContainers(daemon *Daemon) ([]*dockertypes.ContainerJSON, e
 		ok             bool
 	)
 
-	if ids, _ := daemon.GetPodContainersByPod(p.id); ids != nil {
+	if ids, _ := daemon.db.GetP2C(p.id); ids != nil {
 		containerNames := make(map[string]int)
 
 		for idx, c := range p.spec.Containers {
@@ -1016,13 +1016,14 @@ func (p *Pod) Start(daemon *Daemon, vmId string, lazy bool, keep int, streams []
 		return vmResponse, err
 	}
 
-	err = daemon.UpdateVmData(p.vm.Id, vmResponse.Data.([]byte))
+	err = daemon.db.UpdateVM(p.vm.Id, vmResponse.Data.([]byte))
 	if err != nil {
 		glog.Error(err.Error())
 		return nil, err
 	}
 	// add or update the Vm info for POD
-	err = daemon.UpdateVmByPod(p.id, p.vm.Id)
+	glog.V(1).Infof("Add or Update the VM info for pod(%s)", p.id)
+	err = daemon.db.UpdateP2V(p.id, p.vm.Id)
 	if err != nil {
 		glog.Error(err.Error())
 		return nil, err
@@ -1039,7 +1040,7 @@ func (daemon *Daemon) RestartPod(mypod *hypervisor.PodStatus) error {
 	daemon.RemovePod(mypod.Id)
 	daemon.DeleteVolumeId(mypod.Id)
 
-	podData, err := daemon.GetPodFromDB(mypod.Id)
+	podData, err := daemon.db.GetPod(mypod.Id)
 	if err != nil {
 		return err
 	}

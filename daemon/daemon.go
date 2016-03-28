@@ -91,7 +91,7 @@ func (daemon *Daemon) Restore() error {
 			glog.Warningf("Got a unexpected error, %s", err.Error())
 			continue
 		}
-		vmId, err := daemon.DbGetVmByPod(k)
+		vmId, err := daemon.db.GetP2V(k)
 		if err != nil {
 			glog.V(1).Info(err.Error(), " for ", k)
 			continue
@@ -265,10 +265,6 @@ func (daemon *Daemon) GetRunningPodNum() int64 {
 	return daemon.PodList.CountRunning()
 }
 
-func (daemon *Daemon) WritePodToDB(podName string, podData []byte) error {
-	return daemon.db.UpdatePod(podName, podData)
-}
-
 // Lock protected
 func (daemon *Daemon) GetPod(podId, podArgs string) (*Pod, error) {
 	var (
@@ -293,18 +289,6 @@ func (daemon *Daemon) GetPod(podId, podArgs string) (*Pod, error) {
 	}
 
 	return pod, nil
-}
-
-func (daemon *Daemon) GetPodFromDB(podName string) ([]byte, error) {
-	return daemon.db.GetPod(podName)
-}
-
-func (daemon *Daemon) DeletePodFromDB(podName string) error {
-	return daemon.db.DeletePod(podName)
-}
-
-func (daemon *Daemon) SetVolumeId(podId, volName, dev_id string) error {
-	return daemon.db.UpdatePodVolume(podId, volName, []byte(fmt.Sprintf("%s:%s", volName, dev_id)))
 }
 
 func (daemon *Daemon) GetVolumeId(podId, volName string) (int, error) {
@@ -350,37 +334,6 @@ func (daemon *Daemon) WritePodAndContainers(podId string) error {
 	return daemon.db.UpdateP2C(podId, containers)
 }
 
-func (daemon *Daemon) GetPodContainersByPod(podName string) ([]string, error) {
-	return daemon.db.GetP2C(podName)
-}
-
-func (daemon *Daemon) DeletePodContainerFromDB(podName string) error {
-	return daemon.db.DeleteP2C(podName)
-}
-
-func (daemon *Daemon) DbGetVmByPod(podId string) (string, error) {
-	return daemon.db.GetP2V(podId)
-}
-
-func (daemon *Daemon) UpdateVmByPod(podId, vmId string) error {
-	glog.V(1).Infof("Add or Update the VM info for pod(%s)", podId)
-	if err := daemon.db.UpdateP2V(podId, vmId); err != nil {
-		glog.Errorf("fail to add or update the VM info for pod(%s)", podId)
-		return err
-	}
-	glog.V(1).Infof("success to add or update the VM info for pod(%s)", podId)
-	return nil
-}
-
-func (daemon *Daemon) DeleteVmByPod(podId string) error {
-	if err := daemon.db.DeleteVMByPod(podId); err != nil {
-		glog.Errorf("failed to delete the VM info for pod %s", podId)
-		return err
-	}
-	glog.V(1).Infof("success to delete the VM info for pod(%s)", podId)
-	return nil
-}
-
 func (daemon *Daemon) GetVmByPodId(podId string) (string, error) {
 	daemon.PodList.RLock()
 	glog.V(2).Infof("lock read of PodList")
@@ -421,13 +374,13 @@ func (daemon *Daemon) GetPodByContainerIdOrName(name string) (pod *Pod, idx int,
 
 func (daemon *Daemon) AddPod(pod *Pod, podArgs string) (err error) {
 	// store the UserPod into the db
-	if err = daemon.WritePodToDB(pod.id, []byte(podArgs)); err != nil {
+	if err = daemon.db.UpdatePod(pod.id, []byte(podArgs)); err != nil {
 		glog.V(1).Info("Found an error while saveing the POD file")
 		return
 	}
 	defer func() {
 		if err != nil {
-			daemon.DeletePodFromDB(pod.id)
+			daemon.db.DeletePod(pod.id)
 		}
 	}()
 
@@ -460,18 +413,6 @@ func (daemon *Daemon) AddVm(vm *hypervisor.Vm) {
 
 func (daemon *Daemon) RemoveVm(vmId string) {
 	delete(daemon.VmList, vmId)
-}
-
-func (daemon *Daemon) UpdateVmData(vmId string, data []byte) error {
-	return daemon.db.UpdateVM(vmId, data)
-}
-
-func (daemon *Daemon) GetVmData(vmId string) ([]byte, error) {
-	return daemon.db.GetVM(vmId)
-}
-
-func (daemon *Daemon) DeleteVmData(vmId string) error {
-	return daemon.db.DeleteVM(vmId)
 }
 
 func (daemon *Daemon) DestroyAllVm() error {

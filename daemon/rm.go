@@ -28,8 +28,6 @@ func (daemon *Daemon) CleanPodWithLock(podId string) (int, string, error) {
 		err   error
 	)
 
-	os.RemoveAll(path.Join(utils.HYPER_ROOT, "services", podId))
-	os.RemoveAll(path.Join(utils.HYPER_ROOT, "hosts", podId))
 	pod, ok := daemon.PodList.Get(podId)
 	if !ok {
 		return -1, "", fmt.Errorf("Can not find that Pod(%s)", podId)
@@ -42,7 +40,10 @@ func (daemon *Daemon) CleanPodWithLock(podId string) (int, string, error) {
 		}
 	}
 
-	daemon.DeletePodFromDB(podId)
+	os.RemoveAll(path.Join(utils.HYPER_ROOT, "services", podId))
+	os.RemoveAll(path.Join(utils.HYPER_ROOT, "hosts", podId))
+
+	daemon.db.DeletePod(podId)
 	daemon.RemovePod(podId)
 	if pod.status.Type != "kubernetes" {
 		daemon.CleanUpContainer(pod.status)
@@ -60,5 +61,5 @@ func (daemon *Daemon) CleanUpContainer(ps *hypervisor.PodStatus) {
 			glog.Warningf("Error to rm container: %s", err.Error())
 		}
 	}
-	daemon.DeletePodContainerFromDB(ps.Id)
+	daemon.db.DeleteP2C(ps.Id)
 }

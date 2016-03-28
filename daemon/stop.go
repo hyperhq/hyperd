@@ -20,7 +20,7 @@ func (daemon *Daemon) PodStopped(podId string) {
 		return
 	}
 
-	daemon.DeleteVmByPod(podId)
+	daemon.db.DeleteVMByPod(podId)
 	daemon.RemoveVm(pod.vm.Id)
 	pod.vm = nil
 }
@@ -56,7 +56,7 @@ func (daemon *Daemon) StopPodWithLock(podId, stopVm string) (int, string, error)
 	vmResponse := pod.vm.StopPod(pod.status, stopVm)
 
 	// Delete the Vm info for POD
-	daemon.DeleteVmByPod(podId)
+	daemon.db.DeleteVMByPod(podId)
 
 	if vmResponse.Code == types.E_VM_SHUTDOWN {
 		daemon.RemoveVm(vmId)
