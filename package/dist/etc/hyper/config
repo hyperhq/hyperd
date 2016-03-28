@@ -43,3 +43,13 @@ Cbfs=/var/lib/hyper/cbfs-qboot.rom
 
 # This is only useful for hypernetes, to disable the iptables setup by hyperd
 # DisableIptables=false
+
+# VmFactoryPolicy defines the policies to create factories
+# VmFactoryPolicy = [FactoryConfig,]*FactoryConfig
+# FactoryConfig   = {["cache":NUMBER,]"cpu":NUMBER,"memory":NUMBER}
+# Examples:
+# VmFactoryPolicy={"cache":10, "cpu":1, "memory":128}
+# VmFactoryPolicy={"cpu":3, "memory":1024}
+# It is recommended to specify the "cache" when VmFactoryPolicy is set,
+# otherwise it is a less efficient factory
+VmFactoryPolicy=

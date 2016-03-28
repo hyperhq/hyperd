@@ -17,6 +17,7 @@ import (
 	"github.com/hyperhq/hyper/server"
 	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/driverloader"
+	"github.com/hyperhq/runv/factory"
 	"github.com/hyperhq/runv/hypervisor"
 
 	runvutils "github.com/hyperhq/runv/lib/utils"
@@ -194,6 +195,9 @@ func mainDaemon(opt *Options) {
 		glog.Infof("The hypervisor's driver is %s", driver)
 	}
 
+	vmFactoryPolicy, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "VmFactoryPolicy")
+	d.Factory = factory.NewFromPolicy(d.Kernel, d.Initrd, vmFactoryPolicy)
+
 	disableIptables := cfg.MustBool(goconfig.DEFAULT_SECTION, "DisableIptables", false)
 	if err = hypervisor.InitNetwork(d.BridgeIface, d.BridgeIP, disableIptables || opt.DisableIptables); err != nil {
 		glog.Errorf("InitNetwork failed, %s", err.Error())
@@ -229,9 +233,6 @@ func mainDaemon(opt *Options) {
 		return
 	}
 
-	vmCachePolicy, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "VmCachePolicy")
-	d.InitVmCache(vmCachePolicy)
-
 	// Daemon is fully initialized and handling API traffic
 	// Wait for serve API job to complete
 	select {
@@ -249,6 +250,7 @@ func mainDaemon(opt *Options) {
 		d.DestroyAllVm()
 		break
 	}
+	d.Factory.CloseFactory()
 	api.Close()
 	d.Shutdown()
 }

@@ -110,7 +110,7 @@ func (d *Driver) Setup() (err error) {
 	)
 
 	d.daemon = daemon
-	vm, err = d.daemon.StartVm(d.pullVm, 1, 64, false, false, types.VM_KEEP_AFTER_SHUTDOWN)
+	vm, err = d.daemon.StartVm(d.pullVm, 1, 64, false, types.VM_KEEP_AFTER_SHUTDOWN)
 	if err != nil {
 		glog.Errorf(err.Error())
 		return err
