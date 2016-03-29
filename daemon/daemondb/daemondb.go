@@ -79,6 +79,7 @@ func (d *DaemonDB) DeletePodVolumes(podId string) error {
 
 // POD to Containers (string to string list)
 func (d *DaemonDB) GetP2C(id string) ([]string, error) {
+	glog.V(3).Info("try get container list for pod ", id)
 	cl, err := d.Get(keyP2C(id))
 	if err != nil {
 		return []string{}, err
@@ -87,6 +88,7 @@ func (d *DaemonDB) GetP2C(id string) ([]string, error) {
 }
 
 func (d *DaemonDB) UpdateP2C(id string, containers []string) error {
+	glog.V(3).Infof("try set container list for pod %s: %v", id, containers)
 	return d.Update(keyP2C(id), []byte(strings.Join(containers, ":")))
 }
 
@@ -186,7 +188,7 @@ func (d *DaemonDB) PrefixList(prefix []byte, keyFilter KeyFilter) ([][]byte, err
 	iter := d.db.NewIterator(util.BytesPrefix(prefix), nil)
 	for iter.Next() {
 		if keyFilter == nil || keyFilter(iter.Key()) {
-			results = append(results, iter.Value())
+			results = append(results, append([]byte{}, iter.Value()...))
 		}
 	}
 	iter.Release()
@@ -199,7 +201,7 @@ func (d *DaemonDB) PrefixListKey(prefix []byte, keyFilter KeyFilter) ([][]byte, 
 	iter := d.db.NewIterator(util.BytesPrefix(prefix), nil)
 	for iter.Next() {
 		if keyFilter == nil || keyFilter(iter.Key()) {
-			results = append(results, iter.Key())
+			results = append(results, append([]byte{}, iter.Key()...))
 		}
 	}
 	iter.Release()
@@ -215,8 +217,9 @@ func (d *DaemonDB) PrefixList2Chan(prefix []byte, keyFilter KeyFilter) chan *KVP
 	go func() {
 		iter := d.db.NewIterator(util.BytesPrefix(prefix), nil)
 		for iter.Next() {
+			glog.V(3).Infof("got key from leveldb %s", string(iter.Key()))
 			if keyFilter == nil || keyFilter(iter.Key()) {
-				ch <- &KVPair{iter.Key(), iter.Value()}
+				ch <- &KVPair{append([]byte{}, iter.Key()...), append([]byte{}, iter.Value()...)}
 			}
 		}
 		iter.Release()

@@ -193,7 +193,9 @@ func (p *Pod) tryLoadContainers(daemon *Daemon) ([]*dockertypes.ContainerJSON, e
 		ok             bool
 	)
 
-	if ids, _ := daemon.db.GetP2C(p.id); ids != nil {
+	if ids, err := daemon.db.GetP2C(p.id); ids != nil {
+		glog.V(3).Infof("loaded containers for pod %s: %v", p.id, ids)
+
 		containerNames := make(map[string]int)
 
 		for idx, c := range p.spec.Containers {
@@ -218,6 +220,8 @@ func (p *Pod) tryLoadContainers(daemon *Daemon) ([]*dockertypes.ContainerJSON, e
 				}
 			}
 		}
+	} else {
+		glog.V(3).Infof("no containers for pod %s loaded: %v", p.id, err)
 	}
 
 	return containerJsons, nil
