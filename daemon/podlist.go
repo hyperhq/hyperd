@@ -172,6 +172,10 @@ func (pl *PodList) CountRunning() int64 {
 	return pl.CountStatus(types.S_POD_RUNNING)
 }
 
+func (pl *PodList) CountAll() int64 {
+	return int64(len(pl.pods))
+}
+
 func (pl *PodList) CountStatus(status uint) (num int64) {
 	num = 0
 

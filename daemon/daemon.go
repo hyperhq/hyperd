@@ -74,28 +74,40 @@ func (daemon *Daemon) Restore() error {
 
 		podId := string(item.K[4:])
 
+		glog.V(1).Infof("reloading pod %s with args %s", podId, string(item.V))
+
 		daemon.db.DeletePod(podId)
 
 		p, err := daemon.createPodInternal(podId, string(item.V), true)
 		if err != nil {
-			glog.Warningf("Got a unexpected error, %s", err.Error())
+			glog.Warningf("Got a unexpected error when creating(load) pod %s, %v", podId, err)
 			continue
 		}
 
 		if err = daemon.AddPod(p, string(item.V)); err != nil {
 			//TODO: remove the created
+			glog.Warningf("Got a error duriong insert pod %s, %v", p.id, err)
 			continue
 		}
 
 		vmId, err := daemon.db.GetP2V(podId)
 		if err != nil {
-			glog.V(1).Info(err.Error(), " for ", podId)
+			glog.V(1).Infof("no existing VM for pod %s: %v", podId, err)
 			continue
 		}
 		if err := p.AssociateVm(daemon, string(vmId)); err != nil {
 			glog.V(1).Info("Some problem during associate vm %s to pod %s, %v", string(vmId), podId, err)
 			// continue to next
 		}
+	}
+
+	if glog.V(3) {
+		glog.Infof("%d pod have been loaded", daemon.PodList.CountAll())
+		daemon.PodList.Foreach(func(p *Pod) error {
+			glog.Infof("container in pod %s status: %v", p.id, p.Status().Containers)
+			glog.Infof("container in pod %s spec: %v", p.id, p.spec.Containers)
+			return nil
+		})
 	}
 
 	return nil
