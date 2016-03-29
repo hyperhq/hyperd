@@ -132,7 +132,7 @@ func (daemon *Daemon) GetPodInfo(podName string) (types.PodInfo, error) {
 		Memory:     pod.spec.Resource.Memory,
 	}
 	podIPs := []string{}
-	if pod.vm != nil {
+	if pod.status.Status == runvtypes.S_POD_RUNNING && pod.vm != nil {
 		podIPs = pod.status.GetPodIP(pod.vm)
 	}
 	status := types.PodStatus{
