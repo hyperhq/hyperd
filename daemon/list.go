@@ -3,7 +3,6 @@ package daemon
 import (
 	"fmt"
 
-	"github.com/golang/glog"
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/types"
 )
@@ -20,11 +19,6 @@ func (daemon *Daemon) List(item, podId, vmId string, auxiliary bool) (map[string
 	if item != "pod" && item != "container" && item != "vm" {
 		return list, fmt.Errorf("Can not support %s list!", item)
 	}
-
-	daemon.PodList.RLock()
-	glog.Infof("lock read of PodList")
-	defer glog.Infof("unlock read of PodList")
-	defer daemon.PodList.RUnlock()
 
 	if podId != "" {
 		var ok bool

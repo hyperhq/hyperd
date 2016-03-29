@@ -11,17 +11,20 @@ import (
 type PodList struct {
 	pods       map[string]*Pod
 	containers map[string]string
-	sync.RWMutex
+	mu         *sync.RWMutex
 }
 
 func NewPodList() *PodList {
 	return &PodList{
 		pods:       make(map[string]*Pod),
 		containers: make(map[string]string),
+		mu:         &sync.RWMutex{},
 	}
 }
 
 func (pl *PodList) Get(id string) (*Pod, bool) {
+	pl.mu.RLock()
+	defer pl.mu.RUnlock()
 	if pl.pods == nil {
 		return nil, false
 	}
@@ -30,6 +33,8 @@ func (pl *PodList) Get(id string) (*Pod, bool) {
 }
 
 func (pl *PodList) Put(p *Pod) {
+	pl.mu.Lock()
+	defer pl.mu.Unlock()
 	if pl.pods == nil {
 		pl.pods = make(map[string]*Pod)
 	}
@@ -44,6 +49,8 @@ func (pl *PodList) Put(p *Pod) {
 }
 
 func (pl *PodList) Delete(id string) {
+	pl.mu.Lock()
+	defer pl.mu.Unlock()
 	if p, ok := pl.pods[id]; ok {
 		for _, c := range p.status.Containers {
 			delete(pl.containers, c.Id)
@@ -53,7 +60,10 @@ func (pl *PodList) Delete(id string) {
 }
 
 func (pl *PodList) GetByName(name string) *Pod {
-	return pl.Find(func(p *Pod) bool {
+	pl.mu.RLock()
+	defer pl.mu.RUnlock()
+
+	return pl.findUnsafe(func(p *Pod) bool {
 		if p.status.Name == name {
 			return true
 		}
@@ -62,6 +72,9 @@ func (pl *PodList) GetByName(name string) *Pod {
 }
 
 func (pl *PodList) GetByContainerId(cid string) (*Pod, bool) {
+	pl.mu.RLock()
+	defer pl.mu.RUnlock()
+
 	if pl.pods == nil {
 		return nil, false
 	}
@@ -70,7 +83,7 @@ func (pl *PodList) GetByContainerId(cid string) (*Pod, bool) {
 		return p, ok
 	}
 
-	pod := pl.Find(func(p *Pod) bool {
+	pod := pl.findUnsafe(func(p *Pod) bool {
 		for _, c := range p.status.Containers {
 			if c.Id == cid {
 				return true
@@ -87,6 +100,9 @@ func (pl *PodList) GetByContainerId(cid string) (*Pod, bool) {
 }
 
 func (pl *PodList) GetByContainerIdOrName(cid string) (*Pod, int, bool) {
+	pl.mu.RLock()
+	defer pl.mu.RUnlock()
+
 	if pl.pods == nil {
 		return nil, 0, false
 	}
@@ -128,7 +144,7 @@ func (pl *PodList) GetByContainerIdOrName(cid string) (*Pod, int, bool) {
 		wslash = "/" + cid
 	}
 
-	pod := pl.Find(func(p *Pod) bool {
+	pod := pl.findUnsafe(func(p *Pod) bool {
 		for i, c := range p.status.Containers {
 			if c.Id == cid || c.Name == wslash {
 				idx = i
@@ -159,8 +175,8 @@ func (pl *PodList) CountRunning() int64 {
 func (pl *PodList) CountStatus(status uint) (num int64) {
 	num = 0
 
-	pl.RLock()
-	defer pl.RUnlock()
+	pl.mu.RLock()
+	defer pl.mu.RUnlock()
 
 	if pl.pods == nil {
 		return
@@ -177,8 +193,8 @@ func (pl *PodList) CountStatus(status uint) (num int64) {
 
 func (pl *PodList) CountContainers() (num int64) {
 	num = 0
-	pl.RLock()
-	defer pl.RUnlock()
+	pl.mu.RLock()
+	defer pl.mu.RUnlock()
 
 	if pl.pods == nil {
 		return
@@ -195,6 +211,12 @@ type PodOp func(*Pod) error
 type PodFilterOp func(*Pod) bool
 
 func (pl *PodList) Foreach(fn PodOp) error {
+	pl.mu.RLock()
+	defer pl.mu.RUnlock()
+	return pl.foreachUnsafe(fn)
+}
+
+func (pl *PodList) foreachUnsafe(fn PodOp) error {
 	for _, p := range pl.pods {
 		if err := fn(p); err != nil {
 			return err
@@ -204,6 +226,12 @@ func (pl *PodList) Foreach(fn PodOp) error {
 }
 
 func (pl *PodList) Find(fn PodFilterOp) *Pod {
+	pl.mu.RLock()
+	defer pl.mu.RUnlock()
+	return pl.findUnsafe(fn)
+}
+
+func (pl *PodList) findUnsafe(fn PodFilterOp) *Pod {
 	for _, p := range pl.pods {
 		if fn(p) {
 			return p

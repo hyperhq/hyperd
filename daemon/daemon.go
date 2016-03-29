@@ -1,11 +1,14 @@
 package daemon
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path"
 	"strconv"
 	"strings"
+
+	"github.com/hyperhq/hyper/daemon/daemondb"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/Unknwon/goconfig"
@@ -20,8 +23,6 @@ import (
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/pod"
 	"github.com/hyperhq/runv/hypervisor/types"
-	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
 var (
@@ -31,7 +32,7 @@ var (
 type Daemon struct {
 	*docker.Daemon
 	ID          string
-	db          *leveldb.DB
+	db          *daemondb.DaemonDB
 	PodList     *PodList
 	VmList      map[string]*hypervisor.Vm
 	Factory     factory.Factory
@@ -53,48 +54,46 @@ func (daemon *Daemon) Restore() error {
 		return nil
 	}
 
-	podList := map[string]string{}
-
-	iter := daemon.db.NewIterator(util.BytesPrefix([]byte("pod-")), nil)
-	for iter.Next() {
-		key := iter.Key()
-		value := iter.Value()
-		if strings.Contains(string(key), "pod-container-") {
-			glog.V(1).Infof(string(value))
-			continue
-		}
-		glog.V(1).Infof("Get the pod item, pod is %s!", key)
-		err := daemon.db.Delete(key, nil)
-		if err != nil {
-			return err
-		}
-		podList[string(key)[4:]] = string(value)
-	}
-	iter.Release()
-	err := iter.Error()
-	if err != nil {
-		return err
+	ch := daemon.db.GetAllPods()
+	if ch == nil {
+		estr := "Cannot list pods in leveldb"
+		glog.Error(estr)
+		return errors.New(estr)
 	}
 
-	daemon.PodList.Lock()
-	glog.V(2).Infof("lock PodList")
-	defer glog.V(2).Infof("unlock PodList")
-	defer daemon.PodList.Unlock()
+	for {
+		item, ok := <-ch
+		if !ok {
+			break
+		}
+		if item == nil {
+			estr := "error during load pods from leveldb"
+			glog.Error(estr)
+			return errors.New(estr)
+		}
 
-	for k, v := range podList {
-		_, err = daemon.createPodInternal(k, v, false, true)
+		podId := string(item.K[4:])
+
+		daemon.db.DeletePod(podId)
+
+		p, err := daemon.createPodInternal(podId, string(item.V), true)
 		if err != nil {
 			glog.Warningf("Got a unexpected error, %s", err.Error())
 			continue
 		}
-		vmId, err := daemon.DbGetVmByPod(k)
-		if err != nil {
-			glog.V(1).Info(err.Error(), " for ", k)
+
+		if err = daemon.AddPod(p, string(item.V)); err != nil {
+			//TODO: remove the created
 			continue
 		}
-		p, _ := daemon.PodList.Get(k)
+
+		vmId, err := daemon.db.GetP2V(podId)
+		if err != nil {
+			glog.V(1).Info(err.Error(), " for ", podId)
+			continue
+		}
 		if err := p.AssociateVm(daemon, string(vmId)); err != nil {
-			glog.V(1).Info("Some problem during associate vm %s to pod %s, %v", string(vmId), k, err)
+			glog.V(1).Info("Some problem during associate vm %s to pod %s, %v", string(vmId), podId, err)
 			// continue to next
 		}
 	}
@@ -146,9 +145,8 @@ func NewDaemonFromDirectory(cfg *goconfig.ConfigFile) (*Daemon, error) {
 	var (
 		db_file = fmt.Sprintf("%s/hyper.db", realRoot)
 	)
-	db, err := leveldb.OpenFile(db_file, nil)
+	db, err := daemondb.NewDaemonDB(db_file)
 	if err != nil {
-		glog.Errorf("open leveldb file failed, %s", err.Error())
 		return nil, err
 	}
 
@@ -251,234 +249,59 @@ func (daemon *Daemon) DefaultLogCfg(driver string, cfg map[string]string) {
 }
 
 func (daemon *Daemon) GetPodNum() int64 {
-	iter := daemon.db.NewIterator(util.BytesPrefix([]byte("pod-")), nil)
-	var i int64 = 0
-	for iter.Next() {
-		key := iter.Key()
-		if strings.Contains(string(key), "pod-container-") {
-			continue
-		}
-		i++
-	}
-	iter.Release()
-	err := iter.Error()
+	pods, err := daemon.db.ListPod()
 	if err != nil {
 		return 0
 	}
-	return i
+	return int64(len(pods))
 }
 
 func (daemon *Daemon) GetRunningPodNum() int64 {
 	return daemon.PodList.CountRunning()
 }
 
-func (daemon *Daemon) WritePodToDB(podName string, podData []byte) error {
-	key := fmt.Sprintf("pod-%s", podName)
-	_, err := daemon.db.Get([]byte(key), nil)
-	if err != nil {
-		err = daemon.db.Put([]byte(key), podData, nil)
-		if err != nil {
-			return err
-		}
-	} else {
-		err = daemon.db.Delete([]byte(key), nil)
-		if err != nil {
-			return err
-		}
-		err = daemon.db.Put([]byte(key), podData, nil)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// Lock protected
-func (daemon *Daemon) GetPod(podId, podArgs string, autoremove bool) (*Pod, error) {
-	var (
-		pod *Pod
-		ok  bool
-	)
-
-	if podArgs == "" {
-		if pod, ok = daemon.PodList.Get(podId); !ok {
-			return nil, fmt.Errorf("Can not find the POD instance of %s", podId)
-		}
-		return pod, nil
-	}
-
-	pod, err := daemon.createPodInternal(podId, podArgs, autoremove, true)
-	if err != nil {
-		return nil, err
-	}
-
-	if err = daemon.AddPod(pod, podArgs); err != nil {
-		return nil, err
-	}
-
-	return pod, nil
-}
-
-func (daemon *Daemon) GetPodByName(podName string) ([]byte, error) {
-	key := fmt.Sprintf("pod-%s", podName)
-	data, err := daemon.db.Get([]byte(key), nil)
-	if err != nil {
-		return []byte(""), err
-	}
-	return data, nil
-}
-
-func (daemon *Daemon) DeletePodFromDB(podName string) error {
-	key := fmt.Sprintf("pod-%s", podName)
-	err := daemon.db.Delete([]byte(key), nil)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (daemon *Daemon) SetVolumeId(podId, volName, dev_id string) error {
-	key := fmt.Sprintf("vol-%s-%s", podId, dev_id)
-	err := daemon.db.Put([]byte(key), []byte(fmt.Sprintf("%s:%s", volName, dev_id)), nil)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func (daemon *Daemon) GetVolumeId(podId, volName string) (int, error) {
+	vols, err := daemon.db.ListPodVolumes(podId)
+	if err != nil {
+		return -1, err
+	}
+
 	dev_id := 0
-	key := fmt.Sprintf("vol-%s", podId)
-	iter := daemon.db.NewIterator(util.BytesPrefix([]byte(key)), nil)
-	for iter.Next() {
-		value := iter.Value()
-		fields := strings.Split(string(value), ":")
+	for _, vol := range vols {
+		fields := strings.Split(string(vol), ":")
 		if fields[0] == volName {
 			dev_id, _ = strconv.Atoi(fields[1])
 		}
-	}
-	iter.Release()
-	err := iter.Error()
-	if err != nil {
-		return -1, err
 	}
 	return dev_id, nil
 }
 
 func (daemon *Daemon) DeleteVolumeId(podId string) error {
-	key := fmt.Sprintf("vol-%s", podId)
-	iter := daemon.db.NewIterator(util.BytesPrefix([]byte(key)), nil)
-	for iter.Next() {
-		value := iter.Key()
-		daemon.Storage.RemoveVolume(podId, iter.Value())
-		err := daemon.db.Delete(value, nil)
-		if err != nil {
-			return err
-		}
-	}
-	iter.Release()
-	err := iter.Error()
+	vols, err := daemon.db.ListPodVolumes(podId)
 	if err != nil {
 		return err
 	}
-	return nil
+	for _, vol := range vols {
+		daemon.Storage.RemoveVolume(podId, vol)
+	}
+	return daemon.db.DeletePodVolumes(podId)
 }
 
 func (daemon *Daemon) WritePodAndContainers(podId string) error {
-	key := fmt.Sprintf("pod-container-%s", podId)
-	value := ""
 	p, ok := daemon.PodList.Get(podId)
 	if !ok {
 		return fmt.Errorf("Cannot find Pod %s to write", podId)
 	}
 
+	containers := []string{}
 	for _, c := range p.status.Containers {
-		if value == "" {
-			value = c.Id
-		} else {
-			value = value + ":" + c.Id
-		}
+		containers = append(containers, c.Id)
 	}
-	err := daemon.db.Put([]byte(key), []byte(value), nil)
-	if err != nil {
-		return err
-	}
-	return nil
-}
 
-func (daemon *Daemon) GetPodContainersByName(podName string) ([]string, error) {
-	key := fmt.Sprintf("pod-container-%s", podName)
-	data, err := daemon.db.Get([]byte(key), nil)
-	if err != nil {
-		return nil, err
-	}
-	containers := strings.Split(string(data), ":")
-	return containers, nil
-}
-
-func (daemon *Daemon) DeletePodContainerFromDB(podName string) error {
-	key := fmt.Sprintf("pod-container-%s", podName)
-	err := daemon.db.Delete([]byte(key), nil)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (daemon *Daemon) DbGetVmByPod(podId string) (string, error) {
-	key := fmt.Sprintf("vm-%s", podId)
-	data, err := daemon.db.Get([]byte(key), nil)
-	if err != nil {
-		return "", err
-	}
-	return string(data), nil
-}
-
-func (daemon *Daemon) UpdateVmByPod(podId, vmId string) error {
-	glog.V(1).Infof("Add or Update the VM info for pod(%s)", podId)
-	key := fmt.Sprintf("vm-%s", podId)
-	_, err := daemon.db.Get([]byte(key), nil)
-	if err == nil {
-		err = daemon.db.Delete([]byte(key), nil)
-		if err != nil {
-			return err
-		}
-		err = daemon.db.Put([]byte(key), []byte(vmId), nil)
-		if err != nil {
-			return err
-		}
-	} else {
-		err = daemon.db.Put([]byte(key), []byte(vmId), nil)
-		if err != nil {
-			return err
-		}
-	}
-	glog.V(1).Infof("success to add or  update the VM info for pod(%s)", podId)
-	return nil
-}
-
-func (daemon *Daemon) DeleteVmByPod(podId string) error {
-	key := fmt.Sprintf("vm-%s", podId)
-	vmId, err := daemon.db.Get([]byte(key), nil)
-	if err != nil {
-		return err
-	}
-	err = daemon.db.Delete([]byte(key), nil)
-	if err != nil {
-		return err
-	}
-	if err = daemon.DeleteVmData(string(vmId)); err != nil {
-		return err
-	}
-	glog.V(1).Infof("success to delete the VM info for pod(%s)", podId)
-	return nil
+	return daemon.db.UpdateP2C(podId, containers)
 }
 
 func (daemon *Daemon) GetVmByPodId(podId string) (string, error) {
-	daemon.PodList.RLock()
-	glog.V(2).Infof("lock read of PodList")
-	defer glog.V(2).Infof("unlock read of PodList")
-	defer daemon.PodList.RUnlock()
 	pod, ok := daemon.PodList.Get(podId)
 	if !ok {
 		return "", fmt.Errorf("Not found Pod %s", podId)
@@ -487,11 +310,6 @@ func (daemon *Daemon) GetVmByPodId(podId string) (string, error) {
 }
 
 func (daemon *Daemon) GetPodByContainer(containerId string) (string, error) {
-	daemon.PodList.RLock()
-	glog.V(2).Infof("lock read of PodList")
-	defer glog.V(2).Infof("unlock read of PodList")
-	defer daemon.PodList.RUnlock()
-
 	if pod, ok := daemon.PodList.GetByContainerId(containerId); ok {
 		return pod.id, nil
 	} else {
@@ -500,11 +318,6 @@ func (daemon *Daemon) GetPodByContainer(containerId string) (string, error) {
 }
 
 func (daemon *Daemon) GetPodByContainerIdOrName(name string) (pod *Pod, idx int, err error) {
-	daemon.PodList.RLock()
-	glog.V(2).Infof("lock read of PodList")
-	defer glog.V(2).Infof("unlock read of PodList")
-	defer daemon.PodList.RUnlock()
-
 	if pod, idx, ok := daemon.PodList.GetByContainerIdOrName(name); ok {
 		return pod, idx, nil
 	} else {
@@ -514,20 +327,20 @@ func (daemon *Daemon) GetPodByContainerIdOrName(name string) (pod *Pod, idx int,
 
 func (daemon *Daemon) AddPod(pod *Pod, podArgs string) (err error) {
 	// store the UserPod into the db
-	if err = daemon.WritePodToDB(pod.id, []byte(podArgs)); err != nil {
+	if err = daemon.db.UpdatePod(pod.id, []byte(podArgs)); err != nil {
 		glog.V(1).Info("Found an error while saveing the POD file")
 		return
 	}
 	defer func() {
 		if err != nil {
-			daemon.DeletePodFromDB(pod.id)
+			daemon.db.DeletePod(pod.id)
 		}
 	}()
 
 	daemon.PodList.Put(pod)
 	defer func() {
 		if err != nil {
-			daemon.RemovePod(pod.id)
+			daemon.PodList.Delete(pod.id)
 		}
 	}()
 
@@ -551,67 +364,14 @@ func (daemon *Daemon) RemoveVm(vmId string) {
 	delete(daemon.VmList, vmId)
 }
 
-func (daemon *Daemon) UpdateVmData(vmId string, data []byte) error {
-	key := fmt.Sprintf("vmdata-%s", vmId)
-	_, err := daemon.db.Get([]byte(key), nil)
-	if err == nil {
-		err = daemon.db.Delete([]byte(key), nil)
-		if err != nil {
-			return err
-		}
-		err = daemon.db.Put([]byte(key), data, nil)
-		if err != nil {
-			return err
-		}
-	}
-	if err != nil && strings.Contains(err.Error(), "not found") {
-		err = daemon.db.Put([]byte(key), data, nil)
-		if err != nil {
-			return err
-		}
-	}
-	return err
-}
-
-func (daemon *Daemon) GetVmData(vmId string) ([]byte, error) {
-	key := fmt.Sprintf("vmdata-%s", vmId)
-	data, err := daemon.db.Get([]byte(key), nil)
-	if err != nil {
-		return []byte(""), err
-	}
-	return data, nil
-}
-
-func (daemon *Daemon) DeleteVmData(vmId string) error {
-	key := fmt.Sprintf("vmdata-%s", vmId)
-	err := daemon.db.Delete([]byte(key), nil)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func (daemon *Daemon) DestroyAllVm() error {
-	glog.V(0).Info("The daemon will stop all pod")
-	daemon.PodList.Lock()
-	glog.V(2).Infof("lock PodList")
-
 	daemon.PodList.Foreach(func(p *Pod) error {
-		if _, _, err := daemon.StopPodWithLock(p.id, "yes"); err != nil {
+		if _, _, err := daemon.StopPodWithinLock(p, "yes"); err != nil {
 			glog.V(1).Infof("fail to stop %s: %v", p.id, err)
 		}
 		return nil
 	})
-	daemon.PodList.Unlock()
-	glog.V(2).Infof("unlock PodList")
-	iter := daemon.db.NewIterator(util.BytesPrefix([]byte("vm-")), nil)
-	for iter.Next() {
-		key := iter.Key()
-		daemon.db.Delete(key, nil)
-	}
-	iter.Release()
-	err := iter.Error()
-	return err
+	return nil
 }
 
 func (daemon *Daemon) DestroyAndKeepVm() error {
