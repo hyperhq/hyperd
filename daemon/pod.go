@@ -872,7 +872,7 @@ func (p *Pod) Start(daemon *Daemon, vmId string, lazy bool, keep int, streams []
 
 	vmResponse := p.vm.StartPod(p.status, p.spec, p.ctnStartInfo, p.volumes)
 	if vmResponse.Data == nil {
-		err = fmt.Errorf("VM response data is nil")
+		err = fmt.Errorf("VM %s start failed with code %d: %s", vmResponse.VmId, vmResponse.Code, vmResponse.Cause)
 		return vmResponse, err
 	}
 
