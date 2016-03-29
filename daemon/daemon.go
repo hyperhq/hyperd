@@ -366,12 +366,11 @@ func (daemon *Daemon) RemoveVm(vmId string) {
 
 func (daemon *Daemon) DestroyAllVm() error {
 	daemon.PodList.Foreach(func(p *Pod) error {
-		if _, _, err := daemon.StopPodWithLock(p.id, "yes"); err != nil {
+		if _, _, err := daemon.StopPodWithinLock(p, "yes"); err != nil {
 			glog.V(1).Infof("fail to stop %s: %v", p.id, err)
 		}
 		return nil
 	})
-	glog.V(2).Infof("unlock PodList")
 	return nil
 }
 

@@ -12,6 +12,12 @@ func (daemon Daemon) pausePod(podId string) error {
 	if !ok {
 		return fmt.Errorf("Can not get Pod info with pod ID(%s)", podId)
 	}
+
+	if !pod.TransitionLock("pause") {
+		return fmt.Errorf("Pod %s is under other operation, please try again later", podId)
+	}
+	defer pod.TransitionUnlock("pause")
+
 	vmId := pod.status.Vm
 
 	vm, ok := daemon.VmList[vmId]
@@ -45,6 +51,12 @@ func (daemon *Daemon) unpausePod(podId string) error {
 	if !ok {
 		return fmt.Errorf("Can not get Pod info with pod ID(%s)", podId)
 	}
+
+	if !pod.TransitionLock("unpause") {
+		return fmt.Errorf("Pod %s is under other operation, please try again later", podId)
+	}
+	defer pod.TransitionUnlock("unpause")
+
 	vmId := pod.status.Vm
 
 	if pod.status.Status != types.S_POD_PAUSED {

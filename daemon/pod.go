@@ -36,6 +36,8 @@ type Pod struct {
 	ctnStartInfo []*hypervisor.ContainerInfo
 	volumes      []*hypervisor.VolumeInfo
 	ttyList      map[string]*hypervisor.TtyIO
+
+	transiting chan bool
 	sync.RWMutex
 }
 
@@ -43,9 +45,13 @@ func NewPod(rawSpec []byte, id string, data interface{}) (*Pod, error) {
 	var err error
 
 	p := &Pod{
-		id:      id,
-		ttyList: make(map[string]*hypervisor.TtyIO),
+		id:         id,
+		ttyList:    make(map[string]*hypervisor.TtyIO),
+		transiting: make(chan bool, 1),
 	}
+
+	// fill one element in transit chan, only one parallel op is allowed
+	p.transiting <- true
 
 	if p.spec, err = pod.ProcessPodBytes(rawSpec); err != nil {
 		glog.V(1).Infof("Process POD file error: %s", err.Error())
@@ -57,6 +63,28 @@ func NewPod(rawSpec []byte, id string, data interface{}) (*Pod, error) {
 	}
 
 	return p, nil
+}
+
+func (p *Pod) TransitionLock(label string) bool {
+	glog.V(1).Info("lock pod for operation ", label)
+	select {
+	case _ = <-p.transiting:
+		glog.V(3).Info("successfully lock pod for operation ", label)
+		return true
+	default:
+		glog.V(3).Info("failed to lock pod for operation ", label)
+		return false
+	}
+}
+
+func (p *Pod) TransitionUnlock(label string) {
+	glog.V(1).Info("unlock pod for operation ", label)
+	select {
+	case p.transiting <- true:
+		glog.V(3).Info("successfully unlock pod for operation ", label)
+	default:
+		glog.V(3).Info("failed to unlock pod for operation ", label)
+	}
 }
 
 func (p *Pod) GetVM(daemon *Daemon, id string, lazy bool, keep int) (err error) {

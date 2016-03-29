@@ -12,10 +12,6 @@ import (
 )
 
 func (daemon *Daemon) CleanPod(podId string) (int, string, error) {
-	return daemon.CleanPodWithLock(podId)
-}
-
-func (daemon *Daemon) CleanPodWithLock(podId string) (int, string, error) {
 	var (
 		code  = 0
 		cause = ""
@@ -27,8 +23,14 @@ func (daemon *Daemon) CleanPodWithLock(podId string) (int, string, error) {
 		return -1, "", fmt.Errorf("Can not find that Pod(%s)", podId)
 	}
 
+	if !pod.TransitionLock("rm") {
+		glog.Errorf("Pod %s is under other operation", podId)
+		return -1, "", fmt.Errorf("Pod %s is under other operation", podId)
+	}
+	defer pod.TransitionUnlock("rm")
+
 	if pod.status.Status == types.S_POD_RUNNING {
-		code, cause, err = daemon.StopPodWithLock(podId, "yes")
+		code, cause, err = daemon.StopPodWithinLock(pod, "yes")
 		if err != nil {
 			glog.Errorf("failed to stop pod %s", podId)
 		}

@@ -97,6 +97,11 @@ func (daemon *Daemon) StartPod(stdin io.ReadCloser, stdout io.WriteCloser, podId
 }
 
 func (daemon *Daemon) StartInternal(p *Pod, vmId string, config interface{}, lazy bool, keep int, streams []*hypervisor.TtyIO) (int, string, error) {
+	if !p.TransitionLock("start") {
+		return -1, "", fmt.Errorf("The pod(%s) is operting by others, please retry later", p.id)
+	}
+	defer p.TransitionUnlock("start")
+
 	if p.vm != nil {
 		return -1, "", fmt.Errorf("pod %s is already running", p.id)
 	}

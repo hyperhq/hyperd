@@ -61,7 +61,7 @@ func (pl *PodList) Delete(id string) {
 
 func (pl *PodList) GetByName(name string) *Pod {
 	pl.mu.RLock()
-	defer pl.mu.Unlock()
+	defer pl.mu.RUnlock()
 
 	return pl.findUnsafe(func(p *Pod) bool {
 		if p.status.Name == name {
@@ -73,7 +73,7 @@ func (pl *PodList) GetByName(name string) *Pod {
 
 func (pl *PodList) GetByContainerId(cid string) (*Pod, bool) {
 	pl.mu.RLock()
-	defer pl.mu.Unlock()
+	defer pl.mu.RUnlock()
 
 	if pl.pods == nil {
 		return nil, false
@@ -101,7 +101,7 @@ func (pl *PodList) GetByContainerId(cid string) (*Pod, bool) {
 
 func (pl *PodList) GetByContainerIdOrName(cid string) (*Pod, int, bool) {
 	pl.mu.RLock()
-	defer pl.mu.Unlock()
+	defer pl.mu.RUnlock()
 
 	if pl.pods == nil {
 		return nil, 0, false
