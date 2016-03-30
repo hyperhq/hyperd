@@ -260,6 +260,14 @@ func (p *Pod) createNewContainers(daemon *Daemon, jsons []*dockertypes.Container
 			config.Entrypoint = strslice.New(c.Entrypoint...)
 		}
 
+		if len(c.Envs) != 0 {
+			envs := []string{}
+			for _, env := range c.Envs {
+				envs = append(envs, env.Env+"="+env.Value)
+			}
+			config.Env = envs
+		}
+
 		ccs, err = daemon.Daemon.ContainerCreate(dockertypes.ContainerCreateConfig{
 			Name:   c.Name,
 			Config: config,
@@ -304,10 +312,10 @@ func (p *Pod) parseContainerJsons(daemon *Daemon, jsons []*dockertypes.Container
 		)
 
 		if c.Name == "" {
-			c.Name = strings.TrimLeft(info.Name, "/")
+			p.spec.Containers[i].Name = strings.TrimLeft(info.Name, "/")
 		}
 		if c.Image == "" {
-			c.Image = info.Config.Image
+			p.spec.Containers[i].Image = info.Config.Image
 		}
 		glog.Infof("container name %s, image %s", c.Name, c.Image)
 
@@ -329,10 +337,12 @@ func (p *Pod) parseContainerJsons(daemon *Daemon, jsons []*dockertypes.Container
 
 		env := make(map[string]string)
 		for _, v := range info.Config.Env {
-			env[v[:strings.Index(v, "=")]] = v[strings.Index(v, "=")+1:]
-		}
-		for _, e := range p.spec.Containers[i].Envs {
-			env[e.Env] = e.Value
+			pair := strings.SplitN(v, "=", 2)
+			if len(pair) < 2 {
+				env[pair[0]] = ""
+			} else {
+				env[pair[0]] = pair[1]
+			}
 		}
 		ci.Envs = env
 
