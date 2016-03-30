@@ -326,7 +326,8 @@ func (p *Pod) parseContainerJsons(daemon *Daemon, jsons []*dockertypes.Container
 			return errors.New(estr)
 		}
 
-		ci.Id = mountId
+		ci.Id = info.ID
+		ci.MountId = mountId
 		ci.Workdir = info.Config.WorkingDir
 		ci.Cmd = append([]string{info.Path}, info.Args...)
 
@@ -645,7 +646,7 @@ func (p *Pod) setupMountsAndFiles(sd Storage) (err error) {
 			ci *hypervisor.ContainerInfo
 		)
 
-		mountId := p.ctnStartInfo[i].Id
+		mountId := p.ctnStartInfo[i].MountId
 		glog.Infof("container ID: %s, mountId %s\n", c.Id, mountId)
 		ci, err = sd.PrepareContainer(mountId, sharedDir)
 		if err != nil {
