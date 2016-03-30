@@ -18,7 +18,7 @@ Qemu is the powerful and popular Hardware emulator
 Hyper build is for x86_64 arch and enable virtfs and rbd support
 
 %prep
-%autosetup -n qemu-2.4.1
+%setup -n qemu-2.4.1
 
 %build
 cd %{_builddir}/qemu-2.4.1
@@ -33,7 +33,10 @@ make
 
 %files
 %{_bindir}/qemu-system-x86_64
+%{_datadir}/qemu/bios-256k.bin
 %{_datadir}/qemu/efi-virtio.rom
+%{_datadir}/qemu/kvmvapic.bin
+%{_datadir}/qemu/linuxboot.bin
 
 %changelog
 * Fri Jan 29 2016 Xu Wang <xu@hyper.sh> - 2.4.1-2
