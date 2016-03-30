@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -109,6 +110,36 @@ func (p *Pod) KillVM(daemon *Daemon) {
 
 func (p *Pod) Status() *hypervisor.PodStatus {
 	return p.status
+}
+
+func (p *Pod) InitializeFinished(daemon *Daemon) error {
+	update := false
+	p.Lock()
+	defer p.Unlock()
+
+	for idx := range p.spec.Containers {
+		label := fmt.Sprintf("extra.sh.hyper.container.%d.initialize", idx)
+		if _, ok := p.spec.Labels[label]; ok {
+			p.ctnStartInfo[idx].Initialize = false
+			delete(p.spec.Labels, label)
+			update = true
+		}
+	}
+
+	if update == false {
+		return nil
+	}
+
+	spec, err := json.Marshal(p.spec)
+	if err != nil {
+		return err
+	}
+
+	if err := daemon.db.UpdatePod(p.id, spec); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (p *Pod) DoCreate(daemon *Daemon) error {
@@ -279,6 +310,10 @@ func (p *Pod) createNewContainers(daemon *Daemon, jsons []*dockertypes.Container
 		}
 		defer cleanup(ccs.ID)
 
+		// Set Initialize to true, need to initialize container environment
+		label := fmt.Sprintf("extra.sh.hyper.container.%d.initialize", idx)
+		p.spec.Labels[label] = "yes"
+
 		glog.Infof("create container %s", ccs.ID)
 		if r, err = daemon.ContainerInspect(ccs.ID, false, version.Version("1.21")); err != nil {
 			return err
@@ -347,7 +382,14 @@ func (p *Pod) parseContainerJsons(daemon *Daemon, jsons []*dockertypes.Container
 		}
 		ci.Envs = env
 
-		processImageVolumes(info, info.ID, p.spec, &p.spec.Containers[i])
+		label := fmt.Sprintf("extra.sh.hyper.container.%d.initialize", i)
+		if value, ok := p.spec.Labels[label]; ok {
+			if value == "true" || value == "yes" || value == "1" {
+				ci.Initialize = true
+			}
+		}
+
+		processImageVolumes(info, info.ID, p.spec, &p.spec.Containers[i], ci.Initialize)
 
 		p.ctnStartInfo = append(p.ctnStartInfo, ci)
 		glog.V(1).Infof("Container Info is \n%v", ci)
@@ -454,7 +496,7 @@ func processInjectFiles(container *pod.UserContainer, files map[string]pod.UserF
 	return nil
 }
 
-func processImageVolumes(config *dockertypes.ContainerJSON, id string, userPod *pod.UserPod, container *pod.UserContainer) {
+func processImageVolumes(config *dockertypes.ContainerJSON, id string, userPod *pod.UserPod, container *pod.UserContainer, initialize bool) {
 	if config.Config.Volumes == nil {
 		return
 	}
@@ -471,8 +513,9 @@ func processImageVolumes(config *dockertypes.ContainerJSON, id string, userPod *
 
 		n := id + strings.Replace(tgt, "/", "_", -1)
 		v := pod.UserVolume{
-			Name:   n,
-			Source: "",
+			Name:         n,
+			Source:       "",
+			DockerVolume: true,
 		}
 		r := pod.UserVolumeReference{
 			Volume:   n,
@@ -659,6 +702,7 @@ func (p *Pod) setupMountsAndFiles(sd Storage) (err error) {
 		}
 
 		ci.Id = c.Id
+		ci.Initialize = p.ctnStartInfo[i].Initialize
 		ci.Cmd = p.ctnStartInfo[i].Cmd
 		ci.Envs = p.ctnStartInfo[i].Envs
 		ci.Entrypoint = p.ctnStartInfo[i].Entrypoint
