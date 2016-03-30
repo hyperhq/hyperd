@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/docker/docker/pkg/version"
-	dockertypes "github.com/docker/engine-api/types"
 	"github.com/golang/glog"
 	"github.com/hyperhq/hyper/types"
 	"github.com/hyperhq/hyper/utils"
@@ -40,19 +38,15 @@ func (daemon *Daemon) GetPodInfo(podName string) (types.PodInfo, error) {
 		vols := []types.VolumeMount{}
 		cmd := []string{}
 		args := []string{}
-		Response, err := daemon.Daemon.ContainerInspect(c.Id, false, version.Version("1.21"))
-		if err == nil {
-			var jsonResponse *dockertypes.ContainerJSON
-			jsonResponse, _ = Response.(*dockertypes.ContainerJSON)
 
-			for _, e := range jsonResponse.Config.Env {
-				envs = append(envs, types.EnvironmentVar{
-					Env:   e[:strings.Index(e, "=")],
-					Value: e[strings.Index(e, "=")+1:]})
+		if len(pod.ctnStartInfo) > i {
+			ci := pod.ctnStartInfo[i]
+			for k, v := range ci.Envs {
+				envs = append(envs, types.EnvironmentVar{Env: k, Value: v})
 			}
-			imageid = jsonResponse.Image
-			cmd = []string{jsonResponse.Path}
-			args = jsonResponse.Args
+			imageid = c.Image
+			cmd = ci.Cmd[:1]
+			args = ci.Cmd[1:]
 		}
 		if len(cmd) == 0 {
 			cmd = pod.spec.Containers[i].Command
@@ -219,19 +213,14 @@ func (daemon *Daemon) GetContainerInfo(name string) (types.ContainerInfo, error)
 	ports := []types.ContainerPort{}
 	envs := []types.EnvironmentVar{}
 	vols := []types.VolumeMount{}
-	rsp, err := daemon.Daemon.ContainerInspect(c.Id, false, version.Version("1.21"))
-	if err == nil {
-		var jsonResponse *dockertypes.ContainerJSON
-		jsonResponse, _ = rsp.(*dockertypes.ContainerJSON)
-
-		for _, e := range jsonResponse.Config.Env {
-			envs = append(envs, types.EnvironmentVar{
-				Env:   e[:strings.Index(e, "=")],
-				Value: e[strings.Index(e, "=")+1:]})
+	if len(pod.ctnStartInfo) > i {
+		ci := pod.ctnStartInfo[i]
+		for k, v := range ci.Envs {
+			envs = append(envs, types.EnvironmentVar{Env: k, Value: v})
 		}
-		imageid = jsonResponse.Image
-		cmd = []string{jsonResponse.Path}
-		args = jsonResponse.Args
+		imageid = c.Image
+		cmd = ci.Cmd[:1]
+		args = ci.Cmd[1:]
 	}
 	if len(cmd) == 0 {
 		glog.Warning("length of commands in inspect result should not be zero")
