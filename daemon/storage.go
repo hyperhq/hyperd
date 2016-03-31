@@ -163,10 +163,10 @@ func (dms *DevMapperStorage) PrepareContainer(id, sharedDir string) (*hypervisor
 		fstype = "ext4"
 	}
 	return &hypervisor.ContainerInfo{
-		Id:     id,
-		Rootfs: "/rootfs",
-		Image:  devFullName,
-		Fstype: fstype,
+		MountId: id,
+		Rootfs:  "/rootfs",
+		Image:   devFullName,
+		Fstype:  fstype,
 	}, nil
 }
 
@@ -264,10 +264,10 @@ func (a *AufsStorage) PrepareContainer(id, sharedDir string) (*hypervisor.Contai
 	}
 	devFullName := "/" + id + "/rootfs"
 	return &hypervisor.ContainerInfo{
-		Id:     id,
-		Rootfs: "",
-		Image:  devFullName,
-		Fstype: "dir",
+		MountId: id,
+		Rootfs:  "",
+		Image:   devFullName,
+		Fstype:  "dir",
 	}, nil
 }
 
@@ -322,10 +322,10 @@ func (o *OverlayFsStorage) PrepareContainer(id, sharedDir string) (*hypervisor.C
 	}
 	devFullName := "/" + id + "/rootfs"
 	return &hypervisor.ContainerInfo{
-		Id:     id,
-		Rootfs: "",
-		Image:  devFullName,
-		Fstype: "dir",
+		MountId: id,
+		Rootfs:  "",
+		Image:   devFullName,
+		Fstype:  "dir",
 	}, nil
 }
 
@@ -379,10 +379,10 @@ func (v *VBoxStorage) PrepareContainer(id, sharedDir string) (*hypervisor.Contai
 		return nil, err
 	}
 	return &hypervisor.ContainerInfo{
-		Id:     id,
-		Rootfs: "/rootfs",
-		Image:  devFullName,
-		Fstype: "ext4",
+		MountId: id,
+		Rootfs:  "/rootfs",
+		Image:   devFullName,
+		Fstype:  "ext4",
 	}, nil
 }
 
