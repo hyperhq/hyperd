@@ -15,7 +15,7 @@ import (
 
 func (daemon *Daemon) CreatePod(podId, podArgs string) (*Pod, error) {
 	// we can only support 1024 Pods
-	if daemon.GetRunningPodNum() >= 1024 {
+	if daemon.GetRunningPodNum() > 1024 {
 		return nil, fmt.Errorf("Pod full, the maximum Pod is 1024!")
 	}
 
@@ -53,7 +53,7 @@ func (daemon *Daemon) createPodInternal(podId, podArgs string, withinLock bool) 
 
 func (daemon *Daemon) StartPod(stdin io.ReadCloser, stdout io.WriteCloser, podId, vmId, tag string) (int, string, error) {
 	// we can only support 1024 Pods
-	if daemon.GetRunningPodNum() >= 1024 {
+	if daemon.GetRunningPodNum() > 1024 {
 		return -1, "", fmt.Errorf("Pod full, the maximum Pod is 1024!")
 	}
 
