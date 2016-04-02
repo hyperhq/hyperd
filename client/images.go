@@ -8,6 +8,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/docker/go-units"
 	"github.com/hyperhq/hyper/engine"
 
 	gflag "github.com/jessevdk/go-flags"
@@ -83,14 +84,7 @@ func getImageSizeString(size string) string {
 	if err != nil {
 		return ""
 	}
-	var rtn float64
-	if s < 1024 {
-		return size + " B"
-	} else if s < 1024*1024 {
-		rtn = float64(s) / 1024.0
-		return fmt.Sprintf("%.1f KB", rtn)
-	} else {
-		rtn = float64(s) / (1024.0 * 1024.0)
-		return fmt.Sprintf("%.1f MB", rtn)
-	}
+
+	rtn := float64(s)
+	return units.HumanSize(rtn)
 }
