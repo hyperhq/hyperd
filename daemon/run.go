@@ -28,7 +28,13 @@ func (daemon *Daemon) CreatePod(podId, podArgs string) (*Pod, error) {
 		return nil, err
 	}
 
-	if err = daemon.AddPod(p, podArgs); err != nil {
+	/* Create pod may change the pod spec */
+	spec, err := json.Marshal(p.spec)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = daemon.AddPod(p, string(spec)); err != nil {
 		return nil, err
 	}
 
@@ -79,6 +85,11 @@ func (daemon *Daemon) StartPod(stdin io.ReadCloser, stdout io.WriteCloser, podId
 
 	code, cause, err := daemon.StartInternal(p, vmId, nil, lazy, types.VM_KEEP_NONE, ttys)
 	if err != nil {
+		glog.Error(err.Error())
+		return -1, "", err
+	}
+
+	if err := p.InitializeFinished(daemon); err != nil {
 		glog.Error(err.Error())
 		return -1, "", err
 	}
@@ -161,6 +172,9 @@ func (daemon *Daemon) SetPodLabels(podId string, override bool, labels map[strin
 			return fmt.Errorf("Can not get Pod info with pod name(%s)", podId)
 		}
 	}
+
+	pod.Lock()
+	defer pod.Unlock()
 
 	if pod.spec.Labels == nil {
 		pod.spec.Labels = make(map[string]string)
