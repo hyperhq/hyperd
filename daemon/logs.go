@@ -50,7 +50,7 @@ func (daemon *Daemon) GetContainerLogs(container string, config *ContainerLogsCo
 
 	logReader, ok := pod.status.Containers[cidx].Logs.Driver.(logger.LogReader)
 	if !ok {
-		return fmt.Errorf("logger not suppert read")
+		return fmt.Errorf("logger not support read")
 	}
 
 	follow := config.Follow && (pod.status.Status == types.S_POD_RUNNING)

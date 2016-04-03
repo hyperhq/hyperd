@@ -333,14 +333,14 @@ func (daemon *Daemon) GetPodByContainerIdOrName(name string) (pod *Pod, idx int,
 	if pod, idx, ok := daemon.PodList.GetByContainerIdOrName(name); ok {
 		return pod, idx, nil
 	} else {
-		return nil, -1, fmt.Errorf("cannot found container %s", name)
+		return nil, -1, fmt.Errorf("cannot find container %s", name)
 	}
 }
 
 func (daemon *Daemon) AddPod(pod *Pod, podArgs string) (err error) {
 	// store the UserPod into the db
 	if err = daemon.db.UpdatePod(pod.id, []byte(podArgs)); err != nil {
-		glog.V(1).Info("Found an error while saveing the POD file")
+		glog.V(1).Info("Found an error while saving the POD file")
 		return
 	}
 	defer func() {
@@ -357,7 +357,7 @@ func (daemon *Daemon) AddPod(pod *Pod, podArgs string) (err error) {
 	}()
 
 	if err = daemon.WritePodAndContainers(pod.id); err != nil {
-		glog.V(1).Info("Found an error while saveing the Containers info")
+		glog.V(1).Info("Found an error while saving the Containers info")
 		return
 	}
 
