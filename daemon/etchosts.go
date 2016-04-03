@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"syscall"
 
 	"github.com/hyperhq/hyper/utils"
 )
@@ -60,6 +61,11 @@ func prepareHosts(podID string) (string, error) {
 	}
 
 	if _, err = os.Stat(hostsPath); err != nil && os.IsNotExist(err) {
+		// mount tmpfs on hostsDir
+		if err := syscall.Mount(podID+"-hosts", hostsDir, "tmpfs", 0, "size=1024K"); err != nil {
+			return "", err
+		}
+
 		hostsContent, err := generateDefaultHosts()
 		if err != nil {
 			return "", err
@@ -68,4 +74,24 @@ func prepareHosts(podID string) (string, error) {
 	}
 
 	return hostsPath, nil
+}
+
+func cleanupHosts(podID string) error {
+	var hostsDir = path.Join(utils.HYPER_ROOT, "hosts", podID)
+	var hostsPath = path.Join(hostsDir, defaultHostsFilename)
+
+	_, err := os.Stat(hostsPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+
+		return err
+	}
+	// try unmount hostsDir
+	if err := syscall.Unmount(hostsDir, syscall.MNT_DETACH); err != nil {
+		return err
+	}
+
+	return nil
 }
