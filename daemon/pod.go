@@ -626,7 +626,7 @@ func (p *Pod) setupDNS() (err error) {
 	}
 
 	if stat, e := os.Stat(resolvconf); e != nil || !stat.Mode().IsRegular() {
-		glog.V(1).Info("Host resolv.conf is not exist or not a regular file, do not insert DNS conf")
+		glog.V(1).Info("Host resolv.conf does not exist or not a regular file, do not insert DNS conf")
 		return
 	}
 

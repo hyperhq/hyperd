@@ -63,7 +63,7 @@ func main() {
 
 		_, err = runvutils.ExecInDaemon(path, append([]string{os.Args[0], "--nondaemon"}, os.Args[1:]...))
 		if err != nil {
-			fmt.Println("faile to daemonize hyperd")
+			fmt.Println("failed to daemonize hyperd")
 			os.Exit(-1)
 		}
 
