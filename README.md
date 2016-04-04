@@ -42,10 +42,10 @@ Ensure you are running Linux (kernel 3.8 or later) and have Docker
 
 Or download the [binary tarball](https://hyper-install.s3.amazonaws.com/hyper-latest.tgz) and install it directly.
 
-To run *hyper*, just type `hyper` if you've installed packages.
+To run *hyper*, just type `hyperctl` if you've installed packages.
 
-For information on using the command line, just type `hyper`. You may use
-`hyper <command> --help` for detailed information on any specific command.
+For information on using the command line, just type `hyperctl`. You may use
+`hyperctl <command> --help` for detailed information on any specific command.
 
 
 ## Example
@@ -66,7 +66,7 @@ And make sure you have `go` (>= 1.4) , `device-mapper-devel`, and `autotools`, g
     > ./configure
     > make
 
-Then you can get the binaries `hyperd` daemon and `hyper` cmdline tool.
+Then you can get the binaries `hyperd` daemon and `hyperctl` cmdline tool.
 
 You may also need the kernel and initrd from [HyperStart](https://github.com/hyperhq/hyperstart) to run your own hyper.
 
@@ -82,7 +82,7 @@ You may also need the kernel and initrd from [HyperStart](https://github.com/hyp
 
 Found a bug, want to suggest a feature, or have a question?
 [File an issue](https://github.com/hyperhq/hyper/issues), or email <bug@hyper.sh>. When reporting a bug, please include which version of
-hyper you are running, as shown by `hyper --version`.
+hyper you are running, as shown by `hyperctl --version`.
 
 * Twitter: [@hyper_sh](https://twitter.com/hyper_sh)
 * Blog: [https://hyper.sh/blog.html](https://hyper.sh/blog.html)

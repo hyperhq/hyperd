@@ -13,7 +13,7 @@ import (
 //
 // If no server is specified, the user will be logged out from the registry's index server.
 //
-// Usage: hyper logout [SERVER]
+// Usage: hyperctl logout [SERVER]
 func (cli *HyperClient) HyperCmdLogout(args ...string) error {
 	var parser = gflag.NewParser(nil, gflag.Default)
 	parser.Usage = "logout [SERVER]\n\nLog out from a Docker registry, if no server is\nspecified \"" + registry.IndexServer + "\" is the default."

@@ -38,7 +38,7 @@ func (cli *HyperClient) HyperCmdCommit(args ...string) error {
 		}
 	}
 	if len(args) == 0 {
-		return fmt.Errorf("%s: \"commit\" requires a minimum of 1 argument, See 'hyper build --help'.", os.Args[0])
+		return fmt.Errorf("%s: \"commit\" requires a minimum of 1 argument, See 'hyperctl build --help'.", os.Args[0])
 	}
 	var (
 		containerId string = ""

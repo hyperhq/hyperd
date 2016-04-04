@@ -39,7 +39,7 @@ make %{?_smp_mflags}
 mkdir -p %{buildroot}%{_bindir}
 mkdir -p %{buildroot}%{_sysconfdir}
 mkdir -p %{buildroot}/lib/systemd/system/
-cp %{_builddir}/src/github.com/hyperhq/hyper/{hyper,hyperd} %{buildroot}%{_bindir}
+cp %{_builddir}/src/github.com/hyperhq/hyper/{hyperctl,hyperd} %{buildroot}%{_bindir}
 cp -a %{_builddir}/src/github.com/hyperhq/hyper/package/dist/etc/hyper %{buildroot}%{_sysconfdir}
 cp -a %{_builddir}/src/github.com/hyperhq/hyper/package/dist/lib/systemd/system/hyperd.service %{buildroot}/lib/systemd/system/hyperd.service
 

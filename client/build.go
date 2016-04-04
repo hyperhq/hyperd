@@ -23,7 +23,7 @@ import (
 	gflag "github.com/jessevdk/go-flags"
 )
 
-// hyper build [OPTIONS] PATH
+// hyperctl build [OPTIONS] PATH
 func (cli *HyperClient) HyperCmdBuild(args ...string) error {
 	var opts struct {
 		ImageName      string `long:"tag" short:"t" default:"" value-name:"\"\"" default-mask:"-" description:"Repository name (and optionally a tag) to be applied to the resulting image in case of success"`
@@ -42,7 +42,7 @@ func (cli *HyperClient) HyperCmdBuild(args ...string) error {
 	}
 
 	if len(args) == 0 {
-		return fmt.Errorf("%s: \"build\" requires a minimum of 1 argument, See 'hyper build --help'.", os.Args[0])
+		return fmt.Errorf("%s: \"build\" requires a minimum of 1 argument, See 'hyperctl build --help'.", os.Args[0])
 	}
 	var (
 		filename = ""

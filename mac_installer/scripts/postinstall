@@ -56,9 +56,9 @@ cp ${INSTALL_CONFIG}/sh.hyper.hyper.plist /Library/LaunchDaemons/sh.hyper.hyper.
 
 # ln binary to bin
 mkdir -p /usr/local/bin
-if [ -e /usr/local/bin/hyper ] ; then
-	rm -f /usr/local/bin/hyper
+if [ -e /usr/local/bin/hyperctl ] ; then
+	rm -f /usr/local/bin/hyperctl
 fi
-ln -s /opt/hyper/bin/hyper /usr/local/bin/hyper
+ln -s /opt/hyper/bin/hyperctl /usr/local/bin/hyperctl
 
 
