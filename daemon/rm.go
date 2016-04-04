@@ -37,6 +37,7 @@ func (daemon *Daemon) CleanPod(podId string) (int, string, error) {
 	}
 
 	os.RemoveAll(path.Join(utils.HYPER_ROOT, "services", podId))
+	pod.cleanupEtcHosts()
 	os.RemoveAll(path.Join(utils.HYPER_ROOT, "hosts", podId))
 
 	daemon.db.DeletePod(podId)

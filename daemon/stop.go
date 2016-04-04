@@ -19,6 +19,7 @@ func (daemon *Daemon) PodStopped(podId string) {
 		return
 	}
 
+	pod.cleanupEtcHosts()
 	daemon.db.DeleteVMByPod(podId)
 	daemon.RemoveVm(pod.vm.Id)
 	pod.vm = nil

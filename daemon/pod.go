@@ -592,6 +592,18 @@ func (p *Pod) setupEtcHosts() (err error) {
 	return
 }
 
+func (p *Pod) cleanupEtcHosts() {
+	if p.spec == nil {
+		return
+	}
+
+	if err := cleanupHosts(p.id); err != nil {
+		glog.V(1).Infof("cleanup hosts for pod %s failed, %s", p.id, err.Error())
+	}
+
+	return
+}
+
 /***
   PrepareDNS() Set the resolv.conf of host to each container, except the following cases:
 
