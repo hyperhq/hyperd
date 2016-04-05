@@ -212,6 +212,11 @@ func mainDaemon(opt *Options) {
 	// which will be used for puller and builder
 	utils.SetDaemon(d)
 
+	if err := d.Restore(); err != nil {
+		glog.Warningf("Fail to restore the previous VM")
+		return
+	}
+
 	// The serve API routine never exits unless an error occurs
 	// We need to start it as a goroutine and wait on it so
 	// daemon doesn't exit
@@ -227,11 +232,6 @@ func mainDaemon(opt *Options) {
 		utils.VERSION,
 		utils.GITCOMMIT,
 	)
-
-	if err := d.Restore(); err != nil {
-		glog.Warningf("Fail to restore the previous VM")
-		return
-	}
 
 	// Daemon is fully initialized and handling API traffic
 	// Wait for serve API job to complete
