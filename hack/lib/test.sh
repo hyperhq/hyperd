@@ -6,7 +6,7 @@ hyper::test::clear_all() {
 }
 
 hyper::test::pull_image() {
-  sudo hyper pull $@
+  sudo hyperctl pull $@
 }
 
 hyper::test::check_image() {
@@ -18,37 +18,37 @@ hyper::test::check_image() {
   fi
   while read i t o ; do
     [ "$img" = "$i" -a "$tag" = "$t" ] && res=0
-  done < <(sudo hyper images)
+  done < <(sudo hyperctl images)
   return $res
 }
 
 hyper::test::remove_image() {
-  sudo hyper rmi $@
+  sudo hyperctl rmi $@
 }
 
 hyper::test::exitcode() {
   echo "Pod exit code test"
-  res=$(sudo hyper run --rm busybox sh -c "exit 17" > /dev/null 2>&1 ; echo $?)
+  res=$(sudo hyperctl run --rm busybox sh -c "exit 17" > /dev/null 2>&1 ; echo $?)
   echo "should return 17, return: $res"
   test $res -eq 17
 }
 
 hyper::test::exec() {
   echo "Pod exec and exit code test"
-  id=$(sudo hyper run -t -d busybox /bin/sh | sed -ne "s/POD id is \(pod-[0-9A-Za-z]\{1,\}\)/\1/p")
+  id=$(sudo hyperctl run -t -d busybox /bin/sh | sed -ne "s/POD id is \(pod-[0-9A-Za-z]\{1,\}\)/\1/p")
   echo "test pod ID is $id"
-  res=$(sudo hyper exec $id sh -c "exit 37" > /dev/null 2>&1 ; echo $?)
+  res=$(sudo hyperctl exec $id sh -c "exit 37" > /dev/null 2>&1 ; echo $?)
   echo "should return 37, return: $res"
   test $res -eq 37
-  sudo hyper rm $id
+  sudo hyperctl rm $id
 }
 
 hyper::test::run_pod() {
-  sudo hyper run --rm -p $1
+  sudo hyperctl run --rm -p $1
 }
 
 hyper::test::run_attached_pod() {
-  sudo hyper run --rm -a -p $1
+  sudo hyperctl run --rm -a -p $1
 }
 
 hyper::test::hostname() {
@@ -120,7 +120,7 @@ hyper::test::service() {
 }
 
 hyper::test::command() {
-  id=$(sudo hyper run -t -d gcr.io/google_containers/etcd:2.0.9 /usr/local/bin/etcd | sed -ne "s/POD id is \(pod-[0-9A-Za-z]\{1,\}\)/\1/p")
-  sudo hyper rm $id
+  id=$(sudo hyperctl run -t -d gcr.io/google_containers/etcd:2.0.9 /usr/local/bin/etcd | sed -ne "s/POD id is \(pod-[0-9A-Za-z]\{1,\}\)/\1/p")
+  sudo hyperctl rm $id
 }
 

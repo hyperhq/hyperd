@@ -18,12 +18,12 @@ endif
 
 VERSION_PARAM=-ldflags "-X github.com/hyperhq/hyper/utils.VERSION $(VERSION)"
 
-all-local: build-hyperd build-hyper
+all-local: build-hyperd build-hyperctl
 clean-local:
-	-rm -f hyperd hyper
+	-rm -f hyperd hyperctl
 	-rm -f Godeps/_workspace/src/github.com/opencontainers/specs/config-linux.go Godeps/_workspace/src/github.com/opencontainers/specs/runtime-config-linux.go
 install-exec-local: 
-	$(INSTALL_PROGRAM) hyper $(bindir)
+	$(INSTALL_PROGRAM) hyperctl $(bindir)
 	$(INSTALL_PROGRAM) hyperd $(bindir)
 
 # supporting linux container on non-linux platform (copy for catering to go build)
@@ -39,5 +39,5 @@ endif
 
 build-hyperd: linux_container
 	go build -tags "static_build $(HYPER_BULD_TAGS)" $(VERSION_PARAM) hyperd.go
-build-hyper:
-	go build $(VERSION_PARAM) hyper.go
+build-hyperctl:
+	go build $(VERSION_PARAM) hyperctl.go

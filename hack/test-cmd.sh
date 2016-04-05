@@ -57,9 +57,9 @@ function start_hyperd()
     sleep 600
   fi
   hyper::util::wait_for_url "http://127.0.0.1:${API_PORT}/info" "hyper-info"
-  # Check hyper
-  hyper::log::status "Running hyper command with no options"
-  "${HYPER_OUTPUT_HOSTBIN}/hyper"
+  # Check hyperctl
+  hyper::log::status "Running hyperctl command with no options"
+  "${HYPER_OUTPUT_HOSTBIN}/hyperctl"
 }
 
 function stop_hyperd()
@@ -123,10 +123,10 @@ __EOF__
   start_hyperd "${HYPER_TEMP}/config" $stordriver
 
   # Passing no arguments to 'create' is an error
-  ! sudo hyper create
+  ! sudo hyperctl create
 
   # Passing no arguments to 'info' is right
-  sudo hyper info
+  sudo hyperctl info
 
   #######################
   # API status check    #

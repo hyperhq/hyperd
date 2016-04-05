@@ -13,7 +13,7 @@ import (
 
 // CmdPush pushes an image or repository to the registry.
 //
-// Usage: hyper push NAME[:TAG]
+// Usage: hyperctl push NAME[:TAG]
 func (cli *HyperClient) HyperCmdPush(args ...string) error {
 	var parser = gflag.NewParser(nil, gflag.Default)
 	parser.Usage = "push NAME[:TAG]\n\nPush an image to a Docker registry server"

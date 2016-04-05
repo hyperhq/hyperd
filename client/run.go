@@ -19,7 +19,7 @@ import (
 	gflag "github.com/jessevdk/go-flags"
 )
 
-// hyper run [OPTIONS] image [COMMAND] [ARGS...]
+// hyperctl run [OPTIONS] image [COMMAND] [ARGS...]
 func (cli *HyperClient) HyperCmdRun(args ...string) (err error) {
 	var opts struct {
 		PodFile       string   `short:"p" long:"podfile" value-name:"\"\"" description:"Create and Run a pod based on the pod file"`

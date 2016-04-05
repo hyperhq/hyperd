@@ -45,12 +45,12 @@ _testmain.go
 
 # intellij idea configure
 .idea
-/hyper
+/hyperctl
 /hyperd
 *.out
 examples/*
 *.pkg
-mac_installer/dist/opt/hyper/bin/hyper
+mac_installer/dist/opt/hyper/bin/hyperctl
 mac_installer/dist/opt/hyper/bin/hyperd
 *.bak
 mac_installer/dist/opt/hyper/examples/*
