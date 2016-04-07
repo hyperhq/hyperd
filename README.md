@@ -36,11 +36,7 @@ Hyper - Hypervisor-agnostic Docker Runtime
 ## Installation
 
 Ensure you are running Linux (kernel 3.8 or later) and have Docker
-(version 1.5 or later) and QEMU (version 2.0 or later) installed. Then install hyper with
-
-    curl -sSL https://hyper.sh/install | bash
-
-Or download the [binary tarball](https://hyper-install.s3.amazonaws.com/hyper-latest.tgz) and install it directly.
+(version 1.5 or later) and QEMU (version 2.0 or later) installed. Then download the [binary tarball](https://hyper-install.s3.amazonaws.com/hyper-latest.tgz) and install it directly.
 
 To run *hyper*, just type `hyperctl` if you've installed packages.
 
