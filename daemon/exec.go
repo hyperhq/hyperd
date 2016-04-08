@@ -30,7 +30,7 @@ func (daemon *Daemon) ExitCode(container, tag string) (int, error) {
 	return int(tty.ExitCode), nil
 }
 
-func (daemon *Daemon) Exec(stdin io.ReadCloser, stdout io.WriteCloser, key, id, cmd, tag string) error {
+func (daemon *Daemon) Exec(stdin io.ReadCloser, stdout io.WriteCloser, key, id, cmd, tag string, terminal bool) error {
 	var (
 		vmId      string
 		container string
@@ -81,7 +81,7 @@ func (daemon *Daemon) Exec(stdin io.ReadCloser, stdout io.WriteCloser, key, id, 
 		return err
 	}
 
-	if err := vm.Exec(tty, container, cmd); err != nil {
+	if err := vm.Exec(container, cmd, terminal, tty); err != nil {
 		return err
 	}
 
