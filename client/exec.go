@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/hyperhq/hyper/lib/promise"
@@ -51,6 +52,7 @@ func (cli *HyperClient) HyperCmdExec(args ...string) error {
 	var opts struct {
 		Attach bool `short:"a" long:"attach" default:"true" description:"attach current terminal to the stdio of command"`
 		Vm     bool `long:"vm" default:"false" description:"attach to vm"`
+		Tty    bool `short:"t" long:"tty" description:"Allocate a pseudo-TTY"`
 	}
 	var parser = gflag.NewParser(&opts, gflag.Default|gflag.IgnoreUnknown)
 	parser.Usage = "exec [OPTIONS] POD|CONTAINER COMMAND [ARGS...]\n\nRun a command in a container of a running pod"
@@ -103,6 +105,7 @@ func (cli *HyperClient) HyperCmdExec(args ...string) error {
 	}
 	v.Set("command", string(command))
 	v.Set("tag", tag)
+	v.Set("tty", strconv.FormatBool(opts.Tty))
 
 	var (
 		hijacked = make(chan io.Closer)
@@ -117,7 +120,7 @@ func (cli *HyperClient) HyperCmdExec(args ...string) error {
 	}()
 
 	errCh = promise.Go(func() error {
-		return cli.hijack("POST", "/exec?"+v.Encode(), true, cli.in, cli.out, cli.out, hijacked, nil, "")
+		return cli.hijack("POST", "/exec?"+v.Encode(), opts.Tty, cli.in, cli.out, cli.out, hijacked, nil, "")
 	})
 
 	if err := cli.monitorTtySize(podName, tag); err != nil {
