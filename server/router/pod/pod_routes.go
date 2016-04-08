@@ -158,6 +158,30 @@ func (p *podRouter) postPodStop(ctx context.Context, w http.ResponseWriter, r *h
 	return env.WriteJSON(w, http.StatusOK)
 }
 
+func (p *podRouter) postPodKill(ctx context.Context, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+	if err := httputils.ParseForm(r); err != nil {
+		return err
+	}
+
+	var (
+		podId     = r.Form.Get("podName")
+		container = r.Form.Get("container")
+	)
+
+	sigterm := int64(15)
+	signal, err := httputils.Int64ValueOrDefault(r, "signal", sigterm)
+	if err != nil {
+		signal = sigterm
+	}
+
+	env, err := p.backend.CmdKillPod(podId, container, signal)
+	if err != nil {
+		return err
+	}
+
+	return env.WriteJSON(w, http.StatusOK)
+}
+
 func (p *podRouter) postPodPause(ctx context.Context, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
 	if err := httputils.ParseForm(r); err != nil {
 		return err

@@ -27,6 +27,7 @@ func NewRouter(b Backend) router.Router {
 		local.NewPostRoute("/pod/labels", r.postPodLabels),
 		local.NewPostRoute("/pod/start", r.postPodStart),
 		local.NewPostRoute("/pod/stop", r.postPodStop),
+		local.NewPostRoute("/pod/kill", r.postPodKill),
 		local.NewPostRoute("/pod/pause", r.postPodPause),
 		local.NewPostRoute("/pod/unpause", r.postPodUnpause),
 		local.NewPostRoute("/vm/create", r.postVmCreate),

@@ -129,6 +129,27 @@ func (c *containerRouter) postContainerCreate(ctx context.Context, w http.Respon
 	return env.WriteJSON(w, http.StatusCreated)
 }
 
+func (c *containerRouter) postContainerKill(ctx context.Context, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+	if err := httputils.ParseForm(r); err != nil {
+		return err
+	}
+
+	sigterm := int64(15)
+	cname := r.Form.Get("container")
+	signal, err := httputils.Int64ValueOrDefault(r, "signal", sigterm)
+	if err != nil {
+		signal = sigterm
+	}
+
+	env, err := c.backend.CmdKillContainer(cname, signal)
+
+	if err != nil {
+		return err
+	}
+
+	return env.WriteJSON(w, http.StatusCreated)
+}
+
 func (c *containerRouter) postContainerCommit(ctx context.Context, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
 	if err := httputils.ParseForm(r); err != nil {
 		return err

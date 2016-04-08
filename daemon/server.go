@@ -75,6 +75,16 @@ func (daemon *Daemon) CmdCreateContainer(params types.ContainerCreateConfig) (*e
 	return v, nil
 }
 
+func (daemon *Daemon) CmdKillContainer(name string, sig int64) (*engine.Env, error) {
+	err := daemon.KillContainer(name, sig)
+	if err != nil {
+		glog.Errorf("fail to kill container %s with signal %d: %v", name, sig, err)
+		return nil, err
+	}
+	v := &engine.Env{}
+	return v, nil
+}
+
 func (daemon *Daemon) CmdExec(stdin io.ReadCloser, stdout io.WriteCloser, key, id, cmd, tag string, terminal bool) error {
 	return daemon.Exec(stdin, stdout, key, id, cmd, tag, terminal)
 }
@@ -256,6 +266,16 @@ func (daemon *Daemon) CmdStopPod(podId, stopVm string) (*engine.Env, error) {
 	v.SetInt("Code", code)
 	v.Set("Cause", cause)
 
+	return v, nil
+}
+
+func (daemon *Daemon) CmdKillPod(podId, container string, sig int64) (*engine.Env, error) {
+	err := daemon.KillPodContainers(podId, container, sig)
+	if err != nil {
+		glog.Errorf("fail to kill container %s in pod %s with signal %d: %v", container, podId, sig, err)
+		return nil, err
+	}
+	v := &engine.Env{}
 	return v, nil
 }
 
