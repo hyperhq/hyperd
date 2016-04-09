@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/docker/docker/daemon/logger"
+	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/golang/glog"
 	"github.com/hyperhq/runv/hypervisor/types"
 )
@@ -41,6 +42,11 @@ func (daemon *Daemon) GetContainerLogs(container string, config *ContainerLogsCo
 	pod, cidx, err = daemon.GetPodByContainerIdOrName(container)
 	if err != nil {
 		return err
+	}
+
+	if !pod.spec.Containers[cidx].Tty {
+		outStream = stdcopy.NewStdWriter(outStream, stdcopy.Stdout)
+		errStream = stdcopy.NewStdWriter(config.OutStream, stdcopy.Stderr)
 	}
 
 	err = pod.getLogger(daemon)
