@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/docker/go-units"
+
 	gflag "github.com/jessevdk/go-flags"
 )
 
@@ -51,14 +53,6 @@ func (cli *HyperClient) HyperCmdInfo(args ...string) error {
 }
 
 func getMemSizeString(s int) string {
-	var rtn float64
-	if s < 1024*1024 {
-		return fmt.Sprintf("%d KB", s)
-	} else if s < 1024*1024*1024 {
-		rtn = float64(s) / (1024.0 * 1024.0)
-		return fmt.Sprintf("%.1f MB", rtn)
-	} else {
-		rtn = float64(s) / (1024.0 * 1024.0 * 1024.0)
-		return fmt.Sprintf("%.1f GB", rtn)
-	}
+	rtn := float64(s)
+	return units.HumanSize(rtn)
 }
