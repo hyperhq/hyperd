@@ -2,12 +2,9 @@ package client
 
 import (
 	"fmt"
-	"net/url"
 	"os"
 	"strings"
 	"text/tabwriter"
-
-	"github.com/hyperhq/hyper/engine"
 
 	gflag "github.com/jessevdk/go-flags"
 )
@@ -40,32 +37,10 @@ func (cli *HyperClient) HyperCmdList(args ...string) error {
 		return fmt.Errorf("Error, the %s can not support %s list!", os.Args[0], item)
 	}
 
-	v := url.Values{}
-	v.Set("item", item)
-	if opts.Aux {
-		v.Set("auxiliary", "yes")
-	}
-	if opts.Pod != "" {
-		v.Set("pod", opts.Pod)
-	}
-	if opts.VM != "" {
-		v.Set("vm", opts.VM)
-	}
-	body, _, err := readBody(cli.call("GET", "/list?"+v.Encode(), nil, nil))
+	remoteInfo, err := cli.client.List(item, opts.Pod, opts.VM, opts.Aux)
 	if err != nil {
 		return err
 	}
-	out := engine.NewOutput()
-	remoteInfo, err := out.AddEnv()
-	if err != nil {
-		return err
-	}
-
-	if _, err := out.Write(body); err != nil {
-		fmt.Printf("Error reading remote info: %s", err)
-		return err
-	}
-	out.Close()
 
 	var (
 		vmResponse        = []string{}

@@ -3,12 +3,12 @@ package client
 import (
 	"fmt"
 	"io"
-	"net/http"
-	"net/url"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+
+	rand "github.com/hyperhq/hyper/utils"
 
 	"github.com/docker/docker/api"
 	"github.com/docker/docker/builder/dockerignore"
@@ -18,8 +18,6 @@ import (
 	"github.com/docker/docker/pkg/streamformatter"
 	"github.com/docker/docker/pkg/symlink"
 	"github.com/docker/docker/reference"
-	rand "github.com/hyperhq/hyper/utils"
-
 	gflag "github.com/jessevdk/go-flags"
 )
 
@@ -166,17 +164,11 @@ func (cli *HyperClient) HyperCmdBuild(args ...string) error {
 			return err
 		}
 	}
-	v := url.Values{}
-	v.Set("name", name)
-	headers := http.Header(make(map[string][]string))
-	if context != nil {
-		headers.Set("Content-Type", "application/tar")
-	}
-	err = cli.stream("POST", "/image/build?"+v.Encode(), body, cli.out, headers)
+	output, ctype, err := cli.client.Build(name, context != nil, body)
 	if err != nil {
 		return err
 	}
-	return nil
+	return cli.readStreamOutput(output, ctype, false, cli.out, cli.err)
 }
 
 // validateContextDirectory checks if all the contents of the directory

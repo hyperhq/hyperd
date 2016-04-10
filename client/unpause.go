@@ -2,10 +2,8 @@ package client
 
 import (
 	"fmt"
-	"net/url"
 	"strings"
 
-	"github.com/hyperhq/hyper/engine"
 	gflag "github.com/jessevdk/go-flags"
 )
 
@@ -24,21 +22,5 @@ func (cli *HyperClient) HyperCmdUnpause(args ...string) error {
 		return fmt.Errorf("Can not accept the 'unpause' command without Pod ID!")
 	}
 
-	v := url.Values{}
-	v.Set("podId", args[0])
-
-	body, _, err := readBody(cli.call("POST", "/pod/unpause?"+v.Encode(), nil, nil))
-	if err != nil {
-		return err
-	}
-	out := engine.NewOutput()
-	if _, err = out.AddEnv(); err != nil {
-		return err
-	}
-
-	if _, err := out.Write(body); err != nil {
-		return err
-	}
-	out.Close()
-	return nil
+	return cli.client.UnpausePod(args[0])
 }

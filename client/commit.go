@@ -1,13 +1,9 @@
 package client
 
 import (
-	"encoding/json"
 	"fmt"
-	"net/url"
 	"os"
 	"strings"
-
-	"github.com/hyperhq/hyper/engine"
 
 	gflag "github.com/jessevdk/go-flags"
 )
@@ -50,35 +46,12 @@ func (cli *HyperClient) HyperCmdCommit(args ...string) error {
 	if len(args) > 1 {
 		repo = args[1]
 	}
-	v := url.Values{}
-	v.Set("author", opts.Author)
-	changeJson, err := json.Marshal(opts.Change)
-	if err != nil {
-		return err
-	}
-	v.Set("change", string(changeJson))
-	v.Set("message", opts.Message)
-	if opts.Pause == true {
-		v.Set("pause", "yes")
-	} else {
-		v.Set("pause", "no")
-	}
-	v.Set("container", containerId)
-	v.Set("repo", repo)
-	body, _, err := readBody(cli.call("POST", "/container/commit?"+v.Encode(), nil, nil))
-	if err != nil {
-		return err
-	}
-	out := engine.NewOutput()
-	remoteInfo, err := out.AddEnv()
+
+	id, err := cli.client.Commit(containerId, repo, opts.Author, opts.Message, opts.Change, opts.Pause)
 	if err != nil {
 		return err
 	}
 
-	if _, err := out.Write(body); err != nil {
-		return err
-	}
-	out.Close()
-	fmt.Fprintf(cli.out, "%s\n", remoteInfo.Get("ID"))
+	fmt.Fprintf(cli.out, "%s\n", id)
 	return nil
 }

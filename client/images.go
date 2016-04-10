@@ -2,22 +2,20 @@ package client
 
 import (
 	"fmt"
-	"net/url"
 	"strconv"
 	"strings"
 	"text/tabwriter"
 	"time"
 
 	"github.com/docker/go-units"
-	"github.com/hyperhq/hyper/engine"
 
 	gflag "github.com/jessevdk/go-flags"
 )
 
 func (cli *HyperClient) HyperCmdImages(args ...string) error {
 	var opts struct {
-		All bool `short:"a" long:"all" default:"false" description:"Show all images (by default filter out the intermediate image layers)"`
-		Num bool `short:"q" long:"quiet" default:"false" description:"Only show numeric IDs"`
+		All   bool `short:"a" long:"all" default:"false" description:"Show all images (by default filter out the intermediate image layers)"`
+		Quiet bool `short:"q" long:"quiet" default:"false" description:"Only show numeric IDs"`
 	}
 	var parser = gflag.NewParser(&opts, gflag.Default)
 
@@ -30,30 +28,8 @@ func (cli *HyperClient) HyperCmdImages(args ...string) error {
 			return nil
 		}
 	}
-	v := url.Values{}
-	v.Set("all", "no")
-	v.Set("quiet", "no")
-	if opts.All == true {
-		v.Set("all", "yes")
-	}
-	if opts.Num == true {
-		v.Set("quiet", "yes")
-	}
-	body, _, err := readBody(cli.call("GET", "/images/get?"+v.Encode(), nil, nil))
-	if err != nil {
-		return err
-	}
-	out := engine.NewOutput()
-	remoteInfo, err := out.AddEnv()
-	if err != nil {
-		return err
-	}
 
-	if _, err := out.Write(body); err != nil {
-		fmt.Printf("Error reading remote info: %s", err)
-		return err
-	}
-	out.Close()
+	remoteInfo, err := cli.client.GetImages(opts.All, opts.Quiet)
 
 	var (
 		imagesList = []string{}
@@ -61,7 +37,7 @@ func (cli *HyperClient) HyperCmdImages(args ...string) error {
 	imagesList = remoteInfo.GetList("imagesList")
 
 	w := tabwriter.NewWriter(cli.out, 20, 1, 3, ' ', 0)
-	if opts.Num == false {
+	if opts.Quiet == false {
 		fmt.Fprintln(w, "REPOSITORY\tTAG\tIMAGE ID\tCREATED\tVIRTUAL SIZE")
 		for _, item := range imagesList {
 			fields := strings.Split(item, ":")

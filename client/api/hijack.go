@@ -1,4 +1,4 @@
-package client
+package api
 
 import (
 	"fmt"
@@ -6,19 +6,59 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
+	"net/url"
 	"strings"
 	"time"
 
 	"github.com/hyperhq/hyper/lib/promise"
 	"github.com/hyperhq/hyper/utils"
-	"github.com/hyperhq/runv/lib/term"
 )
 
-func (cli *HyperClient) dial() (net.Conn, error) {
+func (cli *Client) hijackRequest(method, tag string, v *url.Values, tty bool, stdin io.ReadCloser, stdout, stderr io.Writer) error {
+	var (
+		hijacked = make(chan io.Closer)
+		errCh    chan error
+	)
+	// Block the return until the chan gets closed
+	defer func() {
+		if _, ok := <-hijacked; ok {
+			fmt.Printf("Hijack did not finish (chan still open)\n")
+		}
+	}()
+
+	request := fmt.Sprintf("/%s?%s", method, v.Encode())
+
+	errCh = promise.Go(func() error {
+		return cli.hijack("POST", request, tty, stdin, stdout, stderr, hijacked, nil, "")
+	})
+
+	// Acknowledge the hijack before starting
+	select {
+	case closer := <-hijacked:
+		// Make sure that hijack gets closed when returning. (result
+		// in closing hijack chan and freeing server's goroutines.
+		if closer != nil {
+			defer closer.Close()
+		}
+	case err := <-errCh:
+		if err != nil {
+			fmt.Printf("Error hijack: %s", err.Error())
+			return err
+		}
+	}
+
+	if err := <-errCh; err != nil {
+		fmt.Printf("Error hijack: %s", err.Error())
+		return err
+	}
+	return nil
+}
+
+func (cli *Client) dial() (net.Conn, error) {
 	return net.Dial(cli.proto, cli.addr)
 }
 
-func (cli *HyperClient) hijack(method, path string, setRawTerminal bool, in io.ReadCloser, stdout, stderr io.Writer, started chan io.Closer, data interface{}, hostname string) error {
+func (cli *Client) hijack(method, path string, setRawTerminal bool, in io.ReadCloser, stdout, stderr io.Writer, started chan io.Closer, data interface{}, hostname string) error {
 	defer func() {
 		if started != nil {
 			close(started)
@@ -54,7 +94,7 @@ func (cli *HyperClient) hijack(method, path string, setRawTerminal bool, in io.R
 	}
 	if err != nil {
 		if strings.Contains(err.Error(), "connection refused") {
-			return fmt.Errorf("Cannot connect to the Hyper daemon. Is 'hyperd' running on this host?")
+			return ErrConnectionRefused
 		}
 		return err
 	}
@@ -76,16 +116,10 @@ func (cli *HyperClient) hijack(method, path string, setRawTerminal bool, in io.R
 
 	var (
 		receiveStdout chan error
-		oldState      *term.State
 	)
 
 	if in != nil && setRawTerminal {
 		// fmt.Printf("In the Raw Terminal!!!\n")
-		oldState, err = term.SetRawTerminal(cli.inFd)
-		if err != nil {
-			return err
-		}
-		defer term.RestoreTerminal(cli.inFd, oldState)
 	}
 
 	if stdout != nil || stderr != nil {
@@ -93,7 +127,6 @@ func (cli *HyperClient) hijack(method, path string, setRawTerminal bool, in io.R
 			defer func() {
 				if in != nil {
 					if setRawTerminal {
-						term.RestoreTerminal(cli.inFd, oldState)
 					}
 				}
 			}()

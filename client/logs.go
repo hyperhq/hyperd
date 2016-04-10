@@ -2,8 +2,6 @@ package client
 
 import (
 	"fmt"
-	"net/http"
-	"net/url"
 	"os"
 	"strings"
 
@@ -33,21 +31,14 @@ func (cli *HyperClient) HyperCmdLogs(args ...string) error {
 		return fmt.Errorf("%s ERROR: Can not accept the 'logs' command without argument!\n", os.Args[0])
 	}
 
-	v := url.Values{}
-	v.Set("container", args[0])
-	v.Set("stdout", "yes")
-	v.Set("stderr", "yes")
-	v.Set("since", opts.Since)
-
-	if opts.Times {
-		v.Set("timestamps", "yes")
+	c, err := cli.client.GetContainerInfo(args[0])
+	if err != nil {
+		return err
 	}
 
-	if opts.Follow {
-		v.Set("follow", "yes")
+	output, ctype, err := cli.client.ContainerLogs(args[0], opts.Since, opts.Times, opts.Follow, opts.Tail)
+	if err != nil {
+		return err
 	}
-	v.Set("tail", opts.Tail)
-
-	headers := http.Header(make(map[string][]string))
-	return cli.stream("GET", "/container/logs?"+v.Encode(), nil, cli.out, headers)
+	return cli.readStreamOutput(output, ctype, c.Tty, cli.out, cli.err)
 }

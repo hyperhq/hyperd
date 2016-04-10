@@ -1,10 +1,14 @@
 package client
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
+	"github.com/hyperhq/runv/hypervisor/pod"
+
 	gflag "github.com/jessevdk/go-flags"
+	"net/http"
 )
 
 func (cli *HyperClient) HyperCmdCreate(args ...string) error {
@@ -31,9 +35,22 @@ func (cli *HyperClient) HyperCmdCreate(args ...string) error {
 		return err
 	}
 
-	podId, err := cli.CreatePod(jsonbody, false)
-	if err != nil {
+	var tmpPod pod.UserPod
+	if err := json.Unmarshal([]byte(jsonbody), &tmpPod); err != nil {
 		return err
+	}
+	podId, statusCode, err := cli.client.CreatePod(&tmpPod)
+	if err != nil {
+		if statusCode == http.StatusNotFound {
+			err = cli.PullImages(&tmpPod)
+			if err != nil {
+				return err
+			}
+			podId, statusCode, err = cli.client.CreatePod(&tmpPod)
+		}
+		if err != nil {
+			return err
+		}
 	}
 	fmt.Printf("Pod ID is %s\n", podId)
 	return nil

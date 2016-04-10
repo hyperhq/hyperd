@@ -2,11 +2,9 @@ package client
 
 import (
 	"fmt"
-	"io"
-	"net/url"
 	"strings"
 
-	"github.com/docker/docker/pkg/promise"
+	"github.com/hyperhq/runv/lib/term"
 
 	gflag "github.com/jessevdk/go-flags"
 )
@@ -26,79 +24,50 @@ func (cli *HyperClient) HyperCmdAttach(args ...string) error {
 		return fmt.Errorf("Can not accept the 'attach' command without Container ID!")
 	}
 	var (
-		podName     = args[0]
+		podId       = args[0]
+		containerId = args[0]
 		tag         = cli.GetTag()
-		containerId = podName
+		tty         bool
 	)
 
-	v := url.Values{}
-	if strings.Contains(podName, "pod-") {
-		_, err = cli.GetPodInfo(podName)
+	if strings.Contains(podId, "pod-") {
+		pod, err := cli.client.GetPodInfo(podId)
 		if err != nil {
 			return err
 		}
-		containerId, err = cli.GetContainerByPod(podName)
-		if err != nil {
-			return err
+
+		if len(pod.Spec.Containers) == 0 {
+			return fmt.Errorf("failed to get container from %s", podId)
 		}
-		v.Set("type", "container")
-		v.Set("value", containerId)
+
+		c := &pod.Spec.Containers[0]
+
+		containerId = c.ContainerID
+		tty = c.Tty
 	} else {
-		v.Set("type", "container")
-		v.Set("value", containerId)
-	}
-	v.Set("tag", tag)
-
-	tty := true //TODO: get the correct tty value of the pod/container from hyperd
-	err = cli.hijackRequest("attach", podName, tag, &v, tty)
-	if err != nil {
-		fmt.Printf("attach failed: %s\n", err.Error())
-		return err
-	}
-
-	return GetExitCode(cli, containerId, tag)
-}
-
-func (cli *HyperClient) hijackRequest(method, pod, tag string, v *url.Values, tty bool) error {
-	var (
-		hijacked = make(chan io.Closer)
-		errCh    chan error
-	)
-	// Block the return until the chan gets closed
-	defer func() {
-		if _, ok := <-hijacked; ok {
-			fmt.Printf("Hijack did not finish (chan still open)\n")
-		}
-	}()
-
-	request := fmt.Sprintf("/%s?%s", method, v.Encode())
-
-	errCh = promise.Go(func() error {
-		return cli.hijack("POST", request, tty, cli.in, cli.out, cli.out, hijacked, nil, "")
-	})
-
-	if err := cli.monitorTtySize(pod, tag); err != nil {
-		fmt.Printf("Monitor tty size fail for %s!\n", pod)
-	}
-
-	// Acknowledge the hijack before starting
-	select {
-	case closer := <-hijacked:
-		// Make sure that hijack gets closed when returning. (result
-		// in closing hijack chan and freeing server's goroutines.
-		if closer != nil {
-			defer closer.Close()
-		}
-	case err := <-errCh:
+		c, err := cli.client.GetContainerInfo(containerId)
 		if err != nil {
-			fmt.Printf("Error hijack: %s", err.Error())
 			return err
 		}
+
+		podId = c.PodID
+		containerId = c.ContainerID
+		tty = c.Tty
 	}
 
-	if err := <-errCh; err != nil {
-		fmt.Printf("Error hijack: %s", err.Error())
+	if tty {
+
+		oldState, err := term.SetRawTerminal(cli.inFd)
+		if err != nil {
+			return err
+		}
+		defer term.RestoreTerminal(cli.inFd, oldState)
+		cli.monitorTtySize(podId, tag)
+	}
+
+	if err := cli.client.Attach(containerId, tag, tty, cli.in, cli.out, cli.err); err != nil {
 		return err
 	}
-	return nil
+
+	return cli.client.GetExitCode(containerId, tag)
 }

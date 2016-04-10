@@ -5,25 +5,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
-	"net/http"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"text/template"
-	"time"
+
+	"github.com/hyperhq/hyper/client/api"
+	"github.com/hyperhq/runv/lib/term"
 
 	"github.com/docker/docker/cliconfig"
 	"github.com/docker/docker/pkg/homedir"
-	"github.com/hyperhq/runv/lib/term"
 )
 
 type HyperClient struct {
-	proto         string
-	addr          string
-	configFile    *cliconfig.ConfigFile
-	scheme        string
+	client        api.APIInterface
 	in            io.ReadCloser
 	out           io.Writer
 	err           io.Writer
@@ -31,8 +27,36 @@ type HyperClient struct {
 	outFd         uintptr
 	isTerminalIn  bool
 	isTerminalOut bool
-	tlsConfig     *tls.Config
-	transport     *http.Transport
+	configFile    *cliconfig.ConfigFile
+}
+
+func NewHyperClient(proto, addr string, tlsConfig *tls.Config) *HyperClient {
+	var (
+		inFd          uintptr
+		outFd         uintptr
+		isTerminalIn  = false
+		isTerminalOut = false
+	)
+
+	clifile, err := cliconfig.Load(filepath.Join(homedir.Get(), ".docker"))
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "WARNING: Error loading config file %v\n", err)
+	}
+
+	inFd, isTerminalIn = term.GetFdInfo(os.Stdin)
+	outFd, isTerminalOut = term.GetFdInfo(os.Stdout)
+
+	return &HyperClient{
+		client:        api.NewClient(proto, addr, tlsConfig),
+		in:            os.Stdin,
+		out:           os.Stdout,
+		err:           os.Stdout,
+		inFd:          inFd,
+		outFd:         outFd,
+		isTerminalIn:  isTerminalIn,
+		isTerminalOut: isTerminalOut,
+		configFile:    clifile,
+	}
 }
 
 var funcMap = template.FuncMap{
@@ -75,59 +99,4 @@ func (cli *HyperClient) Cmd(args ...string) error {
 		return method(args[1:]...)
 	}
 	return cli.HyperCmdHelp()
-}
-
-func NewHyperClient(proto, addr string, tlsConfig *tls.Config) *HyperClient {
-	var (
-		inFd          uintptr
-		outFd         uintptr
-		isTerminalIn  = false
-		isTerminalOut = false
-		scheme        = "http"
-	)
-
-	if tlsConfig != nil {
-		scheme = "https"
-	}
-
-	// The transport is created here for reuse during the client session
-	tran := &http.Transport{
-		TLSClientConfig: tlsConfig,
-	}
-
-	// Why 32? See issue 8035
-	timeout := 32 * time.Second
-	if proto == "unix" {
-		// no need in compressing for local communications
-		tran.DisableCompression = true
-		tran.Dial = func(_, _ string) (net.Conn, error) {
-			return net.DialTimeout(proto, addr, timeout)
-		}
-	} else {
-		tran.Proxy = http.ProxyFromEnvironment
-		tran.Dial = (&net.Dialer{Timeout: timeout}).Dial
-	}
-
-	inFd, isTerminalIn = term.GetFdInfo(os.Stdin)
-	outFd, isTerminalOut = term.GetFdInfo(os.Stdout)
-
-	clifile, err := cliconfig.Load(filepath.Join(homedir.Get(), ".docker"))
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "WARNING: Error loading config file %v\n", err)
-	}
-
-	return &HyperClient{
-		proto:         proto,
-		addr:          addr,
-		configFile:    clifile,
-		in:            os.Stdin,
-		out:           os.Stdout,
-		err:           os.Stdout,
-		inFd:          inFd,
-		outFd:         outFd,
-		isTerminalIn:  isTerminalIn,
-		isTerminalOut: isTerminalOut,
-		scheme:        scheme,
-		transport:     tran,
-	}
 }

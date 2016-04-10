@@ -2,12 +2,12 @@ package client
 
 import (
 	"fmt"
-	"net/url"
+	"io"
 	"strings"
 
 	"github.com/docker/docker/reference"
 	"github.com/docker/docker/registry"
-
+	"github.com/docker/engine-api/types"
 	gflag "github.com/jessevdk/go-flags"
 )
 
@@ -63,10 +63,11 @@ func (cli *HyperClient) HyperCmdPush(args ...string) error {
 		return fmt.Errorf("You cannot push a \"root\" repository. Please rename your repository to <user>/<repo> (ex: %s/%s)", username, ref.Name())
 	}
 
-	v := url.Values{}
-	v.Set("tag", tag)
-	v.Set("remote", repoInfo.String())
+	push := func(auth types.AuthConfig) (io.ReadCloser, string, int, error) {
+		return cli.client.Push(tag, repoInfo.String(), auth)
+	}
 
-	_, _, err = cli.clientRequestAttemptLogin("POST", "/image/push?"+v.Encode(), nil, cli.out, repoInfo.Index, "push")
-	return err
+	body, ctype, _, err := cli.requestWithLogin(repoInfo.Index, push, "push")
+
+	return cli.readStreamOutput(body, ctype, cli.isTerminalOut, cli.out, cli.err)
 }
