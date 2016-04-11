@@ -69,10 +69,10 @@ You may also need the kernel and initrd from [HyperStart](https://github.com/hyp
 
 ## Find out more
 
- * [Documentation](https://docs.hyper.sh)
- * [Get Started](https://docs.hyper.sh/get_started/index.html)
- * [Reference](https://docs.hyper.sh/reference/index.html)
- * [Release Notes](https://docs.hyper.sh/release_notes/latest.html)
+ * [Documentation](https://doc.hyper.sh)
+ * [Get Started](https://doc.hyper.sh/get_started/index.html)
+ * [Reference](https://doc.hyper.sh/reference/index.html)
+ * [Release Notes](https://doc.hyper.sh/release_notes/latest.html)
 
 ## Contact Us
 
