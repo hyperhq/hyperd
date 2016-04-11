@@ -21,23 +21,11 @@ VERSION_PARAM=-ldflags "-X github.com/hyperhq/hyper/utils.VERSION $(VERSION)"
 all-local: build-hyperd build-hyperctl
 clean-local:
 	-rm -f hyperd hyperctl
-	-rm -f Godeps/_workspace/src/github.com/opencontainers/specs/config-linux.go Godeps/_workspace/src/github.com/opencontainers/specs/runtime-config-linux.go
 install-exec-local: 
 	$(INSTALL_PROGRAM) hyperctl $(bindir)
 	$(INSTALL_PROGRAM) hyperd $(bindir)
 
-# supporting linux container on non-linux platform (copy for catering to go build)
-if ON_LINUX
-linux_container: Godeps/_workspace/src/github.com/opencontainers/specs/config_linux.go Godeps/_workspace/src/github.com/opencontainers/specs/runtime_config_linux.go
-else
-linux_container: Godeps/_workspace/src/github.com/opencontainers/specs/config-linux.go Godeps/_workspace/src/github.com/opencontainers/specs/runtime-config-linux.go
-Godeps/_workspace/src/github.com/opencontainers/specs/config-linux.go:
-	-cp Godeps/_workspace/src/github.com/opencontainers/specs/config_linux.go Godeps/_workspace/src/github.com/opencontainers/specs/config-linux.go
-Godeps/_workspace/src/github.com/opencontainers/specs/runtime-config-linux.go:
-	-cp Godeps/_workspace/src/github.com/opencontainers/specs/runtime_config_linux.go Godeps/_workspace/src/github.com/opencontainers/specs/runtime-config-linux.go
-endif
-
-build-hyperd: linux_container
+build-hyperd:
 	go build -tags "static_build $(HYPER_BULD_TAGS)" $(VERSION_PARAM) hyperd.go
 build-hyperctl:
 	go build $(VERSION_PARAM) hyperctl.go

@@ -591,9 +591,9 @@
 			"Rev": "47e3f834d73e76bc2a6a585b48d2a93325b34979"
 		},
 		{
-			"ImportPath": "github.com/opencontainers/specs",
-			"Comment": "v0.1.1-76-g46d949e",
-			"Rev": "46d949ea81080c5f60dfb72ee91468b1e9fb2998"
+			"ImportPath": "github.com/opencontainers/runtime-spec/specs-go",
+			"Comment": "v0.4.0-44-gc337cd2",
+			"Rev": "c337cd2c0a425ac9a7e17a624ac3be23a02fe53f"
 		},
 		{
 			"ImportPath": "github.com/philhofer/fwd",
