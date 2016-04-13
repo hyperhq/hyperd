@@ -35,7 +35,7 @@ type Pod struct {
 	spec         *pod.UserPod
 	vm           *hypervisor.Vm
 	ctnStartInfo []*hypervisor.ContainerInfo
-	volumes      []*hypervisor.VolumeInfo
+	volumes      map[string]*hypervisor.VolumeInfo
 	ttyList      map[string]*hypervisor.TtyIO
 
 	transiting chan bool
@@ -48,6 +48,7 @@ func NewPod(rawSpec []byte, id string, data interface{}) (*Pod, error) {
 	p := &Pod{
 		id:         id,
 		ttyList:    make(map[string]*hypervisor.TtyIO),
+		volumes:    make(map[string]*hypervisor.VolumeInfo),
 		transiting: make(chan bool, 1),
 	}
 
@@ -728,25 +729,31 @@ func (p *Pod) setupMountsAndFiles(sd Storage) (err error) {
 
 func (p *Pod) mountVolumes(daemon *Daemon, sd Storage) (err error) {
 	err = nil
-	p.volumes = []*hypervisor.VolumeInfo{}
 
 	var (
 		sharedDir = path.Join(hypervisor.BaseDir, p.vm.Id, hypervisor.ShareDirTag)
 	)
 
 	for _, v := range p.spec.Volumes {
-		var vol *hypervisor.VolumeInfo
+		var volInfo *hypervisor.VolumeInfo
 		if v.Source == "" {
 			err = fmt.Errorf("volume %s in pod %s is not created", v.Name, p.id)
 			return err
 		}
 
-		vol, err = ProbeExistingVolume(&v, sharedDir)
+		volInfo, err = ProbeExistingVolume(&v, sharedDir)
 		if err != nil {
 			return err
 		}
 
-		p.volumes = append(p.volumes, vol)
+		if vol, ok := p.volumes[v.Name]; ok {
+			vol.Filepath = volInfo.Filepath
+			vol.Fstype = volInfo.Fstype
+			vol.Format = volInfo.Format
+			continue
+		}
+
+		p.volumes[v.Name] = volInfo
 	}
 
 	return nil
