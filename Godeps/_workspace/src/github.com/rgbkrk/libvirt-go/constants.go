@@ -383,3 +383,18 @@ const (
 	VIR_DOMAIN_EVENT_TRAY_CHANGE_OPEN  = C.VIR_DOMAIN_EVENT_TRAY_CHANGE_OPEN
 	VIR_DOMAIN_EVENT_TRAY_CHANGE_CLOSE = C.VIR_DOMAIN_EVENT_TRAY_CHANGE_CLOSE
 )
+
+/*
+ * QMP has two different kinds of ways to talk to QEMU. One is legacy (HMP,
+ * or 'human' monitor protocol. The default is QMP, which is all-JSON.
+ *
+ * QMP json commands are of the format:
+ * 	{"execute" : "query-cpus"}
+ *
+ * whereas the same command in 'HMP' would be:
+ *	'info cpus'
+ */
+const (
+	VIR_DOMAIN_QEMU_MONITOR_COMMAND_DEFAULT = 0
+	VIR_DOMAIN_QEMU_MONITOR_COMMAND_HMP = (1 << 0)
+)
