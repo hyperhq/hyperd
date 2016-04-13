@@ -2,7 +2,6 @@ package client
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -120,8 +119,9 @@ func (cli *HyperClient) HyperCmdLogin(args ...string) error {
 	authconfig.ServerAddress = serverAddress
 	cli.configFile.AuthConfigs[serverAddress] = authconfig
 
-	stream, statusCode, err := cli.call("POST", "/auth", cli.configFile.AuthConfigs[serverAddress], nil)
-	if statusCode == 401 {
+	var response types.AuthResponse
+	remove, err := cli.client.Login(cli.configFile.AuthConfigs[serverAddress], &response)
+	if remove {
 		delete(cli.configFile.AuthConfigs, serverAddress)
 		if err2 := cli.configFile.Save(); err2 != nil {
 			fmt.Fprintf(cli.out, "WARNING: could not save config file: %v\n", err2)
@@ -129,13 +129,6 @@ func (cli *HyperClient) HyperCmdLogin(args ...string) error {
 		return err
 	}
 	if err != nil {
-		return err
-	}
-
-	var response types.AuthResponse
-	if err := json.NewDecoder(stream).Decode(&response); err != nil {
-		// Upon error, remove entry
-		delete(cli.configFile.AuthConfigs, serverAddress)
 		return err
 	}
 

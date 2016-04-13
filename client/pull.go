@@ -2,13 +2,14 @@ package client
 
 import (
 	"fmt"
-	"net/url"
+	"io"
 	"strings"
+
+	"github.com/hyperhq/runv/hypervisor/pod"
 
 	"github.com/docker/docker/reference"
 	"github.com/docker/docker/registry"
-	"github.com/hyperhq/runv/hypervisor/pod"
-
+	"github.com/docker/engine-api/types"
 	gflag "github.com/jessevdk/go-flags"
 )
 
@@ -46,24 +47,23 @@ func (cli *HyperClient) PullImage(imageName string) error {
 		return err
 	}
 
-	v := url.Values{}
-	v.Set("imageName", distributionRef.String())
-	_, _, err = cli.clientRequestAttemptLogin("POST", "/image/create?"+v.Encode(), nil, cli.out, repoInfo.Index, "pull")
-	return err
+	pull := func(auth types.AuthConfig) (io.ReadCloser, string, int, error) {
+		return cli.client.Pull(distributionRef.String(), auth)
+	}
+
+	body, ctype, _, err := cli.requestWithLogin(repoInfo.Index, pull, "pull")
+
+	return cli.readStreamOutput(body, ctype, cli.isTerminalOut, cli.out, cli.err)
 }
 
-func (cli *HyperClient) PullImages(data string) error {
-	userpod, err := pod.ProcessPodBytes([]byte(data))
-	if err != nil {
-		return err
-	}
-	for _, c := range userpod.Containers {
-		if err = cli.PullImage(c.Image); err != nil {
+func (cli *HyperClient) PullImages(spec *pod.UserPod) error {
+	for i := range spec.Containers {
+		if err := cli.PullImage(spec.Containers[i].Image); err != nil {
 			return err
 		}
 	}
 	/* Hack here, pull service discovery image `haproxy` */
-	if len(userpod.Services) > 0 {
+	if len(spec.Services) > 0 {
 		return cli.PullImage("haproxy")
 	}
 	return nil

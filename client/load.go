@@ -32,7 +32,9 @@ func (cli *HyperClient) HyperCmdLoad(args ...string) error {
 		defer file.Close()
 		input = file
 	}
-
-	headers := map[string][]string{"Content-Type": {"application/x-tar"}}
-	return cli.stream("POST", "/image/load", input, cli.out, headers)
+	output, ctype, err := cli.client.Load(input)
+	if err != nil {
+		return err
+	}
+	return cli.readStreamOutput(output, ctype, false, cli.out, cli.err)
 }

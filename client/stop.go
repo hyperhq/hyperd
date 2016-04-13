@@ -2,10 +2,8 @@ package client
 
 import (
 	"fmt"
-	"net/url"
 	"strings"
 
-	"github.com/hyperhq/hyper/engine"
 	"github.com/hyperhq/runv/hypervisor/types"
 
 	gflag "github.com/jessevdk/go-flags"
@@ -35,7 +33,7 @@ func (cli *HyperClient) HyperCmdStop(args ...string) error {
 	if opts.Novm {
 		stopVm = "no"
 	}
-	code, cause, err := cli.StopPod(podID, stopVm)
+	code, cause, err := cli.client.StopPod(podID, stopVm)
 	if err != nil {
 		return err
 	}
@@ -44,34 +42,4 @@ func (cli *HyperClient) HyperCmdStop(args ...string) error {
 	}
 	fmt.Printf("Successfully shutdown the POD: %s!\n", podID)
 	return nil
-}
-
-func (cli *HyperClient) StopPod(podId, stopVm string) (int, string, error) {
-	v := url.Values{}
-	v.Set("podId", podId)
-	v.Set("stopVm", stopVm)
-	body, _, err := readBody(cli.call("POST", "/pod/stop?"+v.Encode(), nil, nil))
-	if err != nil {
-		if strings.Contains(err.Error(), "leveldb: not found") {
-			return -1, "", fmt.Errorf("Can not find that POD ID to stop, please check your POD ID!")
-		}
-		return -1, "", err
-	}
-	out := engine.NewOutput()
-	remoteInfo, err := out.AddEnv()
-	if err != nil {
-		return -1, "", err
-	}
-
-	if _, err := out.Write(body); err != nil {
-		return -1, "", err
-	}
-	out.Close()
-	// This 'ID' stands for pod ID
-	// This 'Code' should be E_SHUTDOWN
-	// THis 'Cause' ..
-	if remoteInfo.Exists("ID") {
-		// TODO ...
-	}
-	return remoteInfo.GetInt("Code"), remoteInfo.Get("Cause"), nil
 }

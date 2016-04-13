@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/hyperhq/hyper/engine"
-
 	gflag "github.com/jessevdk/go-flags"
 )
 
@@ -21,21 +19,12 @@ func (cli *HyperClient) HyperCmdInfo(args ...string) error {
 			return nil
 		}
 	}
-	body, _, err := readBody(cli.call("GET", "/info", nil, nil))
+
+	remoteInfo, err := cli.client.Info()
 	if err != nil {
 		return err
 	}
 
-	out := engine.NewOutput()
-	remoteInfo, err := out.AddEnv()
-	if err != nil {
-		return err
-	}
-
-	if _, err := out.Write(body); err != nil {
-		return err
-	}
-	out.Close()
 	fmt.Fprintf(cli.out, "Images: %d\n", remoteInfo.GetInt("Images"))
 	if remoteInfo.Exists("Containers") {
 		fmt.Fprintf(cli.out, "Containers: %d\n", remoteInfo.GetInt("Containers"))

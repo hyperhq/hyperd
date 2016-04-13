@@ -1,40 +1,15 @@
-package client
+package api
 
 import (
 	"fmt"
 	"net/url"
 	"strconv"
-	"strings"
 
 	"github.com/hyperhq/hyper/engine"
 	"github.com/hyperhq/runv/hypervisor/types"
-
-	gflag "github.com/jessevdk/go-flags"
 )
 
-func (cli *HyperClient) HyperCmdVm(args ...string) error {
-	var parser = gflag.NewParser(nil, gflag.Default)
-	parser.Usage = "vm\n\nRun a VM, without any Pod running on it"
-	args, err := parser.ParseArgs(args)
-	if err != nil {
-		if !strings.Contains(err.Error(), "Usage") {
-			return err
-		} else {
-			return nil
-		}
-	}
-
-	id, err := cli.CreateVm(0, 0, false)
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("New VM id is %s\n", id)
-
-	return nil
-}
-
-func (cli *HyperClient) CreateVm(cpu, mem int, async bool) (id string, err error) {
+func (cli *Client) CreateVm(cpu, mem int, async bool) (id string, err error) {
 	var (
 		body       []byte
 		remoteInfo *engine.Env
@@ -82,7 +57,7 @@ func (cli *HyperClient) CreateVm(cpu, mem int, async bool) (id string, err error
 	return id, err
 }
 
-func (cli *HyperClient) RmVm(vm string) (err error) {
+func (cli *Client) RmVm(vm string) (err error) {
 	var (
 		body       []byte
 		remoteInfo *engine.Env

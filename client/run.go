@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"net/url"
 	"os"
 	"regexp"
 	"strconv"
@@ -12,11 +11,12 @@ import (
 	"time"
 
 	"github.com/docker/docker/pkg/namesgenerator"
-	"github.com/hyperhq/hyper/engine"
 	"github.com/hyperhq/hyper/utils"
 	"github.com/hyperhq/runv/hypervisor/pod"
+	"github.com/hyperhq/runv/lib/term"
 
 	gflag "github.com/jessevdk/go-flags"
+	"net/http"
 )
 
 // hyperctl run [OPTIONS] image [COMMAND] [ARGS...]
@@ -82,24 +82,36 @@ func (cli *HyperClient) HyperCmdRun(args ...string) (err error) {
 
 	var (
 		spec  pod.UserPod
+		code  int
 		async = true
+		tag   string
+		tty   = false
 	)
 	json.Unmarshal([]byte(podJson), &spec)
 
-	vmId, err = cli.CreateVm(spec.Resource.Vcpu, spec.Resource.Memory, async)
+	vmId, err = cli.client.CreateVm(spec.Resource.Vcpu, spec.Resource.Memory, async)
 	if err != nil {
 		return
 	}
 
 	defer func() {
 		if err != nil {
-			cli.RmVm(vmId)
+			cli.client.RmVm(vmId)
 		}
 	}()
 
-	podId, err = cli.CreatePod(podJson, false)
+	podId, code, err = cli.client.CreatePod(&spec)
 	if err != nil {
-		return
+		if code == http.StatusNotFound {
+			err = cli.PullImages(&spec)
+			if err != nil {
+				return
+			}
+			podId, code, err = cli.client.CreatePod(&spec)
+		}
+		if err != nil {
+			return
+		}
 	}
 	if !attach {
 		fmt.Printf("POD id is %s\n", podId)
@@ -107,14 +119,37 @@ func (cli *HyperClient) HyperCmdRun(args ...string) (err error) {
 
 	if opts.Remove {
 		defer func() {
-			rmerr := cli.RmPod(podId)
+			rmerr := cli.client.RmPod(podId)
 			if rmerr != nil {
 				fmt.Fprintf(cli.out, "failed to rm pod, %v\n", rmerr)
 			}
 		}()
 	}
 
-	_, err = cli.StartPod(podId, vmId, attach, opts.Tty)
+	if attach {
+		tag = cli.GetTag()
+		if opts.PodFile == "" && opts.K8s == "" {
+			tty = opts.Tty
+		} else {
+			tty = spec.Tty || spec.Containers[0].Tty
+		}
+
+		if tty {
+			p, err := cli.client.GetPodInfo(podId)
+			if err == nil {
+				cli.monitorTtySize(p.Spec.Containers[0].ContainerID, tag)
+			}
+
+			oldState, err := term.SetRawTerminal(cli.inFd)
+			if err != nil {
+				return err
+			}
+			defer term.RestoreTerminal(cli.inFd, oldState)
+		}
+
+	}
+
+	_, err = cli.client.StartPod(podId, vmId, tag, tty, cli.in, cli.out, cli.err)
 	if err != nil {
 		return
 	}
@@ -315,36 +350,4 @@ func imageToName(image string) string {
 		name = namesgenerator.GetRandomName(0)
 	}
 	return name
-}
-
-func (cli *HyperClient) GetContainerByPod(podId string) (string, error) {
-	v := url.Values{}
-	v.Set("item", "container")
-	v.Set("pod", podId)
-	body, _, err := readBody(cli.call("GET", "/list?"+v.Encode(), nil, nil))
-	if err != nil {
-		return "", err
-	}
-	out := engine.NewOutput()
-	remoteInfo, err := out.AddEnv()
-	if err != nil {
-		return "", err
-	}
-
-	if _, err := out.Write(body); err != nil {
-		fmt.Printf("Error reading remote info: %s", err)
-		return "", err
-	}
-	out.Close()
-	var containerResponse = []string{}
-	containerResponse = remoteInfo.GetList("cData")
-	for _, c := range containerResponse {
-		fields := strings.Split(c, ":")
-		containerId := fields[0]
-		if podId == fields[2] {
-			return containerId, nil
-		}
-	}
-
-	return "", fmt.Errorf("Container not found")
 }
