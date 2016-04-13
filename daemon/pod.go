@@ -536,7 +536,7 @@ func (p *Pod) setupServices() error {
 	return err
 }
 
-// PrepareEtcHosts sets /etc/hosts for each container
+// SetupEtcHosts sets /etc/hosts for each container
 func (p *Pod) setupEtcHosts() (err error) {
 	var (
 		hostsVolumeName = "etchosts-volume"
@@ -752,7 +752,28 @@ func (p *Pod) mountVolumes(daemon *Daemon, sd Storage) (err error) {
 	return nil
 }
 
+func (p *Pod) prepareEtcHosts() error {
+	var (
+		hostsVolumeName = "etchosts-volume"
+		hostVolumePath  = path.Join(utils.HYPER_ROOT, "hosts", p.id, defaultHostsFilename)
+	)
+
+	for _, v := range p.spec.Volumes {
+		// FIXME: check if the user configure the hosts volume
+		if v.Name == hostsVolumeName && v.Source == hostVolumePath {
+			_, err := prepareHosts(p.id)
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (p *Pod) Prepare(daemon *Daemon) (err error) {
+	if err = p.prepareEtcHosts(); err != nil {
+		return
+	}
+
 	if err = p.setupMountsAndFiles(daemon.Storage); err != nil {
 		return
 	}
