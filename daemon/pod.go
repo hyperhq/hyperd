@@ -390,7 +390,7 @@ func (p *Pod) parseContainerJsons(daemon *Daemon, jsons []*dockertypes.Container
 			}
 		}
 
-		processImageVolumes(info, info.ID, p.spec, &p.spec.Containers[i], ci.Initialize)
+		p.processImageVolumes(info, info.ID, &p.spec.Containers[i])
 
 		p.ctnStartInfo = append(p.ctnStartInfo, ci)
 		glog.V(1).Infof("Container Info is \n%v", ci)
@@ -497,10 +497,12 @@ func processInjectFiles(container *pod.UserContainer, files map[string]pod.UserF
 	return nil
 }
 
-func processImageVolumes(config *dockertypes.ContainerJSON, id string, userPod *pod.UserPod, container *pod.UserContainer, initialize bool) {
+func (p *Pod) processImageVolumes(config *dockertypes.ContainerJSON, id string, container *pod.UserContainer) {
 	if config.Config.Volumes == nil {
 		return
 	}
+
+	userPod := p.spec
 
 	existed := make(map[string]bool)
 	for _, v := range container.Volumes {
@@ -514,15 +516,16 @@ func processImageVolumes(config *dockertypes.ContainerJSON, id string, userPod *
 
 		n := id + strings.Replace(tgt, "/", "_", -1)
 		v := pod.UserVolume{
-			Name:         n,
-			Source:       "",
-			DockerVolume: true,
+			Name:   n,
+			Source: "",
 		}
 		r := pod.UserVolumeReference{
 			Volume:   n,
 			Path:     tgt,
 			ReadOnly: false,
 		}
+
+		p.volumes[n] = &hypervisor.VolumeInfo{Name: n, DockerVolume: true}
 		userPod.Volumes = append(userPod.Volumes, v)
 		container.Volumes = append(container.Volumes, r)
 	}
