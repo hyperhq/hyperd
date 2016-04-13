@@ -1,8 +1,9 @@
 package libvirt
 
 /*
-#cgo LDFLAGS: -lvirt 
+#cgo LDFLAGS: -lvirt-qemu -lvirt
 #include <libvirt/libvirt.h>
+#include <libvirt/libvirt-qemu.h>
 #include <libvirt/virterror.h>
 #include <stdlib.h>
 */
@@ -665,4 +666,19 @@ func (d *VirDomain) GetVcpusFlags(flags uint32) (int32, error) {
 		return 0, GetLastError()
 	}
 	return int32(result), nil
+}
+
+func (d *VirDomain) QemuMonitorCommand(flags uint32, command string) (string, error) {
+	var cResult *C.char
+	cCommand := C.CString(command)
+	defer C.free(unsafe.Pointer(cCommand))
+	result := C.virDomainQemuMonitorCommand(d.ptr, cCommand, &cResult, C.uint(flags))
+
+	if result != 0 {
+		return "", GetLastError()
+	}
+
+	rstring := C.GoString(cResult)
+	C.free(unsafe.Pointer(cResult))
+	return rstring, nil
 }

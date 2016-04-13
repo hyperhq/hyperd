@@ -29,11 +29,6 @@
 			"Rev": "18bc852dc01720ee9f0e9e0a01a1bdbc8744095c"
 		},
 		{
-			"ImportPath": "github.com/alexzorin/libvirt-go",
-			"Comment": "v2.12.0-2-g057f70a",
-			"Rev": "057f70a36a6b5d4ea19be345c2369e27dd022e01"
-		},
-		{
 			"ImportPath": "github.com/armon/go-metrics",
 			"Rev": "eb0af217e5e9747e41dd5303755356b62d28e3ec"
 		},
@@ -598,6 +593,11 @@
 		{
 			"ImportPath": "github.com/philhofer/fwd",
 			"Rev": "899e4efba8eaa1fea74175308f3fae18ff3319fa"
+		},
+		{
+			"ImportPath": "github.com/rgbkrk/libvirt-go",
+			"Comment": "v2.12.0-22-g4aa5670",
+			"Rev": "4aa5670b506d439aa71231db2d53bfb4f908fe6f"
 		},
 		{
 			"ImportPath": "github.com/samuel/go-zookeeper/zk",
