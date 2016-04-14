@@ -349,7 +349,6 @@ func MakePod(podId, image, workdir, src, shellDir string, cmds, entrys []string)
 	}
 
 	var container = pod.UserContainer{
-		Name:          "image-builder",
 		Image:         image,
 		Command:       cmds,
 		Workdir:       workdir,
