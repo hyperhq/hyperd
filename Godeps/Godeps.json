@@ -511,7 +511,7 @@
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/proto",
-			"Rev": "f7137ae6b19afbfd61a94b746fda3b3fe0491874"
+			"Rev": "f0a097ddac24fb00e07d2ac17f8671423f3ea47c"
 		},
 		{
 			"ImportPath": "github.com/golang/snappy",
