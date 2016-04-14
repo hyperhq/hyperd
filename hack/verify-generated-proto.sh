@@ -1,5 +1,4 @@
 #!/bin/bash
-
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -23,7 +22,7 @@ mkdir -p ${_tmp}
 protoc --go_out=plugins=grpc:${_tmp} types/types.proto
 
 ret=0
-diff -Naupr ${_tmp}/types/types.pb.go types/types.pb.go || ret=$?
+diff -I "gzipped FileDescriptorProto" -I "0x" -Naupr ${_tmp}/types/types.pb.go types/types.pb.go || ret=$?
 if [[ $ret -eq 0 ]]; then
     echo "Generated types from proto up to date."
 else
