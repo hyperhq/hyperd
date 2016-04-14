@@ -244,7 +244,7 @@ func (d Docker) ContainerCreate(params types.ContainerCreateConfig) (types.Conta
 	podId := fmt.Sprintf("buildpod-%s", utils.RandStr(10, "alpha"))
 	// Hack here, container created by ADD/COPY only has Config
 	if params.HostConfig != nil {
-		podString, err = MakeBasicPod(podId, params.Config.Image, params.Config.WorkingDir)
+		podString, err = MakeBasicPod(podId, params.Config.Image, params.Config.WorkingDir, params.Config.Cmd.Slice(), params.Config.Entrypoint.Slice())
 	} else {
 		podString, err = MakeCopyPod(podId, params.Config.Image, params.Config.WorkingDir)
 	}
@@ -300,8 +300,8 @@ func MakeCopyPod(podId, image, workdir string) (string, error) {
 	return MakePod(podId, image, workdir, tempSrcDir, shellDir, []string{"/bin/sh", "/tmp/shell/exec-copy.sh"}, []string{})
 }
 
-func MakeBasicPod(podId, image, workdir string) (string, error) {
-	return MakePod(podId, image, workdir, "", "", []string{}, []string{})
+func MakeBasicPod(podId, image, workdir string, cmds, entrys []string) (string, error) {
+	return MakePod(podId, image, workdir, "", "", cmds, entrys)
 }
 
 func MakePod(podId, image, workdir, src, shellDir string, cmds, entrys []string) (string, error) {
