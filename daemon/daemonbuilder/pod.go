@@ -348,6 +348,7 @@ func MakePod(podId, image, workdir, src, shellDir string, cmds, entrys []string)
 		Command:       cmds,
 		Workdir:       workdir,
 		Entrypoint:    entrys,
+		Tty:           true,
 		Ports:         []pod.UserContainerPort{},
 		Envs:          env,
 		Volumes:       cVols,
@@ -362,7 +363,7 @@ func MakePod(podId, image, workdir, src, shellDir string, cmds, entrys []string)
 		Resource:   pod.UserResource{Vcpu: 1, Memory: 512},
 		Files:      []pod.UserFile{},
 		Volumes:    volList,
-		Tty:        false,
+		Tty:        true,
 	}
 
 	jsonString, err := utils.JSONMarshal(userPod, true)
