@@ -20,7 +20,9 @@ before_install:
 
 script:
   - cd ${TRAVIS_BUILD_DIR}
+  - hack/install-grpc.sh
   - hack/verify-gofmt.sh
+  - hack/verify-generated-proto.sh
   - ./autogen.sh
   - ./configure
   - make
