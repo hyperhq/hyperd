@@ -40,7 +40,7 @@ func (cli *HyperClient) HyperCmdAttach(args ...string) error {
 			return fmt.Errorf("failed to get container from %s", podId)
 		}
 
-		c := &pod.Spec.Containers[0]
+		c := pod.Spec.Containers[0]
 
 		containerId = c.ContainerID
 		tty = c.Tty
