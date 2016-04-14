@@ -176,29 +176,21 @@ func (d Docker) ContainerStart(cId string, hostConfig *containertypes.HostConfig
 		}
 	}()
 
-	if d.hyper.Vm == nil {
-		vmId := "buildevm-" + utils.RandStr(10, "number")
-		d.hyper.Vm, err = d.Daemon.StartVm(vmId, 1, 512, false, hypertypes.VM_KEEP_AFTER_FINISH)
-		if err != nil {
-			return
-		}
-		d.hyper.Status, err = d.hyper.Vm.GetResponseChan()
-		if err != nil {
-			return
-		}
-	}
-
-	vm = d.hyper.Vm
-	if vm.Status == hypertypes.S_VM_IDLE {
-		_, _, err = d.Daemon.StartPod(nil, nil, podId, vm.Id, "")
-		if err != nil {
-			glog.Errorf("start pod failed %s", err.Error())
-			return
-		}
+	vmId := "buildevm-" + utils.RandStr(10, "number")
+	if vm, err = d.Daemon.StartVm(vmId, 1, 512, false, hypertypes.VM_KEEP_AFTER_FINISH); err != nil {
 		return
 	}
-	glog.Errorf("Vm is not IDLE")
-	return fmt.Errorf("Vm is not IDLE")
+	d.hyper.Vm = vm
+
+	if d.hyper.Status, err = vm.GetResponseChan(); err != nil {
+		return
+	}
+
+	if _, _, err = d.Daemon.StartPod(nil, nil, podId, vm.Id, ""); err != nil {
+		return
+	}
+
+	return nil
 }
 
 func (d Docker) ContainerWait(cId string, timeout time.Duration) (int, error) {
@@ -206,12 +198,10 @@ func (d Docker) ContainerWait(cId string, timeout time.Duration) (int, error) {
 	if d.hyper.Vm == nil {
 		return -1, fmt.Errorf("no vm is running")
 	}
-	podId := ""
-	if _, ok := d.hyper.CopyPods[cId]; ok {
-		podId = d.hyper.CopyPods[cId]
-	} else if _, ok := d.hyper.BasicPods[cId]; ok {
-		podId = d.hyper.BasicPods[cId]
-	} else {
+
+	_, isCopyPod := d.hyper.CopyPods[cId]
+	_, isBasicPod := d.hyper.BasicPods[cId]
+	if !isCopyPod && !isBasicPod {
 		return -1, fmt.Errorf("container %s doesn't belong to pod", cId)
 	}
 
@@ -229,11 +219,15 @@ func (d Docker) ContainerWait(cId string, timeout time.Duration) (int, error) {
 	}
 
 	// release pod from VM
-	glog.Warningf("pod finished, stop it")
-	_, _, err := d.Daemon.StopPod(podId, "no")
-	if err != nil {
+	glog.Warningf("pod finished, stop and remove vm")
+	d.hyper.Vm.ReleaseResponseChan(d.hyper.Status)
+	if code, cause, err := d.Daemon.KillVm(d.hyper.Vm.Id); err != nil {
+		glog.Errorf("Killvm %s failed: %d %s", d.hyper.Vm.Id, code, cause)
 		return -1, err
 	}
+
+	d.hyper.Vm = nil
+	d.hyper.Status = nil
 
 	return 0, nil
 }
@@ -393,19 +387,7 @@ func (d Docker) ContainerRm(name string, config *types.ContainerRmConfig) error 
 
 	glog.Infof("ContainerRm pod id %s", podId)
 	d.Daemon.CleanPod(podId)
-	/*
-		if d.Vm != nil {
-			vm := *d.Vm
-			if d.Status != nil {
-				status := *d.Status
-				vm.ReleaseResponseChan(status)
-				d.Status = nil
-			}
 
-			d.Daemon.KillVm(vm.Id)
-			d.Vm = nil
-		}
-	*/
 	return nil
 }
 
