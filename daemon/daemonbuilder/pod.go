@@ -14,6 +14,7 @@ import (
 	"github.com/docker/docker/pkg/chrootarchive"
 	"github.com/docker/docker/pkg/idtools"
 	"github.com/docker/docker/pkg/ioutils"
+	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/engine-api/types"
 	containertypes "github.com/docker/engine-api/types/container"
 	"github.com/golang/glog"
@@ -27,7 +28,25 @@ import (
 func (d Docker) ContainerAttach(cId string, stdin io.ReadCloser, stdout, stderr io.Writer, stream bool) error {
 	tag := pod.RandStr(8, "alphanum")
 	<-d.hyper.Ready
-	return d.Daemon.Attach(stdin, ioutils.NopWriteCloser(stdout), "container", cId, tag)
+
+	err := d.Daemon.Attach(stdin, ioutils.NopWriteCloser(stdout), "container", cId, tag)
+	if err != nil {
+		return err
+	}
+
+	code, err := d.Daemon.ExitCode(cId, tag)
+	if err != nil {
+		return err
+	}
+
+	if code == 0 {
+		return nil
+	}
+
+	return &jsonmessage.JSONError{
+		Message: fmt.Sprintf("The container '%s' returned a non-zero code: %d", cId, code),
+		Code:    code,
+	}
 }
 
 func (d Docker) Commit(cId string, cfg *types.ContainerCommitConfig) (string, error) {
