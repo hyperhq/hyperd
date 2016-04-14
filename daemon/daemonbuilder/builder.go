@@ -33,6 +33,7 @@ type Docker struct {
 type Hyper struct {
 	CopyPods  map[string]string
 	BasicPods map[string]string
+	Ready     chan bool
 	Status    chan *hypertypes.VmResponse
 	Vm        *hypervisor.Vm
 }
@@ -44,6 +45,7 @@ func (d *Docker) InitHyper() {
 	d.hyper = &Hyper{
 		make(map[string]string),
 		make(map[string]string),
+		make(chan bool, 1),
 		nil, nil,
 	}
 }

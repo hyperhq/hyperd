@@ -26,6 +26,7 @@ import (
 // ContainerAttach attaches streams to the container cID. If stream is true, it streams the output.
 func (d Docker) ContainerAttach(cId string, stdin io.ReadCloser, stdout, stderr io.Writer, stream bool) error {
 	tag := pod.RandStr(8, "alphanum")
+	<-d.hyper.Ready
 	return d.Daemon.Attach(stdin, ioutils.NopWriteCloser(stdout), "container", cId, tag)
 }
 
@@ -48,6 +49,10 @@ func (d Docker) Commit(cId string, cfg *types.ContainerCommitConfig) (string, er
 	fmt.Fprintf(copyshell, "rm -rf /tmp/src/\n")
 
 	copyshell.Close()
+
+	go func() {
+		<-d.hyper.Ready
+	}()
 
 	err = d.ContainerStart(cId, nil)
 	if err != nil {
@@ -165,6 +170,7 @@ func (d Docker) ContainerStart(cId string, hostConfig *containertypes.HostConfig
 	}
 
 	defer func() {
+		d.hyper.Ready <- true
 		if err != nil && d.hyper.Vm != nil {
 			if d.hyper.Status != nil {
 				d.hyper.Vm.ReleaseResponseChan(d.hyper.Status)
@@ -401,6 +407,7 @@ func (d Docker) Cleanup() {
 		d.Daemon.CleanPod(podId)
 	}
 
+	close(d.hyper.Ready)
 	if d.hyper.Vm != nil {
 		if d.hyper.Status != nil {
 			d.hyper.Vm.ReleaseResponseChan(d.hyper.Status)
