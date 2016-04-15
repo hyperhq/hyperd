@@ -64,6 +64,10 @@ var (
 	// a struct with a repeated field containing a nil element.
 	errRepeatedHasNil = errors.New("proto: repeated field has nil element")
 
+	// errOneofHasNil is the error returned if Marshal is called with
+	// a struct with a oneof field containing a nil element.
+	errOneofHasNil = errors.New("proto: oneof field has nil value")
+
 	// ErrNil is the error returned if Marshal is called with nil.
 	ErrNil = errors.New("proto: Marshal called with nil")
 )
@@ -103,6 +107,11 @@ func (p *Buffer) EncodeVarint(x uint64) error {
 	}
 	p.buf = append(p.buf, uint8(x))
 	return nil
+}
+
+// SizeVarint returns the varint encoding size of an integer.
+func SizeVarint(x uint64) int {
+	return sizeVarint(x)
 }
 
 func sizeVarint(x uint64) (n int) {
@@ -228,6 +237,20 @@ func Marshal(pb Message) ([]byte, error) {
 	return p.buf, err
 }
 
+// EncodeMessage writes the protocol buffer to the Buffer,
+// prefixed by a varint-encoded length.
+func (p *Buffer) EncodeMessage(pb Message) error {
+	t, base, err := getbase(pb)
+	if structPointer_IsNil(base) {
+		return ErrNil
+	}
+	if err == nil {
+		var state errorState
+		err = p.enc_len_struct(GetProperties(t.Elem()), base, &state)
+	}
+	return err
+}
+
 // Marshal takes the protocol buffer
 // and encodes it into the wire format, writing the result to the
 // Buffer.
@@ -318,7 +341,7 @@ func size_bool(p *Properties, base structPointer) int {
 
 func size_proto3_bool(p *Properties, base structPointer) int {
 	v := *structPointer_BoolVal(base, p.field)
-	if !v {
+	if !v && !p.oneof {
 		return 0
 	}
 	return len(p.tagcode) + 1 // each bool takes exactly one byte
@@ -361,7 +384,7 @@ func size_int32(p *Properties, base structPointer) (n int) {
 func size_proto3_int32(p *Properties, base structPointer) (n int) {
 	v := structPointer_Word32Val(base, p.field)
 	x := int32(word32Val_Get(v)) // permit sign extension to use full 64-bit range
-	if x == 0 {
+	if x == 0 && !p.oneof {
 		return 0
 	}
 	n += len(p.tagcode)
@@ -407,7 +430,7 @@ func size_uint32(p *Properties, base structPointer) (n int) {
 func size_proto3_uint32(p *Properties, base structPointer) (n int) {
 	v := structPointer_Word32Val(base, p.field)
 	x := word32Val_Get(v)
-	if x == 0 {
+	if x == 0 && !p.oneof {
 		return 0
 	}
 	n += len(p.tagcode)
@@ -452,7 +475,7 @@ func size_int64(p *Properties, base structPointer) (n int) {
 func size_proto3_int64(p *Properties, base structPointer) (n int) {
 	v := structPointer_Word64Val(base, p.field)
 	x := word64Val_Get(v)
-	if x == 0 {
+	if x == 0 && !p.oneof {
 		return 0
 	}
 	n += len(p.tagcode)
@@ -495,7 +518,7 @@ func size_string(p *Properties, base structPointer) (n int) {
 
 func size_proto3_string(p *Properties, base structPointer) (n int) {
 	v := *structPointer_StringVal(base, p.field)
-	if v == "" {
+	if v == "" && !p.oneof {
 		return 0
 	}
 	n += len(p.tagcode)
@@ -529,7 +552,7 @@ func (o *Buffer) enc_struct_message(p *Properties, base structPointer) error {
 		}
 		o.buf = append(o.buf, p.tagcode...)
 		o.EncodeRawBytes(data)
-		return nil
+		return state.err
 	}
 
 	o.buf = append(o.buf, p.tagcode...)
@@ -667,7 +690,7 @@ func (o *Buffer) enc_proto3_slice_byte(p *Properties, base structPointer) error 
 
 func size_slice_byte(p *Properties, base structPointer) (n int) {
 	s := *structPointer_Bytes(base, p.field)
-	if s == nil {
+	if s == nil && !p.oneof {
 		return 0
 	}
 	n += len(p.tagcode)
@@ -677,7 +700,7 @@ func size_slice_byte(p *Properties, base structPointer) (n int) {
 
 func size_proto3_slice_byte(p *Properties, base structPointer) (n int) {
 	s := *structPointer_Bytes(base, p.field)
-	if len(s) == 0 {
+	if len(s) == 0 && !p.oneof {
 		return 0
 	}
 	n += len(p.tagcode)
@@ -1084,7 +1107,7 @@ func (o *Buffer) enc_new_map(p *Properties, base structPointer) error {
 			repeated MapFieldEntry map_field = N;
 	*/
 
-	v := structPointer_Map(base, p.field, p.mtype).Elem() // map[K]V
+	v := structPointer_NewAt(base, p.field, p.mtype).Elem() // map[K]V
 	if v.Len() == 0 {
 		return nil
 	}
@@ -1101,10 +1124,14 @@ func (o *Buffer) enc_new_map(p *Properties, base structPointer) error {
 		return nil
 	}
 
-	keys := v.MapKeys()
-	sort.Sort(mapKeys(keys))
-	for _, key := range keys {
+	// Don't sort map keys. It is not required by the spec, and C++ doesn't do it.
+	for _, key := range v.MapKeys() {
 		val := v.MapIndex(key)
+
+		// The only illegal map entry values are nil message pointers.
+		if val.Kind() == reflect.Ptr && val.IsNil() {
+			return errors.New("proto: map has nil element")
+		}
 
 		keycopy.Set(key)
 		valcopy.Set(val)
@@ -1118,7 +1145,7 @@ func (o *Buffer) enc_new_map(p *Properties, base structPointer) error {
 }
 
 func size_new_map(p *Properties, base structPointer) int {
-	v := structPointer_Map(base, p.field, p.mtype).Elem() // map[K]V
+	v := structPointer_NewAt(base, p.field, p.mtype).Elem() // map[K]V
 
 	keycopy, valcopy, keybase, valbase := mapEncodeScratch(p.mtype)
 
@@ -1128,10 +1155,12 @@ func size_new_map(p *Properties, base structPointer) int {
 		keycopy.Set(key)
 		valcopy.Set(val)
 
-		// Tag codes are two bytes per map entry.
-		n += 2
-		n += p.mkeyprop.size(p.mkeyprop, keybase)
-		n += p.mvalprop.size(p.mvalprop, valbase)
+		// Tag codes for key and val are the responsibility of the sub-sizer.
+		keysize := p.mkeyprop.size(p.mkeyprop, keybase)
+		valsize := p.mvalprop.size(p.mvalprop, valbase)
+		entry := keysize + valsize
+		// Add on tag code and length of map entry itself.
+		n += len(p.tagcode) + sizeVarint(uint64(entry)) + entry
 	}
 	return n
 }
@@ -1194,6 +1223,16 @@ func (o *Buffer) enc_struct(prop *StructProperties, base structPointer) error {
 		}
 	}
 
+	// Do oneof fields.
+	if prop.oneofMarshaler != nil {
+		m := structPointer_Interface(base, prop.stype).(Message)
+		if err := prop.oneofMarshaler(m, o); err == ErrNil {
+			return errOneofHasNil
+		} else if err != nil {
+			return err
+		}
+	}
+
 	// Add unrecognized fields at the end.
 	if prop.unrecField.IsValid() {
 		v := *structPointer_Bytes(base, prop.unrecField)
@@ -1217,6 +1256,12 @@ func size_struct(prop *StructProperties, base structPointer) (n int) {
 	if prop.unrecField.IsValid() {
 		v := *structPointer_Bytes(base, prop.unrecField)
 		n += len(v)
+	}
+
+	// Factor in any oneof fields.
+	if prop.oneofSizer != nil {
+		m := structPointer_Interface(base, prop.stype).(Message)
+		n += prop.oneofSizer(m)
 	}
 
 	return

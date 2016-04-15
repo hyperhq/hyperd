@@ -30,19 +30,19 @@ func (daemon *Daemon) GetPodInfo(podName string) (types.PodInfo, error) {
 	}
 
 	// Construct the PodInfo JSON structure
-	cStatus := []types.ContainerStatus{}
-	containers := []types.Container{}
+	cStatus := []*types.ContainerStatus{}
+	containers := []*types.Container{}
 	for i, c := range pod.status.Containers {
-		ports := []types.ContainerPort{}
-		envs := []types.EnvironmentVar{}
-		vols := []types.VolumeMount{}
+		ports := []*types.ContainerPort{}
+		envs := []*types.EnvironmentVar{}
+		vols := []*types.VolumeMount{}
 		cmd := []string{}
 		args := []string{}
 
 		if len(pod.ctnStartInfo) > i {
 			ci := pod.ctnStartInfo[i]
 			for k, v := range ci.Envs {
-				envs = append(envs, types.EnvironmentVar{Env: k, Value: v})
+				envs = append(envs, &types.EnvironmentVar{Env: k, Value: v})
 			}
 			imageid = c.Image
 			cmd = ci.Cmd[:1]
@@ -52,18 +52,18 @@ func (daemon *Daemon) GetPodInfo(podName string) (types.PodInfo, error) {
 			cmd = pod.spec.Containers[i].Command
 		}
 		for _, port := range pod.spec.Containers[i].Ports {
-			ports = append(ports, types.ContainerPort{
-				HostPort:      port.HostPort,
-				ContainerPort: port.ContainerPort,
+			ports = append(ports, &types.ContainerPort{
+				HostPort:      int32(port.HostPort),
+				ContainerPort: int32(port.ContainerPort),
 				Protocol:      port.Protocol})
 		}
 		for _, e := range pod.spec.Containers[i].Envs {
-			envs = append(envs, types.EnvironmentVar{
+			envs = append(envs, &types.EnvironmentVar{
 				Env:   e.Env,
 				Value: e.Value})
 		}
 		for _, v := range pod.spec.Containers[i].Volumes {
-			vols = append(vols, types.VolumeMount{
+			vols = append(vols, &types.VolumeMount{
 				Name:      v.Volume,
 				MountPath: v.Path,
 				ReadOnly:  v.ReadOnly})
@@ -75,21 +75,21 @@ func (daemon *Daemon) GetPodInfo(podName string) (types.PodInfo, error) {
 			ImageID:         imageid,
 			Commands:        cmd,
 			Args:            args,
-			Workdir:         pod.spec.Containers[i].Workdir,
+			WorkingDir:      pod.spec.Containers[i].Workdir,
 			Ports:           ports,
-			Environment:     envs,
-			Volume:          vols,
+			Env:             envs,
+			VolumeMounts:    vols,
 			Tty:             pod.spec.Containers[i].Tty,
 			ImagePullPolicy: "",
 		}
-		containers = append(containers, container)
+		containers = append(containers, &container)
 		// Set ContainerStatus
 		s := types.ContainerStatus{}
 		s.Name = c.Name
 		s.ContainerID = c.Id
-		s.Waiting = types.WaitingStatus{Reason: ""}
-		s.Running = types.RunningStatus{StartedAt: ""}
-		s.Terminated = types.TermStatus{}
+		s.Waiting = &types.WaitingStatus{Reason: ""}
+		s.Running = &types.RunningStatus{StartedAt: ""}
+		s.Terminated = &types.TermStatus{}
 		if c.Status == runvtypes.S_POD_CREATED {
 			s.Waiting.Reason = "Pending"
 			s.Phase = "pending"
@@ -98,42 +98,42 @@ func (daemon *Daemon) GetPodInfo(podName string) (types.PodInfo, error) {
 			s.Phase = "running"
 		} else { // S_POD_FAILED or S_POD_SUCCEEDED
 			if c.Status == runvtypes.S_POD_FAILED {
-				s.Terminated.ExitCode = c.ExitCode
+				s.Terminated.ExitCode = int32(c.ExitCode)
 				s.Terminated.Reason = "Failed"
 				s.Phase = "failed"
 			} else {
-				s.Terminated.ExitCode = c.ExitCode
+				s.Terminated.ExitCode = int32(c.ExitCode)
 				s.Terminated.Reason = "Succeeded"
 				s.Phase = "succeeded"
 			}
 			s.Terminated.StartedAt = pod.status.StartedAt
 			s.Terminated.FinishedAt = pod.status.FinishedAt
 		}
-		cStatus = append(cStatus, s)
+		cStatus = append(cStatus, &s)
 	}
-	podVoumes := []types.PodVolume{}
+	podVoumes := []*types.PodVolume{}
 	for _, v := range pod.spec.Volumes {
-		podVoumes = append(podVoumes, types.PodVolume{
-			Name:     v.Name,
-			HostPath: v.Source,
-			Driver:   v.Driver})
+		podVoumes = append(podVoumes, &types.PodVolume{
+			Name:   v.Name,
+			Source: v.Source,
+			Driver: v.Driver})
 	}
 	spec := types.PodSpec{
 		Volumes:    podVoumes,
 		Containers: containers,
 		Labels:     pod.spec.Labels,
-		Vcpu:       pod.spec.Resource.Vcpu,
-		Memory:     pod.spec.Resource.Memory,
+		Vcpu:       int32(pod.spec.Resource.Vcpu),
+		Memory:     int32(pod.spec.Resource.Memory),
 	}
 	podIPs := []string{}
 	if pod.status.Status == runvtypes.S_POD_RUNNING && pod.vm != nil {
 		podIPs = pod.status.GetPodIP(pod.vm)
 	}
 	status := types.PodStatus{
-		Status:    cStatus,
-		HostIP:    utils.GetHostIP(),
-		PodIP:     podIPs,
-		StartTime: pod.status.StartedAt,
+		ContainerStatus: cStatus,
+		HostIP:          utils.GetHostIP(),
+		PodIP:           podIPs,
+		StartTime:       pod.status.StartedAt,
 	}
 	switch pod.status.Status {
 	case runvtypes.S_POD_CREATED:
@@ -154,8 +154,8 @@ func (daemon *Daemon) GetPodInfo(podName string) (types.PodInfo, error) {
 		Kind:       "Pod",
 		ApiVersion: utils.APIVERSION,
 		Vm:         pod.status.Vm,
-		Spec:       spec,
-		Status:     status,
+		Spec:       &spec,
+		Status:     &status,
 	}, nil
 }
 
@@ -210,13 +210,13 @@ func (daemon *Daemon) GetContainerInfo(name string) (types.ContainerInfo, error)
 	}
 	c = pod.status.Containers[i]
 
-	ports := []types.ContainerPort{}
-	envs := []types.EnvironmentVar{}
-	vols := []types.VolumeMount{}
+	ports := []*types.ContainerPort{}
+	envs := []*types.EnvironmentVar{}
+	vols := []*types.VolumeMount{}
 	if len(pod.ctnStartInfo) > i {
 		ci := pod.ctnStartInfo[i]
 		for k, v := range ci.Envs {
-			envs = append(envs, types.EnvironmentVar{Env: k, Value: v})
+			envs = append(envs, &types.EnvironmentVar{Env: k, Value: v})
 		}
 		imageid = c.Image
 		cmd = ci.Cmd[:1]
@@ -227,18 +227,18 @@ func (daemon *Daemon) GetContainerInfo(name string) (types.ContainerInfo, error)
 		cmd = pod.spec.Containers[i].Command
 	}
 	for _, port := range pod.spec.Containers[i].Ports {
-		ports = append(ports, types.ContainerPort{
-			HostPort:      port.HostPort,
-			ContainerPort: port.ContainerPort,
+		ports = append(ports, &types.ContainerPort{
+			HostPort:      int32(port.HostPort),
+			ContainerPort: int32(port.ContainerPort),
 			Protocol:      port.Protocol})
 	}
 	for _, e := range pod.spec.Containers[i].Envs {
-		envs = append(envs, types.EnvironmentVar{
+		envs = append(envs, &types.EnvironmentVar{
 			Env:   e.Env,
 			Value: e.Value})
 	}
 	for _, v := range pod.spec.Containers[i].Volumes {
-		vols = append(vols, types.VolumeMount{
+		vols = append(vols, &types.VolumeMount{
 			Name:      v.Volume,
 			MountPath: v.Path,
 			ReadOnly:  v.ReadOnly})
@@ -246,9 +246,9 @@ func (daemon *Daemon) GetContainerInfo(name string) (types.ContainerInfo, error)
 	s := types.ContainerStatus{}
 	s.Name = c.Name
 	s.ContainerID = c.Id
-	s.Waiting = types.WaitingStatus{Reason: ""}
-	s.Running = types.RunningStatus{StartedAt: ""}
-	s.Terminated = types.TermStatus{}
+	s.Waiting = &types.WaitingStatus{Reason: ""}
+	s.Running = &types.RunningStatus{StartedAt: ""}
+	s.Terminated = &types.TermStatus{}
 	if c.Status == runvtypes.S_POD_CREATED {
 		s.Waiting.Reason = "Pending"
 		s.Phase = "pending"
@@ -257,11 +257,11 @@ func (daemon *Daemon) GetContainerInfo(name string) (types.ContainerInfo, error)
 		s.Phase = "running"
 	} else { // S_POD_FAILED or S_POD_SUCCEEDED
 		if c.Status == runvtypes.S_POD_FAILED {
-			s.Terminated.ExitCode = c.ExitCode
+			s.Terminated.ExitCode = int32(c.ExitCode)
 			s.Terminated.Reason = "Failed"
 			s.Phase = "failed"
 		} else {
-			s.Terminated.ExitCode = c.ExitCode
+			s.Terminated.ExitCode = int32(c.ExitCode)
 			s.Terminated.Reason = "Succeeded"
 			s.Phase = "succeeded"
 		}
@@ -269,21 +269,20 @@ func (daemon *Daemon) GetContainerInfo(name string) (types.ContainerInfo, error)
 		s.Terminated.FinishedAt = pod.status.FinishedAt
 	}
 	return types.ContainerInfo{
-		Container: types.Container{
-			Name:            c.Name,
-			ContainerID:     c.Id,
-			Image:           pod.spec.Containers[i].Image,
-			ImageID:         imageid,
-			Commands:        cmd,
-			Args:            args,
-			Workdir:         pod.spec.Containers[i].Workdir,
-			Ports:           ports,
-			Environment:     envs,
-			Volume:          vols,
-			Tty:             pod.spec.Containers[i].Tty,
-			ImagePullPolicy: "",
-		},
+		Name:            c.Name,
+		ContainerID:     c.Id,
+		Image:           pod.spec.Containers[i].Image,
+		ImageID:         imageid,
+		Commands:        cmd,
+		Args:            args,
+		WorkingDir:      pod.spec.Containers[i].Workdir,
+		Ports:           ports,
+		Env:             envs,
+		VolumeMounts:    vols,
+		Tty:             pod.spec.Containers[i].Tty,
+		ImagePullPolicy: "",
+
 		PodID:  pod.id,
-		Status: s,
+		Status: &s,
 	}, nil
 }

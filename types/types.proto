@@ -1,0 +1,127 @@
+// Generate cmd: protoc --go_out=plugins=grpc:. types.proto
+syntax = "proto3";
+
+package types;
+
+
+// Types definitions for HyperContainer
+message ContainerPort {
+    string name         = 1;
+    int32 hostPort      = 2;
+    int32 containerPort = 3;
+    string protocol     = 4;
+    string hostIP       = 5;
+}
+
+message EnvironmentVar {
+    string env    = 1;
+    string value  = 2;
+}
+
+message VolumeMount {
+    string name       = 1;
+    string mountPath  = 2;
+    bool readOnly     = 3;
+}
+
+message WaitingStatus {
+	string reason = 1;
+}
+
+message RunningStatus {
+	string startedAt = 1;
+}
+
+message TermStatus {
+    int32   exitCode    = 1;
+    string  reason      = 2;
+    string  message     = 3;
+    string  startedAt   = 4;
+    string  finishedAt  = 5;
+}
+
+message ContainerStatus {
+    string name             = 1;
+    string containerID      = 2;
+    string phase            = 3;
+    WaitingStatus waiting   = 4;
+    RunningStatus running   = 5;
+    TermStatus terminated   = 6;
+}
+
+// TODO: embed Container message to avoid repetition
+message ContainerInfo {
+  string name                       = 1;
+  string containerID                = 2;
+  string image                      = 3;
+  string imageID                    = 4;
+  repeated string commands          = 5;
+  repeated string args              = 6;
+  string workingDir                 = 7;
+  repeated ContainerPort ports      = 8;
+  repeated EnvironmentVar env       = 9;
+  repeated VolumeMount volumeMounts = 10;
+  bool tty                          = 11;
+  string imagePullPolicy            = 12;
+	string podID                      = 13;
+	ContainerStatus status            = 14;
+}
+
+message Container {
+  string name                       = 1;
+  string containerID                = 2;
+  string image                      = 3;
+  string imageID                    = 4;
+  repeated string commands          = 5;
+  repeated string args              = 6;
+  string workingDir                 = 7;
+  repeated ContainerPort ports      = 8;
+  repeated EnvironmentVar env       = 9;
+  repeated VolumeMount volumeMounts = 10;
+  bool tty                          = 11;
+  string imagePullPolicy            = 12;
+}
+
+message RBDVolumeSource {
+  repeated string monitors  = 1;
+  string image              = 2;
+  string fsType             = 3;
+  string pool               = 4;
+  string user               = 5;
+  string keyring            = 6;
+  bool readOnly             = 7;
+}
+
+message PodVolume {
+	string name         = 1;
+	string source       = 2;
+	string driver       = 3;
+	RBDVolumeSource rbd = 4;
+}
+
+message PodSpec {
+	repeated PodVolume volumes    = 1;
+	repeated Container containers = 2;
+	map<string,string> labels     = 3;
+	int32 vcpu                    = 4;
+	int32 memory                  = 5;
+}
+
+message PodStatus {
+	string phase                              = 1;
+	string message                            = 2;
+	string reason                             = 3;
+	string hostIP                             = 4;
+	repeated string podIP                     = 5;
+	string startTime                          = 6;
+	repeated ContainerStatus containerStatus  = 7;
+}
+
+message PodInfo {
+	string kind       = 1;
+	string apiVersion = 2;
+	string vm         = 3;
+	PodSpec spec      = 4;
+	PodStatus status  = 5;
+}
+
