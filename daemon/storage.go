@@ -12,12 +12,12 @@ import (
 
 	dockertypes "github.com/docker/engine-api/types"
 	"github.com/golang/glog"
-	"github.com/hyperhq/hyper/storage"
-	"github.com/hyperhq/hyper/storage/aufs"
-	dm "github.com/hyperhq/hyper/storage/devicemapper"
-	"github.com/hyperhq/hyper/storage/overlay"
-	"github.com/hyperhq/hyper/storage/vbox"
-	"github.com/hyperhq/hyper/utils"
+	"github.com/hyperhq/hyperd/storage"
+	"github.com/hyperhq/hyperd/storage/aufs"
+	dm "github.com/hyperhq/hyperd/storage/devicemapper"
+	"github.com/hyperhq/hyperd/storage/overlay"
+	"github.com/hyperhq/hyperd/storage/vbox"
+	"github.com/hyperhq/hyperd/utils"
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/pod"
 )

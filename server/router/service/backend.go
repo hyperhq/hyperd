@@ -1,7 +1,7 @@
 package service
 
 import (
-	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/hyperd/engine"
 	"github.com/hyperhq/runv/hypervisor/pod"
 )
 

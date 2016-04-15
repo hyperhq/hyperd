@@ -1,8 +1,8 @@
 package service
 
 import (
-	"github.com/hyperhq/hyper/server/router"
-	"github.com/hyperhq/hyper/server/router/local"
+	"github.com/hyperhq/hyperd/server/router"
+	"github.com/hyperhq/hyperd/server/router/local"
 )
 
 // serverRouter is a router to talk with the server controller.

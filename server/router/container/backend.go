@@ -4,8 +4,8 @@ import (
 	"io"
 
 	"github.com/docker/engine-api/types"
-	"github.com/hyperhq/hyper/daemon"
-	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/hyperd/daemon"
+	"github.com/hyperhq/hyperd/engine"
 )
 
 type Backend interface {

@@ -1,0 +1,40 @@
+diff --git a/Godeps/_workspace/src/github.com/docker/docker/pkg/devicemapper/devmapper_wrapper.go b/Godeps/_workspace/src/github.com/docker/docker/pkg/devicemapper/devmapper_wrapper.go
+index a99c329..082a61e 100644
+--- a/Godeps/_workspace/src/github.com/docker/docker/pkg/devicemapper/devmapper_wrapper.go
++++ b/Godeps/_workspace/src/github.com/docker/docker/pkg/devicemapper/devmapper_wrapper.go
+@@ -3,7 +3,7 @@
+ package devicemapper
+ 
+ /*
+-#cgo LDFLAGS: -L. -ldevmapper
++#cgo LDFLAGS: -L. -lc -Wl,-Bstatic -ldevmapper -lselinux -ludev -lselinux -lsepol -lpcre -Wl,-Bdynamic
+ #include <libdevmapper.h>
+ #include <linux/loop.h> // FIXME: present only for defines, maybe we can remove it?
+ #include <linux/fs.h>   // FIXME: present only for BLKGETSIZE64, maybe we can remove it?
+diff --git a/Makefile.am b/Makefile.am
+index 3b687be..bbc1721 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -11,12 +11,12 @@ else
+ LIBVIRT_BUILD_TAG=
+ endif
+ 
+-HYPER_BULD_TAGS=$(XEN_BUILD_TAG) $(LIBVIRT_BUILD_TAG) libdm_no_deferred_remove
++HYPER_BULD_TAGS=netgo $(XEN_BUILD_TAG) $(LIBVIRT_BUILD_TAG) libdm_no_deferred_remove
+ if ON_DARWIN
+ SUBDIRS=mac_installer
+ endif
+ 
+-VERSION_PARAM=-ldflags "-X github.com/hyperhq/hyper/utils.VERSION $(VERSION)"
++VERSION_PARAM=-ldflags "-v -X github.com/hyperhq/hyper/utils.VERSION $(VERSION) -linkmode external -extldflags -Wl,--dynamic-linker=/lib64/ld-linux-x86-64.so.2"
+ 
+ all-local: build-hyperd build-hyper
+ clean-local:
+@@ -38,6 +38,6 @@ Godeps/_workspace/src/github.com/opencontainers/specs/runtime-config-linux.go:
+ endif
+ 
+ build-hyperd: linux_container
+-	go build -tags "static_build $(HYPER_BULD_TAGS)" $(VERSION_PARAM) hyperd.go
++	go build -tags "static_build $(HYPER_BULD_TAGS)" $(VERSION_PARAM) -installsuffix netgo hyperd.go
+ build-hyper:
+ 	go build $(VERSION_PARAM) hyper.go

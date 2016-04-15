@@ -15,7 +15,7 @@ import (
 	"github.com/docker/docker/pkg/ioutils"
 	"github.com/docker/docker/pkg/version"
 	"github.com/golang/glog"
-	"github.com/hyperhq/hyper/server/httputils"
+	"github.com/hyperhq/hyperd/server/httputils"
 	"golang.org/x/net/context"
 )
 

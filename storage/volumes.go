@@ -7,7 +7,7 @@ import (
 	"runtime"
 
 	"github.com/golang/glog"
-	"github.com/hyperhq/hyper/utils"
+	"github.com/hyperhq/hyperd/utils"
 )
 
 func CreateVFSVolume(podId, shortName string) (string, error) {

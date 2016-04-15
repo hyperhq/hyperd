@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/url"
 
-	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/hyperd/engine"
 )
 
 func (cli *Client) Commit(container, repo, author, message string, changes []string, pause bool) (string, error) {

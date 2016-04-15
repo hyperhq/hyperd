@@ -1,9 +1,9 @@
 package build
 
 import (
-	"github.com/hyperhq/hyper/daemon"
-	"github.com/hyperhq/hyper/server/router"
-	"github.com/hyperhq/hyper/server/router/local"
+	"github.com/hyperhq/hyperd/daemon"
+	"github.com/hyperhq/hyperd/server/router"
+	"github.com/hyperhq/hyperd/server/router/local"
 )
 
 // buildRouter is a router to talk with the build controller

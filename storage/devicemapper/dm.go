@@ -14,7 +14,7 @@ import (
 	"syscall"
 
 	"github.com/golang/glog"
-	"github.com/hyperhq/hyper/storage"
+	"github.com/hyperhq/hyperd/storage"
 )
 
 type jsonMetadata struct {

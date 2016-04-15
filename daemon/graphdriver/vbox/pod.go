@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/hyperhq/hyper/utils"
+	"github.com/hyperhq/hyperd/utils"
 	"github.com/hyperhq/runv/hypervisor/pod"
 )
 

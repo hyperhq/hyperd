@@ -3,7 +3,7 @@ package api
 import (
 	"net/url"
 
-	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/hyperd/engine"
 )
 
 func (cli *Client) PausePod(podId string) error {

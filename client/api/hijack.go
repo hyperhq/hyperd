@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hyperhq/hyper/lib/promise"
-	"github.com/hyperhq/hyper/utils"
+	"github.com/hyperhq/hyperd/lib/promise"
+	"github.com/hyperhq/hyperd/utils"
 )
 
 func (cli *Client) hijackRequest(method, tag string, v *url.Values, tty bool, stdin io.ReadCloser, stdout, stderr io.Writer) error {

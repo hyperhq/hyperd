@@ -11,7 +11,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/hyperhq/hyper/client/api"
+	"github.com/hyperhq/hyperd/client/api"
 	"github.com/hyperhq/runv/lib/term"
 
 	"github.com/docker/docker/cliconfig"

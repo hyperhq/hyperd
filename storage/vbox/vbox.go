@@ -3,7 +3,7 @@ package vbox
 import (
 	"fmt"
 
-	"github.com/hyperhq/hyper/utils"
+	"github.com/hyperhq/hyperd/utils"
 )
 
 // For device mapper, we do not need to mount the container to sharedDir.
