@@ -35,7 +35,7 @@ type Pod struct {
 	spec         *pod.UserPod
 	vm           *hypervisor.Vm
 	ctnStartInfo []*hypervisor.ContainerInfo
-	volumes      []*hypervisor.VolumeInfo
+	volumes      map[string]*hypervisor.VolumeInfo
 	ttyList      map[string]*hypervisor.TtyIO
 
 	transiting chan bool
@@ -48,6 +48,7 @@ func NewPod(rawSpec []byte, id string, data interface{}) (*Pod, error) {
 	p := &Pod{
 		id:         id,
 		ttyList:    make(map[string]*hypervisor.TtyIO),
+		volumes:    make(map[string]*hypervisor.VolumeInfo),
 		transiting: make(chan bool, 1),
 	}
 
@@ -389,7 +390,7 @@ func (p *Pod) parseContainerJsons(daemon *Daemon, jsons []*dockertypes.Container
 			}
 		}
 
-		processImageVolumes(info, info.ID, p.spec, &p.spec.Containers[i], ci.Initialize)
+		p.processImageVolumes(info, info.ID, &p.spec.Containers[i])
 
 		p.ctnStartInfo = append(p.ctnStartInfo, ci)
 		glog.V(1).Infof("Container Info is \n%v", ci)
@@ -496,10 +497,12 @@ func processInjectFiles(container *pod.UserContainer, files map[string]pod.UserF
 	return nil
 }
 
-func processImageVolumes(config *dockertypes.ContainerJSON, id string, userPod *pod.UserPod, container *pod.UserContainer, initialize bool) {
+func (p *Pod) processImageVolumes(config *dockertypes.ContainerJSON, id string, container *pod.UserContainer) {
 	if config.Config.Volumes == nil {
 		return
 	}
+
+	userPod := p.spec
 
 	existed := make(map[string]bool)
 	for _, v := range container.Volumes {
@@ -513,15 +516,16 @@ func processImageVolumes(config *dockertypes.ContainerJSON, id string, userPod *
 
 		n := id + strings.Replace(tgt, "/", "_", -1)
 		v := pod.UserVolume{
-			Name:         n,
-			Source:       "",
-			DockerVolume: true,
+			Name:   n,
+			Source: "",
 		}
 		r := pod.UserVolumeReference{
 			Volume:   n,
 			Path:     tgt,
 			ReadOnly: false,
 		}
+
+		p.volumes[n] = &hypervisor.VolumeInfo{Name: n, DockerVolume: true}
 		userPod.Volumes = append(userPod.Volumes, v)
 		container.Volumes = append(container.Volumes, r)
 	}
@@ -728,25 +732,31 @@ func (p *Pod) setupMountsAndFiles(sd Storage) (err error) {
 
 func (p *Pod) mountVolumes(daemon *Daemon, sd Storage) (err error) {
 	err = nil
-	p.volumes = []*hypervisor.VolumeInfo{}
 
 	var (
 		sharedDir = path.Join(hypervisor.BaseDir, p.vm.Id, hypervisor.ShareDirTag)
 	)
 
 	for _, v := range p.spec.Volumes {
-		var vol *hypervisor.VolumeInfo
+		var volInfo *hypervisor.VolumeInfo
 		if v.Source == "" {
 			err = fmt.Errorf("volume %s in pod %s is not created", v.Name, p.id)
 			return err
 		}
 
-		vol, err = ProbeExistingVolume(&v, sharedDir)
+		volInfo, err = ProbeExistingVolume(&v, sharedDir)
 		if err != nil {
 			return err
 		}
 
-		p.volumes = append(p.volumes, vol)
+		if vol, ok := p.volumes[v.Name]; ok {
+			vol.Filepath = volInfo.Filepath
+			vol.Fstype = volInfo.Fstype
+			vol.Format = volInfo.Format
+			continue
+		}
+
+		p.volumes[v.Name] = volInfo
 	}
 
 	return nil
