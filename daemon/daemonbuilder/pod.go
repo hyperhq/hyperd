@@ -202,7 +202,7 @@ func (d Docker) ContainerStart(cId string, hostConfig *containertypes.HostConfig
 	}()
 
 	vmId := "buildevm-" + utils.RandStr(10, "number")
-	if vm, err = d.Daemon.StartVm(vmId, 1, 512, false, hypertypes.VM_KEEP_AFTER_FINISH); err != nil {
+	if vm, err = d.Daemon.StartVm(vmId, 1, 512, false, hypertypes.VM_KEEP_NONE); err != nil {
 		return
 	}
 	d.hyper.Vm = vm
@@ -237,20 +237,15 @@ func (d Docker) ContainerWait(cId string, timeout time.Duration) (int, error) {
 			return -1, fmt.Errorf("response chan error")
 		}
 
-		if vmResponse.Code == hypertypes.E_POD_FINISHED {
-			glog.Infof("Got E_POD_FINISHED code response")
+		if vmResponse.Code == hypertypes.E_VM_SHUTDOWN {
+			glog.Infof("vm shutdown")
 			break
 		}
 	}
 
 	// release pod from VM
-	glog.Warningf("pod finished, stop and remove vm")
+	glog.Warningf("pod finished, cleanup")
 	d.hyper.Vm.ReleaseResponseChan(d.hyper.Status)
-	if code, cause, err := d.Daemon.KillVm(d.hyper.Vm.Id); err != nil {
-		glog.Errorf("Killvm %s failed: %d %s", d.hyper.Vm.Id, code, cause)
-		return -1, err
-	}
-
 	d.hyper.Vm = nil
 	d.hyper.Status = nil
 
