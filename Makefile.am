@@ -16,7 +16,7 @@ if ON_DARWIN
 SUBDIRS=mac_installer
 endif
 
-VERSION_PARAM=-ldflags "-X github.com/hyperhq/hyper/utils.VERSION $(VERSION)"
+VERSION_PARAM=-ldflags "-X github.com/hyperhq/hyperd/utils.VERSION $(VERSION)"
 
 all-local: build-hyperd build-hyperctl
 clean-local:
