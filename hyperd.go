@@ -195,9 +195,6 @@ func mainDaemon(opt *Options) {
 		glog.Infof("The hypervisor's driver is %s", driver)
 	}
 
-	vmFactoryPolicy, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "VmFactoryPolicy")
-	d.Factory = factory.NewFromPolicy(d.Kernel, d.Initrd, vmFactoryPolicy)
-
 	disableIptables := cfg.MustBool(goconfig.DEFAULT_SECTION, "DisableIptables", false)
 	if err = hypervisor.InitNetwork(d.BridgeIface, d.BridgeIP, disableIptables || opt.DisableIptables); err != nil {
 		glog.Errorf("InitNetwork failed, %s", err.Error())
@@ -216,6 +213,9 @@ func mainDaemon(opt *Options) {
 		glog.Warningf("Fail to restore the previous VM")
 		return
 	}
+
+	vmFactoryPolicy, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "VmFactoryPolicy")
+	d.Factory = factory.NewFromPolicy(d.Kernel, d.Initrd, vmFactoryPolicy)
 
 	// The serve API routine never exits unless an error occurs
 	// We need to start it as a goroutine and wait on it so
