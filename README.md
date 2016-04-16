@@ -9,7 +9,7 @@ HyperContainer - Hypervisor-agnostic Docker Runtime
 
 **HyperContainer is a hypervisor-agnostic technology that allows you to run Docker images on plain hypervisor**.
 
-![](https://trello-attachments.s3.amazonaws.com/5551c49246960a31feab3d35/834x522/d0ea2fe36a806143625a08b26ebec3ec/Pasted_image_at_2016_04_16_06_30_PM.png)
+![](https://trello-attachments.s3.amazonaws.com/5551c49246960a31feab3d35/1515x947/5265a9f72b589ef5dbf8b372b718c43e/Pasted_image_at_2016_04_16_07_33_PM.png)
 
 ## Why HyperContainer?
 -----------
