@@ -269,9 +269,9 @@ func (d Docker) ContainerCreate(params types.ContainerCreateConfig) (types.Conta
 	podId := fmt.Sprintf("buildpod-%s", utils.RandStr(10, "alpha"))
 	// Hack here, container created by ADD/COPY only has Config
 	if params.HostConfig != nil {
-		podString, err = MakeBasicPod(podId, params.Config.Image, params.Config.WorkingDir, params.Config.Cmd.Slice(), params.Config.Entrypoint.Slice())
+		podString, err = MakeBasicPod(podId, params.Config)
 	} else {
-		podString, err = MakeCopyPod(podId, params.Config.Image, params.Config.WorkingDir)
+		podString, err = MakeCopyPod(podId, params.Config)
 	}
 
 	if err != nil {
@@ -298,7 +298,7 @@ func (d Docker) ContainerCreate(params types.ContainerCreateConfig) (types.Conta
 	return types.ContainerCreateResponse{ID: cId}, nil
 }
 
-func MakeCopyPod(podId, image, workdir string) (string, error) {
+func MakeCopyPod(podId string, config *containertypes.Config) (string, error) {
 	tempSrcDir := filepath.Join("/var/run/hyper/temp/", podId)
 	if err := os.MkdirAll(tempSrcDir, 0755); err != nil {
 		glog.Errorf(err.Error())
@@ -322,15 +322,15 @@ func MakeCopyPod(podId, image, workdir string) (string, error) {
 	fmt.Fprintf(copyshell, "#!/bin/sh\n")
 	copyshell.Close()
 
-	return MakePod(podId, image, workdir, tempSrcDir, shellDir, []string{"/bin/sh", "/tmp/shell/exec-copy.sh"}, []string{})
+	return MakePod(podId, tempSrcDir, shellDir, config, []string{"/bin/sh", "/tmp/shell/exec-copy.sh"}, []string{})
 }
 
-func MakeBasicPod(podId, image, workdir string, cmds, entrys []string) (string, error) {
-	return MakePod(podId, image, workdir, "", "", cmds, entrys)
+func MakeBasicPod(podId string, config *containertypes.Config) (string, error) {
+	return MakePod(podId, "", "", config, config.Cmd.Slice(), config.Entrypoint.Slice())
 }
 
-func MakePod(podId, image, workdir, src, shellDir string, cmds, entrys []string) (string, error) {
-	if image == "" {
+func MakePod(podId, src, shellDir string, config *containertypes.Config, cmds, entrys []string) (string, error) {
+	if config.Image == "" {
 		return "", fmt.Errorf("image can not be null")
 	}
 
@@ -368,11 +368,11 @@ func MakePod(podId, image, workdir, src, shellDir string, cmds, entrys []string)
 	}
 
 	var container = pod.UserContainer{
-		Image:         image,
+		Image:         config.Image,
 		Command:       cmds,
-		Workdir:       workdir,
+		Workdir:       config.WorkingDir,
 		Entrypoint:    entrys,
-		Tty:           true,
+		Tty:           config.Tty,
 		Ports:         []pod.UserContainerPort{},
 		Envs:          env,
 		Volumes:       cVols,
@@ -387,7 +387,7 @@ func MakePod(podId, image, workdir, src, shellDir string, cmds, entrys []string)
 		Resource:   pod.UserResource{Vcpu: 1, Memory: 512},
 		Files:      []pod.UserFile{},
 		Volumes:    volList,
-		Tty:        true,
+		Tty:        config.Tty,
 	}
 
 	jsonString, err := utils.JSONMarshal(userPod, true)
