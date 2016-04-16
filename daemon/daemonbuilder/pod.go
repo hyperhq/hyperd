@@ -14,6 +14,7 @@ import (
 	"github.com/docker/docker/pkg/chrootarchive"
 	"github.com/docker/docker/pkg/idtools"
 	"github.com/docker/docker/pkg/ioutils"
+	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/engine-api/types"
 	containertypes "github.com/docker/engine-api/types/container"
 	"github.com/golang/glog"
@@ -26,7 +27,26 @@ import (
 // ContainerAttach attaches streams to the container cID. If stream is true, it streams the output.
 func (d Docker) ContainerAttach(cId string, stdin io.ReadCloser, stdout, stderr io.Writer, stream bool) error {
 	tag := pod.RandStr(8, "alphanum")
-	return d.Daemon.Attach(stdin, ioutils.NopWriteCloser(stdout), "container", cId, tag)
+	<-d.hyper.Ready
+
+	err := d.Daemon.Attach(stdin, ioutils.NopWriteCloser(stdout), "container", cId, tag)
+	if err != nil {
+		return err
+	}
+
+	code, err := d.Daemon.ExitCode(cId, tag)
+	if err != nil {
+		return err
+	}
+
+	if code == 0 {
+		return nil
+	}
+
+	return &jsonmessage.JSONError{
+		Message: fmt.Sprintf("The container '%s' returned a non-zero code: %d", cId, code),
+		Code:    code,
+	}
 }
 
 func (d Docker) Commit(cId string, cfg *types.ContainerCommitConfig) (string, error) {
@@ -48,6 +68,10 @@ func (d Docker) Commit(cId string, cfg *types.ContainerCommitConfig) (string, er
 	fmt.Fprintf(copyshell, "rm -rf /tmp/src/\n")
 
 	copyshell.Close()
+
+	go func() {
+		<-d.hyper.Ready
+	}()
 
 	err = d.ContainerStart(cId, nil)
 	if err != nil {
@@ -165,6 +189,7 @@ func (d Docker) ContainerStart(cId string, hostConfig *containertypes.HostConfig
 	}
 
 	defer func() {
+		d.hyper.Ready <- true
 		if err != nil && d.hyper.Vm != nil {
 			if d.hyper.Status != nil {
 				d.hyper.Vm.ReleaseResponseChan(d.hyper.Status)
@@ -176,29 +201,21 @@ func (d Docker) ContainerStart(cId string, hostConfig *containertypes.HostConfig
 		}
 	}()
 
-	if d.hyper.Vm == nil {
-		vmId := "buildevm-" + utils.RandStr(10, "number")
-		d.hyper.Vm, err = d.Daemon.StartVm(vmId, 1, 512, false, hypertypes.VM_KEEP_AFTER_FINISH)
-		if err != nil {
-			return
-		}
-		d.hyper.Status, err = d.hyper.Vm.GetResponseChan()
-		if err != nil {
-			return
-		}
-	}
-
-	vm = d.hyper.Vm
-	if vm.Status == hypertypes.S_VM_IDLE {
-		_, _, err = d.Daemon.StartPod(nil, nil, podId, vm.Id, "")
-		if err != nil {
-			glog.Errorf("start pod failed %s", err.Error())
-			return
-		}
+	vmId := "buildevm-" + utils.RandStr(10, "number")
+	if vm, err = d.Daemon.StartVm(vmId, 1, 512, false, hypertypes.VM_KEEP_NONE); err != nil {
 		return
 	}
-	glog.Errorf("Vm is not IDLE")
-	return fmt.Errorf("Vm is not IDLE")
+	d.hyper.Vm = vm
+
+	if d.hyper.Status, err = vm.GetResponseChan(); err != nil {
+		return
+	}
+
+	if _, _, err = d.Daemon.StartPod(nil, nil, podId, vm.Id, ""); err != nil {
+		return
+	}
+
+	return nil
 }
 
 func (d Docker) ContainerWait(cId string, timeout time.Duration) (int, error) {
@@ -206,12 +223,10 @@ func (d Docker) ContainerWait(cId string, timeout time.Duration) (int, error) {
 	if d.hyper.Vm == nil {
 		return -1, fmt.Errorf("no vm is running")
 	}
-	podId := ""
-	if _, ok := d.hyper.CopyPods[cId]; ok {
-		podId = d.hyper.CopyPods[cId]
-	} else if _, ok := d.hyper.BasicPods[cId]; ok {
-		podId = d.hyper.BasicPods[cId]
-	} else {
+
+	_, isCopyPod := d.hyper.CopyPods[cId]
+	_, isBasicPod := d.hyper.BasicPods[cId]
+	if !isCopyPod && !isBasicPod {
 		return -1, fmt.Errorf("container %s doesn't belong to pod", cId)
 	}
 
@@ -222,18 +237,17 @@ func (d Docker) ContainerWait(cId string, timeout time.Duration) (int, error) {
 			return -1, fmt.Errorf("response chan error")
 		}
 
-		if vmResponse.Code == hypertypes.E_POD_FINISHED {
-			glog.Infof("Got E_POD_FINISHED code response")
+		if vmResponse.Code == hypertypes.E_VM_SHUTDOWN {
+			glog.Infof("vm shutdown")
 			break
 		}
 	}
 
 	// release pod from VM
-	glog.Warningf("pod finished, stop it")
-	_, _, err := d.Daemon.StopPod(podId, "no")
-	if err != nil {
-		return -1, err
-	}
+	glog.Warningf("pod finished, cleanup")
+	d.hyper.Vm.ReleaseResponseChan(d.hyper.Status)
+	d.hyper.Vm = nil
+	d.hyper.Status = nil
 
 	return 0, nil
 }
@@ -250,9 +264,9 @@ func (d Docker) ContainerCreate(params types.ContainerCreateConfig) (types.Conta
 	podId := fmt.Sprintf("buildpod-%s", utils.RandStr(10, "alpha"))
 	// Hack here, container created by ADD/COPY only has Config
 	if params.HostConfig != nil {
-		podString, err = MakeBasicPod(podId, params.Config.Image, params.Config.WorkingDir)
+		podString, err = MakeBasicPod(podId, params.Config)
 	} else {
-		podString, err = MakeCopyPod(podId, params.Config.Image, params.Config.WorkingDir)
+		podString, err = MakeCopyPod(podId, params.Config)
 	}
 
 	if err != nil {
@@ -279,7 +293,7 @@ func (d Docker) ContainerCreate(params types.ContainerCreateConfig) (types.Conta
 	return types.ContainerCreateResponse{ID: cId}, nil
 }
 
-func MakeCopyPod(podId, image, workdir string) (string, error) {
+func MakeCopyPod(podId string, config *containertypes.Config) (string, error) {
 	tempSrcDir := filepath.Join("/var/run/hyper/temp/", podId)
 	if err := os.MkdirAll(tempSrcDir, 0755); err != nil {
 		glog.Errorf(err.Error())
@@ -303,15 +317,15 @@ func MakeCopyPod(podId, image, workdir string) (string, error) {
 	fmt.Fprintf(copyshell, "#!/bin/sh\n")
 	copyshell.Close()
 
-	return MakePod(podId, image, workdir, tempSrcDir, shellDir, []string{"/bin/sh", "/tmp/shell/exec-copy.sh"}, []string{})
+	return MakePod(podId, tempSrcDir, shellDir, config, []string{"/bin/sh", "/tmp/shell/exec-copy.sh"}, []string{})
 }
 
-func MakeBasicPod(podId, image, workdir string) (string, error) {
-	return MakePod(podId, image, workdir, "", "", []string{}, []string{})
+func MakeBasicPod(podId string, config *containertypes.Config) (string, error) {
+	return MakePod(podId, "", "", config, config.Cmd.Slice(), config.Entrypoint.Slice())
 }
 
-func MakePod(podId, image, workdir, src, shellDir string, cmds, entrys []string) (string, error) {
-	if image == "" {
+func MakePod(podId, src, shellDir string, config *containertypes.Config, cmds, entrys []string) (string, error) {
+	if config.Image == "" {
 		return "", fmt.Errorf("image can not be null")
 	}
 
@@ -349,11 +363,11 @@ func MakePod(podId, image, workdir, src, shellDir string, cmds, entrys []string)
 	}
 
 	var container = pod.UserContainer{
-		Name:          "image-builder",
-		Image:         image,
+		Image:         config.Image,
 		Command:       cmds,
-		Workdir:       workdir,
+		Workdir:       config.WorkingDir,
 		Entrypoint:    entrys,
+		Tty:           config.Tty,
 		Ports:         []pod.UserContainerPort{},
 		Envs:          env,
 		Volumes:       cVols,
@@ -368,7 +382,7 @@ func MakePod(podId, image, workdir, src, shellDir string, cmds, entrys []string)
 		Resource:   pod.UserResource{Vcpu: 1, Memory: 512},
 		Files:      []pod.UserFile{},
 		Volumes:    volList,
-		Tty:        false,
+		Tty:        config.Tty,
 	}
 
 	jsonString, err := utils.JSONMarshal(userPod, true)
@@ -393,19 +407,7 @@ func (d Docker) ContainerRm(name string, config *types.ContainerRmConfig) error 
 
 	glog.Infof("ContainerRm pod id %s", podId)
 	d.Daemon.CleanPod(podId)
-	/*
-		if d.Vm != nil {
-			vm := *d.Vm
-			if d.Status != nil {
-				status := *d.Status
-				vm.ReleaseResponseChan(status)
-				d.Status = nil
-			}
 
-			d.Daemon.KillVm(vm.Id)
-			d.Vm = nil
-		}
-	*/
 	return nil
 }
 
@@ -418,6 +420,7 @@ func (d Docker) Cleanup() {
 		d.Daemon.CleanPod(podId)
 	}
 
+	close(d.hyper.Ready)
 	if d.hyper.Vm != nil {
 		if d.hyper.Status != nil {
 			d.hyper.Vm.ReleaseResponseChan(d.hyper.Status)
