@@ -15,7 +15,7 @@ import (
 	"github.com/docker/docker/reference"
 	"github.com/docker/engine-api/types"
 	"github.com/docker/engine-api/types/container"
-	"github.com/hyperhq/hyper/server/httputils"
+	"github.com/hyperhq/hyperd/server/httputils"
 	"golang.org/x/net/context"
 )
 

@@ -1,6 +1,10 @@
-[![Build Status](https://travis-ci.org/hyperhq/hyper.svg?branch=master)](https://travis-ci.org/hyperhq/hyper)
-Hyper - Hypervisor-agnostic Docker Runtime
+[![Build Status](https://travis-ci.org/hyperhq/hyperd.svg?branch=master)](https://travis-ci.org/hyperhq/hyperd)
+Hyper Container - Hypervisor-agnostic Docker Runtime
 ====
+
+> This project is the container runtime of [Hyper_](https://hyper.sh), both the `hyperd` daemon 
+and the daemon control tool `hyperctl`. If you want to find the source code of the command line client of 
+Hyper_, you can find it in [hyperhq/hypercli](https://github.com/hyperhq/hypercli)
 
 ## What is Hyper?
 
@@ -29,7 +33,6 @@ Hyper - Hypervisor-agnostic Docker Runtime
 
 ## Requirements
 
-- Docker 1.5 or later
 - QEMU 2.0 or later
 - Xen 4.5 and VT enabled host (for Xen support)
 
@@ -37,6 +40,8 @@ Hyper - Hypervisor-agnostic Docker Runtime
 
 Ensure you are running Linux (kernel 3.8 or later) and have Docker
 (version 1.5 or later) and QEMU (version 2.0 or later) installed. Then download the [binary tarball](https://hyper-install.s3.amazonaws.com/hyper-latest.tgz) and install it directly.
+
+For RHEL/CentOS 7.x, you can use our [RPMs](http://docs.hypercontainer.io/get_started/install/linux.html)
 
 To run *hyper*, just type `hyperctl` if you've installed packages.
 

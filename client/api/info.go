@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/hyperhq/hyper/engine"
-	"github.com/hyperhq/hyper/types"
+	"github.com/hyperhq/hyperd/engine"
+	"github.com/hyperhq/hyperd/types"
 )
 
 func (cli *Client) Info() (*engine.Env, error) {

@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/hyperhq/hyper/lib/promise"
+	"github.com/hyperhq/hyperd/lib/promise"
 )
 
 func (cli *Client) Exec(container, tag string, command []byte, tty bool, stdin io.ReadCloser, stdout, stderr io.Writer) error {

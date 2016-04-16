@@ -1,6 +1,6 @@
 package router
 
-import "github.com/hyperhq/hyper/server/httputils"
+import "github.com/hyperhq/hyperd/server/httputils"
 
 // Router defines an interface to specify a group of routes to add the the docker server.
 type Router interface {

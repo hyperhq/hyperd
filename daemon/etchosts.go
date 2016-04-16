@@ -9,7 +9,7 @@ import (
 	"path"
 	"syscall"
 
-	"github.com/hyperhq/hyper/utils"
+	"github.com/hyperhq/hyperd/utils"
 )
 
 // Record Structure for a single host record

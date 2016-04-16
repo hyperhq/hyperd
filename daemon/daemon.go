@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/hyperhq/hyper/daemon/daemondb"
+	"github.com/hyperhq/hyperd/daemon/daemondb"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/Unknwon/goconfig"
@@ -19,7 +19,7 @@ import (
 	"github.com/docker/docker/pkg/parsers/kernel"
 	"github.com/docker/docker/registry"
 	"github.com/golang/glog"
-	"github.com/hyperhq/hyper/utils"
+	"github.com/hyperhq/hyperd/utils"
 	"github.com/hyperhq/runv/factory"
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/pod"

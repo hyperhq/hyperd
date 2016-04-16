@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/hyperd/engine"
 	"github.com/hyperhq/runv/hypervisor/types"
 )
 

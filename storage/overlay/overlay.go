@@ -9,7 +9,7 @@ import (
 	"path"
 	"syscall"
 
-	"github.com/hyperhq/hyper/utils"
+	"github.com/hyperhq/hyperd/utils"
 )
 
 func MountContainerToSharedDir(containerId, rootDir, sharedDir, mountLabel string) (string, error) {

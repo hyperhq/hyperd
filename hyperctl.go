@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/hyperhq/hyper/client"
-	"github.com/hyperhq/hyper/client/api"
+	"github.com/hyperhq/hyperd/client"
+	"github.com/hyperhq/hyperd/client/api"
 )
 
 func main() {

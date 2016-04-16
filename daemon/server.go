@@ -8,9 +8,9 @@ import (
 
 	"github.com/docker/engine-api/types"
 	"github.com/golang/glog"
-	"github.com/hyperhq/hyper/engine"
-	"github.com/hyperhq/hyper/lib/sysinfo"
-	"github.com/hyperhq/hyper/utils"
+	"github.com/hyperhq/hyperd/engine"
+	"github.com/hyperhq/hyperd/lib/sysinfo"
+	"github.com/hyperhq/hyperd/utils"
 	"github.com/hyperhq/runv/hypervisor/pod"
 )
 

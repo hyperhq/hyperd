@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/hyperd/engine"
 )
 
 func (cli *Client) GetContainerByPod(podId string) (string, error) {

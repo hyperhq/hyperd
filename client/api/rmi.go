@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/hyperd/engine"
 )
 
 func (cli *Client) RemoveImage(image string, noprune, force bool) (*engine.Env, error) {

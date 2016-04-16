@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/hyperhq/hyper/engine"
+	"github.com/hyperhq/hyperd/engine"
 )
 
 func (cli *Client) GetImages(all, quiet bool) (*engine.Env, error) {

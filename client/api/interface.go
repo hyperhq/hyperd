@@ -3,8 +3,8 @@ package api
 import (
 	"io"
 
-	"github.com/hyperhq/hyper/engine"
-	"github.com/hyperhq/hyper/types"
+	"github.com/hyperhq/hyperd/engine"
+	"github.com/hyperhq/hyperd/types"
 
 	dockertypes "github.com/docker/engine-api/types"
 )

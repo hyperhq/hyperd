@@ -16,7 +16,7 @@ import (
 	"github.com/docker/docker/registry"
 	"github.com/docker/engine-api/types"
 	"github.com/docker/engine-api/types/container"
-	"github.com/hyperhq/hyper/daemon"
+	"github.com/hyperhq/hyperd/daemon"
 	"github.com/hyperhq/runv/hypervisor"
 	hypertypes "github.com/hyperhq/runv/hypervisor/types"
 )

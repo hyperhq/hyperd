@@ -22,8 +22,8 @@ import (
 	"github.com/docker/engine-api/types/strslice"
 
 	"github.com/golang/glog"
-	"github.com/hyperhq/hyper/servicediscovery"
-	"github.com/hyperhq/hyper/utils"
+	"github.com/hyperhq/hyperd/servicediscovery"
+	"github.com/hyperhq/hyperd/utils"
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/pod"
 	"github.com/hyperhq/runv/hypervisor/types"

@@ -14,8 +14,8 @@ import (
 	"github.com/docker/engine-api/types/container"
 	timetypes "github.com/docker/engine-api/types/time"
 	"github.com/golang/glog"
-	"github.com/hyperhq/hyper/daemon"
-	"github.com/hyperhq/hyper/server/httputils"
+	"github.com/hyperhq/hyperd/daemon"
+	"github.com/hyperhq/hyperd/server/httputils"
 	"golang.org/x/net/context"
 )
 

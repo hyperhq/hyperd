@@ -13,7 +13,7 @@ import (
 	"syscall"
 
 	"github.com/golang/glog"
-	"github.com/hyperhq/hyper/utils"
+	"github.com/hyperhq/hyperd/utils"
 )
 
 /*

@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	rand "github.com/hyperhq/hyper/utils"
+	rand "github.com/hyperhq/hyperd/utils"
 
 	"github.com/docker/docker/api"
 	"github.com/docker/docker/builder/dockerignore"
