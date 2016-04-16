@@ -337,54 +337,47 @@ func (d *Driver) VmMountLayer(id string) error {
 		return err
 	}
 	podId := fmt.Sprintf("pull-%s", utils.RandStr(10, "alpha"))
-	vm, ok := daemon.VmList[d.pullVm]
-	if !ok {
-		return fmt.Errorf("can not find VM(%s)", d.pullVm)
-	}
-	if vm.Status == types.S_VM_IDLE {
-		p, err := daemon.CreatePod(podId, podstring)
-		if err != nil {
-			glog.Errorf("can not create pod %s", podstring)
-			return err
-		}
-		code, cause, err := daemon.StartInternal(p, d.pullVm, nil, false, types.VM_KEEP_AFTER_SHUTDOWN, []*hypervisor.TtyIO{})
-		if err != nil {
-			glog.Errorf("Code is %d, Cause is %s, %s", code, cause, err.Error())
-			d.daemon.KillVm(d.pullVm)
-			return err
-		}
-		vm := d.daemon.VmList[d.pullVm]
-		// wait for cmd finish
-		Status, err := vm.GetResponseChan()
-		if err != nil {
-			glog.Error(err.Error())
-			return err
-		}
-		defer vm.ReleaseResponseChan(Status)
+	vmId := fmt.Sprintf("%s-%s", d.pullVm, utils.RandStr(10, "alpha"))
 
-		var vmResponse *types.VmResponse
-		for {
-			vmResponse = <-Status
-			if vmResponse.VmId == d.pullVm {
-				if vmResponse.Code == types.E_POD_FINISHED {
-					glog.Infof("Got E_POD_FINISHED code response")
-					break
-				}
+	p, err := daemon.CreatePod(podId, podstring)
+	if err != nil {
+		glog.Errorf("can not create pod %s", podstring)
+		return err
+	}
+	defer daemon.CleanPod(podId)
+
+	vm, err := d.daemon.StartVm(vmId, 1, 64, false, types.VM_KEEP_NONE)
+	if err != nil {
+		glog.Errorf(err.Error())
+		return err
+	}
+
+	// wait for cmd finish
+	Status, err := vm.GetResponseChan()
+	if err != nil {
+		d.daemon.KillVm(vmId)
+		glog.Error(err.Error())
+		return err
+	}
+	defer vm.ReleaseResponseChan(Status)
+
+	code, cause, err := daemon.StartInternal(p, vmId, nil, false, types.VM_KEEP_NONE, []*hypervisor.TtyIO{})
+	if err != nil {
+		d.daemon.KillVm(vmId)
+		glog.Errorf("Code is %d, Cause is %s, %s", code, cause, err.Error())
+		return err
+	}
+
+	var vmResponse *types.VmResponse
+	for {
+		vmResponse = <-Status
+		if vmResponse.VmId == vmId {
+			if vmResponse.Code == types.E_VM_SHUTDOWN {
+				glog.Infof("vm sthudown")
+				break
 			}
 		}
-
-		p.SetVM(d.pullVm, vm)
-
-		// release pod from VM
-		code, cause, err = d.daemon.StopPod(podId, "no")
-		if err != nil {
-			glog.Errorf("Code is %d, Cause is %s, %s", code, cause, err.Error())
-			d.daemon.KillVm(d.pullVm)
-			return err
-		}
-		d.daemon.CleanPod(podId)
-	} else {
-		glog.Errorf("pull vm should not be associated")
 	}
+
 	return nil
 }
