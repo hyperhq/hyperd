@@ -84,7 +84,7 @@ func (d *Driver) Diff(id, parent string) (diff archive.Archive, err error) {
 
 	// start vm
 	vmId := fmt.Sprintf("%s-%s", d.pullVm, utils.RandStr(10, "alpha"))
-	vm, err := d.daemon.StartVm(vmId, 1, 64, false, types.VM_KEEP_NONE)
+	vm, err := d.daemon.StartVm(vmId, 1, 64, false)
 	if err != nil {
 		glog.Error(err)
 		return nil, err
@@ -99,7 +99,7 @@ func (d *Driver) Diff(id, parent string) (diff archive.Archive, err error) {
 	}
 	defer vm.ReleaseResponseChan(Status)
 
-	code, cause, err = d.daemon.StartInternal(p, vmId, nil, false, types.VM_KEEP_NONE, []*hypervisor.TtyIO{})
+	code, cause, err = d.daemon.StartInternal(p, vmId, nil, false, []*hypervisor.TtyIO{})
 	if err != nil {
 		glog.Errorf("Code is %d, Cause is %s, %s", code, cause, err.Error())
 		d.daemon.KillVm(vmId)

@@ -11,7 +11,7 @@ import (
 )
 
 func (daemon *Daemon) CreateVm(cpu, mem int, async bool) (*hypervisor.Vm, error) {
-	vm, err := daemon.StartVm("", cpu, mem, false, 0)
+	vm, err := daemon.StartVm("", cpu, mem, false)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +62,7 @@ func (p *Pod) AssociateVm(daemon *Daemon, vmId string) error {
 	}
 	glog.V(1).Infof("The data for vm(%s) is %v", vmId, vmData)
 
-	p.vm = daemon.NewVm(vmId, p.spec.Resource.Vcpu, p.spec.Resource.Memory, false, types.VM_KEEP_NONE)
+	p.vm = daemon.NewVm(vmId, p.spec.Resource.Vcpu, p.spec.Resource.Memory, false)
 	p.status.Vm = vmId
 
 	err = p.vm.AssociateVm(p.status, vmData)
@@ -94,7 +94,7 @@ func (daemon *Daemon) ReleaseAllVms() (int, error) {
 	return ret, err
 }
 
-func (daemon *Daemon) StartVm(vmId string, cpu, mem int, lazy bool, keep int) (vm *hypervisor.Vm, err error) {
+func (daemon *Daemon) StartVm(vmId string, cpu, mem int, lazy bool) (vm *hypervisor.Vm, err error) {
 	var (
 		DEFAULT_CPU = 1
 		DEFAULT_MEM = 128
@@ -118,8 +118,8 @@ func (daemon *Daemon) StartVm(vmId string, cpu, mem int, lazy bool, keep int) (v
 	}
 
 	glog.V(1).Infof("The config: kernel=%s, initrd=%s", daemon.Kernel, daemon.Initrd)
-	if vmId != "" || daemon.Bios != "" || daemon.Cbfs != "" || runtime.GOOS == "darwin" || lazy || keep > 0 {
-		vm, err = hypervisor.GetVm(vmId, b, false, lazy, keep)
+	if vmId != "" || daemon.Bios != "" || daemon.Cbfs != "" || runtime.GOOS == "darwin" || lazy {
+		vm, err = hypervisor.GetVm(vmId, b, false, lazy)
 	} else {
 		vm, err = daemon.Factory.GetVm(cpu, mem)
 	}
@@ -144,9 +144,9 @@ func (daemon *Daemon) WaitVmStart(vm *hypervisor.Vm) error {
 	return nil
 }
 
-func (daemon *Daemon) GetVM(vmId string, resource *pod.UserResource, lazy bool, keep int) (*hypervisor.Vm, error) {
+func (daemon *Daemon) GetVM(vmId string, resource *pod.UserResource, lazy bool) (*hypervisor.Vm, error) {
 	if vmId == "" {
-		return daemon.StartVm("", resource.Vcpu, resource.Memory, lazy, keep)
+		return daemon.StartVm("", resource.Vcpu, resource.Memory, lazy)
 	}
 
 	vm, ok := daemon.VmList[vmId]
@@ -166,7 +166,7 @@ func (daemon *Daemon) GetVM(vmId string, resource *pod.UserResource, lazy bool, 
 	return vm, nil
 }
 
-func (daemon *Daemon) NewVm(id string, cpu, memory int, lazy bool, keep int) *hypervisor.Vm {
+func (daemon *Daemon) NewVm(id string, cpu, memory int, lazy bool) *hypervisor.Vm {
 	vmId := id
 
 	if vmId == "" {
@@ -177,5 +177,5 @@ func (daemon *Daemon) NewVm(id string, cpu, memory int, lazy bool, keep int) *hy
 			}
 		}
 	}
-	return hypervisor.NewVm(vmId, cpu, memory, lazy, keep)
+	return hypervisor.NewVm(vmId, cpu, memory, lazy)
 }

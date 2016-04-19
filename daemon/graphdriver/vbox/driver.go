@@ -110,7 +110,7 @@ func (d *Driver) Setup() (err error) {
 	)
 
 	d.daemon = daemon
-	vm, err = d.daemon.StartVm(d.pullVm, 1, 64, false, types.VM_KEEP_AFTER_SHUTDOWN)
+	vm, err = d.daemon.StartVm(d.pullVm, 1, 64, false)
 	if err != nil {
 		glog.Error(err)
 		return err
@@ -346,7 +346,7 @@ func (d *Driver) VmMountLayer(id string) error {
 	}
 	defer daemon.CleanPod(podId)
 
-	vm, err := d.daemon.StartVm(vmId, 1, 64, false, types.VM_KEEP_NONE)
+	vm, err := d.daemon.StartVm(vmId, 1, 64, false)
 	if err != nil {
 		glog.Error(err)
 		return err
@@ -361,7 +361,7 @@ func (d *Driver) VmMountLayer(id string) error {
 	}
 	defer vm.ReleaseResponseChan(Status)
 
-	code, cause, err := daemon.StartInternal(p, vmId, nil, false, types.VM_KEEP_NONE, []*hypervisor.TtyIO{})
+	code, cause, err := daemon.StartInternal(p, vmId, nil, false, []*hypervisor.TtyIO{})
 	if err != nil {
 		d.daemon.KillVm(vmId)
 		glog.Errorf("Code is %d, Cause is %s, %s", code, cause, err.Error())

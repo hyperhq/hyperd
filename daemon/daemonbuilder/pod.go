@@ -202,7 +202,7 @@ func (d Docker) ContainerStart(cId string, hostConfig *containertypes.HostConfig
 	}()
 
 	vmId := "buildevm-" + utils.RandStr(10, "number")
-	if vm, err = d.Daemon.StartVm(vmId, 1, 512, false, hypertypes.VM_KEEP_NONE); err != nil {
+	if vm, err = d.Daemon.StartVm(vmId, 1, 512, false); err != nil {
 		return
 	}
 	d.hyper.Vm = vm
