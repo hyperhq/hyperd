@@ -126,3 +126,15 @@ message PodInfo {
 	PodStatus status  = 5;
 }
 
+message PodInfoRequest {
+    string podID = 1;
+}
+
+message PodInfoResponse {
+    PodInfo podInfo = 1;
+}
+
+// PublicAPI defines the public APIs which are handled over TCP sockets.
+service PublicAPI {
+    rpc PodInfo(PodInfoRequest) returns (PodInfoResponse) {}
+}
