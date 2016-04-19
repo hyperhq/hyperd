@@ -1004,6 +1004,7 @@ func hyperHandlePodEvent(vmResponse *types.VmResponse, data interface{},
 		if mypod.Status == types.S_POD_RUNNING { // not received finished pod before
 			stopLogger(mypod)
 			mypod.Status = types.S_POD_FAILED
+			mypod.FinishedAt = time.Now().Format("2006-01-02T15:04:05Z")
 			mypod.SetContainerStatus(types.S_POD_FAILED)
 		}
 		daemon.PodStopped(mypod.Id)
