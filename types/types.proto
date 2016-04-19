@@ -136,5 +136,48 @@ message PodInfoResponse {
 
 // PublicAPI defines the public APIs which are handled over TCP sockets.
 service PublicAPI {
+    // PodInfo implements GET /pod/info
     rpc PodInfo(PodInfoRequest) returns (PodInfoResponse) {}
+
+    // TODO: implements  GET    /list
+    // TODO: implements  GET    /pod/stats
+    // TODO: implements  POST   /pod/create
+    // TODO: implements  POST   /pod/labels
+    // TODO: implements  POST   /pod/start
+    // TODO: implements  POST   /pod/stop
+    // TODO: implements  POST   /pod/kill
+    // TODO: implements  POST   /pod/pause
+    // TODO: implements  POST   /pod/unpause
+    // TODO: implements  DELETE /pod
+
+    // TODO: implements  GET    /container/info
+    // TODO: implements  GET    /container/logs
+    // TODO: implements  POST   /container/create
+    // TODO: implements  POST   /container/rename
+    // TODO: implements  POST   /container/commit
+    // TODO: implements  POST   /container/kill
+    // TODO: implements  POST   /exec
+    // TODO: implements  POST   /attach
+    // TODO: implements  POST   /tty/resize
+    // TODO: implements  GET    /exitcode
+
+    // TODO: implements  GET    /service/list
+    // TODO: implements  POST   /service/add
+    // TODO: implements  POST   /service/update
+    // TODO: implements  DELETE /service
+
+    // TODO: implements  GET    /images/get
+    // TODO: implements  POST   /image/create
+    // TODO: implements  POST   /image/load
+    // TODO: implements  POST   /image/push
+    // TODO: implements  DELETE /image
+    // TODO: implements  POST   /image/build
+
+    // TODO: implements  GET    /_ping
+    // TODO: implements  GET    /info
+    // TODO: implements  GET    /version
+    // TODO: implements  POST   /auth
+
+    // TODO: implements  POST   /vm/create
+    // TODO: implements  DELETE /vm
 }

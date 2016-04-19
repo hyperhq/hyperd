@@ -412,6 +412,7 @@ const _ = grpc.SupportPackageIsVersion1
 // Client API for PublicAPI service
 
 type PublicAPIClient interface {
+	// PodInfo implements GET /pod/info
 	PodInfo(ctx context.Context, in *PodInfoRequest, opts ...grpc.CallOption) (*PodInfoResponse, error)
 }
 
@@ -435,6 +436,7 @@ func (c *publicAPIClient) PodInfo(ctx context.Context, in *PodInfoRequest, opts 
 // Server API for PublicAPI service
 
 type PublicAPIServer interface {
+	// PodInfo implements GET /pod/info
 	PodInfo(context.Context, *PodInfoRequest) (*PodInfoResponse, error)
 }
 
