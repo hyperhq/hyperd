@@ -115,6 +115,7 @@ message PodStatus {
 	repeated string podIP                     = 5;
 	string startTime                          = 6;
 	repeated ContainerStatus containerStatus  = 7;
+	string finishTime                         = 8;
 }
 
 message PodInfo {
