@@ -86,14 +86,14 @@ func (d *Driver) Diff(id, parent string) (diff archive.Archive, err error) {
 	vmId := fmt.Sprintf("%s-%s", d.pullVm, utils.RandStr(10, "alpha"))
 	vm, err := d.daemon.StartVm(vmId, 1, 64, false, types.VM_KEEP_NONE)
 	if err != nil {
-		glog.Errorf(err.Error())
+		glog.Error(err)
 		return nil, err
 	}
 
 	// wait for cmd finish
 	Status, err := vm.GetResponseChan()
 	if err != nil {
-		glog.Error(err.Error())
+		glog.Error(err)
 		d.daemon.KillVm(vmId)
 		return nil, err
 	}

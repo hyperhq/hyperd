@@ -72,7 +72,7 @@ func Init(root string, options []string, uidMaps, gidMaps []idtools.IDMap) (grap
 	}
 	vdi := fmt.Sprintf("%s/images/base.vdi", root)
 	if _, err := os.Stat(vdi); err != nil {
-		glog.Error(err.Error())
+		glog.Error(err)
 		return nil, err
 	}
 	d.baseVdi = vdi
@@ -112,7 +112,7 @@ func (d *Driver) Setup() (err error) {
 	d.daemon = daemon
 	vm, err = d.daemon.StartVm(d.pullVm, 1, 64, false, types.VM_KEEP_AFTER_SHUTDOWN)
 	if err != nil {
-		glog.Errorf(err.Error())
+		glog.Error(err)
 		return err
 	}
 	defer func() {
@@ -127,7 +127,7 @@ func (d *Driver) Setup() (err error) {
 	}
 
 	if err = virtualbox.RegisterDisk(d.pullVm, d.pullVm, d.BaseImage(), 4); err != nil {
-		glog.Errorf(err.Error())
+		glog.Error(err)
 		return err
 	}
 	ids, err = loadIds(path.Join(d.RootPath(), "layers"))
@@ -189,13 +189,13 @@ func (d *Driver) Exists(id string) bool {
 
 func (d *Driver) Create(id, parent, mountLabel string) error {
 	if err := d.createDirsFor(id); err != nil {
-		glog.Error(err.Error())
+		glog.Error(err)
 		return err
 	}
 
 	// create the disk and mount it to id's diff dir
 	if err := d.createDisk(id, parent); err != nil {
-		glog.Error(err.Error())
+		glog.Error(err)
 		return err
 	}
 
@@ -264,7 +264,7 @@ func (d *Driver) createDisk(id, parent string) error {
 	params = fmt.Sprintf("vboxmanage closemedium %s", idDisk)
 	cmd = exec.Command("/bin/sh", "-c", params)
 	if output, err := cmd.CombinedOutput(); err != nil {
-		glog.Error(err.Error())
+		glog.Error(err)
 		return fmt.Errorf("error to run vboxmanage closemedium, %s", output)
 	}
 	return nil
@@ -348,7 +348,7 @@ func (d *Driver) VmMountLayer(id string) error {
 
 	vm, err := d.daemon.StartVm(vmId, 1, 64, false, types.VM_KEEP_NONE)
 	if err != nil {
-		glog.Errorf(err.Error())
+		glog.Error(err)
 		return err
 	}
 
@@ -356,7 +356,7 @@ func (d *Driver) VmMountLayer(id string) error {
 	Status, err := vm.GetResponseChan()
 	if err != nil {
 		d.daemon.KillVm(vmId)
-		glog.Error(err.Error())
+		glog.Error(err)
 		return err
 	}
 	defer vm.ReleaseResponseChan(Status)
