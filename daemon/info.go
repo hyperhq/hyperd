@@ -134,6 +134,7 @@ func (daemon *Daemon) GetPodInfo(podName string) (types.PodInfo, error) {
 		HostIP:          utils.GetHostIP(),
 		PodIP:           podIPs,
 		StartTime:       pod.status.StartedAt,
+		FinishTime:      pod.status.FinishedAt,
 	}
 	switch pod.status.Status {
 	case runvtypes.S_POD_CREATED:
