@@ -83,7 +83,7 @@ func (daemon *Daemon) StartPod(stdin io.ReadCloser, stdout io.WriteCloser, podId
 	}
 	var lazy bool = hypervisor.HDriver.SupportLazyMode() && vmId == ""
 
-	code, cause, err := daemon.StartInternal(p, vmId, nil, lazy, types.VM_KEEP_NONE, ttys)
+	code, cause, err := daemon.StartInternal(p, vmId, nil, lazy, ttys)
 	if err != nil {
 		glog.Error(err.Error())
 		return -1, "", err
@@ -107,7 +107,7 @@ func (daemon *Daemon) StartPod(stdin io.ReadCloser, stdout io.WriteCloser, podId
 	return code, cause, nil
 }
 
-func (daemon *Daemon) StartInternal(p *Pod, vmId string, config interface{}, lazy bool, keep int, streams []*hypervisor.TtyIO) (int, string, error) {
+func (daemon *Daemon) StartInternal(p *Pod, vmId string, config interface{}, lazy bool, streams []*hypervisor.TtyIO) (int, string, error) {
 	if !p.TransitionLock("start") {
 		return -1, "", fmt.Errorf("The pod(%s) is operting by others, please retry later", p.id)
 	}
@@ -117,7 +117,7 @@ func (daemon *Daemon) StartInternal(p *Pod, vmId string, config interface{}, laz
 		return -1, "", fmt.Errorf("pod %s is already running", p.id)
 	}
 
-	vmResponse, err := p.Start(daemon, vmId, lazy, keep, streams)
+	vmResponse, err := p.Start(daemon, vmId, lazy, streams)
 	if err != nil {
 		return -1, "", err
 	}
@@ -148,7 +148,7 @@ func (daemon *Daemon) RestartPod(mypod *hypervisor.PodStatus) error {
 		glog.Errorf(err.Error())
 		return err
 	}
-	_, _, err = daemon.StartInternal(pnew, "", nil, lazy, types.VM_KEEP_NONE, []*hypervisor.TtyIO{})
+	_, _, err = daemon.StartInternal(pnew, "", nil, lazy, []*hypervisor.TtyIO{})
 	if err != nil {
 		glog.Error(err.Error())
 		return err

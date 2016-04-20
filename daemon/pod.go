@@ -89,11 +89,11 @@ func (p *Pod) TransitionUnlock(label string) {
 	}
 }
 
-func (p *Pod) GetVM(daemon *Daemon, id string, lazy bool, keep int) (err error) {
+func (p *Pod) GetVM(daemon *Daemon, id string, lazy bool) (err error) {
 	if p == nil || p.spec == nil {
 		return errors.New("Pod: unable to create VM without resource info.")
 	}
-	p.vm, err = daemon.GetVM(id, &p.spec.Resource, lazy, keep)
+	p.vm, err = daemon.GetVM(id, &p.spec.Resource, lazy)
 	return
 }
 
@@ -924,7 +924,7 @@ func (p *Pod) AttachTtys(daemon *Daemon, streams []*hypervisor.TtyIO) (err error
 	return nil
 }
 
-func (p *Pod) Start(daemon *Daemon, vmId string, lazy bool, keep int, streams []*hypervisor.TtyIO) (*types.VmResponse, error) {
+func (p *Pod) Start(daemon *Daemon, vmId string, lazy bool, streams []*hypervisor.TtyIO) (*types.VmResponse, error) {
 
 	var (
 		err       error = nil
@@ -938,7 +938,7 @@ func (p *Pod) Start(daemon *Daemon, vmId string, lazy bool, keep int, streams []
 		return nil, errors.New(estr)
 	}
 
-	if err = p.GetVM(daemon, vmId, lazy, keep); err != nil {
+	if err = p.GetVM(daemon, vmId, lazy); err != nil {
 		return nil, err
 	}
 
