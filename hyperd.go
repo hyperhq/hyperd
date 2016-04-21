@@ -219,12 +219,14 @@ func mainDaemon(opt *Options) {
 	d.Factory = factory.NewFromPolicy(d.Kernel, d.Initrd, vmFactoryPolicy)
 
 	rpcHost, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "gRPCHost")
-	rpcServer := serverrpc.NewServerRPC(d)
 	if rpcHost != "" {
+		rpcServer := serverrpc.NewServerRPC(d)
+		defer rpcServer.Stop()
+
 		go func() {
 			err := rpcServer.Serve(rpcHost)
 			if err != nil {
-				glog.V(0).Infof("Hyper serve RPC error: %v", err)
+				glog.Fatalf("Hyper serve RPC error: %v", err)
 			}
 		}()
 	}
@@ -264,8 +266,5 @@ func mainDaemon(opt *Options) {
 	}
 	d.Factory.CloseFactory()
 	api.Close()
-	if rpcHost != "" {
-		rpcServer.Stop()
-	}
 	d.Shutdown()
 }
