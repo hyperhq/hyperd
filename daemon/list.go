@@ -59,20 +59,24 @@ func (daemon *Daemon) List(item, podId, vmId string, auxiliary bool) (map[string
 	if item == "pod" {
 		if podId == "" && vmId == "" {
 			daemon.PodList.Foreach(func(p *Pod) error {
-				podJsonResponse = append(podJsonResponse, p.id+":"+showPod(p.status))
+				if p.status.Status != types.S_POD_NONE {
+					podJsonResponse = append(podJsonResponse, p.id+":"+showPod(p.status))
+				}
 				return nil
 			})
 		} else if podId != "" && vmId == "" {
-			podJsonResponse = append(podJsonResponse, pod.id+":"+showPod(pod.status))
+			if pod.status.Status != types.S_POD_NONE {
+				podJsonResponse = append(podJsonResponse, pod.id+":"+showPod(pod.status))
+			}
 		} else if podId == "" && vmId != "" {
 			daemon.PodList.Foreach(func(p *Pod) error {
-				if p.status.Vm == vmId {
+				if p.status.Vm == vmId && p.status.Status != types.S_POD_NONE {
 					podJsonResponse = append(podJsonResponse, p.id+":"+showPod(p.status))
 				}
 				return nil
 			})
 		} else {
-			if pod.status.Vm == vmId {
+			if pod.status.Vm == vmId && pod.status.Status != types.S_POD_NONE {
 				podJsonResponse = append(podJsonResponse, pod.id+":"+showPod(pod.status))
 			}
 		}

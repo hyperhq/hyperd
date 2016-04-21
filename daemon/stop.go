@@ -14,6 +14,9 @@ func (daemon *Daemon) PodStopped(podId string) {
 		return
 	}
 
+	pod.Lock()
+	defer pod.Unlock()
+
 	pod.status.Vm = ""
 	if pod.vm == nil {
 		return
@@ -23,6 +26,10 @@ func (daemon *Daemon) PodStopped(podId string) {
 	daemon.db.DeleteVMByPod(podId)
 	daemon.RemoveVm(pod.vm.Id)
 	pod.vm = nil
+
+	if pod.status.Status == types.S_POD_NONE {
+		daemon.RemovePodResource(pod)
+	}
 }
 
 func (daemon *Daemon) StopPod(podId, stopVm string) (int, string, error) {
@@ -49,6 +56,9 @@ func (daemon *Daemon) StopPodWithinLock(pod *Pod, stopVm string) (int, string, e
 	if pod.status.Type == "kubernetes" {
 		pod.status.RestartPolicy = "never"
 	}
+
+	pod.Lock()
+	defer pod.Unlock()
 
 	if pod.vm == nil {
 		return types.E_VM_SHUTDOWN, "", nil
