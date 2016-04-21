@@ -15,6 +15,7 @@ import (
 	"github.com/hyperhq/hyperd/daemon"
 	"github.com/hyperhq/hyperd/daemon/graphdriver/vbox"
 	"github.com/hyperhq/hyperd/server"
+	"github.com/hyperhq/hyperd/serverrpc"
 	"github.com/hyperhq/hyperd/utils"
 	"github.com/hyperhq/runv/driverloader"
 	"github.com/hyperhq/runv/factory"
@@ -216,6 +217,19 @@ func mainDaemon(opt *Options) {
 
 	vmFactoryPolicy, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "VmFactoryPolicy")
 	d.Factory = factory.NewFromPolicy(d.Kernel, d.Initrd, vmFactoryPolicy)
+
+	rpcHost, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "gRPCHost")
+	if rpcHost != "" {
+		rpcServer := serverrpc.NewServerRPC(d)
+		defer rpcServer.Stop()
+
+		go func() {
+			err := rpcServer.Serve(rpcHost)
+			if err != nil {
+				glog.Fatalf("Hyper serve RPC error: %v", err)
+			}
+		}()
+	}
 
 	// The serve API routine never exits unless an error occurs
 	// We need to start it as a goroutine and wait on it so
