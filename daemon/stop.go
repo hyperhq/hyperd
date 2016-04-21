@@ -69,16 +69,7 @@ func (daemon *Daemon) StopPodWithinLock(pod *Pod, stopVm string) (int, string, e
 		return -1, "", fmt.Errorf("Pod %s is not in running state, cannot be stopped", pod.id)
 	}
 
-	vmId := pod.vm.Id
 	vmResponse := pod.vm.StopPod(pod.status, stopVm)
-
-	// Delete the Vm info for POD
-	daemon.db.DeleteVMByPod(pod.id)
-
-	if vmResponse.Code == types.E_VM_SHUTDOWN {
-		daemon.RemoveVm(vmId)
-	}
-	pod.vm = nil
 
 	return vmResponse.Code, vmResponse.Cause, nil
 }

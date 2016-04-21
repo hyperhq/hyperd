@@ -38,15 +38,23 @@ func (daemon *Daemon) CleanPod(podId string) (int, string, error) {
 
 	pod.Lock()
 	defer pod.Unlock()
-	if pod.vm != nil {
-		pod.status.Status = types.S_POD_NONE
-		return code, cause, err
-	}
-
-	return daemon.RemovePodResource(pod)
+	daemon.RemovePodResource(pod)
+	return code, cause, err
 }
 
-func (daemon *Daemon) RemovePodResource(p *Pod) (int, string, error) {
+func (p *Pod) ShouldWaitCleanUp() bool {
+	return p.vm != nil
+}
+
+func (daemon *Daemon) RemovePodResource(p *Pod) {
+
+	if p.ShouldWaitCleanUp() {
+		glog.V(3).Infof("pod %s should wait clean up before being purged", p.id)
+		p.status.Status = types.S_POD_NONE
+		return
+	}
+	glog.V(3).Infof("pod %s is being purged", p.id)
+
 	os.RemoveAll(path.Join(utils.HYPER_ROOT, "services", p.id))
 	os.RemoveAll(path.Join(utils.HYPER_ROOT, "hosts", p.id))
 
@@ -56,8 +64,6 @@ func (daemon *Daemon) RemovePodResource(p *Pod) (int, string, error) {
 		daemon.RemovePodContainer(p)
 	}
 	daemon.DeleteVolumeId(p.id)
-
-	return types.E_OK, "", nil
 }
 
 func (daemon *Daemon) RemovePodContainer(p *Pod) {
