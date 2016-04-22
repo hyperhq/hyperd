@@ -30,7 +30,7 @@ func (daemon *Daemon) CleanPod(podId string) (int, string, error) {
 	defer pod.TransitionUnlock("rm")
 
 	if pod.status.Status == types.S_POD_RUNNING {
-		code, cause, err = daemon.StopPodWithinLock(pod, "yes")
+		code, cause, err = daemon.StopPodWithinLock(pod)
 		if err != nil {
 			glog.Errorf("failed to stop pod %s", podId)
 		}

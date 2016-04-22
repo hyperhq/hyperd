@@ -254,7 +254,7 @@ func (daemon *Daemon) CmdImageDelete(name string, force, prune bool) (*engine.En
 }
 
 func (daemon *Daemon) CmdStopPod(podId, stopVm string) (*engine.Env, error) {
-	code, cause, err := daemon.StopPod(podId, stopVm)
+	code, cause, err := daemon.StopPod(podId)
 	if err != nil {
 		return nil, err
 	}
