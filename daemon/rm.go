@@ -47,7 +47,6 @@ func (p *Pod) ShouldWaitCleanUp() bool {
 }
 
 func (daemon *Daemon) RemovePodResource(p *Pod) {
-
 	if p.ShouldWaitCleanUp() {
 		glog.V(3).Infof("pod %s should wait clean up before being purged", p.id)
 		p.status.Status = types.S_POD_NONE

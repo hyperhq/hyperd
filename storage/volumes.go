@@ -5,6 +5,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"syscall"
 
 	"github.com/golang/glog"
 	"github.com/hyperhq/hyperd/utils"
@@ -59,4 +60,21 @@ func MountVFSVolume(src, sharedDir string) (string, error) {
 	}
 
 	return mountSharedDir, nil
+}
+
+func UmountVFSVolume(vol, sharedDir string) error {
+	mount := path.Join(sharedDir, vol)
+
+	err := syscall.Unmount(mount, 0)
+	if err != nil {
+		glog.Warningf("Cannot umount volume %s: %s", mount, err.Error())
+		err = syscall.Unmount(mount, syscall.MNT_DETACH)
+		if err != nil {
+			glog.Warningf("Cannot lazy umount volume %s: %s", mount, err.Error())
+			return err
+		}
+	}
+
+	os.Remove(mount)
+	return nil
 }
