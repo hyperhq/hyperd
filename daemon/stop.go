@@ -14,6 +14,9 @@ func (daemon *Daemon) PodStopped(podId string) {
 		return
 	}
 
+	pod.Lock()
+	defer pod.Unlock()
+
 	pod.status.Vm = ""
 	if pod.vm == nil {
 		return
@@ -23,6 +26,10 @@ func (daemon *Daemon) PodStopped(podId string) {
 	daemon.db.DeleteVMByPod(podId)
 	daemon.RemoveVm(pod.vm.Id)
 	pod.vm = nil
+
+	if pod.status.Status == types.S_POD_NONE {
+		daemon.RemovePodResource(pod)
+	}
 }
 
 func (daemon *Daemon) StopPod(podId, stopVm string) (int, string, error) {
@@ -50,6 +57,9 @@ func (daemon *Daemon) StopPodWithinLock(pod *Pod, stopVm string) (int, string, e
 		pod.status.RestartPolicy = "never"
 	}
 
+	pod.Lock()
+	defer pod.Unlock()
+
 	if pod.vm == nil {
 		return types.E_VM_SHUTDOWN, "", nil
 	}
@@ -59,16 +69,7 @@ func (daemon *Daemon) StopPodWithinLock(pod *Pod, stopVm string) (int, string, e
 		return -1, "", fmt.Errorf("Pod %s is not in running state, cannot be stopped", pod.id)
 	}
 
-	vmId := pod.vm.Id
 	vmResponse := pod.vm.StopPod(pod.status, stopVm)
-
-	// Delete the Vm info for POD
-	daemon.db.DeleteVMByPod(pod.id)
-
-	if vmResponse.Code == types.E_VM_SHUTDOWN {
-		daemon.RemoveVm(vmId)
-	}
-	pod.vm = nil
 
 	return vmResponse.Code, vmResponse.Cause, nil
 }

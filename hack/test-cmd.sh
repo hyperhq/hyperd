@@ -68,6 +68,12 @@ function stop_hyperd()
     read  HYPERD_PID other < <(ps --ppid ${HYPERD_PID}|grep hyperd)
   fi
   [[ -n "${HYPERD_PID-}" ]] && sudo kill "${HYPERD_PID}" 1>&2 2>/dev/null
+  t=1
+  while ps -p ${HYPERD_PID} >/dev/null 2>&1 ; do
+    echo "wait hyperd(${HYPERD_PID}) stop"
+    sleep 1
+    [ $((t++)) -ge 15 ] && break
+  done
   HYPERD_PID=
 }
 

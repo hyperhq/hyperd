@@ -380,12 +380,16 @@ func (daemon *Daemon) RemoveVm(vmId string) {
 }
 
 func (daemon *Daemon) DestroyAllVm() error {
+	var remains = []*Pod{}
 	daemon.PodList.Foreach(func(p *Pod) error {
+		remains = append(remains, p)
+		return nil
+	})
+	for _, p := range remains {
 		if _, _, err := daemon.StopPodWithinLock(p, "yes"); err != nil {
 			glog.V(1).Infof("fail to stop %s: %v", p.id, err)
 		}
-		return nil
-	})
+	}
 	return nil
 }
 

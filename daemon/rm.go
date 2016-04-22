@@ -36,19 +36,34 @@ func (daemon *Daemon) CleanPod(podId string) (int, string, error) {
 		}
 	}
 
-	os.RemoveAll(path.Join(utils.HYPER_ROOT, "services", podId))
-	pod.cleanupEtcHosts()
-	os.RemoveAll(path.Join(utils.HYPER_ROOT, "hosts", podId))
+	pod.Lock()
+	defer pod.Unlock()
+	daemon.RemovePodResource(pod)
+	return code, cause, err
+}
 
-	daemon.db.DeletePod(podId)
-	daemon.RemovePod(podId)
-	if pod.status.Type != "kubernetes" {
-		daemon.RemovePodContainer(pod)
+func (p *Pod) ShouldWaitCleanUp() bool {
+	return p.vm != nil
+}
+
+func (daemon *Daemon) RemovePodResource(p *Pod) {
+
+	if p.ShouldWaitCleanUp() {
+		glog.V(3).Infof("pod %s should wait clean up before being purged", p.id)
+		p.status.Status = types.S_POD_NONE
+		return
 	}
-	daemon.DeleteVolumeId(podId)
-	code = types.E_OK
+	glog.V(3).Infof("pod %s is being purged", p.id)
 
-	return code, cause, nil
+	os.RemoveAll(path.Join(utils.HYPER_ROOT, "services", p.id))
+	os.RemoveAll(path.Join(utils.HYPER_ROOT, "hosts", p.id))
+
+	daemon.db.DeletePod(p.id)
+	daemon.RemovePod(p.id)
+	if p.status.Type != "kubernetes" {
+		daemon.RemovePodContainer(p)
+	}
+	daemon.DeleteVolumeId(p.id)
 }
 
 func (daemon *Daemon) RemovePodContainer(p *Pod) {

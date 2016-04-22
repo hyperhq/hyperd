@@ -103,6 +103,8 @@ func (p *Pod) SetVM(id string, vm *hypervisor.Vm) {
 }
 
 func (p *Pod) KillVM(daemon *Daemon) {
+	p.Lock()
+	defer p.Unlock()
 	if p.vm != nil {
 		daemon.KillVm(p.vm.Id)
 		p.vm = nil
