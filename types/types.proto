@@ -126,22 +126,117 @@ message PodInfo {
 	PodStatus status  = 5;
 }
 
+message ImageInfo {
+    string id                   = 1;
+    string parentID             = 2;
+    repeated string repoTags    = 3;
+    repeated string repoDigests = 4;
+    int64 created               = 5;
+    int64 virtualSize           = 6;
+    map<string,string> labels   = 7;
+}
+
+////////////////////   PublicAPI Request/Response   ///////////////////////////
+
 message PodInfoRequest {
-    string podID = 1;
+  string podID = 1;
 }
 
 message PodInfoResponse {
-    PodInfo podInfo = 1;
+  PodInfo podInfo = 1;
+}
+
+message PodListRequest {
+  string podID = 1;
+  string vmID  = 2;
+}
+
+message PodListResult {
+  string podID    = 1;
+  string podName  = 2;
+  string vmID     = 3;
+  string status   = 4;
+}
+
+message PodListResponse {
+  repeated PodListResult podList = 1;
+}
+
+message ContainerListRequest {
+  string podID    = 1;
+  string vmID     = 2;
+  bool auxiliary  = 3;
+}
+
+message ContainerListResult {
+  string containerID    = 1;
+  string containerName  = 2;
+  string podID          = 3;
+  string status         = 4;
+}
+
+message ContainerListResponse {
+  repeated ContainerListResult containerList = 1;
+}
+
+message ContainerInfoRequest {
+  // container is the name or id of specified container
+  string container = 1;
+}
+
+message ContainerInfoResponse {
+  ContainerInfo containerInfo = 1;
+}
+
+message VMListResult {
+  string vmID   = 1;
+  string podID  = 2;
+  string status = 3;
+}
+
+message VMListRequest {
+  string podID = 1;
+  string vmID  = 2;
+}
+
+message VMListResponse {
+  repeated VMListResult vmList = 1;
+}
+
+message ImageListRequest {
+  // filterArgs is a JSON-encoded set of filter arguments
+  string filterArgs = 1;
+  // filter is a shell glob string applied to repository names
+  string filter     = 2;
+  // all controls whether all images in the graph are filtered, or just the heads
+  bool all          = 3;
+}
+
+message ImageListResponse {
+    repeated ImageInfo imageList = 1;
 }
 
 // PublicAPI defines the public APIs which are handled over TCP sockets.
 service PublicAPI {
+    // PodList implements GET /list?item=pod
+    rpc PodList(PodListRequest) returns (PodListResponse) {}
+    // TODO: PodCreate implements POST /pod/create
+    // rpc PodCreate(PodCreateRequest) returns (PodCreateResponse) {}
     // PodInfo implements GET /pod/info
     rpc PodInfo(PodInfoRequest) returns (PodInfoResponse) {}
 
-    // TODO: implements  GET    /list
+    // ContainerList implements GET /list?item=container
+    rpc ContainerList(ContainerListRequest) returns (ContainerListResponse) {}
+    // ContainerInfo implements GET /container/info
+    rpc ContainerInfo(ContainerInfoRequest) returns (ContainerInfoResponse) {}
+
+    // ImageList implements GET /images/get
+    rpc ImageList(ImageListRequest) returns (ImageListResponse) {}
+
+    // VMList implements GET /list?item=vm
+    rpc VMList(VMListRequest) returns (VMListResponse) {}
+
     // TODO: implements  GET    /pod/stats
-    // TODO: implements  POST   /pod/create
     // TODO: implements  POST   /pod/labels
     // TODO: implements  POST   /pod/start
     // TODO: implements  POST   /pod/stop
@@ -150,7 +245,6 @@ service PublicAPI {
     // TODO: implements  POST   /pod/unpause
     // TODO: implements  DELETE /pod
 
-    // TODO: implements  GET    /container/info
     // TODO: implements  GET    /container/logs
     // TODO: implements  POST   /container/create
     // TODO: implements  POST   /container/rename
@@ -166,7 +260,6 @@ service PublicAPI {
     // TODO: implements  POST   /service/update
     // TODO: implements  DELETE /service
 
-    // TODO: implements  GET    /images/get
     // TODO: implements  POST   /image/create
     // TODO: implements  POST   /image/load
     // TODO: implements  POST   /image/push

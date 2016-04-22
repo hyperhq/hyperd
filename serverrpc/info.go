@@ -12,11 +12,26 @@ func (s *ServerRPC) PodInfo(c context.Context, req *types.PodInfoRequest) (*type
 
 	info, err := s.daemon.GetPodInfo(req.PodID)
 	if err != nil {
-		glog.Infof("GetPodInfo error: %v", err)
+		glog.Errorf("GetPodInfo error: %v", err)
 		return nil, err
 	}
 
 	return &types.PodInfoResponse{
 		PodInfo: &info,
+	}, nil
+}
+
+// ContainerInfo gets ContainerInfo by ID or name of container
+func (s *ServerRPC) ContainerInfo(c context.Context, req *types.ContainerInfoRequest) (*types.ContainerInfoResponse, error) {
+	glog.V(3).Infof("ContainerInfo with request %v", req.String())
+
+	info, err := s.daemon.GetContainerInfo(req.Container)
+	if err != nil {
+		glog.Errorf("GetContainerInfo error: %v", err)
+		return nil, err
+	}
+
+	return &types.ContainerInfoResponse{
+		ContainerInfo: &info,
 	}, nil
 }
