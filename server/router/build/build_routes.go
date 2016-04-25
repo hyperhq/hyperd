@@ -72,7 +72,7 @@ func newImageBuildOptions(ctx context.Context, r *http.Request) (*types.ImageBui
 	//version := httputils.VersionFromContext(ctx)
 	options := &types.ImageBuildOptions{}
 	options.Remove = true
-	options.PullParent = true
+	//options.PullParent = true
 
 	/*
 		if httputils.BoolValue(r, "forcerm") && version.GreaterThanOrEqualTo("1.12") {
