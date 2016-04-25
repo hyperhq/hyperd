@@ -16,7 +16,7 @@ func (s *ServerRPC) ImageList(ctx context.Context, req *types.ImageListRequest) 
 		return nil, err
 	}
 
-	result := make([]*types.ImageInfo, 0, 1)
+	result := make([]*types.ImageInfo, 0, len(images))
 	for _, image := range images {
 		result = append(result, &types.ImageInfo{
 			Id:          image.ID,

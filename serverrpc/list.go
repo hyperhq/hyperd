@@ -19,7 +19,9 @@ func (s *ServerRPC) ContainerList(ctx context.Context, req *types.ContainerListR
 	}
 
 	if _, ok := containerList["cData"]; !ok {
-		return nil, nil
+		return &types.ContainerListResponse{
+			ContainerList: nil,
+		}, nil
 	}
 
 	result := make([]*types.ContainerListResult, 0, 1)
@@ -58,7 +60,9 @@ func (s *ServerRPC) PodList(ctx context.Context, req *types.PodListRequest) (*ty
 	}
 
 	if _, ok := podList["podData"]; !ok {
-		return nil, nil
+		return &types.PodListResponse{
+			PodList: nil,
+		}, nil
 	}
 
 	for _, c := range podList["podData"] {
@@ -96,7 +100,9 @@ func (s *ServerRPC) VMList(ctx context.Context, req *types.VMListRequest) (*type
 	}
 
 	if _, ok := vmList["vmData"]; !ok {
-		return nil, nil
+		return &types.VMListResponse{
+			VmList: nil,
+		}, nil
 	}
 
 	for _, c := range vmList["vmData"] {
