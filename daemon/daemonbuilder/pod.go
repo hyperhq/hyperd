@@ -102,7 +102,7 @@ func (d Docker) BuilderCopy(cId string, destPath string, src builder.FileInfo, d
 		glog.Errorf(err.Error())
 		return err
 	}
-	fmt.Fprintf(copyshell, fmt.Sprintf("cp /tmp/src/%s %s\n", src.Name(), destPath))
+	fmt.Fprintf(copyshell, fmt.Sprintf("cp -r /tmp/src/%s %s\n", src.Name(), destPath))
 	copyshell.Close()
 
 	srcPath := src.Path()
