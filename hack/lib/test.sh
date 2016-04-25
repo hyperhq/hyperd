@@ -116,7 +116,7 @@ hyper::test::with_volume() {
 }
 
 hyper::test::service() {
-    hyper::test::run_pod ${HYPER_ROOT}/hack/pods/service.pod
+    hyper::test::run_attached_pod ${HYPER_ROOT}/hack/pods/service.pod
 }
 
 hyper::test::command() {
