@@ -71,10 +71,10 @@ You may also need the kernel and initrd from [HyperStart](https://github.com/hyp
 
 ## Find out more
 
- * [Documentation](http://doc.hypercontainer.io)
- * [Get Started](http://doc.hypercontainer.io/get_started/index.html)
- * [Reference](http://doc.hypercontaier.io/reference/index.html)
- * [Release Notes](http://doc.hypercontainer.io/release_notes/latest.html)
+ * [Documentation](http://docs.hypercontainer.io)
+ * [Get Started](http://docs.hypercontainer.io/get_started/index.html)
+ * [Reference](http://docs.hypercontainer.io/reference/index.html)
+ * [Release Notes](http://docs.hypercontainer.io/release_notes/latest.html)
 
 ## Contact Us
 
