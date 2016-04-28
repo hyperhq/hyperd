@@ -97,7 +97,7 @@ func (daemon *Daemon) Restore() error {
 			continue
 		}
 		if err := p.AssociateVm(daemon, string(vmId)); err != nil {
-			glog.V(1).Info("Some problem during associate vm %s to pod %s, %v", string(vmId), podId, err)
+			glog.V(1).Infof("Some problem during associate vm %s to pod %s, %v", string(vmId), podId, err)
 			// continue to next
 		}
 	}
