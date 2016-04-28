@@ -68,24 +68,24 @@ func NewPod(rawSpec []byte, id string, data interface{}) (*Pod, error) {
 }
 
 func (p *Pod) TransitionLock(label string) bool {
-	glog.V(1).Info("lock pod for operation ", label)
+	glog.V(1).Infof("lock pod %s for operation %s", p.id, label)
 	select {
 	case _ = <-p.transiting:
-		glog.V(3).Info("successfully lock pod for operation ", label)
+		glog.V(3).Infof("successfully lock pod %s for operation %s", p.id, label)
 		return true
 	default:
-		glog.V(3).Info("failed to lock pod for operation ", label)
+		glog.V(3).Infof("failed to lock pod %s for operation %s", p.id, label)
 		return false
 	}
 }
 
 func (p *Pod) TransitionUnlock(label string) {
-	glog.V(1).Info("unlock pod for operation ", label)
+	glog.V(1).Infof("unlock pod %s for operation %s", p.id, label)
 	select {
 	case p.transiting <- true:
-		glog.V(3).Info("successfully unlock pod for operation ", label)
+		glog.V(3).Infof("successfully unlock pod %s for operation %s", p.id, label)
 	default:
-		glog.V(3).Info("failed to unlock pod for operation ", label)
+		glog.V(3).Infof("failed to unlock pod %s for operation %s", p.id, label)
 	}
 }
 

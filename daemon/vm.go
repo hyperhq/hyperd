@@ -37,8 +37,10 @@ func (daemon *Daemon) CreateVm(cpu, mem int, async bool) (*hypervisor.Vm, error)
 }
 
 func (daemon *Daemon) KillVm(vmId string) (int, string, error) {
+	glog.V(3).Infof("KillVm %s", vmId)
 	vm, ok := daemon.VmList[vmId]
 	if !ok {
+		glog.V(3).Infof("Cannot find vm %s", vmId)
 		return 0, "", nil
 	}
 	code, cause, err := vm.Kill()
@@ -60,7 +62,7 @@ func (p *Pod) AssociateVm(daemon *Daemon, vmId string) error {
 	if err != nil {
 		return err
 	}
-	glog.V(1).Infof("The data for vm(%s) is %v", vmId, vmData)
+	glog.V(1).Infof("Get data for vm(%s) pod(%s)", vmId, p.id)
 
 	p.vm = daemon.NewVm(vmId, p.spec.Resource.Vcpu, p.spec.Resource.Memory, false)
 	p.status.Vm = vmId
@@ -83,9 +85,11 @@ func (daemon *Daemon) ReleaseAllVms() (int, error) {
 	)
 
 	for _, vm := range daemon.VmList {
+		glog.V(3).Infof("release vm %s", vm.Id)
 		ret, err = vm.ReleaseVm()
 		if err != nil {
 			/* FIXME: continue to release other vms? */
+			glog.Errorf("fail to release vm %s: %v", vm.Id, err)
 			break
 		}
 		daemon.RemoveVm(vm.Id)
