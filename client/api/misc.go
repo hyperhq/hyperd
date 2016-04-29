@@ -30,6 +30,7 @@ func (cli *Client) GetExitCode(container, tag string) error {
 	if err != nil {
 		return err
 	}
+	defer stream.Close()
 
 	err = json.NewDecoder(stream).Decode(&code)
 	if err != nil {

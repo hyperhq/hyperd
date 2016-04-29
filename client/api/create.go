@@ -10,11 +10,13 @@ import (
 
 func (cli *Client) CreatePod(spec interface{}) (string, int, error) {
 	body, statusCode, err := readBody(cli.call("POST", "/pod/create", spec, nil))
-	if statusCode != http.StatusCreated && statusCode != http.StatusOK {
-		return "", statusCode, err
-	} else if err != nil {
+	if err != nil {
 		return "", statusCode, err
 	}
+	if statusCode != http.StatusCreated && statusCode != http.StatusOK {
+		return "", statusCode, err
+	}
+
 	out := engine.NewOutput()
 	remoteInfo, err := out.AddEnv()
 	if err != nil {
