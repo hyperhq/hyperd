@@ -21,7 +21,6 @@ import (
 	"github.com/hyperhq/hyperd/utils"
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/pod"
-	hypertypes "github.com/hyperhq/runv/hypervisor/types"
 )
 
 // ContainerAttach attaches streams to the container cID. If stream is true, it streams the output.
@@ -230,15 +229,10 @@ func (d Docker) ContainerWait(cId string, timeout time.Duration) (int, error) {
 		return -1, fmt.Errorf("container %s doesn't belong to pod", cId)
 	}
 
-	// wait for cmd finish
+	// wait for event channel finished
 	for {
-		vmResponse, ok := <-d.hyper.Status
+		_, ok := <-d.hyper.Status
 		if !ok {
-			return -1, fmt.Errorf("response chan error")
-		}
-
-		if vmResponse.Code == hypertypes.E_VM_SHUTDOWN {
-			glog.Infof("vm shutdown")
 			break
 		}
 	}
