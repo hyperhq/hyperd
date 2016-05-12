@@ -223,19 +223,13 @@ func (d Docker) ContainerWait(cId string, timeout time.Duration) (int, error) {
 		return -1, fmt.Errorf("no vm is running")
 	}
 
-	_, isCopyPod := d.hyper.CopyPods[cId]
-	_, isBasicPod := d.hyper.BasicPods[cId]
+	podId, isCopyPod := d.hyper.CopyPods[cId]
+	podId, isBasicPod := d.hyper.BasicPods[cId]
 	if !isCopyPod && !isBasicPod {
 		return -1, fmt.Errorf("container %s doesn't belong to pod", cId)
 	}
 
-	// wait for event channel finished
-	for {
-		_, ok := <-d.hyper.Status
-		if !ok {
-			break
-		}
-	}
+	d.Daemon.PodWait(podId)
 
 	// release pod from VM
 	glog.Warningf("pod finished, cleanup")
