@@ -248,6 +248,20 @@ func CreateVolume(poolName, volName, dev_id string, size int, restore bool) erro
 	return nil
 }
 
+func UnmapVolume(deviceFullPath string) error {
+	args := fmt.Sprintf("dmsetup remove -f %s", deviceFullPath)
+	cmd := exec.Command("/bin/sh", "-c", args)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		glog.Warningf("Cannot umount device %s: %s, %s", deviceFullPath, err.Error(), output)
+		// retry
+		cmd := exec.Command("/bin/sh", "-c", args)
+		if err := cmd.Run(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func DeleteVolume(dm *DeviceMapper, dev_id int) error {
 	var parms string
 	// Delete the thin pool for test

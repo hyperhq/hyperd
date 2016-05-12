@@ -8,6 +8,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	dockertypes "github.com/docker/engine-api/types"
@@ -39,6 +40,7 @@ type Storage interface {
 	CleanUp() error
 
 	PrepareContainer(id, sharedir string) (*hypervisor.ContainerInfo, error)
+	CleanupContainer(id, sharedDir string) error
 	InjectFile(src io.Reader, containerId, target, rootDir string, perm, uid, gid int) error
 	CreateVolume(daemon *Daemon, podId, shortName string) (*hypervisor.VolumeInfo, error)
 	RemoveVolume(podId string, record []byte) error
@@ -85,6 +87,13 @@ func ProbeExistingVolume(v *pod.UserVolume, sharedDir string) (*hypervisor.Volum
 	}
 
 	return vol, nil
+}
+
+func CleanupExistingVolume(fstype, filepath, sharedDir string) error {
+	if fstype == "dir" {
+		return storage.UmountVFSVolume(filepath, sharedDir)
+	}
+	return dm.UnmapVolume(filepath)
 }
 
 type DevMapperStorage struct {
@@ -168,6 +177,16 @@ func (dms *DevMapperStorage) PrepareContainer(id, sharedDir string) (*hypervisor
 		Image:   devFullName,
 		Fstype:  fstype,
 	}, nil
+}
+
+func (dms *DevMapperStorage) CleanupContainer(id, sharedDir string) error {
+	devFullName, err := dm.MountContainerToSharedDir(id, sharedDir, dms.DevPrefix)
+	if err != nil {
+		glog.Error("got error when mount container to share dir ", err.Error())
+		return err
+	}
+
+	return dm.UnmapVolume(devFullName)
 }
 
 func (dms *DevMapperStorage) InjectFile(src io.Reader, containerId, target, rootDir string, perm, uid, gid int) error {
@@ -271,6 +290,10 @@ func (a *AufsStorage) PrepareContainer(id, sharedDir string) (*hypervisor.Contai
 	}, nil
 }
 
+func (a *AufsStorage) CleanupContainer(id, sharedDir string) error {
+	return aufs.Unmount(path.Join(sharedDir, id, "rootfs"))
+}
+
 func (a *AufsStorage) InjectFile(src io.Reader, containerId, target, rootDir string, perm, uid, gid int) error {
 	return storage.FsInjectFile(src, containerId, target, rootDir, perm, uid, gid)
 }
@@ -329,6 +352,10 @@ func (o *OverlayFsStorage) PrepareContainer(id, sharedDir string) (*hypervisor.C
 	}, nil
 }
 
+func (o *OverlayFsStorage) CleanupContainer(id, sharedDir string) error {
+	return syscall.Unmount(path.Join(sharedDir, id, "rootfs"), 0)
+}
+
 func (o *OverlayFsStorage) InjectFile(src io.Reader, containerId, target, rootDir string, perm, uid, gid int) error {
 	return storage.FsInjectFile(src, containerId, target, rootDir, perm, uid, gid)
 }
@@ -384,6 +411,10 @@ func (v *VBoxStorage) PrepareContainer(id, sharedDir string) (*hypervisor.Contai
 		Image:   devFullName,
 		Fstype:  "ext4",
 	}, nil
+}
+
+func (v *VBoxStorage) CleanupContainer(id, sharedDir string) error {
+	return nil
 }
 
 func (v *VBoxStorage) InjectFile(src io.Reader, containerId, target, rootDir string, perm, uid, gid int) error {

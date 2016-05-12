@@ -386,7 +386,7 @@ func (daemon *Daemon) DestroyAllVm() error {
 		return nil
 	})
 	for _, p := range remains {
-		if _, _, err := daemon.StopPodWithinLock(p, "yes"); err != nil {
+		if _, _, err := daemon.StopPodWithinLock(p); err != nil {
 			glog.V(1).Infof("fail to stop %s: %v", p.id, err)
 		}
 	}

@@ -797,6 +797,29 @@ func (p *Pod) Prepare(daemon *Daemon) (err error) {
 	return nil
 }
 
+func (p *Pod) cleanupMountsAndFiles(sd Storage) {
+	sharedDir := path.Join(hypervisor.BaseDir, p.vm.Id, hypervisor.ShareDirTag)
+
+	for i := range p.status.Containers {
+		mountId := p.ctnStartInfo[i].MountId
+		sd.CleanupContainer(mountId, sharedDir)
+	}
+}
+
+func (p *Pod) cleanupVolumes(sd Storage) {
+	sharedDir := path.Join(hypervisor.BaseDir, p.vm.Id, hypervisor.ShareDirTag)
+
+	for _, v := range p.volumes {
+		CleanupExistingVolume(v.Fstype, v.Filepath, sharedDir)
+	}
+}
+
+func (p *Pod) Cleanup(daemon *Daemon) {
+	p.cleanupEtcHosts()
+	p.cleanupMountsAndFiles(daemon.Storage)
+	p.cleanupVolumes(daemon.Storage)
+}
+
 func stopLogger(mypod *hypervisor.PodStatus) {
 	for _, c := range mypod.Containers {
 		if c.Logs.Driver == nil {

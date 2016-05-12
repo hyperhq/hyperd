@@ -22,8 +22,9 @@ func (daemon *Daemon) PodStopped(podId string) {
 		return
 	}
 
-	pod.cleanupEtcHosts()
+	pod.Cleanup(daemon)
 	daemon.db.DeleteVMByPod(podId)
+
 	daemon.RemoveVm(pod.vm.Id)
 	pod.vm = nil
 
@@ -32,7 +33,7 @@ func (daemon *Daemon) PodStopped(podId string) {
 	}
 }
 
-func (daemon *Daemon) StopPod(podId, stopVm string) (int, string, error) {
+func (daemon *Daemon) StopPod(podId string) (int, string, error) {
 	glog.Infof("Prepare to stop the POD: %s", podId)
 	// find the vm id which running POD, and stop it
 	pod, ok := daemon.PodList.Get(podId)
@@ -47,10 +48,10 @@ func (daemon *Daemon) StopPod(podId, stopVm string) (int, string, error) {
 	}
 	defer pod.TransitionUnlock("stop")
 
-	return daemon.StopPodWithinLock(pod, stopVm)
+	return daemon.StopPodWithinLock(pod)
 }
 
-func (daemon *Daemon) StopPodWithinLock(pod *Pod, stopVm string) (int, string, error) {
+func (daemon *Daemon) StopPodWithinLock(pod *Pod) (int, string, error) {
 	// we need to set the 'RestartPolicy' of the pod to 'never' if stop command is invoked
 	// for kubernetes
 	if pod.status.Type == "kubernetes" {
@@ -69,7 +70,7 @@ func (daemon *Daemon) StopPodWithinLock(pod *Pod, stopVm string) (int, string, e
 		return -1, "", fmt.Errorf("Pod %s is not in running state, cannot be stopped", pod.id)
 	}
 
-	vmResponse := pod.vm.StopPod(pod.status, stopVm)
+	vmResponse := pod.vm.StopPod(pod.status)
 
 	return vmResponse.Code, vmResponse.Cause, nil
 }
