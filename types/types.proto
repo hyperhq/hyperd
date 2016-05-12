@@ -213,7 +213,25 @@ message ImageListRequest {
 }
 
 message ImageListResponse {
-    repeated ImageInfo imageList = 1;
+  repeated ImageInfo imageList = 1;
+}
+
+message VMCreateRequest {
+  int32 cpu     = 1;
+  int32 memory  = 2;
+}
+
+message VMCreateResponse {
+  string vmID = 1;
+}
+
+message VMRemoveRequest {
+  string vmID = 1;
+}
+
+message VMRemoveResponse {
+  int32 code    = 1;
+  string cause  = 2;
 }
 
 // PublicAPI defines the public APIs which are handled over TCP sockets.
@@ -235,6 +253,10 @@ service PublicAPI {
 
     // VMList implements GET /list?item=vm
     rpc VMList(VMListRequest) returns (VMListResponse) {}
+    // VMCreate implements POST /vm/create
+    rpc VMCreate(VMCreateRequest) returns (VMCreateResponse) {}
+    // VMRemove implements DELETE /vm
+    rpc VMRemove(VMRemoveRequest) returns (VMRemoveResponse) {}
 
     // TODO: implements  GET    /pod/stats
     // TODO: implements  POST   /pod/labels
@@ -270,7 +292,4 @@ service PublicAPI {
     // TODO: implements  GET    /info
     // TODO: implements  GET    /version
     // TODO: implements  POST   /auth
-
-    // TODO: implements  POST   /vm/create
-    // TODO: implements  DELETE /vm
 }
