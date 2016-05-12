@@ -2,6 +2,8 @@ package daemon
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/golang/glog"
 	"github.com/hyperhq/runv/hypervisor/types"
 )
@@ -31,6 +33,26 @@ func (daemon *Daemon) PodStopped(podId string) {
 	if pod.status.Status == types.S_POD_NONE {
 		daemon.RemovePodResource(pod)
 	}
+}
+
+func (daemon *Daemon) PodWait(podId string) {
+	// find the vm id which running POD, and stop it
+	pod, ok := daemon.PodList.Get(podId)
+	if !ok {
+		glog.Errorf("Can not find pod(%s)", podId)
+		return
+	}
+
+	// wait until PodStopped() was called
+	for {
+		pod.Lock()
+		if pod.vm == nil {
+			break
+		}
+		pod.Unlock()
+		time.Sleep(100 * time.Millisecond)
+	}
+	pod.Unlock()
 }
 
 func (daemon *Daemon) StopPod(podId string) (int, string, error) {
