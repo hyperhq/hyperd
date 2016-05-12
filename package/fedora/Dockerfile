@@ -1,5 +1,5 @@
 FROM fedora
-MAINTAINER Xu Wang <xu@hyper.sh>
+MAINTAINER Hyper Developers <dev@hyper.sh>
 
 # RPM Build Environment
 RUN dnf install -y patch git fedora-packager rpmdevtools
