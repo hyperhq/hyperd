@@ -572,6 +572,15 @@ message PodUnpauseRequest {
 
 message PodUnpauseResponse {}
 
+message PodLabelsRequest{
+  string podId               = 1;
+  bool override              = 2;
+  map<string, string> labels = 3;
+}
+
+message PodLabelsResponse{
+}
+
 // PublicAPI defines the public APIs which are handled over TCP sockets.
 service PublicAPI {
     // PodList gets a list of pods
@@ -609,6 +618,12 @@ service PublicAPI {
     rpc VMCreate(VMCreateRequest) returns (VMCreateResponse) {}
     // VMRemove deletes a HyperVM by vmID
     rpc VMRemove(VMRemoveRequest) returns (VMRemoveResponse) {}
+
+    // PodLabels implements  POST   /pod/labels
+    rpc PodLabels(PodLabelsRequest) returns (PodLabelsResponse) {}
+
+    // TODO: implements  GET    /pod/stats
+    // GetPodStats returns `interface{}` instead of `hyperhq/runv/hypervisor/types/stats.go`, needs refactoring
 
     // ContainerLogs gets the log of specified container
     rpc ContainerLogs(ContainerLogsRequest) returns (stream ContainerLogsResponse) {}

@@ -103,6 +103,8 @@ It has these top-level messages:
 	PodPauseResponse
 	PodUnpauseRequest
 	PodUnpauseResponse
+	PodLabelsRequest
+	PodLabelsResponse
 */
 package types
 
@@ -1456,6 +1458,30 @@ func (m *PodUnpauseResponse) Reset()         { *m = PodUnpauseResponse{} }
 func (m *PodUnpauseResponse) String() string { return proto.CompactTextString(m) }
 func (*PodUnpauseResponse) ProtoMessage()    {}
 
+type PodLabelsRequest struct {
+	PodId    string            `protobuf:"bytes,1,opt,name=podId,proto3" json:"podId,omitempty"`
+	Override bool              `protobuf:"varint,2,opt,name=override,proto3" json:"override,omitempty"`
+	Labels   map[string]string `protobuf:"bytes,3,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+}
+
+func (m *PodLabelsRequest) Reset()         { *m = PodLabelsRequest{} }
+func (m *PodLabelsRequest) String() string { return proto.CompactTextString(m) }
+func (*PodLabelsRequest) ProtoMessage()    {}
+
+func (m *PodLabelsRequest) GetLabels() map[string]string {
+	if m != nil {
+		return m.Labels
+	}
+	return nil
+}
+
+type PodLabelsResponse struct {
+}
+
+func (m *PodLabelsResponse) Reset()         { *m = PodLabelsResponse{} }
+func (m *PodLabelsResponse) String() string { return proto.CompactTextString(m) }
+func (*PodLabelsResponse) ProtoMessage()    {}
+
 func init() {
 	proto.RegisterType((*ContainerPort)(nil), "types.ContainerPort")
 	proto.RegisterType((*EnvironmentVar)(nil), "types.EnvironmentVar")
@@ -1551,6 +1577,8 @@ func init() {
 	proto.RegisterType((*PodPauseResponse)(nil), "types.PodPauseResponse")
 	proto.RegisterType((*PodUnpauseRequest)(nil), "types.PodUnpauseRequest")
 	proto.RegisterType((*PodUnpauseResponse)(nil), "types.PodUnpauseResponse")
+	proto.RegisterType((*PodLabelsRequest)(nil), "types.PodLabelsRequest")
+	proto.RegisterType((*PodLabelsResponse)(nil), "types.PodLabelsResponse")
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -1590,6 +1618,8 @@ type PublicAPIClient interface {
 	VMCreate(ctx context.Context, in *VMCreateRequest, opts ...grpc.CallOption) (*VMCreateResponse, error)
 	// VMRemove deletes a HyperVM by vmID
 	VMRemove(ctx context.Context, in *VMRemoveRequest, opts ...grpc.CallOption) (*VMRemoveResponse, error)
+	// PodLabels implements  POST   /pod/labels
+	PodLabels(ctx context.Context, in *PodLabelsRequest, opts ...grpc.CallOption) (*PodLabelsResponse, error)
 	// ContainerLogs gets the log of specified container
 	ContainerLogs(ctx context.Context, in *ContainerLogsRequest, opts ...grpc.CallOption) (PublicAPI_ContainerLogsClient, error)
 	// ContainerCreate creates a container in specified pod
@@ -1786,6 +1816,15 @@ func (c *publicAPIClient) VMCreate(ctx context.Context, in *VMCreateRequest, opt
 func (c *publicAPIClient) VMRemove(ctx context.Context, in *VMRemoveRequest, opts ...grpc.CallOption) (*VMRemoveResponse, error) {
 	out := new(VMRemoveResponse)
 	err := grpc.Invoke(ctx, "/types.PublicAPI/VMRemove", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *publicAPIClient) PodLabels(ctx context.Context, in *PodLabelsRequest, opts ...grpc.CallOption) (*PodLabelsResponse, error) {
+	out := new(PodLabelsResponse)
+	err := grpc.Invoke(ctx, "/types.PublicAPI/PodLabels", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2073,6 +2112,8 @@ type PublicAPIServer interface {
 	VMCreate(context.Context, *VMCreateRequest) (*VMCreateResponse, error)
 	// VMRemove deletes a HyperVM by vmID
 	VMRemove(context.Context, *VMRemoveRequest) (*VMRemoveResponse, error)
+	// PodLabels implements  POST   /pod/labels
+	PodLabels(context.Context, *PodLabelsRequest) (*PodLabelsResponse, error)
 	// ContainerLogs gets the log of specified container
 	ContainerLogs(*ContainerLogsRequest, PublicAPI_ContainerLogsServer) error
 	// ContainerCreate creates a container in specified pod
@@ -2302,6 +2343,18 @@ func _PublicAPI_VMRemove_Handler(srv interface{}, ctx context.Context, dec func(
 		return nil, err
 	}
 	out, err := srv.(PublicAPIServer).VMRemove(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func _PublicAPI_PodLabels_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
+	in := new(PodLabelsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	out, err := srv.(PublicAPIServer).PodLabels(ctx, in)
 	if err != nil {
 		return nil, err
 	}
@@ -2602,6 +2655,10 @@ var _PublicAPI_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "VMRemove",
 			Handler:    _PublicAPI_VMRemove_Handler,
+		},
+		{
+			MethodName: "PodLabels",
+			Handler:    _PublicAPI_PodLabels_Handler,
 		},
 		{
 			MethodName: "ContainerCreate",
