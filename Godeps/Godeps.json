@@ -1419,6 +1419,11 @@
 			"Rev": "dd828651e45229541896bc41cd9cf2f89ac7002a"
 		},
 		{
+			"ImportPath": "gopkg.in/check.v1",
+			"Comment": "v1",
+			"Rev": "4f90aeace3a26ad7021961c297b22c42160c7b25"
+		},
+		{
 			"ImportPath": "gopkg.in/fsnotify.v1",
 			"Comment": "v1.2.0",
 			"Rev": "96c060f6a6b7e0d6f75fddd10efeaca3e5d1bcb0"
