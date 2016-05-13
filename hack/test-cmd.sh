@@ -119,6 +119,7 @@ Kernel=${KERNEL_PATH}
 Initrd=${INITRD_PATH}
 StorageDriver=${stordriver}
 Hypervisor=${execdriver}
+gRPCHost=0.0.0.0:22318
 __EOF__
   fi
 
@@ -137,6 +138,11 @@ __EOF__
   #######################
   # API status check    #
   #######################
+
+  ########################
+  # gRPC API integration #
+  ########################
+  hyper::test::integration
 
   ######################
   # Image management   #
