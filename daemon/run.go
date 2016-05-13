@@ -6,14 +6,14 @@ import (
 	"io"
 	"strings"
 
+	"github.com/golang/glog"
+	apitypes "github.com/hyperhq/hyperd/types"
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/pod"
 	"github.com/hyperhq/runv/hypervisor/types"
-
-	"github.com/golang/glog"
 )
 
-func (daemon *Daemon) CreatePod(podId, podArgs string) (*Pod, error) {
+func (daemon *Daemon) CreatePod(podId string, podSpec *apitypes.UserPod) (*Pod, error) {
 	// we can only support 1024 Pods
 	if daemon.GetRunningPodNum() > 1024 {
 		return nil, fmt.Errorf("Pod full, the maximum Pod is 1024!")
@@ -23,7 +23,7 @@ func (daemon *Daemon) CreatePod(podId, podArgs string) (*Pod, error) {
 		podId = fmt.Sprintf("pod-%s", pod.RandStr(10, "alpha"))
 	}
 
-	p, err := daemon.createPodInternal(podId, podArgs, false)
+	p, err := daemon.createPodInternal(podId, podSpec, false)
 	if err != nil {
 		return nil, err
 	}
@@ -41,10 +41,10 @@ func (daemon *Daemon) CreatePod(podId, podArgs string) (*Pod, error) {
 	return p, nil
 }
 
-func (daemon *Daemon) createPodInternal(podId, podArgs string, withinLock bool) (*Pod, error) {
-	glog.V(2).Infof("podArgs: %s", podArgs)
+func (daemon *Daemon) createPodInternal(podId string, podSpec *apitypes.UserPod, withinLock bool) (*Pod, error) {
+	glog.V(2).Infof("podArgs: %s", podSpec.String())
 
-	pod, err := NewPod([]byte(podArgs), podId, daemon)
+	pod, err := NewPod(podSpec, podId, daemon)
 	if err != nil {
 		return nil, err
 	}
@@ -109,12 +109,12 @@ func (daemon *Daemon) StartPod(stdin io.ReadCloser, stdout io.WriteCloser, podId
 
 func (daemon *Daemon) StartInternal(p *Pod, vmId string, config interface{}, lazy bool, streams []*hypervisor.TtyIO) (int, string, error) {
 	if !p.TransitionLock("start") {
-		return -1, "", fmt.Errorf("The pod(%s) is operting by others, please retry later", p.id)
+		return -1, "", fmt.Errorf("The pod(%s) is operting by others, please retry later", p.Id)
 	}
 	defer p.TransitionUnlock("start")
 
 	if p.vm != nil {
-		return -1, "", fmt.Errorf("pod %s is already running", p.id)
+		return -1, "", fmt.Errorf("pod %s is already running", p.Id)
 	}
 
 	vmResponse, err := p.Start(daemon, vmId, lazy, streams)
@@ -142,8 +142,14 @@ func (daemon *Daemon) RestartPod(mypod *hypervisor.PodStatus) error {
 	}
 	var lazy bool = hypervisor.HDriver.SupportLazyMode()
 
+	var podSpec apitypes.UserPod
+	err = json.Unmarshal(podData, &podSpec)
+	if err != nil {
+		return err
+	}
+
 	// Start the pod
-	pnew, err := daemon.CreatePod(pod.id, string(podData))
+	pnew, err := daemon.CreatePod(pod.Id, &podSpec)
 	if err != nil {
 		glog.Errorf(err.Error())
 		return err
@@ -195,7 +201,7 @@ func (daemon *Daemon) SetPodLabels(podId string, override bool, labels map[strin
 		return err
 	}
 
-	if err := daemon.db.UpdatePod(pod.id, spec); err != nil {
+	if err := daemon.db.UpdatePod(pod.Id, spec); err != nil {
 		return err
 	}
 

@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -19,6 +20,7 @@ import (
 	"github.com/docker/docker/pkg/parsers/kernel"
 	"github.com/docker/docker/registry"
 	"github.com/golang/glog"
+	apitypes "github.com/hyperhq/hyperd/types"
 	"github.com/hyperhq/hyperd/utils"
 	"github.com/hyperhq/runv/factory"
 	"github.com/hyperhq/runv/hypervisor"
@@ -79,7 +81,13 @@ func (daemon *Daemon) Restore() error {
 
 		daemon.db.DeletePod(podId)
 
-		p, err := daemon.createPodInternal(podId, string(item.V), true)
+		var podSpec apitypes.UserPod
+		err := json.Unmarshal(item.V, &podSpec)
+		if err != nil {
+			return err
+		}
+
+		p, err := daemon.createPodInternal(podId, &podSpec, true)
 		if err != nil {
 			glog.Warningf("Got a unexpected error when creating(load) pod %s, %v", podId, err)
 			continue
@@ -87,7 +95,7 @@ func (daemon *Daemon) Restore() error {
 
 		if err = daemon.AddPod(p, string(item.V)); err != nil {
 			//TODO: remove the created
-			glog.Warningf("Got a error duriong insert pod %s, %v", p.id, err)
+			glog.Warningf("Got a error duriong insert pod %s, %v", p.Id, err)
 			continue
 		}
 
@@ -105,8 +113,8 @@ func (daemon *Daemon) Restore() error {
 	if glog.V(3) {
 		glog.Infof("%d pod have been loaded", daemon.PodList.CountAll())
 		daemon.PodList.Foreach(func(p *Pod) error {
-			glog.Infof("container in pod %s status: %v", p.id, p.Status().Containers)
-			glog.Infof("container in pod %s spec: %v", p.id, p.spec.Containers)
+			glog.Infof("container in pod %s status: %v", p.Id, p.Status().Containers)
+			glog.Infof("container in pod %s spec: %v", p.Id, p.spec.Containers)
 			return nil
 		})
 	}
@@ -326,7 +334,7 @@ func (daemon *Daemon) GetVmByPodId(podId string) (string, error) {
 
 func (daemon *Daemon) GetPodByContainer(containerId string) (string, error) {
 	if pod, ok := daemon.PodList.GetByContainerId(containerId); ok {
-		return pod.id, nil
+		return pod.Id, nil
 	} else {
 		return "", fmt.Errorf("Can not find that container!")
 	}
@@ -342,24 +350,24 @@ func (daemon *Daemon) GetPodByContainerIdOrName(name string) (pod *Pod, idx int,
 
 func (daemon *Daemon) AddPod(pod *Pod, podArgs string) (err error) {
 	// store the UserPod into the db
-	if err = daemon.db.UpdatePod(pod.id, []byte(podArgs)); err != nil {
+	if err = daemon.db.UpdatePod(pod.Id, []byte(podArgs)); err != nil {
 		glog.V(1).Info("Found an error while saving the POD file")
 		return
 	}
 	defer func() {
 		if err != nil {
-			daemon.db.DeletePod(pod.id)
+			daemon.db.DeletePod(pod.Id)
 		}
 	}()
 
 	daemon.PodList.Put(pod)
 	defer func() {
 		if err != nil {
-			daemon.PodList.Delete(pod.id)
+			daemon.PodList.Delete(pod.Id)
 		}
 	}()
 
-	if err = daemon.WritePodAndContainers(pod.id); err != nil {
+	if err = daemon.WritePodAndContainers(pod.Id); err != nil {
 		glog.V(1).Info("Found an error while saving the Containers info")
 		return
 	}
@@ -387,7 +395,7 @@ func (daemon *Daemon) DestroyAllVm() error {
 	})
 	for _, p := range remains {
 		if _, _, err := daemon.StopPodWithinLock(p); err != nil {
-			glog.V(1).Infof("fail to stop %s: %v", p.id, err)
+			glog.V(1).Infof("fail to stop %s: %v", p.Id, err)
 		}
 	}
 	return nil

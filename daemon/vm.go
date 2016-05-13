@@ -53,7 +53,7 @@ func (daemon *Daemon) KillVm(vmId string) (int, string, error) {
 
 func (p *Pod) AssociateVm(daemon *Daemon, vmId string) error {
 	if p.vm != nil && p.vm.Id != vmId {
-		return fmt.Errorf("pod %s already has vm %s, but trying to associate with %s", p.id, p.vm.Id, vmId)
+		return fmt.Errorf("pod %s already has vm %s, but trying to associate with %s", p.Id, p.vm.Id, vmId)
 	} else if p.vm != nil {
 		return nil
 	}
@@ -62,7 +62,7 @@ func (p *Pod) AssociateVm(daemon *Daemon, vmId string) error {
 	if err != nil {
 		return err
 	}
-	glog.V(1).Infof("Get data for vm(%s) pod(%s)", vmId, p.id)
+	glog.V(1).Infof("Get data for vm(%s) pod(%s)", vmId, p.Id)
 
 	p.vm = daemon.NewVm(vmId, p.spec.Resource.Vcpu, p.spec.Resource.Memory, false)
 	p.status.Vm = vmId

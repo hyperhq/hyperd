@@ -283,7 +283,7 @@ func (daemon *Daemon) GetContainerInfo(name string) (types.ContainerInfo, error)
 		Tty:             pod.spec.Containers[i].Tty,
 		ImagePullPolicy: "",
 
-		PodID:  pod.id,
+		PodID:  pod.Id,
 		Status: &s,
 	}, nil
 }

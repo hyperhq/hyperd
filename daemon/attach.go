@@ -35,7 +35,7 @@ func (daemon *Daemon) Attach(stdin io.ReadCloser, stdout io.WriteCloser, key, id
 			return err
 		}
 
-		podId = pod.id
+		podId = pod.Id
 		pod.Lock()
 		pod.ttyList[tag] = tty
 		pod.Unlock()

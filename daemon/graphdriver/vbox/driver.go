@@ -1,6 +1,7 @@
 package vbox
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -11,6 +12,7 @@ import (
 	"github.com/docker/docker/pkg/idtools"
 	"github.com/golang/glog"
 	hyperdaemon "github.com/hyperhq/hyperd/daemon"
+	apitypes "github.com/hyperhq/hyperd/types"
 	"github.com/hyperhq/hyperd/utils"
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/types"
@@ -339,7 +341,13 @@ func (d *Driver) VmMountLayer(id string) error {
 	podId := fmt.Sprintf("pull-%s", utils.RandStr(10, "alpha"))
 	vmId := fmt.Sprintf("%s-%s", d.pullVm, utils.RandStr(10, "alpha"))
 
-	p, err := daemon.CreatePod(podId, podstring)
+	var podSpec apitypes.UserPod
+	err = json.Unmarshal([]byte(podstring), &podSpec)
+	if err != nil {
+		return err
+	}
+
+	p, err := daemon.CreatePod(podId, &podSpec)
 	if err != nil {
 		glog.Errorf("can not create pod %s", podstring)
 		return err

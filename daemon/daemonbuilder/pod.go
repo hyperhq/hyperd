@@ -1,6 +1,7 @@
 package daemonbuilder
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -18,6 +19,7 @@ import (
 	"github.com/docker/engine-api/types"
 	containertypes "github.com/docker/engine-api/types/container"
 	"github.com/golang/glog"
+	apitypes "github.com/hyperhq/hyperd/types"
 	"github.com/hyperhq/hyperd/utils"
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/pod"
@@ -261,7 +263,13 @@ func (d Docker) ContainerCreate(params types.ContainerCreateConfig) (types.Conta
 		return types.ContainerCreateResponse{}, err
 	}
 
-	pod, err := d.Daemon.CreatePod(podId, podString)
+	var podSpec apitypes.UserPod
+	err = json.Unmarshal([]byte(podString), &podSpec)
+	if err != nil {
+		return types.ContainerCreateResponse{}, err
+	}
+
+	pod, err := d.Daemon.CreatePod(podId, &podSpec)
 	if err != nil {
 		return types.ContainerCreateResponse{}, err
 	}

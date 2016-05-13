@@ -38,13 +38,13 @@ func (pl *PodList) Put(p *Pod) {
 	if pl.pods == nil {
 		pl.pods = make(map[string]*Pod)
 	}
-	pl.pods[p.id] = p
+	pl.pods[p.Id] = p
 
 	if pl.containers == nil {
 		pl.containers = make(map[string]string)
 	}
 	for _, c := range p.status.Containers {
-		pl.containers[c.Id] = p.id
+		pl.containers[c.Id] = p.Id
 	}
 }
 
@@ -93,7 +93,7 @@ func (pl *PodList) GetByContainerId(cid string) (*Pod, bool) {
 	})
 
 	if pod != nil {
-		pl.containers[cid] = pod.id
+		pl.containers[cid] = pod.Id
 		return pod, true
 	}
 	return nil, false
