@@ -139,11 +139,6 @@ __EOF__
   # API status check    #
   #######################
 
-  ########################
-  # gRPC API integration #
-  ########################
-  hyper::test::integration
-
   ######################
   # Image management   #
   ######################
@@ -159,6 +154,11 @@ __EOF__
 
   hyper::test::pull_image "haproxy:1.4"
   hyper::test::check_image "haproxy" "1.4"
+
+  ########################
+  # gRPC API integration #
+  ########################
+  hyper::test::integration
 
   ###########################
   # POD creation / deletion #
