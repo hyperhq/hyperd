@@ -366,6 +366,34 @@ func (s *TestSuite) TestStartAndStopPod(c *C) {
 	c.Assert(err, IsNil)
 }
 
+func (s *TestSuite) TestSetPodLabels(c *C) {
+	spec := types.UserPod{
+		Id: "busybox",
+		Containers: []*types.UserContainer{
+			{
+				Image: "busybox",
+			},
+		},
+	}
+
+	podID, err := s.client.CreatePod(&spec)
+	c.Assert(err, IsNil)
+	c.Logf("Pod created: %s", podID)
+
+	err = s.client.SetPodLabels(podID, true, map[string]string{"foo": "bar"})
+	c.Assert(err, IsNil)
+
+	info, err := s.client.GetPodInfo(podID)
+	c.Assert(err, IsNil)
+
+	if value, ok := info.Spec.Labels["foo"]; !ok || value != "bar" {
+		c.Errorf("Expect labels: %v, but got: %v", map[string]string{"foo": "bar"}, info.Spec.Labels)
+	}
+
+	err = s.client.RemovePod(podID)
+	c.Assert(err, IsNil)
+}
+
 func (s *TestSuite) TestPauseAndUnpausePod(c *C) {
 	spec := types.UserPod{
 		Id: "busybox",
@@ -403,4 +431,39 @@ func (s *TestSuite) TestPauseAndUnpausePod(c *C) {
 
 	err = s.client.RemovePod(pod)
 	c.Assert(err, IsNil)
+}
+
+func (s *TestSuite) TestGetPodStats(c *C) {
+	info, err := s.client.Info()
+	c.Assert(err, IsNil)
+
+	// pod stats only working for libvirt.
+	if info.ExecutionDriver != "libvirt" {
+		c.Skip("Pod stats test is skipped because execdriver is not libvirt")
+	}
+
+	spec := types.UserPod{
+		Id: "busybox",
+		Containers: []*types.UserContainer{
+			{
+				Image: "busybox",
+			},
+		},
+	}
+	podID, err := s.client.CreatePod(&spec)
+	c.Assert(err, IsNil)
+
+	defer func() {
+		err = s.client.RemovePod(podID)
+		c.Assert(err, IsNil)
+	}()
+
+	err = s.client.StartPod(podID, "", "")
+	c.Assert(err, IsNil)
+
+	stats, err := s.client.GetPodStats(podID)
+	c.Assert(err, IsNil)
+	c.Logf("Got Pod Stats %+v", stats)
+	c.Assert(stats.Cpu, NotNil)
+	c.Assert(stats.Timestamp, NotNil)
 }

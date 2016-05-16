@@ -534,6 +534,20 @@ func (c *HyperClient) ListService(podID string) ([]*types.UserService, error) {
 	return resp.Services, nil
 }
 
+// GetPodStats get stats of Pod by podID
+func (c *HyperClient) GetPodStats(podID string) (*types.PodStats, error) {
+	statsResponse, err := c.client.PodStats(
+		c.ctx,
+		&types.PodStatsRequest{PodID: podID},
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return statsResponse.PodStats, nil
+}
+
 // AddService adds user service by podID and service content
 func (c *HyperClient) AddService(podID string, services []*types.UserService) error {
 	_, err := c.client.ServiceAdd(
@@ -554,10 +568,37 @@ func (c *HyperClient) UpdateService(podID string, services []*types.UserService)
 		c.ctx,
 		&types.ServiceUpdateRequest{PodID: podID, Services: services},
 	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// SetPodLabels sets labels to Pod by podID
+func (c *HyperClient) SetPodLabels(podID string, override bool, labels map[string]string) error {
+	_, err := c.client.SetPodLabels(
+		c.ctx,
+		&types.PodLabelsRequest{PodID: podID, Override: override, Labels: labels},
+	)
 
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+// Info gets system info of hyperd
+func (c *HyperClient) Info() (*types.InfoResponse, error) {
+	info, err := c.client.Info(
+		c.ctx,
+		&types.InfoRequest{},
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return info, nil
 }
