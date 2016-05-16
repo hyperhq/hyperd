@@ -18,12 +18,15 @@ before_install:
   - cd lvm2-2_02_131
   - ./configure && make device-mapper && sudo make install
 
-script:
+# override the default `install`, otherwise default `install` will export ${TRAVIS_BUILD_DIR}/Godeps/_workspace as GOPATH
+# see https://docs.travis-ci.com/user/languages/go#Dependency-Management
+
+install:
   - cd ${TRAVIS_BUILD_DIR}
   - hack/install-grpc.sh
   - hack/verify-gofmt.sh
   - hack/verify-generated-proto.sh
-  - ./autogen.sh
-  - ./configure
-  - make
-  - hack/test-cmd.sh
+  - ./autogen.sh && ./configure && make
+
+script:
+  - cd ${TRAVIS_BUILD_DIR} && hack/test-cmd.sh
