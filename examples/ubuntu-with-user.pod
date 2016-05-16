@@ -1,0 +1,21 @@
+{
+	"id": "test-container-create-ubuntu",
+	"containers" : [{
+	    "name": "ubuntu-user-nobody",
+	    "image": "ubuntu:latest",
+	    "user": {
+		"name": "nobody",
+		"group": "13",
+		"additionalGroups":["cdrom", "8"]
+	    },
+	    "workdir": "/",
+	    "command": ["/usr/bin/id"]
+	}],
+	"resource": {
+	    "vcpu": 1,
+	    "memory": 512
+	},
+	"files": [],
+	"volumes": [],
+	"tty": true
+}

@@ -365,6 +365,7 @@ func (p *Pod) parseContainerJsons(daemon *Daemon, jsons []*dockertypes.Container
 		}
 
 		ci.Id = info.ID
+		ci.User = info.Config.User
 		ci.MountId = mountId
 		ci.Workdir = info.Config.WorkingDir
 		ci.Cmd = append([]string{info.Path}, info.Args...)
@@ -720,6 +721,7 @@ func (p *Pod) setupMountsAndFiles(sd Storage) (err error) {
 		}
 
 		ci.Id = c.Id
+		ci.User = p.ctnStartInfo[i].User
 		ci.Initialize = p.ctnStartInfo[i].Initialize
 		ci.Cmd = p.ctnStartInfo[i].Cmd
 		ci.Envs = p.ctnStartInfo[i].Envs

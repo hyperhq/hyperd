@@ -48,7 +48,6 @@ _testmain.go
 /hyperctl
 /hyperd
 *.out
-examples/*
 *.pkg
 mac_installer/dist/opt/hyper/bin/hyperctl
 mac_installer/dist/opt/hyper/bin/hyperd
