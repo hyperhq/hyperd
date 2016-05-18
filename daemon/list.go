@@ -60,24 +60,24 @@ func (daemon *Daemon) List(item, podId, vmId string, auxiliary bool) (map[string
 		if podId == "" && vmId == "" {
 			daemon.PodList.Foreach(func(p *Pod) error {
 				if p.status.Status != types.S_POD_NONE {
-					podJsonResponse = append(podJsonResponse, p.id+":"+showPod(p.status))
+					podJsonResponse = append(podJsonResponse, p.Id+":"+showPod(p.status))
 				}
 				return nil
 			})
 		} else if podId != "" && vmId == "" {
 			if pod.status.Status != types.S_POD_NONE {
-				podJsonResponse = append(podJsonResponse, pod.id+":"+showPod(pod.status))
+				podJsonResponse = append(podJsonResponse, pod.Id+":"+showPod(pod.status))
 			}
 		} else if podId == "" && vmId != "" {
 			daemon.PodList.Foreach(func(p *Pod) error {
 				if p.status.Vm == vmId && p.status.Status != types.S_POD_NONE {
-					podJsonResponse = append(podJsonResponse, p.id+":"+showPod(p.status))
+					podJsonResponse = append(podJsonResponse, p.Id+":"+showPod(p.status))
 				}
 				return nil
 			})
 		} else {
 			if pod.status.Vm == vmId && pod.status.Status != types.S_POD_NONE {
-				podJsonResponse = append(podJsonResponse, pod.id+":"+showPod(pod.status))
+				podJsonResponse = append(podJsonResponse, pod.Id+":"+showPod(pod.status))
 			}
 		}
 		list["podData"] = podJsonResponse

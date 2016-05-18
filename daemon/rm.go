@@ -48,21 +48,21 @@ func (p *Pod) ShouldWaitCleanUp() bool {
 
 func (daemon *Daemon) RemovePodResource(p *Pod) {
 	if p.ShouldWaitCleanUp() {
-		glog.V(3).Infof("pod %s should wait clean up before being purged", p.id)
+		glog.V(3).Infof("pod %s should wait clean up before being purged", p.Id)
 		p.status.Status = types.S_POD_NONE
 		return
 	}
-	glog.V(3).Infof("pod %s is being purged", p.id)
+	glog.V(3).Infof("pod %s is being purged", p.Id)
 
-	os.RemoveAll(path.Join(utils.HYPER_ROOT, "services", p.id))
-	os.RemoveAll(path.Join(utils.HYPER_ROOT, "hosts", p.id))
+	os.RemoveAll(path.Join(utils.HYPER_ROOT, "services", p.Id))
+	os.RemoveAll(path.Join(utils.HYPER_ROOT, "hosts", p.Id))
 
 	if p.status.Type != "kubernetes" {
 		daemon.RemovePodContainer(p)
 	}
-	daemon.DeleteVolumeId(p.id)
-	daemon.db.DeletePod(p.id)
-	daemon.RemovePod(p.id)
+	daemon.DeleteVolumeId(p.Id)
+	daemon.db.DeletePod(p.Id)
+	daemon.RemovePod(p.Id)
 }
 
 func (daemon *Daemon) RemovePodContainer(p *Pod) {
@@ -72,5 +72,5 @@ func (daemon *Daemon) RemovePodContainer(p *Pod) {
 			glog.Warningf("Error to rm container: %s", err.Error())
 		}
 	}
-	daemon.db.DeleteP2C(p.id)
+	daemon.db.DeleteP2C(p.Id)
 }

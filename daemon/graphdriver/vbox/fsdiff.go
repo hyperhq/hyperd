@@ -1,6 +1,7 @@
 package vbox
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -12,6 +13,7 @@ import (
 	"github.com/docker/docker/pkg/chrootarchive"
 	"github.com/docker/docker/pkg/ioutils"
 	"github.com/golang/glog"
+	apitypes "github.com/hyperhq/hyperd/types"
 	"github.com/hyperhq/hyperd/utils"
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/types"
@@ -75,7 +77,13 @@ func (d *Driver) Diff(id, parent string) (diff archive.Archive, err error) {
 		return nil, err
 	}
 
-	p, err := daemon.CreatePod(podId, podData)
+	var podSpec apitypes.UserPod
+	err = json.Unmarshal([]byte(podData), &podSpec)
+	if err != nil {
+		return nil, err
+	}
+
+	p, err := daemon.CreatePod(podId, &podSpec)
 	if err != nil {
 		glog.Errorf("can not create pod %s", podData)
 		return nil, err

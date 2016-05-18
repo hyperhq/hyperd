@@ -119,6 +119,7 @@ Kernel=${KERNEL_PATH}
 Initrd=${INITRD_PATH}
 StorageDriver=${stordriver}
 Hypervisor=${execdriver}
+gRPCHost=0.0.0.0:22318
 __EOF__
   fi
 
@@ -153,6 +154,11 @@ __EOF__
 
   hyper::test::pull_image "haproxy:1.4"
   hyper::test::check_image "haproxy" "1.4"
+
+  ########################
+  # gRPC API integration #
+  ########################
+  hyper::test::integration
 
   ###########################
   # POD creation / deletion #

@@ -234,14 +234,138 @@ message VMRemoveResponse {
   string cause  = 2;
 }
 
+message UserContainerPort {
+  int32 hostPort      = 1;
+  int32 containerPort = 2;
+  int32 servicePort   = 3;
+  string protocol     = 4;
+}
+
+message UserVolumeReference {
+  string path   = 1;
+  string volume = 2;
+  bool readOnly = 3;
+}
+
+message UserFileReference {
+  string path     = 1;
+  string filename = 2;
+  string perm     = 3;
+  string user     = 4;
+  string group    = 5;
+}
+
+message UserContainer {
+  string name                           = 1;
+  string image                          = 2;
+  string workdir                        = 3;
+  string restartPolicy                  = 4;
+  bool tty                              = 5;
+  map<string, string> sysctl            = 6;
+  repeated EnvironmentVar envs          = 7;
+  repeated string command               = 8;
+  repeated string entrypoint            = 9;
+  repeated UserContainerPort ports      = 10;
+  repeated UserVolumeReference volumes  = 11;
+  repeated UserFileReference files      = 12;
+}
+
+message UserResource {
+  int32 vcpu    = 1;
+  int32 memory  = 2;
+}
+
+message UserFile {
+  string name     = 1;
+  string encoding = 2;
+  string uri      = 3;
+  string content  = 4;
+}
+
+message UserVolumeOption {
+  string user               = 1;
+  string keyring            = 2;
+  repeated string monitors  = 3;
+}
+
+message UserVolume {
+  string name             = 1;
+  string source           = 2;
+  string driver           = 3;
+  UserVolumeOption option = 4;
+}
+
+message UserInterface {
+  string bridge = 1;
+  string ip     = 2;
+  string ifname = 3;
+  string mac    = 4;
+  string gateway  = 5;
+}
+
+message UserServiceBackend {
+  string hostip   = 1;
+  int32 hostport  = 2;
+}
+
+message UserService {
+  string serviceip                  = 1;
+  string protocol                   = 2;
+  int32 serviceport                 = 3;
+  repeated UserServiceBackend hosts = 4;
+}
+
+message PodLogConfig {
+  string type                 = 1;
+  map<string, string> config  = 2;
+}
+
+message UserPod {
+  // TODO: rename this to name (renaming will also change restful API)
+  string id                         = 1;
+  string hostname                   = 2;
+  string type                       = 3;
+  string restartPolicy              = 4;
+  bool tty                          = 5;
+  map<string, string> labels        = 6;
+  UserResource resource             = 7;
+  PodLogConfig log                  = 8;
+  repeated string dns               = 9;
+  repeated UserContainer containers = 10;
+  repeated UserFile files           = 11;
+  repeated UserVolume volumes       = 12;
+  repeated UserInterface interfaces = 13;
+  repeated UserService services     = 14;
+}
+
+message PodCreateRequest {
+  UserPod podSpec = 1;
+  string podID    = 2;
+}
+
+message PodCreateResponse {
+  string podID = 1;
+}
+
+message PodRemoveRequest {
+  string podID = 1;
+}
+
+message PodRemoveResponse {
+  int32 code    = 1;
+  string cause  = 2;
+}
+
 // PublicAPI defines the public APIs which are handled over TCP sockets.
 service PublicAPI {
     // PodList implements GET /list?item=pod
     rpc PodList(PodListRequest) returns (PodListResponse) {}
-    // TODO: PodCreate implements POST /pod/create
-    // rpc PodCreate(PodCreateRequest) returns (PodCreateResponse) {}
+    // PodCreate implements POST /pod/create
+    rpc PodCreate(PodCreateRequest) returns (PodCreateResponse) {}
     // PodInfo implements GET /pod/info
     rpc PodInfo(PodInfoRequest) returns (PodInfoResponse) {}
+    // PodRemove implements  DELETE /pod
+    rpc PodRemove(PodRemoveRequest) returns (PodRemoveResponse) {}
 
     // ContainerList implements GET /list?item=container
     rpc ContainerList(ContainerListRequest) returns (ContainerListResponse) {}
@@ -265,7 +389,7 @@ service PublicAPI {
     // TODO: implements  POST   /pod/kill
     // TODO: implements  POST   /pod/pause
     // TODO: implements  POST   /pod/unpause
-    // TODO: implements  DELETE /pod
+
 
     // TODO: implements  GET    /container/logs
     // TODO: implements  POST   /container/create

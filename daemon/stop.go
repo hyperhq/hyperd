@@ -88,8 +88,8 @@ func (daemon *Daemon) StopPodWithinLock(pod *Pod) (int, string, error) {
 	}
 
 	if pod.status.Status != types.S_POD_RUNNING {
-		glog.Errorf("Pod %s is not in running state, cannot be stopped", pod.id)
-		return -1, "", fmt.Errorf("Pod %s is not in running state, cannot be stopped", pod.id)
+		glog.Errorf("Pod %s is not in running state, cannot be stopped", pod.Id)
+		return -1, "", fmt.Errorf("Pod %s is not in running state, cannot be stopped", pod.Id)
 	}
 
 	vmResponse := pod.vm.StopPod(pod.status)

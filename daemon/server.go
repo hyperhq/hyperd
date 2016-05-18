@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/hyperhq/hyperd/engine"
 	"github.com/hyperhq/hyperd/lib/sysinfo"
+	apitypes "github.com/hyperhq/hyperd/types"
 	"github.com/hyperhq/hyperd/utils"
 	"github.com/hyperhq/runv/hypervisor/pod"
 )
@@ -199,13 +201,19 @@ func (daemon *Daemon) CmdStartPod(stdin io.ReadCloser, stdout io.WriteCloser, po
 
 //FIXME: there was a `config` argument passed by docker/builder, but we never processed it.
 func (daemon *Daemon) CmdCreatePod(podArgs string, autoremove bool) (*engine.Env, error) {
-	p, err := daemon.CreatePod("", podArgs)
+	var podSpec apitypes.UserPod
+	err := json.Unmarshal([]byte(podArgs), &podSpec)
+	if err != nil {
+		return nil, err
+	}
+
+	p, err := daemon.CreatePod("", &podSpec)
 	if err != nil {
 		return nil, err
 	}
 
 	v := &engine.Env{}
-	v.Set("ID", p.id)
+	v.Set("ID", p.Id)
 	v.SetInt("Code", 0)
 	v.Set("Cause", "")
 

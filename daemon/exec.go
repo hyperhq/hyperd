@@ -69,7 +69,7 @@ func (daemon *Daemon) Exec(stdin io.ReadCloser, stdout io.WriteCloser, key, id, 
 			}
 		}()
 
-		vmId, err = daemon.GetVmByPodId(pod.id)
+		vmId, err = daemon.GetVmByPodId(pod.Id)
 		if err != nil {
 			return err
 		}
