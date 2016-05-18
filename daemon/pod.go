@@ -378,9 +378,7 @@ func (p *Pod) parseContainerJsons(daemon *Daemon, jsons []*dockertypes.Container
 		env := make(map[string]string)
 		for _, v := range info.Config.Env {
 			pair := strings.SplitN(v, "=", 2)
-			if len(pair) < 2 {
-				env[pair[0]] = ""
-			} else {
+			if len(pair) == 2 && pair[1] != "" {
 				env[pair[0]] = pair[1]
 			}
 		}
