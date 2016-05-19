@@ -67,6 +67,20 @@ func (s *TestSuite) TestGetContainerInfo(c *C) {
 	c.Logf("Got ContainerInfo %v", info)
 }
 
+func (s *TestSuite) TestGetContainerLogs(c *C) {
+	containerList, err := s.client.GetContainerList(true)
+	c.Assert(err, IsNil)
+	c.Logf("Got ContainerList %v", containerList)
+
+	if len(containerList) == 0 {
+		return
+	}
+
+	logs, err := s.client.GetContainerLogs(containerList[0].ContainerID)
+	c.Assert(err, IsNil)
+	c.Logf("Got ContainerLogs %v", logs)
+}
+
 func (s *TestSuite) TestGetPodInfo(c *C) {
 	podList, err := s.client.GetPodList()
 	c.Assert(err, IsNil)

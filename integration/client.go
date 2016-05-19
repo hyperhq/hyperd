@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"io"
 	"time"
 
 	"github.com/hyperhq/hyperd/types"
@@ -98,6 +99,43 @@ func (c *HyperClient) GetContainerInfo(container string) (*types.ContainerInfo, 
 	}
 
 	return cinfo.ContainerInfo, nil
+}
+
+// GetContainerLogs gets container log by container name or id
+func (c *HyperClient) GetContainerLogs(container string) ([]byte, error) {
+	req := types.ContainerLogsRequest{
+		Container:  container,
+		Follow:     false,
+		Timestamps: false,
+		Tail:       "",
+		Since:      "",
+		Stdout:     true,
+		Stderr:     true,
+	}
+	stream, err := c.client.ContainerLogs(
+		c.ctx,
+		&req,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	ret := []byte{}
+	for {
+		res, err := stream.Recv()
+		if err == io.EOF {
+			if req.Follow == true {
+				continue
+			}
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		ret = append(ret, res.Log...)
+	}
+
+	return ret, nil
 }
 
 // GetImageList gets a list of images
