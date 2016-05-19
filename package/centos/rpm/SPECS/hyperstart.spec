@@ -1,6 +1,6 @@
 Summary:            Hyperstart is the initrd for hyper VM
 Name:               hyperstart
-Version:            %VERSION%
+Version:            0.6
 Release:            1%{?dist}
 License:            Apache License, Version 2.0
 Group:              System Environment/Base
@@ -8,8 +8,6 @@ Group:              System Environment/Base
 # following commands to generate the tarball:
 #  git archive --format=tar.gz master > hyperstart-%{version}.tar.gz
 Source0:            %{name}-%{version}.tar.gz
-#  git archive --format=tar.gz master > qboot.tar.gz
-Source1:            qboot.tar.gz
 URL:                https://hyper.sh/
 ExclusiveArch:      x86_64
 
@@ -21,24 +19,17 @@ image.
 %prep
 mkdir -p %{_builddir}/src/github.com/hyperhq/hyperstart
 tar -C %{_builddir}/src/github.com/hyperhq/hyperstart -xvf %SOURCE0
-mkdir -p %{_builddir}/src/qboot
-tar -C %{_builddir}/src/qboot -xvf %SOURCE1
 
 %build
 cd %{_builddir}/src/github.com/hyperhq/hyperstart
 ./autogen.sh
 ./configure
 make %{?_smp_mflags}
-make cbfs
-cd %{_builddir}/src/qboot
-make
 
 %install
 mkdir -p %{buildroot}%{_sharedstatedir}/hyper
 cp %{_builddir}/src/github.com/hyperhq/hyperstart/build/kernel %{buildroot}%{_sharedstatedir}/hyper/
 cp %{_builddir}/src/github.com/hyperhq/hyperstart/build/hyper-initrd.img %{buildroot}%{_sharedstatedir}/hyper/
-cp %{_builddir}/src/github.com/hyperhq/hyperstart/build/cbfs.rom %{buildroot}%{_sharedstatedir}/hyper/cbfs-qboot.rom
-cp %{_builddir}/src/qboot/bios.bin %{buildroot}%{_sharedstatedir}/hyper/bios-qboot.bin
 
 %clean
 rm -rf %{buildroot}
@@ -47,6 +38,12 @@ rm -rf %{buildroot}
 %{_sharedstatedir}/*
 
 %changelog
+* Thu Apr 28 2016 Xu Wang <xu@hyper.sh> - 0.6-1
+- update source to 0.6
+- kernel update to 4.4.7, and will modules provided
+- volume population support
+- tty processing improvement
+- many other fix and improvement
 * Sat Jan 30 2016 Xu Wang <xu@hyper.sh> - 0.5-1
 - update source to 0.5
 * Fri Jan 29 2016 Xu Wang <xu@hyper.sh> - 0.4-2
