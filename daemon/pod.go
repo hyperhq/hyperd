@@ -1184,10 +1184,23 @@ func (p *Pod) Start(daemon *Daemon, vmId string, lazy bool, streams []*hyperviso
 	// now start, the pod handler will deal with the vm
 	preparing = false
 
-	vmResponse := p.vm.StartPod(p.status, p.spec, p.ctnStartInfo, p.volumes)
+	// Do not pass container spec to StartPod
+	containers := p.spec.Containers
+	p.spec.Containers = nil
+	vmResponse := p.vm.StartPod(p.status, p.spec, nil, p.volumes)
+	p.spec.Containers = containers
 	if vmResponse.Data == nil {
 		err = fmt.Errorf("VM %s start failed with code %d: %s", vmResponse.VmId, vmResponse.Code, vmResponse.Cause)
 		return vmResponse, err
+	}
+
+	for _, cInfo := range p.ctnStartInfo {
+		var cUser pod.UserContainer
+		err := p.vm.NewContainer(&cUser, cInfo)
+		if err != nil {
+			glog.Error(err.Error())
+			return nil, err
+		}
 	}
 
 	err = daemon.db.UpdateVM(p.vm.Id, vmResponse.Data.([]byte))
