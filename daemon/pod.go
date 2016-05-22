@@ -1196,7 +1196,7 @@ func (p *Pod) Start(daemon *Daemon, vmId string, lazy bool, streams []*hyperviso
 
 	for _, cInfo := range p.ctnStartInfo {
 		var cUser pod.UserContainer
-		err := p.vm.NewContainer(&cUser, cInfo)
+		_, err := p.vm.NewContainer(&cUser, cInfo)
 		if err != nil {
 			glog.Error(err.Error())
 			return nil, err
