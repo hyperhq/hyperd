@@ -1202,6 +1202,8 @@ func (p *Pod) Start(daemon *Daemon, vmId string, lazy bool, streams []*hyperviso
 			return nil, err
 		}
 	}
+	// Set the container status to online
+	p.status.SetContainerStatus(types.S_POD_RUNNING)
 
 	err = daemon.db.UpdateVM(p.vm.Id, vmResponse.Data.([]byte))
 	if err != nil {
