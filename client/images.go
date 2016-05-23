@@ -30,6 +30,9 @@ func (cli *HyperClient) HyperCmdImages(args ...string) error {
 	}
 
 	remoteInfo, err := cli.client.GetImages(opts.All, opts.Quiet)
+	if err != nil {
+		return err
+	}
 
 	var (
 		imagesList = []string{}
