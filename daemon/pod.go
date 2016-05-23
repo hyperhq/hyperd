@@ -1231,6 +1231,11 @@ func hyperHandlePodEvent(vmResponse *types.VmResponse, data interface{},
 		mypod.SetPodContainerStatus(vmResponse.Data.([]uint32))
 		vm.Status = types.S_VM_IDLE
 		return false
+	case types.E_CONTAINER_FINISHED:
+		result := vmResponse.Data.(*hypervisor.ContainerFinished)
+		mypod.ContainerCode[result.Idx] = result.Code
+		glog.V(1).Infof("Container %d finished with %d", result.Idx, result.Code)
+		return false
 	case types.E_VM_SHUTDOWN: // vm exited, sucessful or not
 		if mypod.Status == types.S_POD_RUNNING { // not received finished pod before
 			stopLogger(mypod)
