@@ -74,6 +74,8 @@ func (daemon *Daemon) GetContainerLogs(container string, config *ContainerLogsCo
 	logs := logReader.ReadLogs(readConfig)
 	for {
 		select {
+		case <-config.Stop:
+			return nil
 		case e := <-logs.Err:
 			glog.Errorf("Error streaming logs: %v", e)
 			return nil

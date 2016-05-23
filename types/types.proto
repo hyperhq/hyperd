@@ -356,6 +356,20 @@ message PodRemoveResponse {
   string cause  = 2;
 }
 
+message ContainerLogsRequest {
+  string  container   = 1;
+  bool    follow      = 2;
+  bool    timestamps  = 3;
+  string  tail        = 4;
+  string  since       = 5;  
+  bool    stdout      = 6;
+  bool    stderr      = 7;
+}
+
+message ContainerLogsResponse {
+  bytes log = 1;
+}
+
 // PublicAPI defines the public APIs which are handled over TCP sockets.
 service PublicAPI {
     // PodList implements GET /list?item=pod
@@ -391,7 +405,8 @@ service PublicAPI {
     // TODO: implements  POST   /pod/unpause
 
 
-    // TODO: implements  GET    /container/logs
+    // ContainerLogs implements  GET  /container/logs
+    rpc ContainerLogs(ContainerLogsRequest) returns (stream ContainerLogsResponse) {}
     // TODO: implements  POST   /container/create
     // TODO: implements  POST   /container/rename
     // TODO: implements  POST   /container/commit
