@@ -225,9 +225,17 @@ func (d Docker) ContainerWait(cId string, timeout time.Duration) (int, error) {
 		return -1, fmt.Errorf("no vm is running")
 	}
 
-	podId, isCopyPod := d.hyper.CopyPods[cId]
-	podId, isBasicPod := d.hyper.BasicPods[cId]
-	if !isCopyPod && !isBasicPod {
+	var podId string
+
+	copyId, isCopyPod := d.hyper.CopyPods[cId]
+	basicId, isBasicPod := d.hyper.BasicPods[cId]
+
+	switch {
+	case isCopyPod:
+		podId = copyId
+	case isBasicPod:
+		podId = basicId
+	default:
 		return -1, fmt.Errorf("container %s doesn't belong to pod", cId)
 	}
 
