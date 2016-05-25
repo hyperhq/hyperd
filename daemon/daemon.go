@@ -11,7 +11,6 @@ import (
 
 	"github.com/hyperhq/hyperd/daemon/daemondb"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/Unknwon/goconfig"
 	docker "github.com/docker/docker/daemon"
 	"github.com/docker/docker/daemon/logger/jsonfilelog"
@@ -19,6 +18,7 @@ import (
 	flag "github.com/docker/docker/pkg/mflag"
 	"github.com/docker/docker/pkg/parsers/kernel"
 	"github.com/docker/docker/registry"
+	dockerutils "github.com/docker/docker/utils"
 	"github.com/golang/glog"
 	apitypes "github.com/hyperhq/hyperd/types"
 	"github.com/hyperhq/hyperd/utils"
@@ -240,7 +240,7 @@ func InitDockerCfg(mirrors []string, insecureRegistries []string, graphdriver, r
 
 	// debug mode
 	if glog.V(3) {
-		logrus.SetLevel(logrus.DebugLevel)
+		dockerutils.EnableDebug()
 	}
 
 	registryOpts := &registry.Options{
