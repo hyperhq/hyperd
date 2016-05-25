@@ -39,7 +39,7 @@ make
 %{_datadir}/qemu/linuxboot.bin
 
 %changelog
-* Fri Jan 29 2016 Xu Wang <xu@hyper.sh> - 2.4.1-2
+* Fri Jan 29 2016 Hyper Dev Team <dev@hyper.sh> - 2.4.1-2
 - Include virtio firmware
 - Include librbd dependency
 * Wed Dec 2 2015 Xu Wang <xu@hyper.sh> - 2.4.1-1
