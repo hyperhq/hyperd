@@ -19,20 +19,9 @@ func (daemon *Daemon) PodStopped(podId string) {
 	pod.Lock()
 	defer pod.Unlock()
 
-	pod.status.Vm = ""
-	if pod.vm == nil {
-		return
-	}
+	daemon.RemoveVm(pod.vm.Id)
 
 	pod.Cleanup(daemon)
-	daemon.db.DeleteVMByPod(podId)
-
-	daemon.RemoveVm(pod.vm.Id)
-	pod.vm = nil
-
-	if pod.status.Status == types.S_POD_NONE {
-		daemon.RemovePodResource(pod)
-	}
 }
 
 func (daemon *Daemon) PodWait(podId string) {

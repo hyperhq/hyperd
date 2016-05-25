@@ -293,15 +293,6 @@ func (p *Pod) SetVM(id string, vm *hypervisor.Vm) {
 	p.vm = vm
 }
 
-func (p *Pod) KillVM(daemon *Daemon) {
-	p.Lock()
-	defer p.Unlock()
-	if p.vm != nil {
-		daemon.KillVm(p.vm.Id)
-		p.vm = nil
-	}
-}
-
 func (p *Pod) Status() *hypervisor.PodStatus {
 	return p.status
 }
@@ -988,27 +979,38 @@ func (p *Pod) Prepare(daemon *Daemon) (err error) {
 	return nil
 }
 
-func (p *Pod) cleanupMountsAndFiles(sd Storage) {
-	sharedDir := path.Join(hypervisor.BaseDir, p.vm.Id, hypervisor.ShareDirTag)
-
+func (p *Pod) cleanupMountsAndFiles(sd Storage, sharedDir string) {
 	for i := range p.status.Containers {
 		mountId := p.ctnStartInfo[i].MountId
 		sd.CleanupContainer(mountId, sharedDir)
 	}
 }
 
-func (p *Pod) cleanupVolumes(sd Storage) {
-	sharedDir := path.Join(hypervisor.BaseDir, p.vm.Id, hypervisor.ShareDirTag)
-
+func (p *Pod) cleanupVolumes(sd Storage, sharedDir string) {
 	for _, v := range p.volumes {
 		CleanupExistingVolume(v.Fstype, v.Filepath, sharedDir)
 	}
 }
 
 func (p *Pod) Cleanup(daemon *Daemon) {
+	p.status.Vm = ""
+
+	if p.vm == nil {
+		return
+	}
+
+	sharedDir := path.Join(hypervisor.BaseDir, p.vm.Id, hypervisor.ShareDirTag)
+	p.vm = nil
+
+	daemon.db.DeleteVMByPod(p.Id)
+
+	p.cleanupVolumes(daemon.Storage, sharedDir)
+	p.cleanupMountsAndFiles(daemon.Storage, sharedDir)
 	p.cleanupEtcHosts()
-	p.cleanupMountsAndFiles(daemon.Storage)
-	p.cleanupVolumes(daemon.Storage)
+
+	if p.status.Status == types.S_POD_NONE {
+		daemon.RemovePodResource(p)
+	}
 }
 
 func stopLogger(mypod *hypervisor.PodStatus) {
@@ -1159,8 +1161,15 @@ func (p *Pod) Start(daemon *Daemon, vmId string, lazy bool, streams []*hyperviso
 	}
 
 	defer func() {
-		if err != nil && preparing && vmId == "" {
-			p.KillVM(daemon)
+		if err != nil && preparing {
+			id := p.vm.Id
+			p.Lock()
+			p.Cleanup(daemon)
+			p.Unlock()
+
+			if vmId == "" {
+				daemon.KillVm(id)
+			}
 		}
 	}()
 
