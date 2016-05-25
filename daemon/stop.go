@@ -16,6 +16,8 @@ func (daemon *Daemon) PodStopped(podId string) {
 		return
 	}
 
+	defer pod.wg.Done()
+
 	pod.Lock()
 	defer pod.Unlock()
 
@@ -81,18 +83,20 @@ func (daemon *Daemon) StopPodWithinLock(pod *Pod) (int, string, error) {
 	}
 
 	pod.Lock()
-	defer pod.Unlock()
 
 	if pod.vm == nil {
+		pod.Unlock()
 		return types.E_VM_SHUTDOWN, "", nil
 	}
 
 	if pod.status.Status != types.S_POD_RUNNING {
+		pod.Unlock()
 		glog.Errorf("Pod %s is not in running state, cannot be stopped", pod.Id)
 		return -1, "", fmt.Errorf("Pod %s is not in running state, cannot be stopped", pod.Id)
 	}
 
 	vmResponse := pod.vm.StopPod(pod.status)
-
+	pod.Unlock()
+	pod.wg.Wait()
 	return vmResponse.Code, vmResponse.Cause, nil
 }
