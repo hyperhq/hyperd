@@ -59,8 +59,6 @@ package/centos/rpm/SOURCES/*
 package/centos/rpm/RPMS/*
 package/centos/rpm/SRPMS/*
 package/centos/centos-rpm.pod
-package/centos/rpm/SPECS/hyper.spec
-package/centos/rpm/SPECS/hyperstart.spec
 package/fedora/rpm/BUILD/*
 package/fedora/rpm/BUILDROOT/*
 package/fedora/rpm/SOURCES/*
