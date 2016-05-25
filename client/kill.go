@@ -26,7 +26,7 @@ func (cli *HyperClient) HyperCmdKill(args ...string) error {
 	}
 
 	if len(args) == 0 {
-		return fmt.Errorf("\"kill\" requires a minimum of 1 argument, please provide VM ID.\n")
+		return fmt.Errorf("\"kill\" requires a minimum of 1 argument, please provide container ID.\n")
 	}
 
 	sig := 9
@@ -40,11 +40,15 @@ func (cli *HyperClient) HyperCmdKill(args ...string) error {
 
 	for i := range args {
 		if opts.Pod {
-			err := cli.client.KillPod(args[i], sig)
-			fmt.Fprintf(cli.err, "failed to delete pod %s: %v", args[i], err)
+			err = cli.client.KillPod(args[i], sig)
+			if err != nil {
+				fmt.Fprintf(cli.err, "failed to kill pod %s: %v", args[i], err)
+			}
 		} else {
-			err := cli.client.KillContainer(args[i], sig)
-			fmt.Fprintf(cli.err, "failed to delete container %s: %v", args[i], err)
+			err = cli.client.KillContainer(args[i], sig)
+			if err != nil {
+				fmt.Fprintf(cli.err, "failed to kill container %s: %v", args[i], err)
+			}
 		}
 	}
 
