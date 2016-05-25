@@ -1,6 +1,6 @@
 Summary:            Hyper is a VM based docker runtime
-Name:               hyper
-Version:            0.5
+Name:               hyper-container
+Version:            0.6
 Release:            1%{?dist}
 License:            Apache License, Version 2.0
 Group:              System Environment/Base
@@ -23,13 +23,13 @@ Hyper is a VM based docker engine, it start a container image in
 VM without a full guest OS
 
 %prep
-mkdir -p %{_builddir}/src/github.com/hyperhq/hyper
+mkdir -p %{_builddir}/src/github.com/hyperhq/hyperd
 mkdir -p %{_builddir}/src/github.com/hyperhq/runv
-tar -C %{_builddir}/src/github.com/hyperhq/hyper -xvf %SOURCE0
+tar -C %{_builddir}/src/github.com/hyperhq/hyperd -xvf %SOURCE0
 tar -C %{_builddir}/src/github.com/hyperhq/runv -xvf %SOURCE1
 
 %build
-cd %{_builddir}/src/github.com/hyperhq/hyper
+cd %{_builddir}/src/github.com/hyperhq/hyperd
 export GOPATH=%{_builddir}
 ./autogen.sh
 ./configure
@@ -39,9 +39,9 @@ make %{?_smp_mflags}
 mkdir -p %{buildroot}%{_bindir}
 mkdir -p %{buildroot}%{_sysconfdir}
 mkdir -p %{buildroot}/lib/systemd/system/
-cp %{_builddir}/src/github.com/hyperhq/hyper/{hyperctl,hyperd} %{buildroot}%{_bindir}
-cp -a %{_builddir}/src/github.com/hyperhq/hyper/package/dist/etc/hyper %{buildroot}%{_sysconfdir}
-cp -a %{_builddir}/src/github.com/hyperhq/hyper/package/dist/lib/systemd/system/hyperd.service %{buildroot}/lib/systemd/system/hyperd.service
+cp %{_builddir}/src/github.com/hyperhq/hyperd/{hyperctl,hyperd} %{buildroot}%{_bindir}
+cp -a %{_builddir}/src/github.com/hyperhq/hyperd/package/dist/etc/hyper %{buildroot}%{_sysconfdir}
+cp -a %{_builddir}/src/github.com/hyperhq/hyperd/package/dist/lib/systemd/system/hyperd.service %{buildroot}/lib/systemd/system/hyperd.service
 
 %clean
 rm -rf %{buildroot}
@@ -52,6 +52,8 @@ rm -rf %{buildroot}
 /lib/systemd/system/hyperd.service
 
 %changelog
+* Wed May 25 2016 Hyper Dev Team <dev@hyper.sh> - 0.6-1
+- update source to 0.6
 * Sat Jan 30 2016 Xu Wang <xu@hyper.sh> - 0.5-1
 - update source to 0.5
 - add libvirt dependency
