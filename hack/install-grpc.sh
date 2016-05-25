@@ -9,8 +9,8 @@ fi
 
 # Install protoc
 cd /tmp
-curl -sSL https://github.com/google/protobuf/releases/download/v3.0.0-beta-2/protoc-3.0.0-beta-2-linux-x86_64.zip -o protoc-3.0.0-beta-2-linux-x86_64.zip
-unzip protoc-3.0.0-beta-2-linux-x86_64.zip
+curl -sSL https://github.com/google/protobuf/releases/download/v3.0.0-beta-3/protoc-3.0.0-beta-3-linux-x86_64.zip -o protoc-3.0.0-beta-3-linux-x86_64.zip
+unzip protoc-3.0.0-beta-3-linux-x86_64.zip
 sudo mv protoc /usr/bin/protoc
 
 # Install protoc-gen-go
