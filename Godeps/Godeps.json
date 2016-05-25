@@ -1,7 +1,7 @@
 {
 	"ImportPath": "github.com/hyperhq/hyperd",
 	"GoVersion": "go1.5",
-	"GodepVersion": "v62",
+	"GodepVersion": "v71",
 	"Deps": [
 		{
 			"ImportPath": "github.com/Azure/go-ansiterm",
@@ -1086,7 +1086,7 @@
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/proto",
-			"Rev": "2ebff28ac76fb19e2d25e5ddd4885708dfdd5611"
+			"Rev": "9e6977f30c91c78396e719e164e57f9287fff42c"
 		},
 		{
 			"ImportPath": "github.com/golang/snappy",
