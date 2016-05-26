@@ -41,6 +41,21 @@ func (c *HyperClient) GetPodInfo(podID string) (*types.PodInfo, error) {
 	return pod.PodInfo, nil
 }
 
+// Wait gets exitcode by container and processId
+func (c *HyperClient) Wait(container, processId string, noHang bool) (int32, error) {
+	request := types.WaitRequest{
+		Container: container,
+		ProcessId: processId,
+		NoHang:    noHang,
+	}
+	response, err := c.client.Wait(c.ctx, &request)
+	if err != nil {
+		return -1, err
+	}
+
+	return response.ExitCode, nil
+}
+
 // GetPodList get a list of Pods
 func (c *HyperClient) GetPodList() ([]*types.PodListResult, error) {
 	request := types.PodListRequest{}
