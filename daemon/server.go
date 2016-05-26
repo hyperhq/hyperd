@@ -95,24 +95,28 @@ func (daemon *Daemon) CmdExitCode(container, tag string) (int, error) {
 	return daemon.ExitCode(container, tag)
 }
 
-func (daemon *Daemon) CmdSystemInfo() (*engine.Env, error) {
+func (daemon *Daemon) CmdSystemInfo() (*apitypes.InfoResponse, error) {
 	sys, err := daemon.Daemon.SystemInfo()
 	if err != nil {
 		return nil, err
 	}
 
 	var num = daemon.PodList.CountContainers()
-	v := &engine.Env{}
-	v.Set("ID", daemon.ID)
-	v.SetInt("Containers", int(num))
-	v.SetInt("Images", sys.Images)
-	v.Set("Driver", sys.Driver)
-	v.SetJson("DriverStatus", sys.DriverStatus)
-	v.Set("DockerRootDir", sys.DockerRootDir)
-	v.Set("IndexServerAddress", sys.IndexServerAddress)
-	v.Set("ExecutionDriver", daemon.Hypervisor)
+	info := &apitypes.InfoResponse{
+		ID:                 daemon.ID,
+		Containers:         int32(num),
+		Images:             int32(sys.Images),
+		Driver:             sys.Driver,
+		DockerRootDir:      sys.DockerRootDir,
+		IndexServerAddress: sys.IndexServerAddress,
+		ExecutionDriver:    daemon.Hypervisor,
+	}
 
-	// Get system infomation
+	for _, driverStatus := range sys.DriverStatus {
+		info.Dstatus = append(info.Dstatus, &apitypes.DriverStatus{Name: driverStatus[0], Status: driverStatus[1]})
+	}
+
+	//Get system infomation
 	meminfo, err := sysinfo.GetMemInfo()
 	if err != nil {
 		return nil, err
@@ -121,14 +125,15 @@ func (daemon *Daemon) CmdSystemInfo() (*engine.Env, error) {
 	if err != nil {
 		return nil, err
 	}
-	v.SetInt64("MemTotal", int64(meminfo.MemTotal))
-	v.SetInt64("Pods", daemon.GetPodNum())
-	v.Set("Operating System", osinfo.PrettyName)
+
+	info.MemTotal = int64(meminfo.MemTotal)
+	info.Pods = daemon.GetPodNum()
+	info.OperatingSystem = osinfo.PrettyName
 	if hostname, err := os.Hostname(); err == nil {
-		v.SetJson("Name", hostname)
+		info.Name = hostname
 	}
 
-	return v, nil
+	return info, nil
 }
 
 func (daemon *Daemon) CmdSystemVersion() *engine.Env {

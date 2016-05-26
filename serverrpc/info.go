@@ -35,3 +35,14 @@ func (s *ServerRPC) ContainerInfo(c context.Context, req *types.ContainerInfoReq
 		ContainerInfo: &info,
 	}, nil
 }
+
+// Info gets CmdSystemInfo
+func (s *ServerRPC) Info(c context.Context, req *types.InfoRequest) (*types.InfoResponse, error) {
+	info, err := s.daemon.CmdSystemInfo()
+	if err != nil {
+		glog.Errorf("CmdSystemInfo error: %v", err)
+		return nil, err
+	}
+
+	return info, nil
+}

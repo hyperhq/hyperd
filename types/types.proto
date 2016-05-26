@@ -370,6 +370,29 @@ message ContainerLogsResponse {
   bytes log = 1;
 }
 
+message DriverStatus {
+  string name     = 1;
+  string status   = 2;
+}
+
+message InfoRequest {
+}
+
+message InfoResponse {
+  string  ID                      = 1;
+  int32   containers              = 2;
+  int32   images                  = 3;
+  string  driver                  = 4;
+  repeated DriverStatus  dstatus  = 5;
+  string  dockerRootDir           = 6;
+  string  indexServerAddress      = 7;
+  string  executionDriver         = 8;
+  int64   memTotal                = 9;
+  int64   pods                    = 10;
+  string  operatingSystem         = 11;
+  string  name                    = 12;
+}
+
 // PublicAPI defines the public APIs which are handled over TCP sockets.
 service PublicAPI {
     // PodList implements GET /list?item=pod
@@ -428,7 +451,8 @@ service PublicAPI {
     // TODO: implements  POST   /image/build
 
     // TODO: implements  GET    /_ping
-    // TODO: implements  GET    /info
+    // Info implements  GET    /info
+    rpc Info(InfoRequest) returns (InfoResponse) {}
     // TODO: implements  GET    /version
     // TODO: implements  POST   /auth
 }
