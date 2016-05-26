@@ -128,6 +128,14 @@ func convertToRunvPodSpec(podSpec *apitypes.UserPod) (*pod.UserPod, error) {
 				RestartPolicy: v.RestartPolicy,
 			}
 
+			if v.User != nil {
+				container.User = pod.UserUser{
+					Name:             v.User.Name,
+					Group:            v.User.Group,
+					AdditionalGroups: v.User.AdditionalGroups,
+				}
+			}
+
 			if len(v.Ports) > 0 {
 				ports := make([]pod.UserContainerPort, 0, len(v.Ports))
 				for _, p := range v.Ports {

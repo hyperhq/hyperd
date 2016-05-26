@@ -255,6 +255,12 @@ message UserFileReference {
   string group    = 5;
 }
 
+message UserUser {
+  string name                       = 1;
+  string group                      = 2;
+  repeated string additionalGroups  = 3;
+}
+
 message UserContainer {
   string name                           = 1;
   string image                          = 2;
@@ -268,6 +274,7 @@ message UserContainer {
   repeated UserContainerPort ports      = 10;
   repeated UserVolumeReference volumes  = 11;
   repeated UserFileReference files      = 12;
+  UserUser user                         = 13;
 }
 
 message UserResource {
