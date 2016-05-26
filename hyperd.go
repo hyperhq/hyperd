@@ -21,6 +21,7 @@ import (
 	"github.com/hyperhq/runv/factory"
 	"github.com/hyperhq/runv/hypervisor"
 
+	"github.com/docker/docker/pkg/parsers/kernel"
 	runvutils "github.com/hyperhq/runv/lib/utils"
 	"github.com/kardianos/osext"
 )
@@ -35,6 +36,17 @@ type Options struct {
 
 func main() {
 	if reexec.Init() {
+		return
+	}
+
+	if os.Geteuid() != 0 {
+		glog.Errorf("The Hyper daemon needs to be run as root")
+		return
+	}
+
+	// hyper needs Linux kernel 3.8.0+
+	if err := checkKernel(3, 8, 0); err != nil {
+		glog.Errorf(err.Error())
 		return
 	}
 
@@ -267,4 +279,23 @@ func mainDaemon(opt *Options) {
 	d.Factory.CloseFactory()
 	api.Close()
 	d.Shutdown()
+}
+
+func checkKernel(k, major, minor int) error {
+	leastVersionInfo := kernel.VersionInfo{
+		Kernel: k,
+		Major:  major,
+		Minor:  minor,
+	}
+
+	if v, err := kernel.GetKernelVersion(); err != nil {
+		return err
+	} else {
+		if kernel.CompareKernelVersion(*v, leastVersionInfo) < 0 {
+			msg := fmt.Sprintf("Your Linux kernel(%d.%d.%d) is too old to support Hyper daemon(%d.%d.%d+)",
+				v.Kernel, v.Major, v.Minor, k, major, minor)
+			return fmt.Errorf(msg)
+		}
+		return nil
+	}
 }
