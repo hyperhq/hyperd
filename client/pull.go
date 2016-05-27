@@ -52,6 +52,9 @@ func (cli *HyperClient) PullImage(imageName string) error {
 	}
 
 	body, ctype, _, err := cli.requestWithLogin(repoInfo.Index, pull, "pull")
+	if err != nil {
+		return err
+	}
 
 	return cli.readStreamOutput(body, ctype, cli.isTerminalOut, cli.out, cli.err)
 }
