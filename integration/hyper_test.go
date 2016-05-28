@@ -149,3 +149,20 @@ func (s *TestSuite) TestCreatePod(c *C) {
 	err = s.client.RemovePod(pod)
 	c.Assert(err, IsNil)
 }
+
+func (s *TestSuite) TestStartPod(c *C) {
+	podList, err := s.client.GetPodList()
+	c.Assert(err, IsNil)
+	c.Logf("Got PodList %v", podList)
+
+	if len(podList) == 0 {
+		return
+	}
+
+	err = s.client.StartPod(podList[0].PodID, "", "")
+	c.Assert(err, IsNil)
+
+	podInfo, err := s.client.GetPodInfo(podList[0].PodID)
+	c.Assert(err, IsNil)
+	c.Assert(podInfo.Status.Phase, Equals, "Running")
+}
