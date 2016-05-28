@@ -68,6 +68,9 @@ func (cli *HyperClient) HyperCmdPush(args ...string) error {
 	}
 
 	body, ctype, _, err := cli.requestWithLogin(repoInfo.Index, push, "push")
+	if err != nil {
+		return err
+	}
 
 	return cli.readStreamOutput(body, ctype, cli.isTerminalOut, cli.out, cli.err)
 }
