@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"fmt"
 	"io"
 	"time"
 
@@ -137,6 +138,39 @@ func (c *HyperClient) GetContainerLogs(container string) ([]byte, error) {
 	}
 
 	return ret, nil
+}
+
+// PostAttach attach to a container or pod by id
+func (c *HyperClient) PostAttach(id, tag string) error {
+	stream, err := c.client.Attach(c.ctx)
+	if err != nil {
+		return err
+	}
+
+	req := types.AttachMessage{
+		ContainerID: id,
+		Tag:         tag,
+	}
+	if err := stream.Send(&req); err != nil {
+		return err
+	}
+
+	cmd := types.AttachMessage{
+		Data: []byte("echo Hello Hyper\n"),
+	}
+	if err := stream.Send(&cmd); err != nil {
+		return err
+	}
+
+	res, err := stream.Recv()
+	if err != nil {
+		return err
+	}
+	if string(res.Data) != "Hello Hyper\n" {
+		return fmt.Errorf("post attach response error\n")
+	}
+
+	return nil
 }
 
 // GetImageList gets a list of images
