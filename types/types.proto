@@ -336,6 +336,7 @@ message UserPod {
   repeated UserVolume volumes       = 12;
   repeated UserInterface interfaces = 13;
   repeated UserService services     = 14;
+  repeated string whiteCIDRs        = 15;
 }
 
 message PodCreateRequest {

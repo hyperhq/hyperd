@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"os"
 	"path"
 	"path/filepath"
@@ -53,12 +54,24 @@ func convertToRunvPodSpec(podSpec *apitypes.UserPod) (*pod.UserPod, error) {
 		userPod.Name = utils.RandStr(10, "alphanum")
 	}
 
+	if len(podSpec.WhiteCIDRs) > 0 {
+		for _, cidr := range podSpec.WhiteCIDRs {
+			_, _, err := net.ParseCIDR(cidr)
+			if err != nil {
+				return nil, fmt.Errorf("WhiteCIDR %s format error", cidr)
+			}
+		}
+
+		userPod.WhiteCIDRs = podSpec.WhiteCIDRs
+	}
+
 	userPod.Hostname = podSpec.Hostname
 	userPod.Type = podSpec.Type
 	userPod.RestartPolicy = podSpec.RestartPolicy
 	userPod.Dns = podSpec.Dns
 	userPod.Tty = podSpec.Tty
 	userPod.Labels = podSpec.Labels
+
 	if podSpec.Labels == nil {
 		userPod.Labels = make(map[string]string)
 	}
