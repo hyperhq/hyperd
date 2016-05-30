@@ -82,5 +82,5 @@ Found a bug, want to suggest a feature, or have a question?
 [File an issue](https://github.com/hyperhq/hyperd/issues). When reporting a bug, please include which version of hyperd you are running, as shown by `hyperctl --version`.
 
 * Twitter: [@hyper_sh](https://twitter.com/hyper_sh)
-* Blog: [https://hyper.sh/blog.html](https://hyper.sh/blog.html)
+* Blog: [https://hyper.sh/blog.html](https://blog.hyper.sh/)
 * Slack: [#hyper](https://slack.hyper.sh/) (The IRC has been migrated to slack.)
