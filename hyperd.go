@@ -89,7 +89,7 @@ func printHelp() {
 Application Options:
   --nondaemon            Not daemonize
   --config=""            Configuration for %s
-  --v=0                  Log level fro V logs
+  --v=0                  Log level for V logs
   --log_dir              Log directory
   --host                 Host address and port for hyperd(such as --host=tcp://127.0.0.1:12345)
   --registry_mirror      Prefered docker registry mirror, multiple values separated by a comma
