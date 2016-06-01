@@ -4,6 +4,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/hyperhq/hyperd/lib/promise"
 	"github.com/hyperhq/hyperd/types"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -212,5 +213,73 @@ func (c *HyperClient) RemovePod(podID string) error {
 		return err
 	}
 
+	return nil
+}
+
+// ContainerExec exec a command in a container with input stream in and output stream out
+func (c *HyperClient) ContainerExec(container, tag string, command []string, tty bool, stdin io.ReadCloser, stdout, stderr io.Writer) error {
+	request := types.ContainerExecRequest{
+		ContainerID: container,
+		Command:     command,
+		Tag:         tag,
+		Tty:         tty,
+	}
+	stream, err := c.client.ContainerExec(context.Background())
+	if err != nil {
+		return err
+	}
+	if err := stream.Send(&request); err != nil {
+		return err
+	}
+	var recvStdoutError chan error
+	if stdout != nil || stderr != nil {
+		recvStdoutError = promise.Go(func() (err error) {
+			for {
+				in, err := stream.Recv()
+				if err != nil && err != io.EOF {
+					return err
+				}
+				if in != nil && in.Stdout != nil {
+					nw, ew := stdout.Write(in.Stdout)
+					if ew != nil {
+						return ew
+					}
+					if nw != len(in.Stdout) {
+						return io.ErrShortWrite
+					}
+				}
+				if err == io.EOF {
+					break
+				}
+			}
+			return nil
+		})
+	}
+	if stdin != nil {
+		go func() error {
+			defer stream.CloseSend()
+			buf := make([]byte, 32)
+			for {
+				nr, err := stdin.Read(buf)
+				if nr > 0 {
+					if err := stream.Send(&types.ContainerExecRequest{Stdin: buf[:nr]}); err != nil {
+						return err
+					}
+				}
+				if err == io.EOF {
+					break
+				}
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		}()
+	}
+	if stdout != nil || stderr != nil {
+		if err := <-recvStdoutError; err != nil {
+			return err
+		}
+	}
 	return nil
 }
