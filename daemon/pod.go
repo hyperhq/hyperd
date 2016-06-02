@@ -39,7 +39,6 @@ type Pod struct {
 	ctnStartInfo []*hypervisor.ContainerInfo
 	volumes      map[string]*hypervisor.VolumeInfo
 	ttyList      map[string]*hypervisor.TtyIO
-	wg           *sync.WaitGroup
 
 	transiting chan bool
 	sync.RWMutex
@@ -255,7 +254,6 @@ func NewPod(podSpec *apitypes.UserPod, id string, data interface{}) (*Pod, error
 		ttyList:    make(map[string]*hypervisor.TtyIO),
 		volumes:    make(map[string]*hypervisor.VolumeInfo),
 		transiting: make(chan bool, 1),
-		wg:         new(sync.WaitGroup),
 	}
 
 	// fill one element in transit chan, only one parallel op is allowed
@@ -1214,7 +1212,6 @@ func (p *Pod) Start(daemon *Daemon, vmId string, lazy bool, streams []*hyperviso
 		return vmResponse, err
 	}
 
-	p.wg.Add(1)
 	err = daemon.db.UpdateVM(p.vm.Id, vmResponse.Data.([]byte))
 	if err != nil {
 		glog.Error(err.Error())
