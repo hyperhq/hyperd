@@ -413,6 +413,16 @@ message PodStartMessage {
   bytes  data   = 4;
 }
 
+message WaitRequest{
+    string container = 1;
+    string processId = 2;
+    bool   noHang    = 3;
+}
+
+message WaitResponse{
+    int32 exitCode = 1;
+}
+
 // PublicAPI defines the public APIs which are handled over TCP sockets.
 service PublicAPI {
     // PodList implements GET /list?item=pod
@@ -459,7 +469,8 @@ service PublicAPI {
     rpc ContainerExec(stream ContainerExecRequest) returns (stream ContainerExecResponse) {}
     // TODO: implements  POST   /attach
     // TODO: implements  POST   /tty/resize
-    // TODO: implements  GET    /exitcode
+    // Wait implements  GET    /exitcode
+    rpc Wait(WaitRequest) returns (WaitResponse) {}
 
     // TODO: implements  GET    /service/list
     // TODO: implements  POST   /service/add
