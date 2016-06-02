@@ -317,3 +317,18 @@ func (c *HyperClient) StartPod(podID, vmID, tag string) error {
 
 	return nil
 }
+
+// Wait gets exitcode by container and processId
+func (c *HyperClient) Wait(container, processId string, noHang bool) (int32, error) {
+	request := types.WaitRequest{
+		Container: container,
+		ProcessId: processId,
+		NoHang:    noHang,
+	}
+	response, err := c.client.Wait(c.ctx, &request)
+	if err != nil {
+		return -1, err
+	}
+
+	return response.ExitCode, nil
+}
