@@ -394,6 +394,18 @@ message InfoResponse {
   string  name                    = 12;
 }
 
+message ContainerExecRequest{
+    string containerID      = 1;
+    repeated string command = 2;
+    string tag              = 3;
+    bool   tty              = 4;
+    bytes  stdin            = 5;
+}
+
+message ContainerExecResponse{
+    bytes stdout = 1;
+}
+
 // PublicAPI defines the public APIs which are handled over TCP sockets.
 service PublicAPI {
     // PodList implements GET /list?item=pod
@@ -435,7 +447,8 @@ service PublicAPI {
     // TODO: implements  POST   /container/rename
     // TODO: implements  POST   /container/commit
     // TODO: implements  POST   /container/kill
-    // TODO: implements  POST   /exec
+    // ContainerExec implements  POST   /exec
+    rpc ContainerExec(stream ContainerExecRequest) returns (stream ContainerExecResponse) {}
     // TODO: implements  POST   /attach
     // TODO: implements  POST   /tty/resize
     // TODO: implements  GET    /exitcode
