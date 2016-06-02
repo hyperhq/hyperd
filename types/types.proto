@@ -406,6 +406,13 @@ message ContainerExecResponse{
     bytes stdout = 1;
 }
 
+message PodStartMessage {
+  string podID  = 1;
+  string vmID   = 2;
+  string tag    = 3;
+  bytes  data   = 4;
+}
+
 // PublicAPI defines the public APIs which are handled over TCP sockets.
 service PublicAPI {
     // PodList implements GET /list?item=pod
@@ -434,7 +441,8 @@ service PublicAPI {
 
     // TODO: implements  GET    /pod/stats
     // TODO: implements  POST   /pod/labels
-    // TODO: implements  POST   /pod/start
+    // PodStart implements  POST   /pod/start
+    rpc PodStart(stream PodStartMessage) returns (stream PodStartMessage) {}
     // TODO: implements  POST   /pod/stop
     // TODO: implements  POST   /pod/kill
     // TODO: implements  POST   /pod/pause
