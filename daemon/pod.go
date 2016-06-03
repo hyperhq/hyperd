@@ -53,15 +53,37 @@ func convertToRunvPodSpec(podSpec *apitypes.UserPod) (*pod.UserPod, error) {
 		userPod.Name = utils.RandStr(10, "alphanum")
 	}
 
-	if len(podSpec.WhiteCIDRs) > 0 {
-		for _, cidr := range podSpec.WhiteCIDRs {
+	if podSpec.PortmappingWhiteLists != nil {
+		for _, cidr := range podSpec.PortmappingWhiteLists.ExternalNetworks {
 			_, _, err := net.ParseCIDR(cidr)
 			if err != nil {
-				return nil, fmt.Errorf("WhiteCIDR %s format error", cidr)
+				return nil, fmt.Errorf("PortmappingWhiteLists.ExternalNetwork %s format error", cidr)
+			}
+		}
+		filteredInternalNetworks := make([]string, 0)
+		for _, cidr := range podSpec.PortmappingWhiteLists.InternalNetworks {
+			_, _, err := net.ParseCIDR(cidr)
+			if err != nil {
+				return nil, fmt.Errorf("PortmappingWhiteLists.InternalNetworks %s format error", cidr)
+			}
+
+			// filter cidr out if the cidr is also in ExternalNetworks
+			found := false
+			for _, ext := range podSpec.PortmappingWhiteLists.ExternalNetworks {
+				if cidr == ext {
+					found = true
+					break
+				}
+			}
+			if !found {
+				filteredInternalNetworks = append(filteredInternalNetworks, cidr)
 			}
 		}
 
-		userPod.WhiteCIDRs = podSpec.WhiteCIDRs
+		userPod.PortmappingWhiteLists = &pod.PortmappingWhiteList{
+			InternalNetworks: filteredInternalNetworks,
+			ExternalNetworks: podSpec.PortmappingWhiteLists.ExternalNetworks,
+		}
 	}
 
 	userPod.Hostname = podSpec.Hostname

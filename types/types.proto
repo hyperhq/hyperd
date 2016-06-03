@@ -320,23 +320,32 @@ message PodLogConfig {
   map<string, string> config  = 2;
 }
 
+message PortmappingWhiteList {
+  // allowed internal networks in CIDR format for portmapping
+  // Those networks could visit all container ports if portmapping is enabled
+  repeated string internalNetworks = 1;
+  // allowed external networks in CIDR format for portmapping
+  // Those networks could only visit exposed ports if portmapping is enabled
+  repeated string externalNetworks = 2;
+}
+
 message UserPod {
   // TODO: rename this to name (renaming will also change restful API)
-  string id                         = 1;
-  string hostname                   = 2;
-  string type                       = 3;
-  string restartPolicy              = 4;
-  bool tty                          = 5;
-  map<string, string> labels        = 6;
-  UserResource resource             = 7;
-  PodLogConfig log                  = 8;
-  repeated string dns               = 9;
-  repeated UserContainer containers = 10;
-  repeated UserFile files           = 11;
-  repeated UserVolume volumes       = 12;
-  repeated UserInterface interfaces = 13;
-  repeated UserService services     = 14;
-  repeated string whiteCIDRs        = 15;
+  string id                                  = 1;
+  string hostname                            = 2;
+  string type                                = 3;
+  string restartPolicy                       = 4;
+  bool tty                                   = 5;
+  map<string, string> labels                 = 6;
+  UserResource resource                      = 7;
+  PodLogConfig log                           = 8;
+  repeated string dns                        = 9;
+  repeated UserContainer containers          = 10;
+  repeated UserFile files                    = 11;
+  repeated UserVolume volumes                = 12;
+  repeated UserInterface interfaces          = 13;
+  repeated UserService services              = 14;
+  PortmappingWhiteList portmappingWhiteLists = 15;
 }
 
 message PodCreateRequest {
