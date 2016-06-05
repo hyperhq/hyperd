@@ -166,15 +166,15 @@ func (daemon *Daemon) RestartPod(mypod *hypervisor.PodStatus) error {
 func (daemon *Daemon) SetPodLabels(podId string, override bool, labels map[string]string) error {
 
 	var pod *Pod
+	var ok bool
 	if strings.Contains(podId, "pod-") {
-		var ok bool
 		pod, ok = daemon.PodList.Get(podId)
 		if !ok {
 			return fmt.Errorf("Can not get Pod info with pod ID(%s)", podId)
 		}
 	} else {
-		pod = daemon.PodList.GetByName(podId)
-		if pod == nil {
+		pod, ok = daemon.PodList.GetByName(podId)
+		if !ok {
 			return fmt.Errorf("Can not get Pod info with pod name(%s)", podId)
 		}
 	}

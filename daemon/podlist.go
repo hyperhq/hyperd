@@ -59,16 +59,22 @@ func (pl *PodList) Delete(id string) {
 	delete(pl.pods, id)
 }
 
-func (pl *PodList) GetByName(name string) *Pod {
+func (pl *PodList) GetByName(name string) (*Pod, bool) {
 	pl.mu.RLock()
 	defer pl.mu.RUnlock()
 
-	return pl.findUnsafe(func(p *Pod) bool {
+	pod := pl.findUnsafe(func(p *Pod) bool {
 		if p.status.Name == name {
 			return true
 		}
 		return false
 	})
+
+	if pod != nil {
+		return pod, true
+	}
+
+	return nil, false
 }
 
 func (pl *PodList) GetByContainerId(cid string) (*Pod, bool) {
