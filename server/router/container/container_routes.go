@@ -3,6 +3,7 @@ package container
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"time"
 
@@ -108,19 +109,19 @@ func (c *containerRouter) postContainerCreate(ctx context.Context, w http.Respon
 		return err
 	}
 
-	imageName := r.Form.Get("imageName")
-	glog.V(1).Infof("Image name is %s", imageName)
+	podId := r.Form.Get("podId")
+	if podId == "" {
+		return fmt.Errorf("podId is required to create a new container")
+	}
 
-	config, hostConfig, _, err := runconfig.DecodeContainerConfig(r.Body)
+	containerArgs, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		return err
 	}
 
-	env, err := c.backend.CmdCreateContainer(types.ContainerCreateConfig{
-		Name:       imageName,
-		Config:     config,
-		HostConfig: hostConfig,
-	})
+	glog.V(1).Infof("Create container %s in pod %s", string(containerArgs), podId)
+
+	env, err := c.backend.CmdCreateContainer(podId, containerArgs)
 
 	if err != nil {
 		return err

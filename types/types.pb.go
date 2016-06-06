@@ -1241,45 +1241,45 @@ const _ = grpc.SupportPackageIsVersion2
 // Client API for PublicAPI service
 
 type PublicAPIClient interface {
-	// PodList implements GET /list?item=pod
+	// PodList gets a list of pods
 	PodList(ctx context.Context, in *PodListRequest, opts ...grpc.CallOption) (*PodListResponse, error)
-	// PodCreate implements POST /pod/create
+	// PodCreate creates a pod according to UserPod
 	PodCreate(ctx context.Context, in *PodCreateRequest, opts ...grpc.CallOption) (*PodCreateResponse, error)
-	// PodInfo implements GET /pod/info
+	// PodInfo gets pod's info by podID
 	PodInfo(ctx context.Context, in *PodInfoRequest, opts ...grpc.CallOption) (*PodInfoResponse, error)
-	// PodRemove implements  DELETE /pod
+	// PodRemove deletes a pod by podID
 	PodRemove(ctx context.Context, in *PodRemoveRequest, opts ...grpc.CallOption) (*PodRemoveResponse, error)
-	// ContainerList implements GET /list?item=container
+	// ContainerList gets a list of containers
 	ContainerList(ctx context.Context, in *ContainerListRequest, opts ...grpc.CallOption) (*ContainerListResponse, error)
-	// ContainerInfo implements GET /container/info
+	// ContainerInfo gets container's info by container's id or name
 	ContainerInfo(ctx context.Context, in *ContainerInfoRequest, opts ...grpc.CallOption) (*ContainerInfoResponse, error)
-	// ImageList implements GET /images/get
+	// ImageList gets a list of images by filters
 	ImageList(ctx context.Context, in *ImageListRequest, opts ...grpc.CallOption) (*ImageListResponse, error)
-	// VMList implements GET /list?item=vm
+	// VMList gets a list of HyperVMs
 	VMList(ctx context.Context, in *VMListRequest, opts ...grpc.CallOption) (*VMListResponse, error)
-	// VMCreate implements POST /vm/create
+	// VMCreate creates a HyperVM with specified CPU and memory
 	VMCreate(ctx context.Context, in *VMCreateRequest, opts ...grpc.CallOption) (*VMCreateResponse, error)
-	// VMRemove implements DELETE /vm
+	// VMRemove deletes a HyperVM by vmID
 	VMRemove(ctx context.Context, in *VMRemoveRequest, opts ...grpc.CallOption) (*VMRemoveResponse, error)
-	// TODO: implements  GET    /pod/stats
-	// TODO: implements  POST   /pod/labels
-	// PodStart implements  POST   /pod/start
+	// TODO: PodStats gets the statistics of a pod
+	// TODO: PodLabels updates labels of the specified pod
+	// PodStart starts a pod
 	PodStart(ctx context.Context, opts ...grpc.CallOption) (PublicAPI_PodStartClient, error)
-	// ContainerLogs implements  GET  /container/logs
+	// ContainerLogs gets the log of specified container
 	ContainerLogs(ctx context.Context, in *ContainerLogsRequest, opts ...grpc.CallOption) (PublicAPI_ContainerLogsClient, error)
-	// TODO: implements  POST   /container/create
-	// TODO: implements  POST   /container/rename
-	// TODO: implements  POST   /container/commit
-	// TODO: implements  POST   /container/kill
-	// ContainerExec implements  POST   /exec
+	// TODO: ContainerCreate creates a container in specified pod
+	// TODO: ContainerRename renames a container
+	// TODO: ContainerCommit commits the changes of the specified container
+	// TODO: ContainerSignal sends a singla to specified container
+	// TODO: ContainerLabels updates labels of the specified container
+	// ContainerExec execs a command in specified container
 	ContainerExec(ctx context.Context, opts ...grpc.CallOption) (PublicAPI_ContainerExecClient, error)
-	// Attach: implements  POST   /attach
+	// Attach attaches to the specified container
 	Attach(ctx context.Context, opts ...grpc.CallOption) (PublicAPI_AttachClient, error)
-	// TODO: implements  POST   /tty/resize
-	// Wait implements  GET    /exitcode
+	// Wait gets the exit code of the specified container
 	Wait(ctx context.Context, in *WaitRequest, opts ...grpc.CallOption) (*WaitResponse, error)
-	// TODO: implements  GET    /_ping
-	// Info implements  GET    /info
+	// TODO: Ping checks if hyperd is running (returns 'OK' on success)
+	// Info gets the info of hyperd
 	Info(ctx context.Context, in *InfoRequest, opts ...grpc.CallOption) (*InfoResponse, error)
 }
 
@@ -1527,45 +1527,45 @@ func (c *publicAPIClient) Info(ctx context.Context, in *InfoRequest, opts ...grp
 // Server API for PublicAPI service
 
 type PublicAPIServer interface {
-	// PodList implements GET /list?item=pod
+	// PodList gets a list of pods
 	PodList(context.Context, *PodListRequest) (*PodListResponse, error)
-	// PodCreate implements POST /pod/create
+	// PodCreate creates a pod according to UserPod
 	PodCreate(context.Context, *PodCreateRequest) (*PodCreateResponse, error)
-	// PodInfo implements GET /pod/info
+	// PodInfo gets pod's info by podID
 	PodInfo(context.Context, *PodInfoRequest) (*PodInfoResponse, error)
-	// PodRemove implements  DELETE /pod
+	// PodRemove deletes a pod by podID
 	PodRemove(context.Context, *PodRemoveRequest) (*PodRemoveResponse, error)
-	// ContainerList implements GET /list?item=container
+	// ContainerList gets a list of containers
 	ContainerList(context.Context, *ContainerListRequest) (*ContainerListResponse, error)
-	// ContainerInfo implements GET /container/info
+	// ContainerInfo gets container's info by container's id or name
 	ContainerInfo(context.Context, *ContainerInfoRequest) (*ContainerInfoResponse, error)
-	// ImageList implements GET /images/get
+	// ImageList gets a list of images by filters
 	ImageList(context.Context, *ImageListRequest) (*ImageListResponse, error)
-	// VMList implements GET /list?item=vm
+	// VMList gets a list of HyperVMs
 	VMList(context.Context, *VMListRequest) (*VMListResponse, error)
-	// VMCreate implements POST /vm/create
+	// VMCreate creates a HyperVM with specified CPU and memory
 	VMCreate(context.Context, *VMCreateRequest) (*VMCreateResponse, error)
-	// VMRemove implements DELETE /vm
+	// VMRemove deletes a HyperVM by vmID
 	VMRemove(context.Context, *VMRemoveRequest) (*VMRemoveResponse, error)
-	// TODO: implements  GET    /pod/stats
-	// TODO: implements  POST   /pod/labels
-	// PodStart implements  POST   /pod/start
+	// TODO: PodStats gets the statistics of a pod
+	// TODO: PodLabels updates labels of the specified pod
+	// PodStart starts a pod
 	PodStart(PublicAPI_PodStartServer) error
-	// ContainerLogs implements  GET  /container/logs
+	// ContainerLogs gets the log of specified container
 	ContainerLogs(*ContainerLogsRequest, PublicAPI_ContainerLogsServer) error
-	// TODO: implements  POST   /container/create
-	// TODO: implements  POST   /container/rename
-	// TODO: implements  POST   /container/commit
-	// TODO: implements  POST   /container/kill
-	// ContainerExec implements  POST   /exec
+	// TODO: ContainerCreate creates a container in specified pod
+	// TODO: ContainerRename renames a container
+	// TODO: ContainerCommit commits the changes of the specified container
+	// TODO: ContainerSignal sends a singla to specified container
+	// TODO: ContainerLabels updates labels of the specified container
+	// ContainerExec execs a command in specified container
 	ContainerExec(PublicAPI_ContainerExecServer) error
-	// Attach: implements  POST   /attach
+	// Attach attaches to the specified container
 	Attach(PublicAPI_AttachServer) error
-	// TODO: implements  POST   /tty/resize
-	// Wait implements  GET    /exitcode
+	// Wait gets the exit code of the specified container
 	Wait(context.Context, *WaitRequest) (*WaitResponse, error)
-	// TODO: implements  GET    /_ping
-	// Info implements  GET    /info
+	// TODO: Ping checks if hyperd is running (returns 'OK' on success)
+	// Info gets the info of hyperd
 	Info(context.Context, *InfoRequest) (*InfoResponse, error)
 }
 

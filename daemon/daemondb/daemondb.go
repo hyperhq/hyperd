@@ -81,7 +81,7 @@ func (d *DaemonDB) DeletePodVolumes(podId string) error {
 func (d *DaemonDB) GetP2C(id string) ([]string, error) {
 	glog.V(3).Info("try get container list for pod ", id)
 	cl, err := d.Get(keyP2C(id))
-	if err != nil {
+	if err != nil || len(cl) == 0 {
 		return []string{}, err
 	}
 	return strings.Split(string(cl), ":"), nil

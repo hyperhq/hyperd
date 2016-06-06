@@ -371,7 +371,7 @@ func (p *Pod) InitializeFinished(daemon *Daemon) error {
 }
 
 func (p *Pod) DoCreate(daemon *Daemon) error {
-	jsons, err := p.tryLoadContainers(daemon)
+	jsons, err := p.TryLoadContainers(daemon)
 	if err != nil {
 		return err
 	}
@@ -380,15 +380,15 @@ func (p *Pod) DoCreate(daemon *Daemon) error {
 		return err
 	}
 
-	if err = p.parseContainerJsons(daemon, jsons); err != nil {
+	if err = p.ParseContainerJsons(daemon, jsons); err != nil {
 		return err
 	}
 
-	if err = p.createVolumes(daemon); err != nil {
+	if err = p.CreateVolumes(daemon); err != nil {
 		return err
 	}
 
-	if err = p.updateContainerStatus(jsons); err != nil {
+	if err = p.UpdateContainerStatus(jsons); err != nil {
 		return err
 	}
 
@@ -445,7 +445,7 @@ func (p *Pod) preprocess() error {
 	return nil
 }
 
-func (p *Pod) tryLoadContainers(daemon *Daemon) ([]*dockertypes.ContainerJSON, error) {
+func (p *Pod) TryLoadContainers(daemon *Daemon) ([]*dockertypes.ContainerJSON, error) {
 	var (
 		containerJsons = make([]*dockertypes.ContainerJSON, len(p.spec.Containers))
 		rsp            *dockertypes.ContainerJSON
@@ -461,6 +461,7 @@ func (p *Pod) tryLoadContainers(daemon *Daemon) ([]*dockertypes.ContainerJSON, e
 			containerNames[c.Name] = idx
 		}
 		for _, id := range ids {
+			glog.V(3).Infof("Loading container %s of pod %s", id, p.Id)
 			if r, err := daemon.ContainerInspect(id, false, version.Version("1.21")); err == nil {
 				rsp, ok = r.(*dockertypes.ContainerJSON)
 				if !ok {
@@ -558,7 +559,7 @@ func (p *Pod) createNewContainers(daemon *Daemon, jsons []*dockertypes.Container
 	return nil
 }
 
-func (p *Pod) parseContainerJsons(daemon *Daemon, jsons []*dockertypes.ContainerJSON) (err error) {
+func (p *Pod) ParseContainerJsons(daemon *Daemon, jsons []*dockertypes.ContainerJSON) (err error) {
 	err = nil
 	p.ctnStartInfo = []*hypervisor.ContainerInfo{}
 
@@ -639,7 +640,7 @@ func GetMountIdByContainer(driver, cid string) (string, error) {
 	return string(id), nil
 }
 
-func (p *Pod) createVolumes(daemon *Daemon) error {
+func (p *Pod) CreateVolumes(daemon *Daemon) error {
 
 	var (
 		vol *hypervisor.VolumeInfo
@@ -666,7 +667,7 @@ func (p *Pod) createVolumes(daemon *Daemon) error {
 	return nil
 }
 
-func (p *Pod) updateContainerStatus(jsons []*dockertypes.ContainerJSON) error {
+func (p *Pod) UpdateContainerStatus(jsons []*dockertypes.ContainerJSON) error {
 	p.status.Containers = []*hypervisor.Container{}
 	for idx, c := range p.spec.Containers {
 		if jsons[idx] == nil {
