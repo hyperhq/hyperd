@@ -44,6 +44,79 @@ type Pod struct {
 	sync.RWMutex
 }
 
+func convertToRunvContainerSpec(v *apitypes.UserContainer, podTTY bool) pod.UserContainer {
+	container := pod.UserContainer{
+		Tty:           v.Tty || podTTY,
+		Name:          v.Name,
+		Image:         v.Image,
+		Command:       v.Command,
+		Workdir:       v.Workdir,
+		Entrypoint:    v.Entrypoint,
+		Sysctl:        v.Sysctl,
+		RestartPolicy: v.RestartPolicy,
+	}
+
+	if v.User != nil {
+		container.User = pod.UserUser{
+			Name:             v.User.Name,
+			Group:            v.User.Group,
+			AdditionalGroups: v.User.AdditionalGroups,
+		}
+	}
+
+	if len(v.Ports) > 0 {
+		ports := make([]pod.UserContainerPort, 0, len(v.Ports))
+		for _, p := range v.Ports {
+			ports = append(ports, pod.UserContainerPort{
+				Protocol:      p.Protocol,
+				ContainerPort: int(p.ContainerPort),
+				ServicePort:   int(p.ServicePort),
+				HostPort:      int(p.HostPort),
+			})
+		}
+		container.Ports = ports
+	}
+
+	if len(v.Envs) > 0 {
+		envs := make([]pod.UserEnvironmentVar, 0, len(v.Envs))
+		for _, env := range v.Envs {
+			envs = append(envs, pod.UserEnvironmentVar{
+				Env:   env.Env,
+				Value: env.Value,
+			})
+		}
+		container.Envs = envs
+	}
+
+	if len(v.Volumes) > 0 {
+		volumes := make([]pod.UserVolumeReference, 0, len(v.Volumes))
+		for _, vol := range v.Volumes {
+			volumes = append(volumes, pod.UserVolumeReference{
+				Path:     vol.Path,
+				ReadOnly: vol.ReadOnly,
+				Volume:   vol.Volume,
+			})
+		}
+		container.Volumes = volumes
+	}
+
+	if len(v.Files) > 0 {
+		files := make([]pod.UserFileReference, 0, len(v.Files))
+		for _, f := range v.Files {
+			files = append(files, pod.UserFileReference{
+				Path:     f.Path,
+				Filename: f.Filename,
+				Perm:     f.Perm,
+				User:     f.User,
+				Group:    f.Group,
+			})
+		}
+		container.Files = files
+	}
+
+	return container
+}
+
 // TODO: remove convertToRunvPodSpec after pod.UserPod is deleted from runv
 func convertToRunvPodSpec(podSpec *apitypes.UserPod) (*pod.UserPod, error) {
 	var userPod pod.UserPod
@@ -117,76 +190,7 @@ func convertToRunvPodSpec(podSpec *apitypes.UserPod) (*pod.UserPod, error) {
 				return nil, fmt.Errorf("Please specific your image for your container, it can not be null!\n")
 			}
 
-			container := pod.UserContainer{
-				Tty:           v.Tty || userPod.Tty,
-				Name:          v.Name,
-				Image:         v.Image,
-				Command:       v.Command,
-				Workdir:       v.Workdir,
-				Entrypoint:    v.Entrypoint,
-				Sysctl:        v.Sysctl,
-				RestartPolicy: v.RestartPolicy,
-			}
-
-			if v.User != nil {
-				container.User = pod.UserUser{
-					Name:             v.User.Name,
-					Group:            v.User.Group,
-					AdditionalGroups: v.User.AdditionalGroups,
-				}
-			}
-
-			if len(v.Ports) > 0 {
-				ports := make([]pod.UserContainerPort, 0, len(v.Ports))
-				for _, p := range v.Ports {
-					ports = append(ports, pod.UserContainerPort{
-						Protocol:      p.Protocol,
-						ContainerPort: int(p.ContainerPort),
-						ServicePort:   int(p.ServicePort),
-						HostPort:      int(p.HostPort),
-					})
-				}
-				container.Ports = ports
-			}
-
-			if len(v.Envs) > 0 {
-				envs := make([]pod.UserEnvironmentVar, 0, len(v.Envs))
-				for _, env := range v.Envs {
-					envs = append(envs, pod.UserEnvironmentVar{
-						Env:   env.Env,
-						Value: env.Value,
-					})
-				}
-				container.Envs = envs
-			}
-
-			if len(v.Volumes) > 0 {
-				volumes := make([]pod.UserVolumeReference, 0, len(v.Volumes))
-				for _, vol := range v.Volumes {
-					volumes = append(volumes, pod.UserVolumeReference{
-						Path:     vol.Path,
-						ReadOnly: vol.ReadOnly,
-						Volume:   vol.Volume,
-					})
-				}
-				container.Volumes = volumes
-			}
-
-			if len(v.Files) > 0 {
-				files := make([]pod.UserFileReference, 0, len(v.Files))
-				for _, f := range v.Files {
-					files = append(files, pod.UserFileReference{
-						Path:     f.Path,
-						Filename: f.Filename,
-						Perm:     f.Perm,
-						User:     f.User,
-						Group:    f.Group,
-					})
-				}
-				container.Files = files
-			}
-
-			containers = append(containers, container)
+			containers = append(containers, convertToRunvContainerSpec(v, userPod.Tty))
 		}
 
 		userPod.Containers = containers

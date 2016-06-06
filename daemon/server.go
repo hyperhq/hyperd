@@ -120,7 +120,7 @@ func (daemon *Daemon) CreateContainerInPod(podId string, spec *apitypes.UserCont
 
 	rsp, ok := r.(*types.ContainerJSON)
 	if !ok {
-		err = fmt.Errorf("fail to unpack container json response for %s of %s", c.Name, p.Id)
+		err = fmt.Errorf("fail to unpack container json response for %s of %s", spec.Name, p.Id)
 		return "", err
 	}
 
@@ -132,7 +132,7 @@ func (daemon *Daemon) CreateContainerInPod(podId string, spec *apitypes.UserCont
 
 	glog.V(3).Infof("ContainerJSON for container %s: %v", ccs.ID, *rsp)
 	p.Status().AddContainer(rsp.ID, "/"+rsp.Name, rsp.Image, rsp.Config.Cmd.Slice(), hypervisortypes.S_POD_CREATED)
-	p.spec.Containers = append(p.spec.Containers, c)
+	p.spec.Containers = append(p.spec.Containers, convertToRunvContainerSpec(spec, p.spec.Tty))
 
 	podSpec, err := json.Marshal(p.spec)
 	if err != nil {
@@ -163,7 +163,7 @@ func (daemon *Daemon) CmdCreateContainer(podId string, containerArgs []byte) (st
 	err := json.Unmarshal(containerArgs, &c)
 	if err != nil {
 		glog.Errorf("Create container unmarshal failed: %v", err)
-		return nil, err
+		return "", err
 	}
 
 	return daemon.CreateContainerInPod(podId, &c)
