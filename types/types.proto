@@ -445,6 +445,15 @@ message AttachMessage {
   bytes  data          = 3;
 }
 
+message ContainerCreateRequest {
+  UserContainer containerSpec = 1;
+  string podID                = 2;
+}
+
+message ContainerCreateResponse {
+  string containerID = 1;
+}
+
 // PublicAPI defines the public APIs which are handled over TCP sockets.
 service PublicAPI {
     // PodList gets a list of pods
@@ -483,7 +492,8 @@ service PublicAPI {
 
     // ContainerLogs gets the log of specified container
     rpc ContainerLogs(ContainerLogsRequest) returns (stream ContainerLogsResponse) {}
-    // TODO: ContainerCreate creates a container in specified pod
+    // ContainerCreate creates a container in specified pod
+    rpc ContainerCreate(ContainerCreateRequest) returns (ContainerCreateResponse) {}
     // TODO: ContainerRename renames a container
     // TODO: ContainerCommit commits the changes of the specified container
     // TODO: ContainerSignal sends a singla to specified container

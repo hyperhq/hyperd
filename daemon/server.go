@@ -67,48 +67,41 @@ func (daemon *Daemon) CmdCommitImage(name string, cfg *types.ContainerCommitConf
 	return v, nil
 }
 
-func (daemon *Daemon) CmdCreateContainer(podId string, containerArgs []byte) (*engine.Env, error) {
+func (daemon *Daemon) CreateContainerInPod(podId string, spec *apitypes.UserContainer) (string, error) {
 	var err error
-	var c pod.UserContainer
 
 	p, ok := daemon.PodList.Get(podId)
 	if !ok {
-		return nil, fmt.Errorf("The pod(%s) can not be found", podId)
+		return "", fmt.Errorf("The pod(%s) can not be found", podId)
 	}
 
 	p.Lock()
 	defer p.Unlock()
 
-	err = json.Unmarshal(containerArgs, &c)
-	if err != nil {
-		glog.Errorf("Create container unmarshal failed: %v", err)
-		return nil, err
-	}
-
 	config := &container.Config{
-		Image:           c.Image,
-		Cmd:             strslice.New(c.Command...),
+		Image:           spec.Image,
+		Cmd:             strslice.New(spec.Command...),
 		NetworkDisabled: true,
 	}
 
-	if len(c.Entrypoint) != 0 {
-		config.Entrypoint = strslice.New(c.Entrypoint...)
+	if len(spec.Entrypoint) != 0 {
+		config.Entrypoint = strslice.New(spec.Entrypoint...)
 	}
 
-	if len(c.Envs) != 0 {
+	if len(spec.Envs) != 0 {
 		envs := []string{}
-		for _, env := range c.Envs {
+		for _, env := range spec.Envs {
 			envs = append(envs, env.Env+"="+env.Value)
 		}
 		config.Env = envs
 	}
 
 	ccs, err := daemon.Daemon.ContainerCreate(types.ContainerCreateConfig{
-		Name:   c.Name,
+		Name:   spec.Name,
 		Config: config,
 	})
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	glog.Infof("create container %s", ccs.ID)
@@ -122,18 +115,18 @@ func (daemon *Daemon) CmdCreateContainer(podId string, containerArgs []byte) (*e
 
 	r, err := daemon.ContainerInspect(ccs.ID, false, version.Version("1.21"))
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	rsp, ok := r.(*types.ContainerJSON)
 	if !ok {
 		err = fmt.Errorf("fail to unpack container json response for %s of %s", c.Name, p.Id)
-		return nil, err
+		return "", err
 	}
 
 	jsons, err := p.TryLoadContainers(daemon)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	jsons = append(jsons, rsp)
 
@@ -144,27 +137,36 @@ func (daemon *Daemon) CmdCreateContainer(podId string, containerArgs []byte) (*e
 	podSpec, err := json.Marshal(p.spec)
 	if err != nil {
 		glog.Errorf("Marshal podspec %v failed: %v", p.spec, err)
-		return nil, err
+		return "", err
 	}
 	if err = daemon.db.UpdatePod(p.Id, podSpec); err != nil {
-		glog.V(1).Info("Found an error while saving the POD file")
-		return nil, err
+		glog.Errorf("Found an error while saving the POD file: %v", err)
+		return "", err
 	}
 
 	if err = p.ParseContainerJsons(daemon, jsons); err != nil {
-		return nil, err
+		glog.Errorf("Found an error while parsing the Containers json: %v", err)
+		return "", err
 	}
 	daemon.PodList.Put(p)
 	if err = daemon.WritePodAndContainers(p.Id); err != nil {
-		glog.V(1).Info("Found an error while saving the Containers info")
+		glog.Errorf("Found an error while saving the Containers info: %v", err)
+		return "", err
+	}
+
+	return ccs.ID, nil
+}
+
+func (daemon *Daemon) CmdCreateContainer(podId string, containerArgs []byte) (string, error) {
+	var c apitypes.UserContainer
+
+	err := json.Unmarshal(containerArgs, &c)
+	if err != nil {
+		glog.Errorf("Create container unmarshal failed: %v", err)
 		return nil, err
 	}
 
-	v := &engine.Env{}
-	v.SetJson("ID", ccs.ID)
-	glog.V(3).Infof("The ContainerID is %s", ccs.ID)
-
-	return v, nil
+	return daemon.CreateContainerInPod(podId, &c)
 }
 
 func (daemon *Daemon) CmdKillContainer(name string, sig int64) (*engine.Env, error) {
