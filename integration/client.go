@@ -236,6 +236,20 @@ func (c *HyperClient) CreatePod(spec *types.UserPod) (string, error) {
 	return resp.PodID, nil
 }
 
+// CreateContainer creates a container
+func (c *HyperClient) CreateContainer(podID string, spec *types.UserContainer) (string, error) {
+	req := types.ContainerCreateRequest{
+		PodID:         podID,
+		ContainerSpec: spec,
+	}
+	resp, err := c.client.ContainerCreate(c.ctx, &req)
+	if err != nil {
+		return "", err
+	}
+
+	return resp.ContainerID, nil
+}
+
 // RemovePod removes a pod by podID
 func (c *HyperClient) RemovePod(podID string) error {
 	_, err := c.client.PodRemove(
