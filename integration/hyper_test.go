@@ -81,6 +81,25 @@ func (s *TestSuite) TestGetContainerLogs(c *C) {
 	c.Logf("Got ContainerLogs %v", logs)
 }
 
+func (s *TestSuite) TestPostAttach(c *C) {
+	podList, err := s.client.GetPodList()
+	c.Assert(err, IsNil)
+	c.Logf("Got PodList %v", podList)
+
+	if len(podList) == 0 {
+		return
+	}
+
+	err = s.client.StartPod(podList[0].PodID, "", "")
+	c.Assert(err, IsNil)
+
+	podInfo, err := s.client.GetPodInfo(podList[0].PodID)
+	c.Assert(err, IsNil)
+
+	err = s.client.PostAttach(podInfo.Status.ContainerStatus[0].ContainerID, "abcdefgh")
+	c.Assert(err, IsNil)
+}
+
 func (s *TestSuite) TestGetPodInfo(c *C) {
 	podList, err := s.client.GetPodList()
 	c.Assert(err, IsNil)
