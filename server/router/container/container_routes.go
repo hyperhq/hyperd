@@ -3,6 +3,7 @@ package container
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	timetypes "github.com/docker/engine-api/types/time"
 	"github.com/golang/glog"
 	"github.com/hyperhq/hyperd/daemon"
+	"github.com/hyperhq/hyperd/engine"
 	"github.com/hyperhq/hyperd/server/httputils"
 	"golang.org/x/net/context"
 )
@@ -108,25 +110,26 @@ func (c *containerRouter) postContainerCreate(ctx context.Context, w http.Respon
 		return err
 	}
 
-	imageName := r.Form.Get("imageName")
-	glog.V(1).Infof("Image name is %s", imageName)
+	podId := r.Form.Get("podId")
+	if podId == "" {
+		return fmt.Errorf("podId is required to create a new container")
+	}
 
-	config, hostConfig, _, err := runconfig.DecodeContainerConfig(r.Body)
+	containerArgs, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		return err
 	}
 
-	env, err := c.backend.CmdCreateContainer(types.ContainerCreateConfig{
-		Name:       imageName,
-		Config:     config,
-		HostConfig: hostConfig,
-	})
+	glog.V(1).Infof("Create container %s in pod %s", string(containerArgs), podId)
 
+	containterID, err := c.backend.CmdCreateContainer(podId, containerArgs)
 	if err != nil {
 		return err
 	}
 
-	return env.WriteJSON(w, http.StatusCreated)
+	v := &engine.Env{}
+	v.SetJson("ID", containterID)
+	return v.WriteJSON(w, http.StatusCreated)
 }
 
 func (c *containerRouter) postContainerKill(ctx context.Context, w http.ResponseWriter, r *http.Request, vars map[string]string) error {

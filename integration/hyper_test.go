@@ -185,3 +185,23 @@ func (s *TestSuite) TestStartPod(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(podInfo.Status.Phase, Equals, "Running")
 }
+
+func (s *TestSuite) TestCreateContainer(c *C) {
+	spec := types.UserPod{}
+	pod, err := s.client.CreatePod(&spec)
+	c.Assert(err, IsNil)
+	c.Logf("Pod created: %s", pod)
+
+	container, err := s.client.CreateContainer(pod, &types.UserContainer{
+		Image: "busybox",
+	})
+	c.Assert(err, IsNil)
+	c.Logf("Container created: %s", container)
+
+	info, err := s.client.GetContainerInfo(container)
+	c.Assert(err, IsNil)
+	c.Assert(info.PodID, Equals, pod)
+
+	err = s.client.RemovePod(pod)
+	c.Assert(err, IsNil)
+}

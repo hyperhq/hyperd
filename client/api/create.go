@@ -2,10 +2,11 @@ package api
 
 import (
 	"fmt"
+	"net/http"
+	"net/url"
 
 	"github.com/hyperhq/hyperd/engine"
 	"github.com/hyperhq/runv/hypervisor/types"
-	"net/http"
 )
 
 func (cli *Client) CreatePod(spec interface{}) (string, int, error) {
@@ -42,5 +43,30 @@ func (cli *Client) CreatePod(spec interface{}) (string, int, error) {
 			return "", statusCode, fmt.Errorf("Cause is %s", remoteInfo.Get("Cause"))
 		}
 	}
+	return remoteInfo.Get("ID"), statusCode, nil
+}
+
+func (cli *Client) CreateContainer(podID string, spec interface{}) (string, int, error) {
+	v := url.Values{}
+	v.Set("podID", podID)
+	body, statusCode, err := readBody(cli.call("POST", "/container/create?"+v.Encode(), spec, nil))
+	if err != nil {
+		return "", statusCode, err
+	}
+	if statusCode != http.StatusCreated && statusCode != http.StatusOK {
+		return "", statusCode, err
+	}
+
+	out := engine.NewOutput()
+	remoteInfo, err := out.AddEnv()
+	if err != nil {
+		return "", statusCode, err
+	}
+
+	if _, err := out.Write(body); err != nil {
+		return "", statusCode, fmt.Errorf("Error reading remote info: %s", err)
+	}
+	out.Close()
+
 	return remoteInfo.Get("ID"), statusCode, nil
 }

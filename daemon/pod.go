@@ -44,6 +44,79 @@ type Pod struct {
 	sync.RWMutex
 }
 
+func convertToRunvContainerSpec(v *apitypes.UserContainer, podTTY bool) pod.UserContainer {
+	container := pod.UserContainer{
+		Tty:           v.Tty || podTTY,
+		Name:          v.Name,
+		Image:         v.Image,
+		Command:       v.Command,
+		Workdir:       v.Workdir,
+		Entrypoint:    v.Entrypoint,
+		Sysctl:        v.Sysctl,
+		RestartPolicy: v.RestartPolicy,
+	}
+
+	if v.User != nil {
+		container.User = pod.UserUser{
+			Name:             v.User.Name,
+			Group:            v.User.Group,
+			AdditionalGroups: v.User.AdditionalGroups,
+		}
+	}
+
+	if len(v.Ports) > 0 {
+		ports := make([]pod.UserContainerPort, 0, len(v.Ports))
+		for _, p := range v.Ports {
+			ports = append(ports, pod.UserContainerPort{
+				Protocol:      p.Protocol,
+				ContainerPort: int(p.ContainerPort),
+				ServicePort:   int(p.ServicePort),
+				HostPort:      int(p.HostPort),
+			})
+		}
+		container.Ports = ports
+	}
+
+	if len(v.Envs) > 0 {
+		envs := make([]pod.UserEnvironmentVar, 0, len(v.Envs))
+		for _, env := range v.Envs {
+			envs = append(envs, pod.UserEnvironmentVar{
+				Env:   env.Env,
+				Value: env.Value,
+			})
+		}
+		container.Envs = envs
+	}
+
+	if len(v.Volumes) > 0 {
+		volumes := make([]pod.UserVolumeReference, 0, len(v.Volumes))
+		for _, vol := range v.Volumes {
+			volumes = append(volumes, pod.UserVolumeReference{
+				Path:     vol.Path,
+				ReadOnly: vol.ReadOnly,
+				Volume:   vol.Volume,
+			})
+		}
+		container.Volumes = volumes
+	}
+
+	if len(v.Files) > 0 {
+		files := make([]pod.UserFileReference, 0, len(v.Files))
+		for _, f := range v.Files {
+			files = append(files, pod.UserFileReference{
+				Path:     f.Path,
+				Filename: f.Filename,
+				Perm:     f.Perm,
+				User:     f.User,
+				Group:    f.Group,
+			})
+		}
+		container.Files = files
+	}
+
+	return container
+}
+
 // TODO: remove convertToRunvPodSpec after pod.UserPod is deleted from runv
 func convertToRunvPodSpec(podSpec *apitypes.UserPod) (*pod.UserPod, error) {
 	var userPod pod.UserPod
@@ -117,68 +190,7 @@ func convertToRunvPodSpec(podSpec *apitypes.UserPod) (*pod.UserPod, error) {
 				return nil, fmt.Errorf("Please specific your image for your container, it can not be null!\n")
 			}
 
-			container := pod.UserContainer{
-				Tty:           v.Tty || userPod.Tty,
-				Name:          v.Name,
-				Image:         v.Image,
-				Command:       v.Command,
-				Workdir:       v.Workdir,
-				Entrypoint:    v.Entrypoint,
-				Sysctl:        v.Sysctl,
-				RestartPolicy: v.RestartPolicy,
-			}
-
-			if len(v.Ports) > 0 {
-				ports := make([]pod.UserContainerPort, 0, len(v.Ports))
-				for _, p := range v.Ports {
-					ports = append(ports, pod.UserContainerPort{
-						Protocol:      p.Protocol,
-						ContainerPort: int(p.ContainerPort),
-						ServicePort:   int(p.ServicePort),
-						HostPort:      int(p.HostPort),
-					})
-				}
-				container.Ports = ports
-			}
-
-			if len(v.Envs) > 0 {
-				envs := make([]pod.UserEnvironmentVar, 0, len(v.Envs))
-				for _, env := range v.Envs {
-					envs = append(envs, pod.UserEnvironmentVar{
-						Env:   env.Env,
-						Value: env.Value,
-					})
-				}
-				container.Envs = envs
-			}
-
-			if len(v.Volumes) > 0 {
-				volumes := make([]pod.UserVolumeReference, 0, len(v.Volumes))
-				for _, vol := range v.Volumes {
-					volumes = append(volumes, pod.UserVolumeReference{
-						Path:     vol.Path,
-						ReadOnly: vol.ReadOnly,
-						Volume:   vol.Volume,
-					})
-				}
-				container.Volumes = volumes
-			}
-
-			if len(v.Files) > 0 {
-				files := make([]pod.UserFileReference, 0, len(v.Files))
-				for _, f := range v.Files {
-					files = append(files, pod.UserFileReference{
-						Path:     f.Path,
-						Filename: f.Filename,
-						Perm:     f.Perm,
-						User:     f.User,
-						Group:    f.Group,
-					})
-				}
-				container.Files = files
-			}
-
-			containers = append(containers, container)
+			containers = append(containers, convertToRunvContainerSpec(v, userPod.Tty))
 		}
 
 		userPod.Containers = containers
@@ -363,7 +375,7 @@ func (p *Pod) InitializeFinished(daemon *Daemon) error {
 }
 
 func (p *Pod) DoCreate(daemon *Daemon) error {
-	jsons, err := p.tryLoadContainers(daemon)
+	jsons, err := p.TryLoadContainers(daemon)
 	if err != nil {
 		return err
 	}
@@ -372,15 +384,15 @@ func (p *Pod) DoCreate(daemon *Daemon) error {
 		return err
 	}
 
-	if err = p.parseContainerJsons(daemon, jsons); err != nil {
+	if err = p.ParseContainerJsons(daemon, jsons); err != nil {
 		return err
 	}
 
-	if err = p.createVolumes(daemon); err != nil {
+	if err = p.CreateVolumes(daemon); err != nil {
 		return err
 	}
 
-	if err = p.updateContainerStatus(jsons); err != nil {
+	if err = p.UpdateContainerStatus(jsons); err != nil {
 		return err
 	}
 
@@ -437,7 +449,7 @@ func (p *Pod) preprocess() error {
 	return nil
 }
 
-func (p *Pod) tryLoadContainers(daemon *Daemon) ([]*dockertypes.ContainerJSON, error) {
+func (p *Pod) TryLoadContainers(daemon *Daemon) ([]*dockertypes.ContainerJSON, error) {
 	var (
 		containerJsons = make([]*dockertypes.ContainerJSON, len(p.spec.Containers))
 		rsp            *dockertypes.ContainerJSON
@@ -453,6 +465,7 @@ func (p *Pod) tryLoadContainers(daemon *Daemon) ([]*dockertypes.ContainerJSON, e
 			containerNames[c.Name] = idx
 		}
 		for _, id := range ids {
+			glog.V(3).Infof("Loading container %s of pod %s", id, p.Id)
 			if r, err := daemon.ContainerInspect(id, false, version.Version("1.21")); err == nil {
 				rsp, ok = r.(*dockertypes.ContainerJSON)
 				if !ok {
@@ -550,7 +563,7 @@ func (p *Pod) createNewContainers(daemon *Daemon, jsons []*dockertypes.Container
 	return nil
 }
 
-func (p *Pod) parseContainerJsons(daemon *Daemon, jsons []*dockertypes.ContainerJSON) (err error) {
+func (p *Pod) ParseContainerJsons(daemon *Daemon, jsons []*dockertypes.ContainerJSON) (err error) {
 	err = nil
 	p.ctnStartInfo = []*hypervisor.ContainerInfo{}
 
@@ -631,7 +644,7 @@ func GetMountIdByContainer(driver, cid string) (string, error) {
 	return string(id), nil
 }
 
-func (p *Pod) createVolumes(daemon *Daemon) error {
+func (p *Pod) CreateVolumes(daemon *Daemon) error {
 
 	var (
 		vol *hypervisor.VolumeInfo
@@ -658,7 +671,7 @@ func (p *Pod) createVolumes(daemon *Daemon) error {
 	return nil
 }
 
-func (p *Pod) updateContainerStatus(jsons []*dockertypes.ContainerJSON) error {
+func (p *Pod) UpdateContainerStatus(jsons []*dockertypes.ContainerJSON) error {
 	p.status.Containers = []*hypervisor.Container{}
 	for idx, c := range p.spec.Containers {
 		if jsons[idx] == nil {

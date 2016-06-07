@@ -7,13 +7,17 @@ import (
 	"os"
 	"strings"
 
+	"github.com/docker/docker/pkg/version"
 	"github.com/docker/engine-api/types"
+	"github.com/docker/engine-api/types/container"
+	"github.com/docker/engine-api/types/strslice"
 	"github.com/golang/glog"
 	"github.com/hyperhq/hyperd/engine"
 	"github.com/hyperhq/hyperd/lib/sysinfo"
 	apitypes "github.com/hyperhq/hyperd/types"
 	"github.com/hyperhq/hyperd/utils"
 	"github.com/hyperhq/runv/hypervisor/pod"
+	hypervisortypes "github.com/hyperhq/runv/hypervisor/types"
 )
 
 func (daemon *Daemon) CmdImages(args, filter string, all bool) (*engine.Env, error) {
@@ -63,18 +67,106 @@ func (daemon *Daemon) CmdCommitImage(name string, cfg *types.ContainerCommitConf
 	return v, nil
 }
 
-func (daemon *Daemon) CmdCreateContainer(params types.ContainerCreateConfig) (*engine.Env, error) {
-	res, err := daemon.Daemon.ContainerCreate(params)
-	if err != nil {
-		return nil, err
+func (daemon *Daemon) CreateContainerInPod(podId string, spec *apitypes.UserContainer) (string, error) {
+	var err error
+
+	p, ok := daemon.PodList.Get(podId)
+	if !ok {
+		return "", fmt.Errorf("The pod(%s) can not be found", podId)
 	}
 
-	v := &engine.Env{}
-	v.SetJson("ID", daemon.ID)
-	v.Set("ContainerID", res.ID)
-	glog.V(3).Infof("The ContainerID is %s", res.ID)
+	p.Lock()
+	defer p.Unlock()
 
-	return v, nil
+	config := &container.Config{
+		Image:           spec.Image,
+		Cmd:             strslice.New(spec.Command...),
+		NetworkDisabled: true,
+	}
+
+	if len(spec.Entrypoint) != 0 {
+		config.Entrypoint = strslice.New(spec.Entrypoint...)
+	}
+
+	if len(spec.Envs) != 0 {
+		envs := []string{}
+		for _, env := range spec.Envs {
+			envs = append(envs, env.Env+"="+env.Value)
+		}
+		config.Env = envs
+	}
+
+	ccs, err := daemon.Daemon.ContainerCreate(types.ContainerCreateConfig{
+		Name:   spec.Name,
+		Config: config,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	glog.Infof("create container %s", ccs.ID)
+
+	defer func(id string) {
+		if err != nil {
+			glog.V(3).Infof("rollback container %s of %s", id, p.Id)
+			daemon.Daemon.ContainerRm(id, &types.ContainerRmConfig{})
+		}
+	}(ccs.ID)
+
+	r, err := daemon.ContainerInspect(ccs.ID, false, version.Version("1.21"))
+	if err != nil {
+		return "", err
+	}
+
+	rsp, ok := r.(*types.ContainerJSON)
+	if !ok {
+		err = fmt.Errorf("fail to unpack container json response for %s of %s", spec.Name, p.Id)
+		return "", err
+	}
+
+	jsons, err := p.TryLoadContainers(daemon)
+	if err != nil {
+		return "", err
+	}
+	jsons = append(jsons, rsp)
+
+	glog.V(3).Infof("ContainerJSON for container %s: %v", ccs.ID, *rsp)
+	p.Status().AddContainer(rsp.ID, "/"+rsp.Name, rsp.Image, rsp.Config.Cmd.Slice(), hypervisortypes.S_POD_CREATED)
+	p.spec.Containers = append(p.spec.Containers, convertToRunvContainerSpec(spec, p.spec.Tty))
+
+	podSpec, err := json.Marshal(p.spec)
+	if err != nil {
+		glog.Errorf("Marshal podspec %v failed: %v", p.spec, err)
+		return "", err
+	}
+	if err = daemon.db.UpdatePod(p.Id, podSpec); err != nil {
+		glog.Errorf("Found an error while saving the POD file: %v", err)
+		return "", err
+	}
+
+	if err = p.ParseContainerJsons(daemon, jsons); err != nil {
+		glog.Errorf("Found an error while parsing the Containers json: %v", err)
+		return "", err
+	}
+	daemon.PodList.Put(p)
+	if err = daemon.WritePodAndContainers(p.Id); err != nil {
+		glog.Errorf("Found an error while saving the Containers info: %v", err)
+		return "", err
+	}
+
+	return ccs.ID, nil
+}
+
+func (daemon *Daemon) CmdCreateContainer(podId string, containerArgs []byte) (string, error) {
+	var c apitypes.UserContainer
+
+	err := json.Unmarshal(containerArgs, &c)
+	if err != nil {
+		glog.Errorf("Create container unmarshal failed: %v", err)
+		return "", err
+	}
+
+	return daemon.CreateContainerInPod(podId, &c)
 }
 
 func (daemon *Daemon) CmdKillContainer(name string, sig int64) (*engine.Env, error) {
