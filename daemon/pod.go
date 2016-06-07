@@ -32,13 +32,15 @@ import (
 )
 
 type Pod struct {
-	Id      string
-	status  *hypervisor.PodStatus
-	spec    *pod.UserPod
-	vm      *hypervisor.Vm
-	ctnInfo []*hypervisor.ContainerInfo
-	volumes map[string]*hypervisor.VolumeInfo
-	ttyList map[string]*hypervisor.TtyIO
+	Id       string
+	status   *hypervisor.PodStatus
+	spec     *pod.UserPod
+	vm       *hypervisor.Vm
+	ctnInfo  []*hypervisor.ContainerInfo
+	volumes  map[string]*hypervisor.VolumeInfo
+	execList map[string]*hypervisor.ExecInfo
+	ttyList  map[string]*hypervisor.TtyIO
+	// TODO: remove ttyList
 
 	transiting chan bool
 	sync.RWMutex
@@ -286,6 +288,7 @@ func NewPod(podSpec *apitypes.UserPod, id string, data interface{}) (*Pod, error
 	p := &Pod{
 		Id:         id,
 		ttyList:    make(map[string]*hypervisor.TtyIO),
+		execList:   make(map[string]*hypervisor.ExecInfo),
 		volumes:    make(map[string]*hypervisor.VolumeInfo),
 		transiting: make(chan bool, 1),
 	}
