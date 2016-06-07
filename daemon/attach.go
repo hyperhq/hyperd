@@ -20,10 +20,9 @@ func (daemon *Daemon) Attach(stdin io.ReadCloser, stdout io.WriteCloser, key, id
 	)
 
 	tty := &hypervisor.TtyIO{
-		ClientTag: tag,
-		Stdin:     stdin,
-		Stdout:    stdout,
-		Callback:  make(chan *types.VmResponse, 1),
+		Stdin:    stdin,
+		Stdout:   stdout,
+		Callback: make(chan *types.VmResponse, 1),
 	}
 
 	// We need find the vm id which running POD, and stop it

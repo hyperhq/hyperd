@@ -69,10 +69,9 @@ func (daemon *Daemon) StartPod(stdin io.ReadCloser, stdout io.WriteCloser, podId
 		// tag is only used to identify if attach to the container
 		glog.V(1).Info("Pod Run with client terminal tag: ", tag)
 		ttys = append(ttys, &hypervisor.TtyIO{
-			Stdin:     stdin,
-			Stdout:    stdout,
-			ClientTag: tag,
-			Callback:  make(chan *types.VmResponse, 1),
+			Stdin:    stdin,
+			Stdout:   stdout,
+			Callback: make(chan *types.VmResponse, 1),
 		})
 	}
 

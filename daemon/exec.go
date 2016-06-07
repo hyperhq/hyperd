@@ -36,26 +36,23 @@ func (daemon *Daemon) ExitCode(container, tag string) (int, error) {
 
 func (daemon *Daemon) Exec(stdin io.ReadCloser, stdout io.WriteCloser, key, id, cmd, tag string, terminal bool) error {
 	var (
-		vmId      string
-		container string
-		err       error
+		vmId string
+		err  error
 	)
 
 	execId := fmt.Sprintf("exec-%s", pod.RandStr(10, "alpha"))
 	exec := &hypervisor.ExecInfo{
-		ExecId:    execId,
-		ClientTag: execId,
-		Command:   cmd,
-		ExitCode:  255,
-		Terminal:  terminal,
-		Stdin:     stdin,
-		Stdout:    stdout,
+		ExecId:   execId,
+		Command:  cmd,
+		ExitCode: 255,
+		Terminal: terminal,
+		Stdin:    stdin,
+		Stdout:   stdout,
 	}
 
 	// We need find the vm id which running POD, and stop it
 	if key == "pod" {
 		vmId = id
-		container = ""
 	} else {
 		glog.V(1).Infof("Get container id is %s", id)
 		pod, _, err := daemon.GetPodByContainerIdOrName(id)
