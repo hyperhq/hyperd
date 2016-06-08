@@ -23,8 +23,8 @@ func (daemon *Daemon) GetPodInfo(podName string) (types.PodInfo, error) {
 			return types.PodInfo{}, fmt.Errorf("Can not get Pod info with pod ID(%s)", podName)
 		}
 	} else {
-		pod = daemon.PodList.GetByName(podName)
-		if pod == nil {
+		pod, ok = daemon.PodList.GetByName(podName)
+		if !ok {
 			return types.PodInfo{}, fmt.Errorf("Can not get Pod info with pod name(%s)", podName)
 		}
 	}
@@ -171,8 +171,8 @@ func (daemon *Daemon) GetPodStats(podId string) (interface{}, error) {
 			return nil, fmt.Errorf("Can not get Pod stats with pod ID(%s)", podId)
 		}
 	} else {
-		pod = daemon.PodList.GetByName(podId)
-		if pod == nil {
+		pod, ok = daemon.PodList.GetByName(podId)
+		if !ok {
 			return nil, fmt.Errorf("Can not get Pod stats with pod name(%s)", podId)
 		}
 	}

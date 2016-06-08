@@ -20,8 +20,8 @@ func (daemon *Daemon) KillContainer(name string, sig int64) error {
 }
 
 func (daemon *Daemon) KillPodContainers(podName, container string, sig int64) error {
-	p := daemon.PodList.GetByName(podName)
-	if p == nil {
+	p, ok := daemon.PodList.GetByName(podName)
+	if !ok {
 		return fmt.Errorf("can not find pod %s", podName)
 	}
 
