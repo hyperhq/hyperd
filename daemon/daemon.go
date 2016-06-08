@@ -16,7 +16,6 @@ import (
 	"github.com/docker/docker/daemon/logger/jsonfilelog"
 	"github.com/docker/docker/opts"
 	flag "github.com/docker/docker/pkg/mflag"
-	"github.com/docker/docker/pkg/parsers/kernel"
 	"github.com/docker/docker/registry"
 	dockerutils "github.com/docker/docker/utils"
 	"github.com/golang/glog"
@@ -131,15 +130,6 @@ func NewDaemon(cfg *goconfig.ConfigFile) (*Daemon, error) {
 }
 
 func NewDaemonFromDirectory(cfg *goconfig.ConfigFile) (*Daemon, error) {
-	if os.Geteuid() != 0 {
-		return nil, fmt.Errorf("The Hyper daemon needs to be run as root")
-	}
-
-	// hyper needs Linux kernel 3.8.0+
-	if err := checkKernel(3, 8, 0); err != nil {
-		return nil, err
-	}
-
 	kernel, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Kernel")
 	initrd, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Initrd")
 	glog.V(0).Infof("The config: kernel=%s, initrd=%s", kernel, initrd)
@@ -422,23 +412,4 @@ func (daemon *Daemon) Shutdown() error {
 	daemon.db.Close()
 	glog.Flush()
 	return nil
-}
-
-func checkKernel(k, major, minor int) error {
-	leastVersionInfo := kernel.VersionInfo{
-		Kernel: k,
-		Major:  major,
-		Minor:  minor,
-	}
-
-	if v, err := kernel.GetKernelVersion(); err != nil {
-		return err
-	} else {
-		if kernel.CompareKernelVersion(*v, leastVersionInfo) < 0 {
-			msg := fmt.Sprintf("Your Linux kernel(%d.%d.%d) is too old to support Hyper daemon(%d.%d.%d+)",
-				v.Kernel, v.Major, v.Minor, k, major, minor)
-			return fmt.Errorf(msg)
-		}
-		return nil
-	}
 }
