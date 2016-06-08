@@ -40,16 +40,20 @@ func (daemon *Daemon) Attach(stdin io.ReadCloser, stdout io.WriteCloser, key, id
 		podId = pod.Id
 
 		pod.Lock()
-		pod.ttyList[tag] = tty
-		pod.Unlock()
+		for _, c := range pod.ctnInfo {
+			if c.Id == container {
+				c.ClientTag[tag] = true
 
-		defer func() {
-			if err != nil && pod != nil {
-				pod.Lock()
-				delete(pod.ttyList, tag)
-				pod.Unlock()
+				defer func() {
+					pod.Lock()
+					if err != nil {
+						delete(c.ClientTag, tag)
+					}
+					pod.Unlock()
+				}()
 			}
-		}()
+		}
+		pod.Unlock()
 	}
 
 	vmId, err = daemon.GetVmByPodId(podId)

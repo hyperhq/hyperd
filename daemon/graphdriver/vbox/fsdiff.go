@@ -107,7 +107,7 @@ func (d *Driver) Diff(id, parent string) (diff archive.Archive, err error) {
 	}
 	defer vm.ReleaseResponseChan(Status)
 
-	code, cause, err = d.daemon.StartInternal(p, vmId, nil, false, []*hypervisor.TtyIO{})
+	code, cause, err = d.daemon.StartInternal(p, vmId, nil, false, []*hypervisor.TtyIO{}, "")
 	if err != nil {
 		glog.Errorf("Code is %d, Cause is %s, %s", code, cause, err.Error())
 		d.daemon.KillVm(vmId)

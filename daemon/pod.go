@@ -39,8 +39,6 @@ type Pod struct {
 	ctnInfo  []*hypervisor.ContainerInfo
 	volumes  map[string]*hypervisor.VolumeInfo
 	execList map[string]*hypervisor.ExecInfo
-	ttyList  map[string]*hypervisor.TtyIO
-	// TODO: remove ttyList
 
 	transiting chan bool
 	sync.RWMutex
@@ -287,7 +285,6 @@ func NewPod(podSpec *apitypes.UserPod, id string, data interface{}) (*Pod, error
 
 	p := &Pod{
 		Id:         id,
-		ttyList:    make(map[string]*hypervisor.TtyIO),
 		execList:   make(map[string]*hypervisor.ExecInfo),
 		volumes:    make(map[string]*hypervisor.VolumeInfo),
 		transiting: make(chan bool, 1),
@@ -598,6 +595,7 @@ func (p *Pod) ParseContainerJson(daemon *Daemon, info *dockertypes.ContainerJSON
 	ci.MountId = mountId
 	ci.Workdir = info.Config.WorkingDir
 	ci.Cmd = append([]string{info.Path}, info.Args...)
+	ci.ClientTag = make(map[string]bool)
 	ci.ExitCode = 255
 
 	// We should ignore these two in runv, instead of clear them, but here is a work around
@@ -963,6 +961,7 @@ func (p *Pod) setupMountsAndFiles(sd Storage) (err error) {
 		ci.Envs = p.ctnInfo[i].Envs
 		ci.Entrypoint = p.ctnInfo[i].Entrypoint
 		ci.Workdir = p.ctnInfo[i].Workdir
+		ci.ClientTag = p.ctnInfo[i].ClientTag
 		ci.ExitCode = p.ctnInfo[i].ExitCode
 
 		p.ctnInfo[i] = ci
@@ -1172,7 +1171,7 @@ func (p *Pod) startLogging(daemon *Daemon) (err error) {
 	return nil
 }
 
-func (p *Pod) AttachTtys(daemon *Daemon, streams []*hypervisor.TtyIO) (err error) {
+func (p *Pod) AttachTtys(daemon *Daemon, streams []*hypervisor.TtyIO, tag string) (err error) {
 
 	ttyContainers := p.ctnInfo
 	if p.spec.Type == "service-discovery" {
@@ -1184,22 +1183,20 @@ func (p *Pod) AttachTtys(daemon *Daemon, streams []*hypervisor.TtyIO) (err error
 			break
 		}
 
-		p.Lock()
-		p.ttyList[str.ClientTag] = str
-		p.Unlock()
+		ttyContainers[idx].ClientTag[tag] = true
 
 		err = p.vm.Attach(str, ttyContainers[idx].Id, nil)
 		if err != nil {
-			glog.Errorf("Failed to attach client %s before start pod", str.ClientTag)
+			glog.Errorf("Failed to attach client %s before start pod", tag)
 			return
 		}
-		glog.V(1).Infof("Attach client %s before start pod", str.ClientTag)
+		glog.V(1).Infof("Attach client %s before start pod", tag)
 	}
 
 	return nil
 }
 
-func (p *Pod) Start(daemon *Daemon, vmId string, lazy bool, streams []*hypervisor.TtyIO) (*types.VmResponse, error) {
+func (p *Pod) Start(daemon *Daemon, vmId string, lazy bool, streams []*hypervisor.TtyIO, tag string) (*types.VmResponse, error) {
 
 	var (
 		err       error = nil
@@ -1243,7 +1240,7 @@ func (p *Pod) Start(daemon *Daemon, vmId string, lazy bool, streams []*hyperviso
 		}
 	}()
 
-	if err = p.AttachTtys(daemon, streams); err != nil {
+	if err = p.AttachTtys(daemon, streams, tag); err != nil {
 		return nil, err
 	}
 
