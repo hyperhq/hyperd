@@ -18,16 +18,20 @@ func (daemon *Daemon) ExitCode(container, tag string) (int, error) {
 	}
 
 	pod.RLock()
-	tty, ok := pod.ttyList[tag]
 	defer pod.RUnlock()
 
-	if !ok {
-		return -1, fmt.Errorf("Tag %s incorrect", tag)
+	if tty, ok := pod.ttyList[tag]; ok {
+		delete(pod.ttyList, tty.ClientTag)
+		return int(tty.ExitCode), nil
 	}
 
-	delete(pod.ttyList, tty.ClientTag)
+	for _, c := range pod.ctnInfo {
+		if c.Id == container {
+			return int(c.ExitCode), nil
+		}
+	}
 
-	return int(tty.ExitCode), nil
+	return -1, fmt.Errorf("Tag %s incorrect", tag)
 }
 
 func (daemon *Daemon) Exec(stdin io.ReadCloser, stdout io.WriteCloser, key, id, cmd, tag string, terminal bool) error {
@@ -62,7 +66,7 @@ func (daemon *Daemon) Exec(stdin io.ReadCloser, stdout io.WriteCloser, key, id, 
 		pod.Unlock()
 
 		defer func() {
-			if err != nil && pod != nil {
+			if err != nil {
 				pod.Lock()
 				delete(pod.ttyList, tag)
 				pod.Unlock()

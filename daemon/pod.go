@@ -595,6 +595,7 @@ func (p *Pod) ParseContainerJson(daemon *Daemon, info *dockertypes.ContainerJSON
 	ci.MountId = mountId
 	ci.Workdir = info.Config.WorkingDir
 	ci.Cmd = append([]string{info.Path}, info.Args...)
+	ci.ExitCode = 255
 
 	// We should ignore these two in runv, instead of clear them, but here is a work around
 	c.Entrypoint = []string{}
@@ -959,6 +960,7 @@ func (p *Pod) setupMountsAndFiles(sd Storage) (err error) {
 		ci.Envs = p.ctnInfo[i].Envs
 		ci.Entrypoint = p.ctnInfo[i].Entrypoint
 		ci.Workdir = p.ctnInfo[i].Workdir
+		ci.ExitCode = p.ctnInfo[i].ExitCode
 
 		p.ctnInfo[i] = ci
 	}

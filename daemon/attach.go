@@ -9,12 +9,14 @@ import (
 	"github.com/hyperhq/runv/hypervisor/types"
 )
 
+//TODO: get rid of tag
 func (daemon *Daemon) Attach(stdin io.ReadCloser, stdout io.WriteCloser, key, id, tag string) error {
 	var (
 		podId     string
 		vmId      string
 		container string
 		err       error
+		pod       *Pod
 	)
 
 	tty := &hypervisor.TtyIO{
@@ -30,12 +32,13 @@ func (daemon *Daemon) Attach(stdin io.ReadCloser, stdout io.WriteCloser, key, id
 		container = ""
 	} else {
 		container = id
-		pod, _, err := daemon.GetPodByContainerIdOrName(container)
+		pod, _, err = daemon.GetPodByContainerIdOrName(container)
 		if err != nil {
 			return err
 		}
 
 		podId = pod.Id
+
 		pod.Lock()
 		pod.ttyList[tag] = tty
 		pod.Unlock()
@@ -69,7 +72,18 @@ func (daemon *Daemon) Attach(stdin io.ReadCloser, stdout io.WriteCloser, key, id
 		glog.V(2).Info("Defer function for attach!")
 	}()
 
-	err = tty.WaitForFinish()
+	if err = tty.WaitForFinish(); err != nil {
+		return err
+	}
 
-	return err
+	pod.RLock()
+	defer pod.RUnlock()
+
+	for _, c := range pod.ctnInfo {
+		if c.Id == id {
+			c.ExitCode = tty.ExitCode
+		}
+	}
+
+	return nil
 }
