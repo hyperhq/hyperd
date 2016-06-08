@@ -39,8 +39,8 @@ func (daemon *Daemon) GetPodInfo(podName string) (types.PodInfo, error) {
 		cmd := []string{}
 		args := []string{}
 
-		if len(pod.ctnStartInfo) > i {
-			ci := pod.ctnStartInfo[i]
+		if len(pod.ctnInfo) > i {
+			ci := pod.ctnInfo[i]
 			for k, v := range ci.Envs {
 				envs = append(envs, &types.EnvironmentVar{Env: k, Value: v})
 			}
@@ -214,8 +214,8 @@ func (daemon *Daemon) GetContainerInfo(name string) (types.ContainerInfo, error)
 	ports := []*types.ContainerPort{}
 	envs := []*types.EnvironmentVar{}
 	vols := []*types.VolumeMount{}
-	if len(pod.ctnStartInfo) > i {
-		ci := pod.ctnStartInfo[i]
+	if len(pod.ctnInfo) > i {
+		ci := pod.ctnInfo[i]
 		for k, v := range ci.Envs {
 			envs = append(envs, &types.EnvironmentVar{Env: k, Value: v})
 		}
