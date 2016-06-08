@@ -454,6 +454,50 @@ message ContainerCreateResponse {
   string containerID = 1;
 }
 
+message AuthConfig {
+  string username = 1;
+  string password = 2;
+  string auth     = 3;
+  string email    = 4;
+  string serveraddress = 5;
+  string registrytoken = 6;
+}
+
+message ImagePullRequest {
+  string image    = 1;
+  string tag      = 2;
+  AuthConfig auth = 3;
+}
+
+message ImagePullResponse {
+  bytes data = 1;
+}
+
+message ImagePushRequest {
+  string repo     = 1;
+  string tag      = 2;
+  AuthConfig auth = 3;
+}
+
+message ImagePushResponse {
+  bytes data = 1;
+}
+
+message ImageRemoveRequest {
+  string image = 1;
+  bool force   = 2;
+  bool prune   = 3;
+}
+
+message ImageDelete {
+  string untaged = 1;
+  string deleted = 2;
+}
+
+message ImageRemoveResponse {
+  repeated ImageDelete images = 1;
+}
+
 // PublicAPI defines the public APIs which are handled over TCP sockets.
 service PublicAPI {
     // PodList gets a list of pods
@@ -489,7 +533,6 @@ service PublicAPI {
     // TODO: PodPause pauses a pod
     // TODO: PodUnpause unpauses a pod
 
-
     // ContainerLogs gets the log of specified container
     rpc ContainerLogs(ContainerLogsRequest) returns (stream ContainerLogsResponse) {}
     // ContainerCreate creates a container in specified pod
@@ -504,7 +547,6 @@ service PublicAPI {
     rpc Attach(stream AttachMessage) returns (stream AttachMessage) {}
     // Wait gets the exit code of the specified container
     rpc Wait(WaitRequest) returns (WaitResponse) {}
-    
     // TODO: TTYResize resizes the tty of the specified container
 
     // TODO: ServiceList gets a list of services
@@ -512,11 +554,14 @@ service PublicAPI {
     // TODO: ServiceUpdate updates an existing service
     // TODO: ServiceDelete deletes the specified service
 
-    // TODO: ImagePull pulls a image from registry
-    // TODO: ImageLoad loads a image from stream
-    // TODO: ImagePush pushes a local image to registry
-    // TODO: ImageDelete deletes a image from hyperd
+    // ImagePull pulls a image from registry
+    rpc ImagePull(ImagePullRequest) returns (stream ImagePullResponse) {}
+    // ImagePush pushes a local image to registry
+    rpc ImagePush(ImagePushRequest) returns (stream ImagePushResponse) {}
+    // ImageRemove deletes a image from hyperd
+    rpc ImageRemove(ImageRemoveRequest) returns (ImageRemoveResponse) {}
     // TODO: ImageBuild builds a image from Dockerfile
+    // TODO: ImageLoad loads a image from stream
 
     // TODO: Ping checks if hyperd is running (returns 'OK' on success)
     // Info gets the info of hyperd

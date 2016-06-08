@@ -82,18 +82,26 @@ func (s *TestSuite) TestGetContainerLogs(c *C) {
 }
 
 func (s *TestSuite) TestPostAttach(c *C) {
-	podList, err := s.client.GetPodList()
+	err := s.client.PullImage("busybox", "latest", nil)
 	c.Assert(err, IsNil)
-	c.Logf("Got PodList %v", podList)
 
-	if len(podList) == 0 {
-		return
+	spec := types.UserPod{
+		Containers: []*types.UserContainer{
+			{
+				Image: "busybox",
+			},
+		},
 	}
 
-	err = s.client.StartPod(podList[0].PodID, "", "")
+	pod, err := s.client.CreatePod(&spec)
+	c.Assert(err, IsNil)
+	c.Logf("Pod created: %s", pod)
+	defer s.client.RemovePod(pod)
+
+	err = s.client.StartPod(pod, "", "")
 	c.Assert(err, IsNil)
 
-	podInfo, err := s.client.GetPodInfo(podList[0].PodID)
+	podInfo, err := s.client.GetPodInfo(pod)
 	c.Assert(err, IsNil)
 
 	err = s.client.PostAttach(podInfo.Status.ContainerStatus[0].ContainerID, "abcdefgh")
@@ -137,6 +145,9 @@ func (s *TestSuite) TestGetVMCreateRemove(c *C) {
 }
 
 func (s *TestSuite) TestCreatePod(c *C) {
+	err := s.client.PullImage("busybox", "latest", nil)
+	c.Assert(err, IsNil)
+
 	spec := types.UserPod{
 		Id: "busybox",
 		Containers: []*types.UserContainer{
@@ -187,6 +198,9 @@ func (s *TestSuite) TestStartPod(c *C) {
 }
 
 func (s *TestSuite) TestCreateContainer(c *C) {
+	err := s.client.PullImage("busybox", "latest", nil)
+	c.Assert(err, IsNil)
+
 	spec := types.UserPod{}
 	pod, err := s.client.CreatePod(&spec)
 	c.Assert(err, IsNil)
@@ -204,4 +218,38 @@ func (s *TestSuite) TestCreateContainer(c *C) {
 
 	err = s.client.RemovePod(pod)
 	c.Assert(err, IsNil)
+}
+
+func (s *TestSuite) TestPullImage(c *C) {
+	err := s.client.PullImage("alpine", "latest", nil)
+	c.Assert(err, IsNil)
+
+	list, err := s.client.GetImageList()
+	c.Assert(err, IsNil)
+	found := false
+	for _, img := range list {
+		for _, repo := range img.RepoTags {
+			if repo == "alpine:latest" {
+				found = true
+				break
+			}
+		}
+	}
+	c.Assert(found, Equals, true)
+
+	err = s.client.RemoveImage("alpine")
+	c.Assert(err, IsNil)
+	list, err = s.client.GetImageList()
+	c.Assert(err, IsNil)
+
+	found = false
+	for _, img := range list {
+		for _, repo := range img.RepoTags {
+			if repo == "alpine:latest" {
+				found = true
+				break
+			}
+		}
+	}
+	c.Assert(found, Equals, false)
 }

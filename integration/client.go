@@ -380,3 +380,76 @@ func (c *HyperClient) Wait(container, processId string, noHang bool) (int32, err
 
 	return response.ExitCode, nil
 }
+
+func (c *HyperClient) PullImage(image, tag string, out io.Writer) error {
+	request := types.ImagePullRequest{
+		Image: image,
+		Tag:   tag,
+	}
+
+	stream, err := c.client.ImagePull(c.ctx, &request)
+	if err != nil {
+		return err
+	}
+
+	for {
+		res, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+
+		if out != nil {
+			n, err := out.Write(res.Data)
+			if err != nil {
+				return err
+			}
+			if n != len(res.Data) {
+				return io.ErrShortWrite
+			}
+		}
+	}
+
+	return nil
+}
+
+func (c *HyperClient) RemoveImage(image string) error {
+	_, err := c.client.ImageRemove(c.ctx, &types.ImageRemoveRequest{Image: image})
+	return err
+}
+
+func (c *HyperClient) PushImage(repo, tag string, out io.Writer) error {
+	request := types.ImagePushRequest{
+		Repo: repo,
+		Tag:  tag,
+	}
+
+	stream, err := c.client.ImagePush(c.ctx, &request)
+	if err != nil {
+		return err
+	}
+
+	for {
+		res, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+
+		if out != nil {
+			n, err := out.Write(res.Data)
+			if err != nil {
+				return err
+			}
+			if n != len(res.Data) {
+				return io.ErrShortWrite
+			}
+		}
+	}
+
+	return nil
+}
