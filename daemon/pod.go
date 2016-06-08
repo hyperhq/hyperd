@@ -563,68 +563,72 @@ func (p *Pod) createNewContainers(daemon *Daemon, jsons []*dockertypes.Container
 	return nil
 }
 
+func (p *Pod) ParseContainerJson(daemon *Daemon, info *dockertypes.ContainerJSON, i int) (err error) {
+	var (
+		ci *hypervisor.ContainerInfo = &hypervisor.ContainerInfo{}
+		c                            = &p.spec.Containers[i]
+	)
+
+	if info == nil {
+		estr := fmt.Sprintf("container %s of pod %s does not have inspect json", c.Name, p.Id)
+		glog.Error(estr)
+		return errors.New(estr)
+	}
+
+	if c.Name == "" {
+		c.Name = strings.TrimLeft(info.Name, "/")
+	}
+	if c.Image == "" {
+		c.Image = info.Config.Image
+	}
+	glog.Infof("container name %s, image %s", c.Name, c.Image)
+
+	mountId, err := GetMountIdByContainer(daemon.Storage.Type(), info.ID)
+	if err != nil {
+		estr := fmt.Sprintf("Cannot find mountID for container %s : %s", info.ID, err)
+		glog.Error(estr)
+		return errors.New(estr)
+	}
+
+	ci.Id = info.ID
+	ci.User = info.Config.User
+	ci.MountId = mountId
+	ci.Workdir = info.Config.WorkingDir
+	ci.Cmd = append([]string{info.Path}, info.Args...)
+
+	// We should ignore these two in runv, instead of clear them, but here is a work around
+	c.Entrypoint = []string{}
+	c.Command = []string{}
+	glog.Infof("container info config %v, Cmd %v, Args %v", info.Config, info.Config.Cmd.Slice(), info.Args)
+
+	env := make(map[string]string)
+	for _, v := range info.Config.Env {
+		pair := strings.SplitN(v, "=", 2)
+		if len(pair) == 2 && pair[1] != "" {
+			env[pair[0]] = pair[1]
+		}
+	}
+	ci.Envs = env
+
+	label := fmt.Sprintf("extra.sh.hyper.container.%d.initialize", i)
+	if value, ok := p.spec.Labels[label]; ok {
+		if value == "true" || value == "yes" || value == "1" {
+			ci.Initialize = true
+		}
+	}
+
+	p.processImageVolumes(info, info.ID, c)
+
+	p.ctnInfo = append(p.ctnInfo, ci)
+	glog.V(1).Infof("Container Info is \n%v", ci)
+	return nil
+}
+
 func (p *Pod) ParseContainerJsons(daemon *Daemon, jsons []*dockertypes.ContainerJSON) (err error) {
-	err = nil
-	p.ctnInfo = []*hypervisor.ContainerInfo{}
-
-	for i, c := range p.spec.Containers {
-		if jsons[i] == nil {
-			estr := fmt.Sprintf("container %s of pod %s does not have inspect json", c.Name, p.Id)
-			glog.Error(estr)
-			return errors.New(estr)
+	for i := range p.spec.Containers {
+		if err := p.ParseContainerJson(daemon, jsons[i], i); err != nil {
+			return err
 		}
-
-		var (
-			info *dockertypes.ContainerJSON = jsons[i]
-			ci   *hypervisor.ContainerInfo  = &hypervisor.ContainerInfo{}
-		)
-
-		if c.Name == "" {
-			p.spec.Containers[i].Name = strings.TrimLeft(info.Name, "/")
-		}
-		if c.Image == "" {
-			p.spec.Containers[i].Image = info.Config.Image
-		}
-		glog.Infof("container name %s, image %s", c.Name, c.Image)
-
-		mountId, err := GetMountIdByContainer(daemon.Storage.Type(), info.ID)
-		if err != nil {
-			estr := fmt.Sprintf("Cannot find mountID for container %s : %s", info.ID, err)
-			glog.Error(estr)
-			return errors.New(estr)
-		}
-
-		ci.Id = info.ID
-		ci.User = info.Config.User
-		ci.MountId = mountId
-		ci.Workdir = info.Config.WorkingDir
-		ci.Cmd = append([]string{info.Path}, info.Args...)
-
-		// We should ignore these two in runv, instead of clear them, but here is a work around
-		p.spec.Containers[i].Entrypoint = []string{}
-		p.spec.Containers[i].Command = []string{}
-		glog.Infof("container info config %v, Cmd %v, Args %v", info.Config, info.Config.Cmd.Slice(), info.Args)
-
-		env := make(map[string]string)
-		for _, v := range info.Config.Env {
-			pair := strings.SplitN(v, "=", 2)
-			if len(pair) == 2 && pair[1] != "" {
-				env[pair[0]] = pair[1]
-			}
-		}
-		ci.Envs = env
-
-		label := fmt.Sprintf("extra.sh.hyper.container.%d.initialize", i)
-		if value, ok := p.spec.Labels[label]; ok {
-			if value == "true" || value == "yes" || value == "1" {
-				ci.Initialize = true
-			}
-		}
-
-		p.processImageVolumes(info, info.ID, &p.spec.Containers[i])
-
-		p.ctnInfo = append(p.ctnInfo, ci)
-		glog.V(1).Infof("Container Info is \n%v", ci)
 	}
 
 	return nil
