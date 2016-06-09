@@ -36,6 +36,7 @@ func (r *containerRouter) initRoutes() {
 		local.NewPostRoute("/container/create", r.postContainerCreate),
 		local.NewPostRoute("/container/rename", r.postContainerRename),
 		local.NewPostRoute("/container/commit", r.postContainerCommit),
+		local.NewPostRoute("/container/stop", r.postContainerStop),
 		local.NewPostRoute("/container/kill", r.postContainerKill),
 		local.NewPostRoute("/exec", r.postContainerExec),
 		local.NewPostRoute("/attach", r.postContainerAttach),

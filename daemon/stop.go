@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"fmt"
+	"syscall"
 	"time"
 
 	"github.com/golang/glog"
@@ -88,4 +89,43 @@ func (daemon *Daemon) StopPodWithinLock(pod *Pod) (int, string, error) {
 	vmResponse := vm.StopPod(pod.status)
 
 	return vmResponse.Code, vmResponse.Cause, nil
+}
+
+func (daemon *Daemon) StopContainer(container string) error {
+	pod, idx, ok := daemon.PodList.GetByContainerIdOrName(container)
+	if !ok {
+		return fmt.Errorf("can not found container %s", container)
+	}
+
+	if !pod.TransitionLock("stop") {
+		glog.Errorf("Pod %s is under other operation", pod.Id)
+		return fmt.Errorf("Pod %s is under other operation", pod.Id)
+	}
+	defer pod.TransitionUnlock("stop")
+
+	containerId := pod.status.Containers[idx].Id
+	glog.V(1).Infof("found container %s to stop", containerId)
+
+	return daemon.StopContainerWithinLock(pod, containerId)
+}
+
+func (daemon *Daemon) StopContainerWithinLock(pod *Pod, containerId string) error {
+	pod.Lock()
+
+	if pod.vm == nil {
+		pod.Unlock()
+		return fmt.Errorf("pod is not started yet")
+	}
+
+	err := pod.vm.KillContainer(containerId, syscall.SIGKILL)
+	if err != nil {
+		pod.Unlock()
+		return err
+	}
+
+	pod.status.SetOneContainerStatus(containerId, types.S_POD_FAILED)
+
+	pod.Unlock()
+
+	return nil
 }
