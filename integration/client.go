@@ -350,6 +350,10 @@ func (c *HyperClient) StartPod(podID, vmID, tag string) error {
 	}
 
 	if tag == "" {
+		if _, err := stream.Recv(); err != nil {
+			return err
+		}
+
 		return nil
 	}
 
