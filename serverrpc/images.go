@@ -55,16 +55,22 @@ func (s *ServerRPC) ImagePull(req *types.ImagePullRequest, stream types.PublicAP
 	}
 
 	buffer := bytes.NewBuffer([]byte{})
-	exit := make(chan error, 1)
+	var pullResult error
+	var complete = false
 	go func() {
-		exit <- s.daemon.CmdImagePull(req.Image, req.Tag, authConfig, nil, buffer)
+		pullResult = s.daemon.CmdImagePull(req.Image, req.Tag, authConfig, nil, buffer)
+		complete = true
 	}()
 
 	for {
 		data := make([]byte, 512)
 		n, err := buffer.Read(data)
 		if err == io.EOF {
-			break
+			if complete {
+				break
+			} else {
+				continue
+			}
 		}
 
 		if err != nil {
@@ -77,7 +83,7 @@ func (s *ServerRPC) ImagePull(req *types.ImagePullRequest, stream types.PublicAP
 		}
 	}
 
-	return <-exit
+	return pullResult
 }
 
 // ImagePush pushes a local image to registry
@@ -97,16 +103,22 @@ func (s *ServerRPC) ImagePush(req *types.ImagePushRequest, stream types.PublicAP
 	}
 
 	buffer := bytes.NewBuffer([]byte{})
-	exit := make(chan error, 1)
+	var pushResult error
+	var complete = false
 	go func() {
-		exit <- s.daemon.CmdImagePush(req.Repo, req.Tag, authConfig, nil, buffer)
+		pushResult = s.daemon.CmdImagePush(req.Repo, req.Tag, authConfig, nil, buffer)
+		complete = true
 	}()
 
 	for {
 		data := make([]byte, 512)
 		n, err := buffer.Read(data)
 		if err == io.EOF {
-			break
+			if complete {
+				break
+			} else {
+				continue
+			}
 		}
 
 		if err != nil {
@@ -119,7 +131,7 @@ func (s *ServerRPC) ImagePush(req *types.ImagePushRequest, stream types.PublicAP
 		}
 	}
 
-	return <-exit
+	return pushResult
 }
 
 // ImageDelete deletes a image from hyperd
