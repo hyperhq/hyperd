@@ -33,7 +33,7 @@ func (daemon *Daemon) TtyResize(podId, tag string, h, w int) error {
 		}
 	}
 
-	vm, ok := daemon.VmList[vmid]
+	vm, ok := daemon.VmList.Get(vmid)
 	if !ok {
 		return fmt.Errorf("vm %s doesn't exist!", vmid)
 	}

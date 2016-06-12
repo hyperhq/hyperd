@@ -36,7 +36,7 @@ type Daemon struct {
 	ID          string
 	db          *daemondb.DaemonDB
 	PodList     *PodList
-	VmList      map[string]*hypervisor.Vm
+	VmList      *VmList
 	Factory     factory.Factory
 	Kernel      string
 	Initrd      string
@@ -172,7 +172,7 @@ func NewDaemonFromDirectory(cfg *goconfig.ConfigFile) (*Daemon, error) {
 		Cbfs:        cbfs,
 		VboxImage:   vboxImage,
 		PodList:     NewPodList(),
-		VmList:      make(map[string]*hypervisor.Vm),
+		VmList:      NewVmList(),
 		Host:        host,
 		BridgeIP:    bridgeip,
 		BridgeIface: biface,
@@ -370,11 +370,11 @@ func (daemon *Daemon) RemovePod(podId string) {
 }
 
 func (daemon *Daemon) AddVm(vm *hypervisor.Vm) {
-	daemon.VmList[vm.Id] = vm
+	daemon.VmList.Add(vm)
 }
 
 func (daemon *Daemon) RemoveVm(vmId string) {
-	delete(daemon.VmList, vmId)
+	daemon.VmList.Remove(vmId)
 }
 
 func (daemon *Daemon) DestroyAllVm() error {
@@ -406,9 +406,14 @@ func (daemon *Daemon) DestroyAndKeepVm() error {
 func (daemon *Daemon) Shutdown() error {
 	glog.V(0).Info("The daemon will be shutdown")
 	glog.V(0).Info("Shutdown all VMs")
-	for vm := range daemon.VmList {
-		daemon.KillVm(vm)
-	}
+
+	daemon.VmList.Foreach(func(vm *hypervisor.Vm) error {
+		if _, _, err := vm.Kill(); err == nil {
+			delete(daemon.VmList.vms, vm.Id)
+		}
+		return nil
+	})
+
 	daemon.db.Close()
 	glog.Flush()
 	return nil

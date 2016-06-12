@@ -3,12 +3,79 @@ package daemon
 import (
 	"fmt"
 	"runtime"
+	"sync"
 
 	"github.com/golang/glog"
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/pod"
 	"github.com/hyperhq/runv/hypervisor/types"
 )
+
+type VmList struct {
+	vms map[string]*hypervisor.Vm
+	sync.RWMutex
+}
+
+func NewVmList() *VmList {
+	return &VmList{
+		vms: make(map[string]*hypervisor.Vm),
+	}
+}
+
+func (vl *VmList) NewVm(id string, cpu, memory int, lazy bool) *hypervisor.Vm {
+	vmId := id
+
+	vl.Lock()
+	defer vl.Unlock()
+
+	if vmId == "" {
+		for {
+			vmId = fmt.Sprintf("vm-%s", pod.RandStr(10, "alpha"))
+			if _, ok := vl.vms[vmId]; !ok {
+				break
+			}
+		}
+		vl.vms[vmId] = nil
+	}
+	return hypervisor.NewVm(vmId, cpu, memory, lazy)
+}
+
+func (vl *VmList) Add(vm *hypervisor.Vm) {
+	vl.Lock()
+	defer vl.Unlock()
+
+	vl.vms[vm.Id] = vm
+}
+
+func (vl *VmList) Get(id string) (*hypervisor.Vm, bool) {
+	vl.RLock()
+	defer vl.RUnlock()
+
+	vm, ok := vl.vms[id]
+	return vm, ok
+}
+
+func (vl *VmList) Remove(id string) {
+	vl.Lock()
+	defer vl.Unlock()
+
+	delete(vl.vms, id)
+}
+
+type VmOp func(*hypervisor.Vm) error
+
+func (vl *VmList) Foreach(fn VmOp) error {
+	vl.Lock()
+	defer vl.Unlock()
+
+	for _, vm := range vl.vms {
+		if err := fn(vm); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
 
 func (daemon *Daemon) CreateVm(cpu, mem int, async bool) (*hypervisor.Vm, error) {
 	vm, err := daemon.StartVm("", cpu, mem, false)
@@ -38,7 +105,7 @@ func (daemon *Daemon) CreateVm(cpu, mem int, async bool) (*hypervisor.Vm, error)
 
 func (daemon *Daemon) KillVm(vmId string) (int, string, error) {
 	glog.V(3).Infof("KillVm %s", vmId)
-	vm, ok := daemon.VmList[vmId]
+	vm, ok := daemon.VmList.Get(vmId)
 	if !ok {
 		glog.V(3).Infof("Cannot find vm %s", vmId)
 		return 0, "", nil
@@ -64,7 +131,7 @@ func (p *Pod) AssociateVm(daemon *Daemon, vmId string) error {
 	}
 	glog.V(1).Infof("Get data for vm(%s) pod(%s)", vmId, p.Id)
 
-	p.vm = daemon.NewVm(vmId, p.spec.Resource.Vcpu, p.spec.Resource.Memory, false)
+	p.vm = daemon.VmList.NewVm(vmId, p.spec.Resource.Vcpu, p.spec.Resource.Memory, false)
 	p.status.Vm = vmId
 
 	err = p.vm.AssociateVm(p.status, vmData)
@@ -74,7 +141,7 @@ func (p *Pod) AssociateVm(daemon *Daemon, vmId string) error {
 		return err
 	}
 
-	daemon.AddVm(p.vm)
+	daemon.VmList.Add(p.vm)
 	return nil
 }
 
@@ -84,16 +151,17 @@ func (daemon *Daemon) ReleaseAllVms() (int, error) {
 		err error = nil
 	)
 
-	for _, vm := range daemon.VmList {
+	daemon.VmList.Foreach(func(vm *hypervisor.Vm) error {
 		glog.V(3).Infof("release vm %s", vm.Id)
 		ret, err = vm.ReleaseVm()
 		if err != nil {
-			/* FIXME: continue to release other vms? */
+			// FIXME: return nil to continue to release other vms?
 			glog.Errorf("fail to release vm %s: %v", vm.Id, err)
-			break
+			return err
 		}
-		daemon.RemoveVm(vm.Id)
-	}
+		delete(daemon.VmList.vms, vm.Id)
+		return nil
+	})
 
 	return ret, err
 }
@@ -128,7 +196,7 @@ func (daemon *Daemon) StartVm(vmId string, cpu, mem int, lazy bool) (vm *hypervi
 		vm, err = daemon.Factory.GetVm(cpu, mem)
 	}
 	if err == nil {
-		daemon.AddVm(vm)
+		daemon.VmList.Add(vm)
 	}
 	return vm, err
 }
@@ -153,7 +221,7 @@ func (daemon *Daemon) GetVM(vmId string, resource *pod.UserResource, lazy bool) 
 		return daemon.StartVm("", resource.Vcpu, resource.Memory, lazy)
 	}
 
-	vm, ok := daemon.VmList[vmId]
+	vm, ok := daemon.VmList.Get(vmId)
 	if !ok {
 		return nil, fmt.Errorf("The VM %s doesn't exist", vmId)
 	}
@@ -168,18 +236,4 @@ func (daemon *Daemon) GetVM(vmId string, resource *pod.UserResource, lazy bool) 
 	}
 
 	return vm, nil
-}
-
-func (daemon *Daemon) NewVm(id string, cpu, memory int, lazy bool) *hypervisor.Vm {
-	vmId := id
-
-	if vmId == "" {
-		for {
-			vmId = fmt.Sprintf("vm-%s", pod.RandStr(10, "alpha"))
-			if _, ok := daemon.VmList[vmId]; !ok {
-				break
-			}
-		}
-	}
-	return hypervisor.NewVm(vmId, cpu, memory, lazy)
 }
