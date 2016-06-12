@@ -1089,6 +1089,10 @@
 			"Rev": "9e6977f30c91c78396e719e164e57f9287fff42c"
 		},
 		{
+			"ImportPath": "github.com/golang/protobuf/protoc-gen-go",
+			"Rev": "9e6977f30c91c78396e719e164e57f9287fff42c"
+		},
+		{
 			"ImportPath": "github.com/golang/snappy",
 			"Rev": "723cc1e459b8eea2dea4583200fd60757d40097a"
 		},

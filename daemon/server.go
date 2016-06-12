@@ -7,7 +7,9 @@ import (
 	"os"
 	"strings"
 
+	"github.com/docker/distribution/digest"
 	"github.com/docker/docker/pkg/version"
+	"github.com/docker/docker/reference"
 	"github.com/docker/engine-api/types"
 	"github.com/docker/engine-api/types/container"
 	"github.com/docker/engine-api/types/strslice"
@@ -344,18 +346,69 @@ func (daemon *Daemon) CmdCleanPod(podId string) (*engine.Env, error) {
 	return v, nil
 }
 
-func (daemon *Daemon) CmdImageDelete(name string, force, prune bool) (*engine.Env, error) {
-	imagesList := []string{}
+func (daemon *Daemon) CmdImageDelete(name string, force, prune bool) ([]*apitypes.ImageDelete, error) {
 	list, err := daemon.Daemon.ImageDelete(name, force, prune)
 	if err != nil {
 		return nil, err
 	}
-	// FIXME
-	_ = list
-	v := &engine.Env{}
-	v.SetList("imagesList", imagesList)
 
-	return v, nil
+	result := make([]*apitypes.ImageDelete, len(list))
+	for index, img := range list {
+		result[index] = &apitypes.ImageDelete{
+			Untaged: img.Untagged,
+			Deleted: img.Deleted,
+		}
+	}
+
+	return result, nil
+}
+
+func (daemon *Daemon) CmdImagePull(image, tag string, authConfig *types.AuthConfig, metaHeaders map[string][]string, output io.Writer) error {
+	// Special case: "pull -a" may send an image name with a
+	// trailing :. This is ugly, but let's not break API
+	// compatibility.
+	image = strings.TrimSuffix(image, ":")
+
+	var ref reference.Named
+	ref, err := reference.ParseNamed(image)
+	if err != nil {
+		return err
+	}
+
+	if tag != "" {
+		// The "tag" could actually be a digest.
+		var dgst digest.Digest
+		dgst, err = digest.ParseDigest(tag)
+		if err == nil {
+			ref, err = reference.WithDigest(ref, dgst)
+		} else {
+			ref, err = reference.WithTag(ref, tag)
+		}
+	}
+
+	return daemon.Daemon.PullImage(ref, metaHeaders, authConfig, output)
+}
+
+func (daemon *Daemon) CmdImagePush(repo, tag string, authConfig *types.AuthConfig, metaHeaders map[string][]string, output io.Writer) error {
+	// Special case: "pull -a" may send an image name with a
+	// trailing :. This is ugly, but let's not break API
+	// compatibility.
+	repo = strings.TrimSuffix(repo, ":")
+
+	var ref reference.Named
+	ref, err := reference.ParseNamed(repo)
+	if err != nil {
+		return err
+	}
+
+	if tag != "" {
+		ref, err = reference.WithTag(ref, tag)
+		if err != nil {
+			return err
+		}
+	}
+
+	return daemon.Daemon.PushImage(ref, metaHeaders, authConfig, output)
 }
 
 func (daemon *Daemon) CmdStopPod(podId, stopVm string) (*engine.Env, error) {

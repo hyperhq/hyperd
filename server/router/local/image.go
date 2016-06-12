@@ -8,13 +8,13 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/docker/distribution/digest"
 	"github.com/docker/docker/builder/dockerfile"
 	"github.com/docker/docker/pkg/ioutils"
 	"github.com/docker/docker/pkg/streamformatter"
 	"github.com/docker/docker/reference"
 	"github.com/docker/engine-api/types"
 	"github.com/docker/engine-api/types/container"
+	"github.com/hyperhq/hyperd/engine"
 	"github.com/hyperhq/hyperd/server/httputils"
 	"golang.org/x/net/context"
 )
@@ -51,35 +51,14 @@ func (s *router) postImagesCreate(ctx context.Context, w http.ResponseWriter, r 
 	w.Header().Set("Content-Type", "application/json")
 
 	if image != "" { //pull
-		// Special case: "pull -a" may send an image name with a
-		// trailing :. This is ugly, but let's not break API
-		// compatibility.
-		image = strings.TrimSuffix(image, ":")
-
-		var ref reference.Named
-		ref, err = reference.ParseNamed(image)
-		if err == nil {
-			if tag != "" {
-				// The "tag" could actually be a digest.
-				var dgst digest.Digest
-				dgst, err = digest.ParseDigest(tag)
-				if err == nil {
-					ref, err = reference.WithDigest(ref, dgst)
-				} else {
-					ref, err = reference.WithTag(ref, tag)
-				}
-			}
-			if err == nil {
-				metaHeaders := map[string][]string{}
-				for k, v := range r.Header {
-					if strings.HasPrefix(k, "X-Meta-") {
-						metaHeaders[k] = v
-					}
-				}
-
-				err = s.daemon.PullImage(ref, metaHeaders, authConfig, output)
+		metaHeaders := map[string][]string{}
+		for k, v := range r.Header {
+			if strings.HasPrefix(k, "X-Meta-") {
+				metaHeaders[k] = v
 			}
 		}
+
+		err = s.daemon.CmdImagePull(image, tag, authConfig, metaHeaders, output)
 	} else { //import
 		var newRef reference.Named
 		if repo != "" {
@@ -168,25 +147,13 @@ func (s *router) postImagesPush(ctx context.Context, w http.ResponseWriter, r *h
 		}
 	}
 
-	ref, err := reference.ParseNamed(r.Form.Get("remote"))
-	if err != nil {
-		return err
-	}
+	repo := r.Form.Get("remote")
 	tag := r.Form.Get("tag")
-	if tag != "" {
-		// Push by digest is not supported, so only tags are supported.
-		ref, err = reference.WithTag(ref, tag)
-		if err != nil {
-			return err
-		}
-	}
-
 	output := ioutils.NewWriteFlusher(w)
 	defer output.Close()
-
 	w.Header().Set("Content-Type", "application/json")
 
-	if err := s.daemon.PushImage(ref, metaHeaders, authConfig, output); err != nil {
+	if err := s.daemon.CmdImagePush(repo, tag, authConfig, metaHeaders, output); err != nil {
 		if !output.Flushed() {
 			return err
 		}
@@ -210,11 +177,13 @@ func (s *router) deleteImages(ctx context.Context, w http.ResponseWriter, r *htt
 	force := httputils.BoolValue(r, "force")
 	prune := !httputils.BoolValue(r, "noprune")
 
-	env, err := s.daemon.CmdImageDelete(name, force, prune)
+	images, err := s.daemon.CmdImageDelete(name, force, prune)
 	if err != nil {
 		return err
 	}
 
+	env := &engine.Env{}
+	env.SetJson("imagesList", images)
 	return env.WriteJSON(w, http.StatusOK)
 }
 

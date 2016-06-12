@@ -42,6 +42,11 @@ func (s *ServerRPC) PodStart(stream types.PublicAPI_PodStartServer) error {
 			return err
 		}
 
+		// Send an empty message to client, so client could wait for start complete
+		if err := stream.Send(&types.PodStartMessage{}); err != nil {
+			return err
+		}
+
 		return nil
 	}
 
