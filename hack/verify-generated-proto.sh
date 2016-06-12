@@ -12,6 +12,9 @@ fi
 HYPER_ROOT=$(dirname "${BASH_SOURCE}")/..
 _tmp="${HYPER_ROOT}/_tmp"
 
+hack/build-protoc-gen-go.sh
+export PATH=${HYPER_ROOT}/Godeps/_workspace/src/github.com/golang/protobuf/protoc-gen-go/:$PATH
+
 cleanup() {
   rm -rf "${_tmp}"
 }

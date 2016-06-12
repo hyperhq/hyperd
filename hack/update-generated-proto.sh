@@ -9,5 +9,9 @@ if [[ $? != 0 ]]; then
     exit 1
 fi
 
+HYPER_ROOT=$(dirname "${BASH_SOURCE}")/..
+hack/build-protoc-gen-go.sh
+export PATH=${HYPER_ROOT}/Godeps/_workspace/src/github.com/golang/protobuf/protoc-gen-go/:$PATH
+
 protoc --go_out=plugins=grpc:. types/types.proto
 echo "Generated types from proto updated."
