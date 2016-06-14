@@ -140,7 +140,7 @@ func (s *ServerRPC) ImageRemove(ctx context.Context, req *types.ImageRemoveReque
 
 	resp, err := s.daemon.CmdImageDelete(req.Image, req.Force, req.Prune)
 	if err != nil {
-		glog.Errorf("DeleteImage failed: %v")
+		glog.Errorf("DeleteImage failed: %v", err)
 		return nil, err
 	}
 
