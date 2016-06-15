@@ -314,14 +314,14 @@ message UserInterface {
 }
 
 message UserServiceBackend {
-  string hostip   = 1;
-  int32 hostport  = 2;
+  string hostIP   = 1;
+  int32 hostPort  = 2;
 }
 
 message UserService {
-  string serviceip                  = 1;
+  string serviceIP                  = 1;
   string protocol                   = 2;
-  int32 serviceport                 = 3;
+  int32 servicePort                 = 3;
   repeated UserServiceBackend hosts = 4;
 }
 
@@ -515,6 +515,30 @@ message VersionResponse {
   string apiVersion = 2;
 }
 
+message ServiceListResponse {
+  repeated UserService services = 1;
+}
+
+message ServiceListRequest {
+  string podID =1;
+}
+
+message ServiceAddRequest {
+  string podID =1;
+  string data  =2;
+}
+
+message ServiceAddResponse {
+}
+
+message ServiceDelRequest {
+  string podID =1;
+  string data  =2;
+}
+
+message ServiceDelResponse {
+}
+
 // PublicAPI defines the public APIs which are handled over TCP sockets.
 service PublicAPI {
     // PodList gets a list of pods
@@ -567,11 +591,14 @@ service PublicAPI {
     // Wait gets the exit code of the specified container
     rpc Wait(WaitRequest) returns (WaitResponse) {}
     // TODO: TTYResize resizes the tty of the specified container
-
-    // TODO: ServiceList gets a list of services
-    // TODO: ServiceCreate creates a new service
+    
+    // ServiceList  implements   /service/list
+    rpc ServiceList(ServiceListRequest) returns (ServiceListResponse) {}
+    // ServiceAdd implements  POST   /service/add
+    rpc ServiceAdd(ServiceAddRequest) returns (ServiceAddResponse){}
+    // ServiceDelete implements  DELETE /service
+    rpc ServiceDelete(ServiceDelRequest) returns (ServiceDelResponse){}
     // TODO: ServiceUpdate updates an existing service
-    // TODO: ServiceDelete deletes the specified service
 
     // ImagePull pulls a image from registry
     rpc ImagePull(ImagePullRequest) returns (stream ImagePullResponse) {}

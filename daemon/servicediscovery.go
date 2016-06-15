@@ -136,7 +136,7 @@ func (daemon *Daemon) GetServiceContainerInfo(podId string) (*hypervisor.Vm, str
 	glog.V(1).Infof("Get container id is %s", container)
 
 	if pod.vm == nil {
-		return nil, "", fmt.Errorf("Can find VM for %s!", podId)
+		return nil, "", fmt.Errorf("Cannot find VM for %s!", podId)
 	}
 
 	return pod.vm, container, nil

@@ -253,3 +253,53 @@ func (s *TestSuite) TestPullImage(c *C) {
 	}
 	c.Assert(found, Equals, false)
 }
+
+func (s *TestSuite) TestAddListDeleteService(c *C) {
+	spec := types.UserPod{
+		Containers: []*types.UserContainer{
+			{
+				Image:   "busybox",
+				Command: []string{"sleep", "10000"},
+			},
+		},
+		Services: []*types.UserService{
+			&types.UserService{
+				ServiceIP:   "10.254.0.24",
+				ServicePort: 2834,
+				Protocol:    "TCP",
+				Hosts: []*types.UserServiceBackend{
+					&types.UserServiceBackend{
+						HostIP:   "192.168.23.2",
+						HostPort: 2345,
+					},
+				},
+			},
+		},
+	}
+
+	pod, err := s.client.CreatePod(&spec)
+	c.Assert(err, IsNil)
+	c.Logf("Pod created: %v", pod)
+
+	// clear the test pod
+	defer func() {
+		err = s.client.RemovePod(pod)
+		c.Assert(err, IsNil)
+	}()
+
+	err = s.client.StartPod(pod, "", "")
+	c.Assert(err, IsNil)
+
+	// testService := "[{\"serviceip\": \"10.10.0.22\",\"serviceport\": 80,\"protocol\": \"TCP\",\"hosts\": [{\"hostip\": \"192.168.23.2\",\"hostport\": 8080}]}]"
+	// err = s.client.AddService(pod, testService)
+	// c.Assert(err, IsNil)
+
+	svcList, err := s.client.ListService(pod)
+	c.Assert(err, IsNil)
+	c.Assert(len(svcList), Equals, 2)
+
+	// err = s.client.DeleteService(pod, testService)
+	// c.Assert(err, IsNil)
+	// svcList, err = s.client.ListService(pod)
+	// c.Assert(len(svcList), Equals, 1)
+}

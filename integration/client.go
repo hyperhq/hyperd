@@ -457,3 +457,44 @@ func (c *HyperClient) PushImage(repo, tag string, out io.Writer) error {
 
 	return nil
 }
+
+// DeleteService deletes user service by podID and service content
+func (c *HyperClient) DeleteService(podID string, data string) error {
+	_, err := c.client.ServiceDelete(
+		c.ctx,
+		&types.ServiceDelRequest{PodID: podID, Data: data},
+	)
+
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// ListService lists user services by podID
+func (c *HyperClient) ListService(podID string) ([]*types.UserService, error) {
+	resp, err := c.client.ServiceList(
+		c.ctx,
+		&types.ServiceListRequest{PodID: podID},
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.UserService, nil
+}
+
+// AddService add user service by podID and service content
+func (c *HyperClient) AddService(podID string, data string) error {
+	_, err := c.client.ServiceAdd(
+		c.ctx,
+		&types.ServiceAddRequest{PodID: podID, Data: data},
+	)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
