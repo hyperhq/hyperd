@@ -63,8 +63,9 @@ message ContainerInfo {
   repeated VolumeMount volumeMounts = 10;
   bool tty                          = 11;
   string imagePullPolicy            = 12;
-	string podID                      = 13;
-	ContainerStatus status            = 14;
+  string podID                      = 13;
+  ContainerStatus status            = 14;
+  map<string, string> labels        = 15;
 }
 
 message Container {
@@ -80,6 +81,7 @@ message Container {
   repeated VolumeMount volumeMounts = 10;
   bool tty                          = 11;
   string imagePullPolicy            = 12;
+  map<string, string> labels        = 13;
 }
 
 message RBDVolumeSource {
@@ -275,6 +277,7 @@ message UserContainer {
   repeated UserVolumeReference volumes  = 11;
   repeated UserFileReference files      = 12;
   UserUser user                         = 13;
+  map<string, string> labels            = 14;
 }
 
 message UserResource {
@@ -392,8 +395,7 @@ message DriverStatus {
   string status   = 2;
 }
 
-message InfoRequest {
-}
+message InfoRequest {}
 
 message InfoResponse {
   string  ID                      = 1;
@@ -502,8 +504,15 @@ message ContainerStopRequest {
   string containerID   = 1;
 }
 
-message ContainerStopResponse {
+message ContainerStopResponse {}
 
+message VersionRequest {}
+
+message VersionResponse {
+  // Version is the version of hyperd
+  string version = 1;
+  // ApiVersion is the version of gRPC API
+  string apiVersion = 2;
 }
 
 // PublicAPI defines the public APIs which are handled over TCP sockets.
@@ -576,6 +585,7 @@ service PublicAPI {
     // TODO: Ping checks if hyperd is running (returns 'OK' on success)
     // Info gets the info of hyperd
     rpc Info(InfoRequest) returns (InfoResponse) {}
-    // TODO: Version gets the version of hyperd
+    // Version gets the version and apiVersion of hyperd
+    rpc Version(VersionRequest) returns (VersionResponse) {}
     // TODO: Auth auths a user to the specified docker registry
 }

@@ -54,6 +54,7 @@ func convertToRunvContainerSpec(v *apitypes.UserContainer, podTTY bool) pod.User
 		Entrypoint:    v.Entrypoint,
 		Sysctl:        v.Sysctl,
 		RestartPolicy: v.RestartPolicy,
+		Labels:        v.Labels,
 	}
 
 	if v.User != nil {
