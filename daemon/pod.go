@@ -246,7 +246,7 @@ func convertToRunvPodSpec(podSpec *apitypes.UserPod) (*pod.UserPod, error) {
 				hosts := make([]pod.UserServiceBackend, 0, len(svc.Hosts))
 				for _, host := range svc.Hosts {
 					hosts = append(hosts, pod.UserServiceBackend{
-						HostIP:   host.HostIp,
+						HostIP:   host.HostIP,
 						HostPort: int(host.HostPort),
 					})
 				}

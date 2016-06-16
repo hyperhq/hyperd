@@ -539,6 +539,14 @@ message ServiceDelRequest {
 message ServiceDelResponse {
 }
 
+message ServiceUpdateRequest {
+  string podID =1;
+  string data  =2;
+}
+
+message ServiceUpdateResponse {
+}
+
 // PublicAPI defines the public APIs which are handled over TCP sockets.
 service PublicAPI {
     // PodList gets a list of pods
@@ -598,7 +606,8 @@ service PublicAPI {
     rpc ServiceAdd(ServiceAddRequest) returns (ServiceAddResponse){}
     // ServiceDelete implements  DELETE /service
     rpc ServiceDelete(ServiceDelRequest) returns (ServiceDelResponse){}
-    // TODO: ServiceUpdate updates an existing service
+    // ServiceUpdate updates an existing service
+    rpc ServiceUpdate(ServiceUpdateRequest) returns (ServiceUpdateResponse){}
 
     // ImagePull pulls a image from registry
     rpc ImagePull(ImagePullRequest) returns (stream ImagePullResponse) {}

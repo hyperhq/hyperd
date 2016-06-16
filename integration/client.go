@@ -482,14 +482,28 @@ func (c *HyperClient) ListService(podID string) ([]*types.UserService, error) {
 		return nil, err
 	}
 
-	return resp.UserService, nil
+	return resp.Services, nil
 }
 
-// AddService add user service by podID and service content
+// AddService adds user service by podID and service content
 func (c *HyperClient) AddService(podID string, data string) error {
 	_, err := c.client.ServiceAdd(
 		c.ctx,
 		&types.ServiceAddRequest{PodID: podID, Data: data},
+	)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// UpdateService updates user service by podID and service content
+func (c *HyperClient) UpdateService(podID string, data string) error {
+	_, err := c.client.ServiceUpdate(
+		c.ctx,
+		&types.ServiceUpdateRequest{PodID: podID, Data: data},
 	)
 
 	if err != nil {

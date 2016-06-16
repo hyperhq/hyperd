@@ -34,7 +34,7 @@ func (s *ServerRPC) ServiceList(ctx context.Context, req *types.ServiceListReque
 	}
 
 	return &types.ServiceListResponse{
-		UserService: result,
+		Services: result,
 	}, nil
 }
 
@@ -60,4 +60,16 @@ func (s *ServerRPC) ServiceDelete(ctx context.Context, req *types.ServiceDelRequ
 		return nil, err
 	}
 	return &types.ServiceDelResponse{}, nil
+}
+
+// ServiceUpdate implements UPDATE /service
+func (s *ServerRPC) ServiceUpdate(ctx context.Context, req *types.ServiceUpdateRequest) (*types.ServiceUpdateResponse, error) {
+	glog.V(3).Infof("ServiceUpdate with request %s", req.String())
+
+	err := s.daemon.UpdateService(req.PodID, req.Data)
+	if err != nil {
+		glog.Errorf("ServiceUpdate error: %v", err)
+		return nil, err
+	}
+	return &types.ServiceUpdateResponse{}, nil
 }
