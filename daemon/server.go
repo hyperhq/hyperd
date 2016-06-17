@@ -480,7 +480,13 @@ func (daemon *Daemon) CmdKillVm(vmId string) (*engine.Env, error) {
 }
 
 func (daemon *Daemon) CmdAddService(podId, data string) (*engine.Env, error) {
-	err := daemon.AddService(podId, data)
+	var srvs []pod.UserService
+	err := json.Unmarshal([]byte(data), &srvs)
+	if err != nil {
+		return nil, err
+	}
+
+	err = daemon.AddService(podId, srvs)
 	if err != nil {
 		return nil, err
 	}
@@ -491,7 +497,13 @@ func (daemon *Daemon) CmdAddService(podId, data string) (*engine.Env, error) {
 }
 
 func (daemon *Daemon) CmdUpdateService(podId, data string) (*engine.Env, error) {
-	err := daemon.UpdateService(podId, data)
+	var srvs []pod.UserService
+	err := json.Unmarshal([]byte(data), &srvs)
+	if err != nil {
+		return nil, err
+	}
+
+	err = daemon.UpdateService(podId, srvs)
 	if err != nil {
 		return nil, err
 	}
@@ -502,7 +514,13 @@ func (daemon *Daemon) CmdUpdateService(podId, data string) (*engine.Env, error) 
 }
 
 func (daemon *Daemon) CmdDeleteService(podId, data string) (*engine.Env, error) {
-	err := daemon.DeleteService(podId, data)
+	var srvs []pod.UserService
+	err := json.Unmarshal([]byte(data), &srvs)
+	if err != nil {
+		return nil, err
+	}
+
+	err = daemon.DeleteService(podId, srvs)
 	if err != nil {
 		return nil, err
 	}

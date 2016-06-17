@@ -459,10 +459,10 @@ func (c *HyperClient) PushImage(repo, tag string, out io.Writer) error {
 }
 
 // DeleteService deletes user service by podID and service content
-func (c *HyperClient) DeleteService(podID string, data string) error {
+func (c *HyperClient) DeleteService(podID string, services []*types.UserService) error {
 	_, err := c.client.ServiceDelete(
 		c.ctx,
-		&types.ServiceDelRequest{PodID: podID, Data: data},
+		&types.ServiceDelRequest{PodID: podID, Services: services},
 	)
 
 	if err != nil {
@@ -486,10 +486,10 @@ func (c *HyperClient) ListService(podID string) ([]*types.UserService, error) {
 }
 
 // AddService adds user service by podID and service content
-func (c *HyperClient) AddService(podID string, data string) error {
+func (c *HyperClient) AddService(podID string, services []*types.UserService) error {
 	_, err := c.client.ServiceAdd(
 		c.ctx,
-		&types.ServiceAddRequest{PodID: podID, Data: data},
+		&types.ServiceAddRequest{PodID: podID, Services: services},
 	)
 
 	if err != nil {
@@ -500,10 +500,10 @@ func (c *HyperClient) AddService(podID string, data string) error {
 }
 
 // UpdateService updates user service by podID and service content
-func (c *HyperClient) UpdateService(podID string, data string) error {
+func (c *HyperClient) UpdateService(podID string, services []*types.UserService) error {
 	_, err := c.client.ServiceUpdate(
 		c.ctx,
-		&types.ServiceUpdateRequest{PodID: podID, Data: data},
+		&types.ServiceUpdateRequest{PodID: podID, Services: services},
 	)
 
 	if err != nil {

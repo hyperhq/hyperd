@@ -1,7 +1,6 @@
 package daemon
 
 import (
-	"encoding/json"
 	"fmt"
 	"path"
 
@@ -12,20 +11,13 @@ import (
 	"github.com/hyperhq/runv/hypervisor/pod"
 )
 
-func (daemon *Daemon) AddService(podId, data string) error {
-	var srvs []pod.UserService
-
+func (daemon *Daemon) AddService(podId string, srvs []pod.UserService) error {
 	vm, container, err := daemon.GetServiceContainerInfo(podId)
 	if err != nil {
 		return err
 	}
 
 	services, err := servicediscovery.GetServices(vm, container)
-	if err != nil {
-		return err
-	}
-
-	json.Unmarshal([]byte(data), &srvs)
 	if err != nil {
 		return err
 	}
@@ -41,28 +33,20 @@ func (daemon *Daemon) AddService(podId, data string) error {
 	return nil
 }
 
-func (daemon *Daemon) UpdateService(podId, data string) error {
-	var srv []pod.UserService
-
+func (daemon *Daemon) UpdateService(podId string, srvs []pod.UserService) error {
 	vm, container, err := daemon.GetServiceContainerInfo(podId)
 	if err != nil {
 		return err
 	}
 
-	err = json.Unmarshal([]byte(data), &srv)
-	if err != nil {
-		return err
-	}
-
-	if err := servicediscovery.ApplyServices(vm, container, srv); err != nil {
+	if err := servicediscovery.ApplyServices(vm, container, srvs); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (daemon *Daemon) DeleteService(podId, data string) error {
-	var srvs []pod.UserService
+func (daemon *Daemon) DeleteService(podId string, srvs []pod.UserService) error {
 	var services []pod.UserService
 	var services2 []pod.UserService
 	var found int = 0
@@ -73,11 +57,6 @@ func (daemon *Daemon) DeleteService(podId, data string) error {
 	}
 
 	services, err = servicediscovery.GetServices(vm, container)
-	if err != nil {
-		return err
-	}
-
-	err = json.Unmarshal([]byte(data), &srvs)
 	if err != nil {
 		return err
 	}

@@ -293,7 +293,20 @@ func (s *TestSuite) TestAddListDeleteService(c *C) {
 	err = s.client.StartPod(pod, "", "")
 	c.Assert(err, IsNil)
 
-	updateService := "[{\"serviceip\": \"10.10.0.100\",\"serviceport\": 80,\"protocol\": \"TCP\",\"hosts\": [{\"hostip\": \"192.168.23.2\",\"hostport\": 8080}]}]"
+	updateService := []*types.UserService{
+		{
+			ServiceIP:   "10.10.0.100",
+			ServicePort: 80,
+			Protocol:    "TCP",
+			Hosts: []*types.UserServiceBackend{
+				{
+					HostIP:   "192.168.23.2",
+					HostPort: 8080,
+				},
+			},
+		},
+	}
+
 	err = s.client.UpdateService(pod, updateService)
 	c.Assert(err, IsNil)
 
@@ -302,7 +315,20 @@ func (s *TestSuite) TestAddListDeleteService(c *C) {
 	c.Assert(len(svcList), Equals, 1)
 	c.Assert(svcList[0].ServiceIP, Equals, "10.10.0.100")
 
-	addService := "[{\"serviceip\": \"10.10.0.22\",\"serviceport\": 80,\"protocol\": \"TCP\",\"hosts\": [{\"hostip\": \"192.168.23.2\",\"hostport\": 8080}]}]"
+	addService := []*types.UserService{
+		{
+			ServiceIP:   "10.10.0.22",
+			ServicePort: 80,
+			Protocol:    "TCP",
+			Hosts: []*types.UserServiceBackend{
+				{
+					HostIP:   "192.168.23.2",
+					HostPort: 8080,
+				},
+			},
+		},
+	}
+
 	err = s.client.AddService(pod, addService)
 	c.Assert(err, IsNil)
 	svcList, err = s.client.ListService(pod)

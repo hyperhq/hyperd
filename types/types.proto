@@ -524,24 +524,24 @@ message ServiceListRequest {
 }
 
 message ServiceAddRequest {
-  string podID =1;
-  string data  =2;
+  string podID                   =1;
+  repeated UserService services  =2;
 }
 
 message ServiceAddResponse {
 }
 
 message ServiceDelRequest {
-  string podID =1;
-  string data  =2;
+  string podID                   =1;
+  repeated UserService services  =2;
 }
 
 message ServiceDelResponse {
 }
 
 message ServiceUpdateRequest {
-  string podID =1;
-  string data  =2;
+  string podID                   =1;
+  repeated UserService services  =2;
 }
 
 message ServiceUpdateResponse {
@@ -600,13 +600,13 @@ service PublicAPI {
     rpc Wait(WaitRequest) returns (WaitResponse) {}
     // TODO: TTYResize resizes the tty of the specified container
     
-    // ServiceList  implements   /service/list
+    // ServiceList gets a list of services
     rpc ServiceList(ServiceListRequest) returns (ServiceListResponse) {}
-    // ServiceAdd implements  POST   /service/add
+    // ServiceAdd add a service to a pod
     rpc ServiceAdd(ServiceAddRequest) returns (ServiceAddResponse){}
-    // ServiceDelete implements  DELETE /service
+    // ServiceDelete delete a service from a pod
     rpc ServiceDelete(ServiceDelRequest) returns (ServiceDelResponse){}
-    // ServiceUpdate updates an existing service
+    // ServiceUpdate updates an existing service of a pod
     rpc ServiceUpdate(ServiceUpdateRequest) returns (ServiceUpdateResponse){}
 
     // ImagePull pulls a image from registry
