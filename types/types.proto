@@ -498,6 +498,14 @@ message ImageRemoveResponse {
   repeated ImageDelete images = 1;
 }
 
+message ContainerStopRequest {
+  string containerID   = 1;
+}
+
+message ContainerStopResponse {
+
+}
+
 // PublicAPI defines the public APIs which are handled over TCP sockets.
 service PublicAPI {
     // PodList gets a list of pods
@@ -541,6 +549,8 @@ service PublicAPI {
     // TODO: ContainerCommit commits the changes of the specified container
     // TODO: ContainerSignal sends a singla to specified container
     // TODO: ContainerLabels updates labels of the specified container
+    // ContainerStop stops the specified container
+    rpc ContainerStop(ContainerStopRequest) returns (ContainerStopResponse) {}
     // ContainerExec execs a command in specified container
     rpc ContainerExec(stream ContainerExecRequest) returns (stream ContainerExecResponse) {}
     // Attach attaches to the specified container

@@ -181,6 +181,16 @@ func (daemon *Daemon) CmdKillContainer(name string, sig int64) (*engine.Env, err
 	return v, nil
 }
 
+func (daemon *Daemon) CmdStopContainer(name string) (*engine.Env, error) {
+	err := daemon.StopContainer(name)
+	if err != nil {
+		glog.Errorf("fail to stop container %s: %v", name, err)
+		return nil, err
+	}
+	v := &engine.Env{}
+	return v, nil
+}
+
 func (daemon *Daemon) CmdExec(stdin io.ReadCloser, stdout io.WriteCloser, key, id, cmd, tag string, terminal bool) error {
 	return daemon.Exec(stdin, stdout, key, id, cmd, tag, terminal)
 }

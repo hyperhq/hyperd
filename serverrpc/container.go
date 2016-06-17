@@ -20,3 +20,16 @@ func (s *ServerRPC) ContainerCreate(ctx context.Context, req *types.ContainerCre
 		ContainerID: containerID,
 	}, nil
 }
+
+// ContainerStop implements POST /container/stop
+func (s *ServerRPC) ContainerStop(c context.Context, req *types.ContainerStopRequest) (*types.ContainerStopResponse, error) {
+	glog.V(3).Infof("ContainerStop with request %v", req.String())
+
+	err := s.daemon.StopContainer(req.ContainerID)
+	if err != nil {
+		glog.Errorf("ContainerStop error: %v", err)
+		return nil, err
+	}
+
+	return &types.ContainerStopResponse{}, nil
+}

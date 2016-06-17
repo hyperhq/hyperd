@@ -8,6 +8,17 @@ import (
 	"github.com/hyperhq/hyperd/engine"
 )
 
+func (cli *Client) StopContainer(container string) error {
+	v := url.Values{}
+	v.Set("container", container)
+
+	_, _, err := readBody(cli.call("POST", "/container/stop?"+v.Encode(), nil, nil))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (cli *Client) StopPod(podId, stopVm string) (int, string, error) {
 	v := url.Values{}
 	v.Set("podId", podId)

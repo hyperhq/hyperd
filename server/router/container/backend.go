@@ -14,6 +14,7 @@ type Backend interface {
 	CmdExitCode(container, tag string) (int, error)
 	CmdCreateContainer(podId string, containerArgs []byte) (string, error)
 	CmdKillContainer(name string, sig int64) (*engine.Env, error)
+	CmdStopContainer(name string) (*engine.Env, error)
 	CmdContainerRename(oldName, newName string) (*engine.Env, error)
 	CmdExec(in io.ReadCloser, out io.WriteCloser, key, id, cmd, tag string, terminal bool) error
 	CmdAttach(in io.ReadCloser, out io.WriteCloser, key, id, tag string) error
