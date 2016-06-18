@@ -121,6 +121,8 @@ It has these top-level messages:
 	PodLabelsResponse
 	PodStatsRequest
 	PodStatsResponse
+	ContainerRemoveRequest
+	ContainerRemoveResponse
 */
 package types
 
@@ -1860,6 +1862,21 @@ func (m *PodStatsResponse) GetPodStats() *PodStats {
 	return nil
 }
 
+type ContainerRemoveRequest struct {
+	ContainerID string `protobuf:"bytes,1,opt,name=containerID,proto3" json:"containerID,omitempty"`
+}
+
+func (m *ContainerRemoveRequest) Reset()         { *m = ContainerRemoveRequest{} }
+func (m *ContainerRemoveRequest) String() string { return proto.CompactTextString(m) }
+func (*ContainerRemoveRequest) ProtoMessage()    {}
+
+type ContainerRemoveResponse struct {
+}
+
+func (m *ContainerRemoveResponse) Reset()         { *m = ContainerRemoveResponse{} }
+func (m *ContainerRemoveResponse) String() string { return proto.CompactTextString(m) }
+func (*ContainerRemoveResponse) ProtoMessage()    {}
+
 func init() {
 	proto.RegisterType((*ContainerPort)(nil), "types.ContainerPort")
 	proto.RegisterType((*EnvironmentVar)(nil), "types.EnvironmentVar")
@@ -1973,6 +1990,8 @@ func init() {
 	proto.RegisterType((*PodLabelsResponse)(nil), "types.PodLabelsResponse")
 	proto.RegisterType((*PodStatsRequest)(nil), "types.PodStatsRequest")
 	proto.RegisterType((*PodStatsResponse)(nil), "types.PodStatsResponse")
+	proto.RegisterType((*ContainerRemoveRequest)(nil), "types.ContainerRemoveRequest")
+	proto.RegisterType((*ContainerRemoveResponse)(nil), "types.ContainerRemoveResponse")
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -2030,6 +2049,8 @@ type PublicAPIClient interface {
 	ExecCreate(ctx context.Context, in *ExecCreateRequest, opts ...grpc.CallOption) (*ExecCreateResponse, error)
 	// ExecStart starts exec
 	ExecStart(ctx context.Context, opts ...grpc.CallOption) (PublicAPI_ExecStartClient, error)
+	// ContainerRemove deletes the specified container
+	ContainerRemove(ctx context.Context, in *ContainerRemoveRequest, opts ...grpc.CallOption) (*ContainerRemoveResponse, error)
 	// Attach attaches to the specified container
 	Attach(ctx context.Context, opts ...grpc.CallOption) (PublicAPI_AttachClient, error)
 	// Wait gets the exit code of the specified container
@@ -2328,6 +2349,15 @@ func (x *publicAPIExecStartClient) Recv() (*ExecStartResponse, error) {
 	return m, nil
 }
 
+func (c *publicAPIClient) ContainerRemove(ctx context.Context, in *ContainerRemoveRequest, opts ...grpc.CallOption) (*ContainerRemoveResponse, error) {
+	out := new(ContainerRemoveResponse)
+	err := grpc.Invoke(ctx, "/types.PublicAPI/ContainerRemove", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *publicAPIClient) Attach(ctx context.Context, opts ...grpc.CallOption) (PublicAPI_AttachClient, error) {
 	stream, err := grpc.NewClientStream(ctx, &_PublicAPI_serviceDesc.Streams[3], c.cc, "/types.PublicAPI/Attach", opts...)
 	if err != nil {
@@ -2546,6 +2576,8 @@ type PublicAPIServer interface {
 	ExecCreate(context.Context, *ExecCreateRequest) (*ExecCreateResponse, error)
 	// ExecStart starts exec
 	ExecStart(PublicAPI_ExecStartServer) error
+	// ContainerRemove deletes the specified container
+	ContainerRemove(context.Context, *ContainerRemoveRequest) (*ContainerRemoveResponse, error)
 	// Attach attaches to the specified container
 	Attach(PublicAPI_AttachServer) error
 	// Wait gets the exit code of the specified container
@@ -2876,6 +2908,18 @@ func (x *publicAPIExecStartServer) Recv() (*ExecStartRequest, error) {
 	return m, nil
 }
 
+func _PublicAPI_ContainerRemove_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
+	in := new(ContainerRemoveRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	out, err := srv.(PublicAPIServer).ContainerRemove(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func _PublicAPI_Attach_Handler(srv interface{}, stream grpc.ServerStream) error {
 	return srv.(PublicAPIServer).Attach(&publicAPIAttachServer{stream})
 }
@@ -3119,6 +3163,10 @@ var _PublicAPI_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ExecCreate",
 			Handler:    _PublicAPI_ExecCreate_Handler,
+		},
+		{
+			MethodName: "ContainerRemove",
+			Handler:    _PublicAPI_ContainerRemove_Handler,
 		},
 		{
 			MethodName: "Wait",

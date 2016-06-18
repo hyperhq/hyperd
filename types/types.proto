@@ -707,6 +707,14 @@ message PodStatsResponse {
   PodStats podStats = 1;
 }
 
+message ContainerRemoveRequest {
+  string containerID   = 1;
+}
+
+message ContainerRemoveResponse {
+  
+}
+
 // PublicAPI defines the public APIs which are handled over TCP sockets.
 service PublicAPI {
     // PodList gets a list of pods
@@ -763,6 +771,8 @@ service PublicAPI {
     rpc ExecCreate(ExecCreateRequest) returns (ExecCreateResponse) {}
     // ExecStart starts exec
     rpc ExecStart(stream ExecStartRequest) returns (stream ExecStartResponse) {}
+    // ContainerRemove deletes the specified container
+    rpc ContainerRemove(ContainerRemoveRequest) returns (ContainerRemoveResponse) {}
     // Attach attaches to the specified container
     rpc Attach(stream AttachMessage) returns (stream AttachMessage) {}
     // Wait gets the exit code of the specified container
