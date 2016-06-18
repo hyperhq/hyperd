@@ -78,7 +78,7 @@ func (daemon *Daemon) RemovePodContainer(p *Pod) {
 	daemon.db.DeleteP2C(p.Id)
 }
 
-func (daemon *Daemon) DeleteContainer(containerId string) error {
+func (daemon *Daemon) RemoveContainer(containerId string) error {
 	pod, idx, ok := daemon.PodList.GetByContainerIdOrName(containerId)
 	if !ok {
 		return fmt.Errorf("can not find container %s", containerId)
@@ -90,10 +90,12 @@ func (daemon *Daemon) DeleteContainer(containerId string) error {
 	}
 	defer pod.TransitionUnlock("rm")
 
-	if pod.status.Status == types.S_POD_RUNNING && pod.status.Containers[idx].Status == types.S_POD_RUNNING {
-		err := daemon.StopContainerWithinLock(pod, containerId)
-		if err != nil {
-			return fmt.Errorf("failed to stop container %s", containerId)
+	if pod.PodStatus.Status == types.S_POD_RUNNING {
+		if pod.PodStatus.Containers[idx].Status == types.S_POD_RUNNING {
+			return fmt.Errorf("Container %s is still running, stop it first", containerId)
+		}
+		if err := pod.VM.RemoveContainer(containerId); err != nil {
+			return err
 		}
 	}
 
@@ -122,15 +124,15 @@ func (daemon *Daemon) DeleteContainer(containerId string) error {
 		return fmt.Errorf("fail to unpack container json response for %s of %s", containerId, pod.Id)
 	}
 	name := strings.TrimLeft(rsp.Name, "/")
-	for i, c := range pod.spec.Containers {
+	for i, c := range pod.Spec.Containers {
 		if name == c.Name {
-			pod.spec.Containers = append(pod.spec.Containers[:i], pod.spec.Containers[i+1:]...)
+			pod.Spec.Containers = append(pod.Spec.Containers[:i], pod.Spec.Containers[i+1:]...)
 			break
 		}
 	}
-	podSpec, err := json.Marshal(pod.spec)
+	podSpec, err := json.Marshal(pod.Spec)
 	if err != nil {
-		glog.Errorf("Marshal podspec %v failed: %v", pod.spec, err)
+		glog.Errorf("Marshal podspec %v failed: %v", pod.Spec, err)
 		return err
 	}
 	if err = daemon.db.UpdatePod(pod.Id, podSpec); err != nil {

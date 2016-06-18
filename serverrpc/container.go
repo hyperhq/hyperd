@@ -38,7 +38,7 @@ func (s *ServerRPC) ContainerStop(c context.Context, req *types.ContainerStopReq
 func (s *ServerRPC) ContainerRemove(c context.Context, req *types.ContainerRemoveRequest) (*types.ContainerRemoveResponse, error) {
 	glog.V(3).Infof("ContainerRemove with  request %v", req.String())
 
-	err := s.daemon.DeleteContainer(req.ContainerID)
+	err := s.daemon.RemoveContainer(req.ContainerID)
 	if err != nil {
 		glog.Errorf("ContainerRemove error: %v", err)
 		return nil, err
