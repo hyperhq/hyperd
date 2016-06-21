@@ -142,6 +142,7 @@ func GetServices(vm *hypervisor.Vm, container string) ([]pod.UserService, error)
 		return nil, err
 	}
 
+	// if there's no data read, token will be empty and this method will return an empty service list
 	token := bytes.Split(data, []byte("\n"))
 
 	for _, tok := range token {
