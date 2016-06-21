@@ -536,10 +536,10 @@ func (daemon *Daemon) CmdGetServices(podId string) ([]pod.UserService, error) {
 
 func (daemon *Daemon) CmdPausePod(podId string) error {
 	glog.V(1).Infof("Pause pod %s", podId)
-	return daemon.pausePod(podId)
+	return daemon.PausePod(podId)
 }
 
 func (daemon *Daemon) CmdUnpausePod(podId string) error {
 	glog.V(1).Infof("Unpause pod %s", podId)
-	return daemon.unpausePod(podId)
+	return daemon.UnpausePod(podId)
 }

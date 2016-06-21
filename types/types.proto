@@ -524,28 +524,53 @@ message ServiceListRequest {
 }
 
 message ServiceAddRequest {
-  string podID                   =1;
-  repeated UserService services  =2;
+  string podID                   = 1;
+  repeated UserService services  = 2;
 }
 
-message ServiceAddResponse {
-}
+message ServiceAddResponse {}
 
 message ServiceDelRequest {
-  string podID                   =1;
-  repeated UserService services  =2;
+  string podID                   = 1;
+  repeated UserService services  = 2;
 }
 
-message ServiceDelResponse {
-}
+message ServiceDelResponse {}
 
 message ServiceUpdateRequest {
-  string podID                   =1;
-  repeated UserService services  =2;
+  string podID                   = 1;
+  repeated UserService services  = 2;
 }
 
-message ServiceUpdateResponse {
+message ServiceUpdateResponse {}
+
+message PodStopRequest {
+  string podID = 1;
 }
+
+message PodStopResponse {
+  int32 code    = 1;
+  string cause  = 2;
+}
+
+message PodSignalRequest {
+  string podID = 1;
+  int64 signal = 2;
+}
+
+message PodSignalResponse {}
+
+message PodPauseRequest {
+  string podID = 1;
+}
+
+message PodPauseResponse {}
+
+message PodUnpauseRequest {
+  string podID = 1;
+}
+
+message PodUnpauseResponse {}
 
 // PublicAPI defines the public APIs which are handled over TCP sockets.
 service PublicAPI {
@@ -557,6 +582,18 @@ service PublicAPI {
     rpc PodInfo(PodInfoRequest) returns (PodInfoResponse) {}
     // PodRemove deletes a pod by podID
     rpc PodRemove(PodRemoveRequest) returns (PodRemoveResponse) {}
+    // PodStart starts a pod
+    rpc PodStart(stream PodStartMessage) returns (stream PodStartMessage) {}
+    // PodStop stops a pod
+    rpc PodStop(PodStopRequest) returns (PodStopResponse) {}
+    // PodSignal sends a singal to all containers of specified pod
+    rpc PodSignal(PodSignalRequest) returns (PodSignalResponse) {}
+    // PodPause pauses a pod
+    rpc PodPause(PodPauseRequest) returns (PodPauseResponse) {}
+    // PodUnpause unpauses a pod
+    rpc PodUnpause(PodUnpauseRequest) returns (PodUnpauseResponse) {}
+    // TODO: PodStats gets the statistics of a pod
+    // TODO: PodLabels updates labels of the specified pod
 
     // ContainerList gets a list of containers
     rpc ContainerList(ContainerListRequest) returns (ContainerListResponse) {}
@@ -572,15 +609,6 @@ service PublicAPI {
     rpc VMCreate(VMCreateRequest) returns (VMCreateResponse) {}
     // VMRemove deletes a HyperVM by vmID
     rpc VMRemove(VMRemoveRequest) returns (VMRemoveResponse) {}
-
-    // TODO: PodStats gets the statistics of a pod
-    // TODO: PodLabels updates labels of the specified pod
-    // PodStart starts a pod
-    rpc PodStart(stream PodStartMessage) returns (stream PodStartMessage) {}
-    // TODO: PodStop stops a pod
-    // TODO: PodKill sends a singal to all containers of specified pod
-    // TODO: PodPause pauses a pod
-    // TODO: PodUnpause unpauses a pod
 
     // ContainerLogs gets the log of specified container
     rpc ContainerLogs(ContainerLogsRequest) returns (stream ContainerLogsResponse) {}

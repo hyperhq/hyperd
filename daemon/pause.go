@@ -7,7 +7,7 @@ import (
 	"github.com/hyperhq/runv/hypervisor/types"
 )
 
-func (daemon Daemon) pausePod(podId string) error {
+func (daemon Daemon) PausePod(podId string) error {
 	pod, ok := daemon.PodList.Get(podId)
 	if !ok {
 		return fmt.Errorf("Can not get Pod info with pod ID(%s)", podId)
@@ -43,10 +43,10 @@ func (daemon Daemon) PauseContainer(container string) error {
 		return err
 	}
 
-	return daemon.pausePod(podId)
+	return daemon.PausePod(podId)
 }
 
-func (daemon *Daemon) unpausePod(podId string) error {
+func (daemon *Daemon) UnpausePod(podId string) error {
 	pod, ok := daemon.PodList.Get(podId)
 	if !ok {
 		return fmt.Errorf("Can not get Pod info with pod ID(%s)", podId)
@@ -86,5 +86,5 @@ func (daemon *Daemon) UnpauseContainer(container string) error {
 		return err
 	}
 
-	return daemon.unpausePod(podId)
+	return daemon.UnpausePod(podId)
 }
