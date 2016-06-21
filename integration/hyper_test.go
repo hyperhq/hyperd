@@ -144,7 +144,7 @@ func (s *TestSuite) TestGetVMCreateRemove(c *C) {
 	c.Logf("RemoveVM resp %s", resp.String())
 }
 
-func (s *TestSuite) TestCreatePod(c *C) {
+func (s *TestSuite) TestCreateAndStartPod(c *C) {
 	err := s.client.PullImage("busybox", "latest", nil)
 	c.Assert(err, IsNil)
 
@@ -176,25 +176,15 @@ func (s *TestSuite) TestCreatePod(c *C) {
 		c.Errorf("Can't found pod %s", pod)
 	}
 
-	err = s.client.RemovePod(pod)
-	c.Assert(err, IsNil)
-}
-
-func (s *TestSuite) TestStartPod(c *C) {
-	podList, err := s.client.GetPodList()
-	c.Assert(err, IsNil)
-	c.Logf("Got PodList %v", podList)
-
-	if len(podList) == 0 {
-		return
-	}
-
-	err = s.client.StartPod(podList[0].PodID, "", "")
+	err = s.client.StartPod(pod, "", "")
 	c.Assert(err, IsNil)
 
-	podInfo, err := s.client.GetPodInfo(podList[0].PodID)
+	podInfo, err := s.client.GetPodInfo(pod)
 	c.Assert(err, IsNil)
 	c.Assert(podInfo.Status.Phase, Equals, "Running")
+
+	err = s.client.RemovePod(pod)
+	c.Assert(err, IsNil)
 }
 
 func (s *TestSuite) TestCreateContainer(c *C) {
@@ -255,6 +245,9 @@ func (s *TestSuite) TestPullImage(c *C) {
 }
 
 func (s *TestSuite) TestAddListDeleteService(c *C) {
+	err := s.client.PullImage("haproxy", "1.4", nil)
+	c.Assert(err, IsNil)
+
 	spec := types.UserPod{
 		Containers: []*types.UserContainer{
 			{
@@ -339,4 +332,75 @@ func (s *TestSuite) TestAddListDeleteService(c *C) {
 	c.Assert(err, IsNil)
 	svcList, err = s.client.ListService(pod)
 	c.Assert(len(svcList), Equals, 1)
+}
+
+func (s *TestSuite) TestStartAndStopPod(c *C) {
+	spec := types.UserPod{
+		Id: "busybox",
+		Containers: []*types.UserContainer{
+			{
+				Image: "busybox",
+			},
+		},
+	}
+
+	pod, err := s.client.CreatePod(&spec)
+	c.Assert(err, IsNil)
+	c.Logf("Pod created: %s", pod)
+
+	err = s.client.StartPod(pod, "", "")
+	c.Assert(err, IsNil)
+
+	podInfo, err := s.client.GetPodInfo(pod)
+	c.Assert(err, IsNil)
+	c.Assert(podInfo.Status.Phase, Equals, "Running")
+
+	_, _, err = s.client.StopPod(pod)
+	c.Assert(err, IsNil)
+
+	podInfo, err = s.client.GetPodInfo(pod)
+	c.Assert(err, IsNil)
+	c.Assert(podInfo.Status.Phase, Equals, "Failed")
+
+	err = s.client.RemovePod(pod)
+	c.Assert(err, IsNil)
+}
+
+func (s *TestSuite) TestPauseAndUnpausePod(c *C) {
+	spec := types.UserPod{
+		Id: "busybox",
+		Containers: []*types.UserContainer{
+			{
+				Image: "busybox",
+			},
+		},
+	}
+
+	pod, err := s.client.CreatePod(&spec)
+	c.Assert(err, IsNil)
+	c.Logf("Pod created: %s", pod)
+
+	err = s.client.StartPod(pod, "", "")
+	c.Assert(err, IsNil)
+
+	podInfo, err := s.client.GetPodInfo(pod)
+	c.Assert(err, IsNil)
+	c.Assert(podInfo.Status.Phase, Equals, "Running")
+
+	err = s.client.PausePod(pod)
+	c.Assert(err, IsNil)
+
+	podInfo, err = s.client.GetPodInfo(pod)
+	c.Assert(err, IsNil)
+	c.Assert(podInfo.Status.Phase, Equals, "Paused")
+
+	err = s.client.UnpausePod(pod)
+	c.Assert(err, IsNil)
+
+	podInfo, err = s.client.GetPodInfo(pod)
+	c.Assert(err, IsNil)
+	c.Assert(podInfo.Status.Phase, Equals, "Running")
+
+	err = s.client.RemovePod(pod)
+	c.Assert(err, IsNil)
 }

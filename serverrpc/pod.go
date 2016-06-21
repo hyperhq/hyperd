@@ -108,3 +108,58 @@ func (s *ServerRPC) PodRemove(ctx context.Context, req *types.PodRemoveRequest) 
 		Code:  int32(code),
 	}, nil
 }
+
+// PodStop stops a pod
+func (s *ServerRPC) PodStop(ctx context.Context, req *types.PodStopRequest) (*types.PodStopResponse, error) {
+	glog.V(3).Infof("PodStop with request %s", req.String())
+
+	code, cause, err := s.daemon.StopPod(req.PodID)
+	if err != nil {
+		glog.Errorf("StopPod %s failed: %v", req.PodID, err)
+		return nil, err
+	}
+
+	return &types.PodStopResponse{
+		Cause: cause,
+		Code:  int32(code),
+	}, nil
+}
+
+// PodSignal sends a singal to all containers of specified pod
+func (s *ServerRPC) PodSignal(ctx context.Context, req *types.PodSignalRequest) (*types.PodSignalResponse, error) {
+	glog.V(3).Infof("PodSignal with request %s", req.String())
+
+	err := s.daemon.KillPodContainers(req.PodID, "", req.Signal)
+	if err != nil {
+		glog.Errorf("KillPodContainers %s with signal %d failed: %v", req.PodID, req.Signal, err)
+		return nil, err
+	}
+
+	return &types.PodSignalResponse{}, nil
+}
+
+// PodPause pauses a pod
+func (s *ServerRPC) PodPause(ctx context.Context, req *types.PodPauseRequest) (*types.PodPauseResponse, error) {
+	glog.V(3).Infof("PodPause with request %s", req.String())
+
+	err := s.daemon.PausePod(req.PodID)
+	if err != nil {
+		glog.Errorf("PausePod %s failed: %v", req.PodID, err)
+		return nil, err
+	}
+
+	return &types.PodPauseResponse{}, nil
+}
+
+// PodUnpause unpauses a pod
+func (s *ServerRPC) PodUnpause(ctx context.Context, req *types.PodUnpauseRequest) (*types.PodUnpauseResponse, error) {
+	glog.V(3).Infof("PodUnpause with request %s", req.String())
+
+	err := s.daemon.UnpausePod(req.PodID)
+	if err != nil {
+		glog.Errorf("UnpausePod %s failed: %v", req.PodID, err)
+		return nil, err
+	}
+
+	return &types.PodUnpauseResponse{}, nil
+}

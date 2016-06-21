@@ -370,6 +370,55 @@ func (c *HyperClient) StartPod(podID, vmID, tag string) error {
 	return nil
 }
 
+// StopPod stops a pod
+func (c *HyperClient) StopPod(podID string) (int, string, error) {
+	resp, err := c.client.PodStop(c.ctx, &types.PodStopRequest{
+		PodID: podID,
+	})
+	if err != nil {
+		return -1, "", err
+	}
+
+	return int(resp.Code), resp.Cause, nil
+}
+
+// PausePod pauses a pod
+func (c *HyperClient) PausePod(podID string) error {
+	_, err := c.client.PodPause(c.ctx, &types.PodPauseRequest{
+		PodID: podID,
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// UnpausePod unpauses a pod
+func (c *HyperClient) UnpausePod(podID string) error {
+	_, err := c.client.PodUnpause(c.ctx, &types.PodUnpauseRequest{
+		PodID: podID,
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// PodSignal sends a signal to all containers of specified pod
+func (c *HyperClient) PodSignal(podID string, signal int64) error {
+	_, err := c.client.PodSignal(c.ctx, &types.PodSignalRequest{
+		PodID:  podID,
+		Signal: signal,
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // Wait gets exitcode by container and processId
 func (c *HyperClient) Wait(container, processId string, noHang bool) (int32, error) {
 	request := types.WaitRequest{

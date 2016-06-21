@@ -144,6 +144,9 @@ func (daemon *Daemon) GetPodInfo(podName string) (types.PodInfo, error) {
 	case runvtypes.S_POD_RUNNING:
 		status.Phase = "Running"
 		break
+	case runvtypes.S_POD_PAUSED:
+		status.Phase = "Paused"
+		break
 	case runvtypes.S_POD_SUCCEEDED:
 		status.Phase = "Succeeded"
 		break
