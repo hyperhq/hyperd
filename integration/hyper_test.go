@@ -144,7 +144,7 @@ func (s *TestSuite) TestGetVMCreateRemove(c *C) {
 	c.Logf("RemoveVM resp %s", resp.String())
 }
 
-func (s *TestSuite) TestCreatePod(c *C) {
+func (s *TestSuite) TestCreateAndStartPod(c *C) {
 	err := s.client.PullImage("busybox", "latest", nil)
 	c.Assert(err, IsNil)
 
@@ -176,25 +176,15 @@ func (s *TestSuite) TestCreatePod(c *C) {
 		c.Errorf("Can't found pod %s", pod)
 	}
 
-	err = s.client.RemovePod(pod)
-	c.Assert(err, IsNil)
-}
-
-func (s *TestSuite) TestStartPod(c *C) {
-	podList, err := s.client.GetPodList()
-	c.Assert(err, IsNil)
-	c.Logf("Got PodList %v", podList)
-
-	if len(podList) == 0 {
-		return
-	}
-
-	err = s.client.StartPod(podList[0].PodID, "", "")
+	err = s.client.StartPod(pod, "", "")
 	c.Assert(err, IsNil)
 
-	podInfo, err := s.client.GetPodInfo(podList[0].PodID)
+	podInfo, err := s.client.GetPodInfo(pod)
 	c.Assert(err, IsNil)
 	c.Assert(podInfo.Status.Phase, Equals, "Running")
+
+	err = s.client.RemovePod(pod)
+	c.Assert(err, IsNil)
 }
 
 func (s *TestSuite) TestCreateContainer(c *C) {
