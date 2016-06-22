@@ -20,7 +20,7 @@ func (daemon Daemon) PausePod(podId string) error {
 
 	vmId := pod.status.Vm
 
-	vm, ok := daemon.VmList[vmId]
+	vm, ok := daemon.VmList.Get(vmId)
 	if !ok {
 		return fmt.Errorf("Can not find VM whose Id is %s!", vmId)
 	}
@@ -63,7 +63,7 @@ func (daemon *Daemon) UnpausePod(podId string) error {
 		return fmt.Errorf("pod is not paused")
 	}
 
-	vm, ok := daemon.VmList[vmId]
+	vm, ok := daemon.VmList.Get(vmId)
 	if !ok {
 		return fmt.Errorf("Can not find VM whose Id is %s!", vmId)
 	}

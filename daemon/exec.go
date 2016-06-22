@@ -75,7 +75,7 @@ func (daemon *Daemon) Exec(stdin io.ReadCloser, stdout io.WriteCloser, key, id, 
 		}
 	}
 
-	vm, ok := daemon.VmList[vmId]
+	vm, ok := daemon.VmList.Get(vmId)
 	if !ok {
 		err = fmt.Errorf("Can not find VM whose Id is %s!", vmId)
 		return err

@@ -30,7 +30,7 @@ func (daemon *Daemon) List(item, podId, vmId string, auxiliary bool) (map[string
 
 	if vmId != "" {
 		var ok bool
-		vm, ok = daemon.VmList[vmId]
+		vm, ok = daemon.VmList.Get(vmId)
 		if !ok || (vm == nil) {
 			return list, fmt.Errorf("Cannot find specified vm %s", vmId)
 		}
@@ -38,11 +38,12 @@ func (daemon *Daemon) List(item, podId, vmId string, auxiliary bool) (map[string
 
 	if item == "vm" {
 		if podId == "" && vmId == "" {
-			for v, info := range daemon.VmList {
-				vmJsonResponse = append(vmJsonResponse, v+":"+showVM(info))
-			}
+			daemon.VmList.Foreach(func(vm *hypervisor.Vm) error {
+				vmJsonResponse = append(vmJsonResponse, vm.Id+":"+showVM(vm))
+				return nil
+			})
 		} else if podId != "" && vmId == "" {
-			if v, ok := daemon.VmList[pod.status.Vm]; ok {
+			if v, ok := daemon.VmList.Get(pod.status.Vm); ok {
 				vmJsonResponse = append(vmJsonResponse, pod.status.Vm+":"+showVM(v))
 			}
 		} else if podId == "" && vmId != "" {
