@@ -8,13 +8,13 @@
             ],
             "services": [
                 {
-                        "serviceip": "10.254.0.24",
-                        "serviceport": 2834,
+                        "serviceIP": "10.254.0.24",
+                        "servicePort": 2834,
                         "protocol": "TCP",
                         "hosts": [
                                 {
-                                        "hostip":"192.168.23.2",
-                                        "hostport":2345
+                                        "hostIP":"192.168.23.2",
+                                        "hostPort":2345
                                 }
                         ]
                 }
