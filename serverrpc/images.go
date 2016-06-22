@@ -3,6 +3,7 @@ package serverrpc
 import (
 	"bytes"
 	"io"
+	"io/ioutil"
 
 	enginetypes "github.com/docker/engine-api/types"
 	"github.com/golang/glog"
@@ -111,8 +112,7 @@ func (s *ServerRPC) ImagePush(req *types.ImagePushRequest, stream types.PublicAP
 	}()
 
 	for {
-		data := make([]byte, 512)
-		n, err := buffer.Read(data)
+		data, err := ioutil.ReadAll(buffer)
 		if err == io.EOF {
 			if complete {
 				break
@@ -126,7 +126,7 @@ func (s *ServerRPC) ImagePush(req *types.ImagePushRequest, stream types.PublicAP
 			return err
 		}
 
-		if err := stream.Send(&types.ImagePushResponse{Data: data[:n]}); err != nil {
+		if err := stream.Send(&types.ImagePushResponse{Data: data}); err != nil {
 			return err
 		}
 	}
@@ -134,7 +134,7 @@ func (s *ServerRPC) ImagePush(req *types.ImagePushRequest, stream types.PublicAP
 	return pushResult
 }
 
-// ImageDelete deletes a image from hyperd
+// ImageRemove deletes a image from hyperd
 func (s *ServerRPC) ImageRemove(ctx context.Context, req *types.ImageRemoveRequest) (*types.ImageRemoveResponse, error) {
 	glog.V(3).Infof("ImageDelete with request %s", req.String())
 

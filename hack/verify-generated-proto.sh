@@ -3,17 +3,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-which protoc>/dev/null
-if [[ $? != 0 ]]; then
-    echo "Please install grpc from www.grpc.io"
-    exit 1
-fi
-
 HYPER_ROOT=$(dirname "${BASH_SOURCE}")/..
+PROTO_ROOT=${HYPER_ROOT}/types
 _tmp="${HYPER_ROOT}/_tmp"
-
-hack/build-protoc-gen-go.sh
-export PATH=${HYPER_ROOT}/Godeps/_workspace/src/github.com/golang/protobuf/protoc-gen-go/:$PATH
 
 cleanup() {
   rm -rf "${_tmp}"
@@ -22,10 +14,11 @@ cleanup() {
 trap "cleanup" EXIT SIGINT
 
 mkdir -p ${_tmp}
-protoc --go_out=plugins=grpc:${_tmp} types/types.proto
+cp ${PROTO_ROOT}/types.pb.go ${_tmp}
 
 ret=0
-diff -I "gzipped FileDescriptorProto" -I "0x" -Naupr ${_tmp}/types/types.pb.go types/types.pb.go || ret=$?
+hack/update-generated-proto.sh
+diff -I "gzipped FileDescriptorProto" -I "0x" -Naupr ${_tmp}/types.pb.go ${PROTO_ROOT}/types.pb.go || ret=$?
 if [[ $ret -eq 0 ]]; then
     echo "Generated types from proto up to date."
 else
