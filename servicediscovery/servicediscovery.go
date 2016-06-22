@@ -14,7 +14,6 @@ import (
 	"github.com/hyperhq/hyperd/utils"
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/pod"
-	"github.com/hyperhq/runv/hypervisor/types"
 )
 
 var (
@@ -77,17 +76,21 @@ func SetupLoopbackAddress(vm *hypervisor.Vm, container, ip, operation string) er
 		return err
 	}
 
-	tty := &hypervisor.TtyIO{
-		Callback:  make(chan *types.VmResponse, 1),
-		ClientTag: pod.RandStr(8, "alphanum"),
+	execId := fmt.Sprintf("exec-%s", pod.RandStr(10, "alpha"))
+	exec := &hypervisor.ExecInfo{
+		Container: container,
+		ExecId:    execId,
+		Command:   string(execcmd),
+		ExitCode:  255,
+		Terminal:  false,
 	}
 
-	if err := vm.Exec(container, string(execcmd), false, tty); err != nil {
+	if err := vm.Exec(exec); err != nil {
 		return err
 	}
 
-	if tty.ExitCode != 0 {
-		return fmt.Errorf("exec %s on container %s failed with exit code %d", command, container, tty.ExitCode)
+	if exec.ExitCode != 0 {
+		return fmt.Errorf("exec %s on container %s failed with exit code %d", command, container, exec.ExitCode)
 	}
 
 	return nil
@@ -117,17 +120,21 @@ func ApplyServices(vm *hypervisor.Vm, container string, services []pod.UserServi
 		return err
 	}
 
-	tty := &hypervisor.TtyIO{
-		Callback:  make(chan *types.VmResponse, 1),
-		ClientTag: pod.RandStr(8, "alphanum"),
+	execId := fmt.Sprintf("exec-%s", pod.RandStr(10, "alpha"))
+	exec := &hypervisor.ExecInfo{
+		Container: container,
+		ExecId:    execId,
+		Command:   string(execcmd),
+		ExitCode:  255,
+		Terminal:  false,
 	}
 
-	if err := vm.Exec(container, string(execcmd), false, tty); err != nil {
+	if err := vm.Exec(exec); err != nil {
 		return err
 	}
 
-	if tty.ExitCode != 0 {
-		return fmt.Errorf("exec %s on container %s failed with exit code %d", command, container, tty.ExitCode)
+	if exec.ExitCode != 0 {
+		return fmt.Errorf("exec %s on container %s failed with exit code %d", execcmd, container, exec.ExitCode)
 	}
 
 	return nil

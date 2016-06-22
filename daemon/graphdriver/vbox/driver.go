@@ -369,7 +369,7 @@ func (d *Driver) VmMountLayer(id string) error {
 	}
 	defer vm.ReleaseResponseChan(Status)
 
-	code, cause, err := daemon.StartInternal(p, vmId, nil, false, []*hypervisor.TtyIO{})
+	code, cause, err := daemon.StartInternal(p, vmId, nil, false, []*hypervisor.TtyIO{}, "")
 	if err != nil {
 		d.daemon.KillVm(vmId)
 		glog.Errorf("Code is %d, Cause is %s, %s", code, cause, err.Error())

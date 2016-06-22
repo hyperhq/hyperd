@@ -32,13 +32,13 @@ import (
 )
 
 type Pod struct {
-	Id           string
-	status       *hypervisor.PodStatus
-	spec         *pod.UserPod
-	vm           *hypervisor.Vm
-	ctnStartInfo []*hypervisor.ContainerInfo
-	volumes      map[string]*hypervisor.VolumeInfo
-	ttyList      map[string]*hypervisor.TtyIO
+	Id       string
+	status   *hypervisor.PodStatus
+	spec     *pod.UserPod
+	vm       *hypervisor.Vm
+	ctnInfo  []*hypervisor.ContainerInfo
+	volumes  map[string]*hypervisor.VolumeInfo
+	execList map[string]*hypervisor.ExecInfo
 
 	transiting chan bool
 	sync.RWMutex
@@ -286,7 +286,7 @@ func NewPod(podSpec *apitypes.UserPod, id string, data interface{}) (*Pod, error
 
 	p := &Pod{
 		Id:         id,
-		ttyList:    make(map[string]*hypervisor.TtyIO),
+		execList:   make(map[string]*hypervisor.ExecInfo),
 		volumes:    make(map[string]*hypervisor.VolumeInfo),
 		transiting: make(chan bool, 1),
 	}
@@ -353,7 +353,7 @@ func (p *Pod) InitializeFinished(daemon *Daemon) error {
 	for idx := range p.spec.Containers {
 		label := fmt.Sprintf("extra.sh.hyper.container.%d.initialize", idx)
 		if _, ok := p.spec.Labels[label]; ok {
-			p.ctnStartInfo[idx].Initialize = false
+			p.ctnInfo[idx].Initialize = false
 			delete(p.spec.Labels, label)
 			update = true
 		}
@@ -564,68 +564,74 @@ func (p *Pod) createNewContainers(daemon *Daemon, jsons []*dockertypes.Container
 	return nil
 }
 
+func (p *Pod) ParseContainerJson(daemon *Daemon, info *dockertypes.ContainerJSON, i int) (err error) {
+	var (
+		ci *hypervisor.ContainerInfo = &hypervisor.ContainerInfo{}
+		c                            = &p.spec.Containers[i]
+	)
+
+	if info == nil {
+		estr := fmt.Sprintf("container %s of pod %s does not have inspect json", c.Name, p.Id)
+		glog.Error(estr)
+		return errors.New(estr)
+	}
+
+	if c.Name == "" {
+		c.Name = strings.TrimLeft(info.Name, "/")
+	}
+	if c.Image == "" {
+		c.Image = info.Config.Image
+	}
+	glog.Infof("container name %s, image %s", c.Name, c.Image)
+
+	mountId, err := GetMountIdByContainer(daemon.Storage.Type(), info.ID)
+	if err != nil {
+		estr := fmt.Sprintf("Cannot find mountID for container %s : %s", info.ID, err)
+		glog.Error(estr)
+		return errors.New(estr)
+	}
+
+	ci.Id = info.ID
+	ci.User = info.Config.User
+	ci.MountId = mountId
+	ci.Workdir = info.Config.WorkingDir
+	ci.Cmd = append([]string{info.Path}, info.Args...)
+	ci.ClientTag = make(map[string]bool)
+	ci.ExitCode = 255
+
+	// We should ignore these two in runv, instead of clear them, but here is a work around
+	c.Entrypoint = []string{}
+	c.Command = []string{}
+	glog.Infof("container info config %v, Cmd %v, Args %v", info.Config, info.Config.Cmd.Slice(), info.Args)
+
+	env := make(map[string]string)
+	for _, v := range info.Config.Env {
+		pair := strings.SplitN(v, "=", 2)
+		if len(pair) == 2 && pair[1] != "" {
+			env[pair[0]] = pair[1]
+		}
+	}
+	ci.Envs = env
+
+	label := fmt.Sprintf("extra.sh.hyper.container.%d.initialize", i)
+	if value, ok := p.spec.Labels[label]; ok {
+		if value == "true" || value == "yes" || value == "1" {
+			ci.Initialize = true
+		}
+	}
+
+	p.processImageVolumes(info, info.ID, c)
+
+	p.ctnInfo = append(p.ctnInfo, ci)
+	glog.V(1).Infof("Container Info is \n%v", ci)
+	return nil
+}
+
 func (p *Pod) ParseContainerJsons(daemon *Daemon, jsons []*dockertypes.ContainerJSON) (err error) {
-	err = nil
-	p.ctnStartInfo = []*hypervisor.ContainerInfo{}
-
-	for i, c := range p.spec.Containers {
-		if jsons[i] == nil {
-			estr := fmt.Sprintf("container %s of pod %s does not have inspect json", c.Name, p.Id)
-			glog.Error(estr)
-			return errors.New(estr)
+	for i := range p.spec.Containers {
+		if err := p.ParseContainerJson(daemon, jsons[i], i); err != nil {
+			return err
 		}
-
-		var (
-			info *dockertypes.ContainerJSON = jsons[i]
-			ci   *hypervisor.ContainerInfo  = &hypervisor.ContainerInfo{}
-		)
-
-		if c.Name == "" {
-			p.spec.Containers[i].Name = strings.TrimLeft(info.Name, "/")
-		}
-		if c.Image == "" {
-			p.spec.Containers[i].Image = info.Config.Image
-		}
-		glog.Infof("container name %s, image %s", c.Name, c.Image)
-
-		mountId, err := GetMountIdByContainer(daemon.Storage.Type(), info.ID)
-		if err != nil {
-			estr := fmt.Sprintf("Cannot find mountID for container %s : %s", info.ID, err)
-			glog.Error(estr)
-			return errors.New(estr)
-		}
-
-		ci.Id = info.ID
-		ci.User = info.Config.User
-		ci.MountId = mountId
-		ci.Workdir = info.Config.WorkingDir
-		ci.Cmd = append([]string{info.Path}, info.Args...)
-
-		// We should ignore these two in runv, instead of clear them, but here is a work around
-		p.spec.Containers[i].Entrypoint = []string{}
-		p.spec.Containers[i].Command = []string{}
-		glog.Infof("container info config %v, Cmd %v, Args %v", info.Config, info.Config.Cmd.Slice(), info.Args)
-
-		env := make(map[string]string)
-		for _, v := range info.Config.Env {
-			pair := strings.SplitN(v, "=", 2)
-			if len(pair) == 2 && pair[1] != "" {
-				env[pair[0]] = pair[1]
-			}
-		}
-		ci.Envs = env
-
-		label := fmt.Sprintf("extra.sh.hyper.container.%d.initialize", i)
-		if value, ok := p.spec.Labels[label]; ok {
-			if value == "true" || value == "yes" || value == "1" {
-				ci.Initialize = true
-			}
-		}
-
-		p.processImageVolumes(info, info.ID, &p.spec.Containers[i])
-
-		p.ctnStartInfo = append(p.ctnStartInfo, ci)
-		glog.V(1).Infof("Container Info is \n%v", ci)
 	}
 
 	return nil
@@ -916,7 +922,7 @@ func (p *Pod) setupDNS() (err error) {
 }
 
 func (p *Pod) setupMountsAndFiles(sd Storage) (err error) {
-	if len(p.ctnStartInfo) != len(p.spec.Containers) {
+	if len(p.ctnInfo) != len(p.spec.Containers) {
 		estr := fmt.Sprintf("Prepare error, pod %s does not get container infos well", p.Id)
 		glog.Error(estr)
 		err = errors.New(estr)
@@ -937,7 +943,7 @@ func (p *Pod) setupMountsAndFiles(sd Storage) (err error) {
 			ci *hypervisor.ContainerInfo
 		)
 
-		mountId := p.ctnStartInfo[i].MountId
+		mountId := p.ctnInfo[i].MountId
 		glog.Infof("container ID: %s, mountId %s\n", c.Id, mountId)
 		ci, err = sd.PrepareContainer(mountId, sharedDir)
 		if err != nil {
@@ -950,14 +956,16 @@ func (p *Pod) setupMountsAndFiles(sd Storage) (err error) {
 		}
 
 		ci.Id = c.Id
-		ci.User = p.ctnStartInfo[i].User
-		ci.Initialize = p.ctnStartInfo[i].Initialize
-		ci.Cmd = p.ctnStartInfo[i].Cmd
-		ci.Envs = p.ctnStartInfo[i].Envs
-		ci.Entrypoint = p.ctnStartInfo[i].Entrypoint
-		ci.Workdir = p.ctnStartInfo[i].Workdir
+		ci.User = p.ctnInfo[i].User
+		ci.Initialize = p.ctnInfo[i].Initialize
+		ci.Cmd = p.ctnInfo[i].Cmd
+		ci.Envs = p.ctnInfo[i].Envs
+		ci.Entrypoint = p.ctnInfo[i].Entrypoint
+		ci.Workdir = p.ctnInfo[i].Workdir
+		ci.ClientTag = p.ctnInfo[i].ClientTag
+		ci.ExitCode = p.ctnInfo[i].ExitCode
 
-		p.ctnStartInfo[i] = ci
+		p.ctnInfo[i] = ci
 	}
 
 	return nil
@@ -1030,7 +1038,7 @@ func (p *Pod) Prepare(daemon *Daemon) (err error) {
 
 func (p *Pod) cleanupMountsAndFiles(sd Storage, sharedDir string) {
 	for i := range p.status.Containers {
-		mountId := p.ctnStartInfo[i].MountId
+		mountId := p.ctnInfo[i].MountId
 		sd.CleanupContainer(mountId, sharedDir)
 	}
 }
@@ -1115,10 +1123,10 @@ func (p *Pod) getLogger(daemon *Daemon) (err error) {
 			ContainerCreated:   time.Now(), //FIXME: should record creation time in PodStatus
 		}
 
-		if p.ctnStartInfo != nil && len(p.ctnStartInfo) > i {
-			ctx.ContainerEntrypoint = p.ctnStartInfo[i].Workdir
-			ctx.ContainerArgs = p.ctnStartInfo[i].Cmd
-			ctx.ContainerImageID = p.ctnStartInfo[i].Image
+		if p.ctnInfo != nil && len(p.ctnInfo) > i {
+			ctx.ContainerEntrypoint = p.ctnInfo[i].Workdir
+			ctx.ContainerArgs = p.ctnInfo[i].Cmd
+			ctx.ContainerImageID = p.ctnInfo[i].Image
 		}
 
 		if p.spec.LogConfig.Type == jsonfilelog.Name {
@@ -1149,8 +1157,7 @@ func (p *Pod) startLogging(daemon *Daemon) (err error) {
 	for _, c := range p.status.Containers {
 		var stdout, stderr io.Reader
 
-		tag := "log-" + utils.RandStr(8, "alphanum")
-		if stdout, stderr, err = p.vm.GetLogOutput(c.Id, tag, nil); err != nil {
+		if stdout, stderr, err = p.vm.GetLogOutput(c.Id, nil); err != nil {
 			return
 		}
 		c.Logs.Copier = logger.NewCopier(c.Id, map[string]io.Reader{"stdout": stdout, "stderr": stderr}, c.Logs.Driver)
@@ -1164,11 +1171,11 @@ func (p *Pod) startLogging(daemon *Daemon) (err error) {
 	return nil
 }
 
-func (p *Pod) AttachTtys(daemon *Daemon, streams []*hypervisor.TtyIO) (err error) {
+func (p *Pod) AttachTtys(daemon *Daemon, streams []*hypervisor.TtyIO, tag string) (err error) {
 
-	ttyContainers := p.ctnStartInfo
+	ttyContainers := p.ctnInfo
 	if p.spec.Type == "service-discovery" {
-		ttyContainers = p.ctnStartInfo[1:]
+		ttyContainers = p.ctnInfo[1:]
 	}
 
 	for idx, str := range streams {
@@ -1176,22 +1183,21 @@ func (p *Pod) AttachTtys(daemon *Daemon, streams []*hypervisor.TtyIO) (err error
 			break
 		}
 
-		p.Lock()
-		p.ttyList[str.ClientTag] = str
-		p.Unlock()
+		ttyContainers[idx].ClientTag[tag] = true
 
-		err = p.vm.Attach(str, ttyContainers[idx].Id, nil)
+		container := ttyContainers[idx].Id
+		err = p.vm.Attach(str, container, nil)
 		if err != nil {
-			glog.Errorf("Failed to attach client %s before start pod", str.ClientTag)
+			glog.Errorf("Failed to attach client %s before start pod", tag)
 			return
 		}
-		glog.V(1).Infof("Attach client %s before start pod", str.ClientTag)
+		glog.V(1).Infof("Attach client %s before start pod", tag)
 	}
 
 	return nil
 }
 
-func (p *Pod) Start(daemon *Daemon, vmId string, lazy bool, streams []*hypervisor.TtyIO) (*types.VmResponse, error) {
+func (p *Pod) Start(daemon *Daemon, vmId string, lazy bool, streams []*hypervisor.TtyIO, tag string) (*types.VmResponse, error) {
 
 	var (
 		err       error = nil
@@ -1235,14 +1241,14 @@ func (p *Pod) Start(daemon *Daemon, vmId string, lazy bool, streams []*hyperviso
 		}
 	}()
 
-	if err = p.AttachTtys(daemon, streams); err != nil {
+	if err = p.AttachTtys(daemon, streams, tag); err != nil {
 		return nil, err
 	}
 
 	// now start, the pod handler will deal with the vm
 	preparing = false
 
-	vmResponse := p.vm.StartPod(p.status, p.spec, p.ctnStartInfo, p.volumes)
+	vmResponse := p.vm.StartPod(p.status, p.spec, p.ctnInfo, p.volumes)
 	if vmResponse.Data == nil {
 		err = fmt.Errorf("VM %s start failed with code %d: %s", vmResponse.VmId, vmResponse.Code, vmResponse.Cause)
 		return vmResponse, err

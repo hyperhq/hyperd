@@ -126,15 +126,13 @@ func (daemon *Daemon) CreateContainerInPod(podId string, spec *apitypes.UserCont
 		return "", err
 	}
 
-	jsons, err := p.TryLoadContainers(daemon)
-	if err != nil {
-		return "", err
-	}
-	jsons = append(jsons, rsp)
-
 	glog.V(3).Infof("ContainerJSON for container %s: %v", ccs.ID, *rsp)
 	p.Status().AddContainer(rsp.ID, "/"+rsp.Name, rsp.Image, rsp.Config.Cmd.Slice(), hypervisortypes.S_POD_CREATED)
 	p.spec.Containers = append(p.spec.Containers, convertToRunvContainerSpec(spec, p.spec.Tty))
+	if err = p.ParseContainerJson(daemon, rsp, len(p.spec.Containers)-1); err != nil {
+		glog.Errorf("Found an error while parsing the Container json: %v", err)
+		return "", err
+	}
 
 	podSpec, err := json.Marshal(p.spec)
 	if err != nil {
@@ -146,10 +144,6 @@ func (daemon *Daemon) CreateContainerInPod(podId string, spec *apitypes.UserCont
 		return "", err
 	}
 
-	if err = p.ParseContainerJsons(daemon, jsons); err != nil {
-		glog.Errorf("Found an error while parsing the Containers json: %v", err)
-		return "", err
-	}
 	daemon.PodList.Put(p)
 	if err = daemon.WritePodAndContainers(p.Id); err != nil {
 		glog.Errorf("Found an error while saving the Containers info: %v", err)

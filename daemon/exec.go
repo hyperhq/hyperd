@@ -6,7 +6,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/hyperhq/runv/hypervisor"
-	"github.com/hyperhq/runv/hypervisor/types"
+	"github.com/hyperhq/runv/hypervisor/pod"
 )
 
 func (daemon *Daemon) ExitCode(container, tag string) (int, error) {
@@ -18,36 +18,41 @@ func (daemon *Daemon) ExitCode(container, tag string) (int, error) {
 	}
 
 	pod.RLock()
-	tty, ok := pod.ttyList[tag]
 	defer pod.RUnlock()
 
-	if !ok {
-		return -1, fmt.Errorf("Tag %s incorrect", tag)
+	if exec, ok := pod.execList[tag]; ok {
+		delete(pod.execList, tag)
+		return int(exec.ExitCode), nil
 	}
 
-	delete(pod.ttyList, tty.ClientTag)
+	for _, c := range pod.ctnInfo {
+		if c.Id == container {
+			return int(c.ExitCode), nil
+		}
+	}
 
-	return int(tty.ExitCode), nil
+	return -1, fmt.Errorf("Tag %s incorrect", tag)
 }
 
 func (daemon *Daemon) Exec(stdin io.ReadCloser, stdout io.WriteCloser, key, id, cmd, tag string, terminal bool) error {
 	var (
-		vmId      string
-		container string
-		err       error
+		vmId string
+		err  error
 	)
 
-	tty := &hypervisor.TtyIO{
-		ClientTag: tag,
-		Stdin:     stdin,
-		Stdout:    stdout,
-		Callback:  make(chan *types.VmResponse, 1),
+	execId := fmt.Sprintf("exec-%s", pod.RandStr(10, "alpha"))
+	exec := &hypervisor.ExecInfo{
+		ExecId:   execId,
+		Command:  cmd,
+		ExitCode: 255,
+		Terminal: terminal,
+		Stdin:    stdin,
+		Stdout:   stdout,
 	}
 
 	// We need find the vm id which running POD, and stop it
 	if key == "pod" {
 		vmId = id
-		container = ""
 	} else {
 		glog.V(1).Infof("Get container id is %s", id)
 		pod, _, err := daemon.GetPodByContainerIdOrName(id)
@@ -55,16 +60,16 @@ func (daemon *Daemon) Exec(stdin io.ReadCloser, stdout io.WriteCloser, key, id, 
 			return err
 		}
 
-		container = id
+		exec.Container = id
 
 		pod.Lock()
-		pod.ttyList[tag] = tty
+		pod.execList[tag] = exec
 		pod.Unlock()
 
 		defer func() {
-			if err != nil && pod != nil {
+			if err != nil {
 				pod.Lock()
-				delete(pod.ttyList, tag)
+				delete(pod.execList, tag)
 				pod.Unlock()
 			}
 		}()
@@ -81,7 +86,7 @@ func (daemon *Daemon) Exec(stdin io.ReadCloser, stdout io.WriteCloser, key, id, 
 		return err
 	}
 
-	if err := vm.Exec(container, cmd, terminal, tty); err != nil {
+	if err := vm.Exec(exec); err != nil {
 		return err
 	}
 
