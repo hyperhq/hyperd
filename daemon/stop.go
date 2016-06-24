@@ -123,8 +123,6 @@ func (daemon *Daemon) StopContainerWithinLock(pod *Pod, containerId string) erro
 		return err
 	}
 
-	pod.status.SetOneContainerStatus(containerId, types.S_POD_FAILED)
-
 	pod.Unlock()
 
 	return nil
