@@ -415,9 +415,7 @@ func (p *Pod) init(data interface{}) error {
 		return err
 	}
 
-	status := hypervisor.NewPod(p.Id, p.spec)
-	status.Handler.Handle = hyperHandlePodEvent
-	status.Handler.Data = data
+	status := hypervisor.NewPod(p.Id, p.spec, &hypervisor.HandleEvent{hyperHandlePodEvent, data})
 	status.ResourcePath = resPath
 
 	p.status = status
@@ -1268,20 +1266,10 @@ func hyperHandlePodEvent(vmResponse *types.VmResponse, data interface{},
 	mypod *hypervisor.PodStatus, vm *hypervisor.Vm) bool {
 	daemon := data.(*Daemon)
 
-	switch vmResponse.Code {
-	case types.E_POD_FINISHED: // successfully exit
+	if vmResponse.Code == types.E_VM_SHUTDOWN { // vm exited, sucessful or not
 		stopLogger(mypod)
-		mypod.SetPodContainerStatus(vmResponse.Data.([]uint32))
-		vm.Status = types.S_VM_IDLE
-		return false
-	case types.E_VM_SHUTDOWN: // vm exited, sucessful or not
-		if mypod.Status == types.S_POD_RUNNING { // not received finished pod before
-			stopLogger(mypod)
-			mypod.Status = types.S_POD_FAILED
-			mypod.FinishedAt = time.Now().Format("2006-01-02T15:04:05Z")
-			mypod.SetContainerStatus(types.S_POD_FAILED)
-		}
 		daemon.PodStopped(mypod.Id)
+
 		if mypod.Type == "kubernetes" {
 			cleanup := false
 			switch mypod.Status {
@@ -1309,7 +1297,7 @@ func hyperHandlePodEvent(vmResponse *types.VmResponse, data interface{},
 			}
 		}
 		return true
-	default:
-		return false
 	}
+
+	return false
 }
