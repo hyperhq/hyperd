@@ -671,7 +671,7 @@ func (p *Pod) CreateVolumes(daemon *Daemon) error {
 }
 
 func (p *Pod) UpdateContainerStatus(jsons []*dockertypes.ContainerJSON) error {
-	p.status.Containers = []*hypervisor.Container{}
+	p.status.Containers = []*hypervisor.ContainerStatus{}
 	for idx, c := range p.spec.Containers {
 		if jsons[idx] == nil {
 			estr := fmt.Sprintf("container %s of pod %s does not have inspect json", c.Name, p.Id)
