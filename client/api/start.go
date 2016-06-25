@@ -34,7 +34,7 @@ func (cli *Client) StartPod(podId, vmId, tag string, tty bool, stdin io.ReadClos
 			return "", err
 		}
 
-		return "", cli.GetExitCode(containerId, tag)
+		return "", cli.GetExitCode(containerId, "")
 	}
 }
 

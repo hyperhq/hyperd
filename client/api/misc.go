@@ -20,10 +20,10 @@ func (e StatusError) Error() string {
 	return fmt.Sprintf("Status: %s, Code: %d", e.Status, e.StatusCode)
 }
 
-func (cli *Client) GetExitCode(container, tag string) error {
+func (cli *Client) GetExitCode(containerId, execId string) error {
 	v := url.Values{}
-	v.Set("container", container)
-	v.Set("tag", tag)
+	v.Set("container", containerId)
+	v.Set("exec", execId)
 	code := -1
 
 	stream, _, err := cli.call("GET", "/exitcode?"+v.Encode(), nil, nil)

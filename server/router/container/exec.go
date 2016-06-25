@@ -15,7 +15,7 @@ func (s *containerRouter) getExitCode(ctx context.Context, w http.ResponseWriter
 		return err
 	}
 
-	code, err := s.backend.CmdExitCode(r.Form.Get("container"), r.Form.Get("tag"))
+	code, err := s.backend.CmdExitCode(r.Form.Get("container"), r.Form.Get("exec"))
 	if err != nil {
 		return err
 	}
