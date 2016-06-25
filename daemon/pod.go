@@ -1053,6 +1053,8 @@ func (p *Pod) Cleanup(daemon *Daemon) {
 	p.cleanupMountsAndFiles(daemon.Storage, sharedDir)
 	p.cleanupEtcHosts()
 
+	p.status.CleanupExec()
+
 	if p.status.Status == types.S_POD_NONE {
 		daemon.RemovePodResource(p)
 	}
