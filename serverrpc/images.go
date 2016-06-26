@@ -55,34 +55,38 @@ func (s *ServerRPC) ImagePull(req *types.ImagePullRequest, stream types.PublicAP
 		}
 	}
 
-	buffer := bytes.NewBuffer([]byte{})
+	r, w := io.Pipe()
+
 	var pullResult error
 	var complete = false
-	go func() {
-		pullResult = s.daemon.CmdImagePull(req.Image, req.Tag, authConfig, nil, buffer)
-		complete = true
-	}()
 
-	for {
-		data := make([]byte, 512)
-		n, err := buffer.Read(data)
-		if err == io.EOF {
-			if complete {
-				break
-			} else {
-				continue
+	go func() {
+		defer r.Close()
+		for {
+			data := make([]byte, 512)
+			n, err := r.Read(data)
+			if err == io.EOF {
+				if complete {
+					break
+				} else {
+					continue
+				}
+			}
+
+			if err != nil {
+				glog.Errorf("Read image pull stream error: %v", err)
+				return
+			}
+
+			if err := stream.Send(&types.ImagePullResponse{Data: data[:n]}); err != nil {
+				glog.Errorf("Send image pull  progress to stream error: %v", err)
+				return
 			}
 		}
+	}()
 
-		if err != nil {
-			glog.Errorf("Read image pull stream error: %v", err)
-			return err
-		}
-
-		if err := stream.Send(&types.ImagePullResponse{Data: data[:n]}); err != nil {
-			return err
-		}
-	}
+	pullResult = s.daemon.CmdImagePull(req.Image, req.Tag, authConfig, nil, w)
+	complete = true
 
 	return pullResult
 }
