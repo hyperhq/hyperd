@@ -38,7 +38,6 @@ type Pod struct {
 	vm           *hypervisor.Vm
 	ctnStartInfo []*hypervisor.ContainerInfo
 	volumes      map[string]*hypervisor.VolumeInfo
-	ttyList      map[string]*hypervisor.TtyIO
 
 	transiting chan bool
 	sync.RWMutex
@@ -286,7 +285,6 @@ func NewPod(podSpec *apitypes.UserPod, id string, data interface{}) (*Pod, error
 
 	p := &Pod{
 		Id:         id,
-		ttyList:    make(map[string]*hypervisor.TtyIO),
 		volumes:    make(map[string]*hypervisor.VolumeInfo),
 		transiting: make(chan bool, 1),
 	}
@@ -1173,10 +1171,6 @@ func (p *Pod) AttachTtys(daemon *Daemon, streams []*hypervisor.TtyIO) (err error
 		if idx >= len(ttyContainers) {
 			break
 		}
-
-		p.Lock()
-		p.ttyList[str.ClientTag] = str
-		p.Unlock()
 
 		err = p.vm.Attach(str, ttyContainers[idx].Id, nil)
 		if err != nil {

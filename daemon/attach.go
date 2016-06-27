@@ -36,17 +36,6 @@ func (daemon *Daemon) Attach(stdin io.ReadCloser, stdout io.WriteCloser, key, id
 		}
 
 		podId = pod.Id
-		pod.Lock()
-		pod.ttyList[tag] = tty
-		pod.Unlock()
-
-		defer func() {
-			if err != nil && pod != nil {
-				pod.Lock()
-				delete(pod.ttyList, tag)
-				pod.Unlock()
-			}
-		}()
 	}
 
 	vmId, err = daemon.GetVmByPodId(podId)

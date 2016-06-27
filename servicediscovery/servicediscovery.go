@@ -71,6 +71,7 @@ func UpdateLoopbackAddress(vm *hypervisor.Vm, container string, oldServices, new
 // Setup lo ip address
 // options for operation: add or del
 func SetupLoopbackAddress(vm *hypervisor.Vm, container, ip, operation string) error {
+	execId := fmt.Sprintf("exec-%s", utils.RandStr(10, "alpha"))
 	command := "ip addr " + operation + " dev lo " + ip + "/32"
 	execcmd, err := json.Marshal(strings.Split(command, " "))
 	if err != nil {
@@ -79,15 +80,22 @@ func SetupLoopbackAddress(vm *hypervisor.Vm, container, ip, operation string) er
 
 	tty := &hypervisor.TtyIO{
 		Callback:  make(chan *types.VmResponse, 1),
-		ClientTag: pod.RandStr(8, "alphanum"),
+		ClientTag: utils.RandStr(8, "alphanum"),
 	}
 
-	if err := vm.Exec(container, string(execcmd), false, tty); err != nil {
+	vm.Pod.AddExec(container, execId, command)
+	defer vm.Pod.DeleteExec(execId)
+
+	if err := vm.Exec(container, execId, string(execcmd), false, tty); err != nil {
 		return err
 	}
 
-	if tty.ExitCode != 0 {
-		return fmt.Errorf("exec %s on container %s failed with exit code %d", command, container, tty.ExitCode)
+	es := vm.Pod.GetExec(execId)
+	if es == nil {
+		return fmt.Errorf("cannot find exec status for %s: %s", command, execId)
+	}
+	if es.ExitCode != 0 {
+		return fmt.Errorf("exec %s on container %s failed with exit code %d", command, container, es.ExitCode)
 	}
 
 	return nil
@@ -96,6 +104,8 @@ func SetupLoopbackAddress(vm *hypervisor.Vm, container, ip, operation string) er
 func ApplyServices(vm *hypervisor.Vm, container string, services []pod.UserService) error {
 	// Update lo ip addresses
 	var command []string
+	execId := fmt.Sprintf("exec-%s", utils.RandStr(10, "alpha"))
+
 	oldServices, err := GetServices(vm, container)
 	if err != nil {
 		return err
@@ -119,15 +129,22 @@ func ApplyServices(vm *hypervisor.Vm, container string, services []pod.UserServi
 
 	tty := &hypervisor.TtyIO{
 		Callback:  make(chan *types.VmResponse, 1),
-		ClientTag: pod.RandStr(8, "alphanum"),
+		ClientTag: utils.RandStr(8, "alphanum"),
 	}
 
-	if err := vm.Exec(container, string(execcmd), false, tty); err != nil {
+	vm.Pod.AddExec(container, execId, string(execcmd))
+	defer vm.Pod.DeleteExec(execId)
+
+	if err := vm.Exec(container, execId, string(execcmd), false, tty); err != nil {
 		return err
 	}
 
-	if tty.ExitCode != 0 {
-		return fmt.Errorf("exec %s on container %s failed with exit code %d", command, container, tty.ExitCode)
+	es := vm.Pod.GetExec(execId)
+	if es == nil {
+		return fmt.Errorf("cannot find exec status for %s: %s", command, execId)
+	}
+	if es.ExitCode != 0 {
+		return fmt.Errorf("exec %s on container %s failed with exit code %d", command, container, es.ExitCode)
 	}
 
 	return nil

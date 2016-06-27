@@ -85,13 +85,7 @@ func (daemon *Daemon) StartPod(stdin io.ReadCloser, stdout io.WriteCloser, podId
 	}
 
 	if len(ttys) > 0 {
-		p.RLock()
-		tty, ok := p.ttyList[tag]
-		p.RUnlock()
-
-		if ok {
-			tty.WaitForFinish()
-		}
+		ttys[0].WaitForFinish()
 	}
 
 	return code, cause, nil
