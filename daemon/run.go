@@ -14,11 +14,6 @@ import (
 )
 
 func (daemon *Daemon) CreatePod(podId string, podSpec *apitypes.UserPod) (*Pod, error) {
-	// we can only support 1024 Pods
-	if daemon.GetRunningPodNum() > 1024 {
-		return nil, fmt.Errorf("Pod full, the maximum Pod is 1024!")
-	}
-
 	if podId == "" {
 		podId = fmt.Sprintf("pod-%s", pod.RandStr(10, "alpha"))
 	}
@@ -58,11 +53,6 @@ func (daemon *Daemon) createPodInternal(podId string, podSpec *apitypes.UserPod,
 }
 
 func (daemon *Daemon) StartPod(stdin io.ReadCloser, stdout io.WriteCloser, podId, vmId, tag string) (int, string, error) {
-	// we can only support 1024 Pods
-	if daemon.GetRunningPodNum() > 1024 {
-		return -1, "", fmt.Errorf("Pod full, the maximum Pod is 1024!")
-	}
-
 	var ttys []*hypervisor.TtyIO = []*hypervisor.TtyIO{}
 
 	if tag != "" {
@@ -108,6 +98,11 @@ func (daemon *Daemon) StartPod(stdin io.ReadCloser, stdout io.WriteCloser, podId
 }
 
 func (daemon *Daemon) StartInternal(p *Pod, vmId string, config interface{}, lazy bool, streams []*hypervisor.TtyIO) (int, string, error) {
+	// we can only support 1024 Pods
+	if daemon.GetRunningPodNum() >= 1024 {
+		return -1, "", fmt.Errorf("Pod full, the maximum Pod is 1024!")
+	}
+
 	if !p.TransitionLock("start") {
 		return -1, "", fmt.Errorf("The pod(%s) is operting by others, please retry later", p.Id)
 	}
