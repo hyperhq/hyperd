@@ -174,8 +174,10 @@ func (dms *DevMapperStorage) PrepareContainer(id, sharedDir string) (*hypervisor
 	return &hypervisor.ContainerInfo{
 		MountId: id,
 		Rootfs:  "/rootfs",
-		Image:   devFullName,
-		Fstype:  fstype,
+		Image: pod.UserVolume{
+			Source: devFullName,
+		},
+		Fstype: fstype,
 	}, nil
 }
 
@@ -285,8 +287,10 @@ func (a *AufsStorage) PrepareContainer(id, sharedDir string) (*hypervisor.Contai
 	return &hypervisor.ContainerInfo{
 		MountId: id,
 		Rootfs:  "",
-		Image:   devFullName,
-		Fstype:  "dir",
+		Image: pod.UserVolume{
+			Source: devFullName,
+		},
+		Fstype: "dir",
 	}, nil
 }
 
@@ -347,8 +351,10 @@ func (o *OverlayFsStorage) PrepareContainer(id, sharedDir string) (*hypervisor.C
 	return &hypervisor.ContainerInfo{
 		MountId: id,
 		Rootfs:  "",
-		Image:   devFullName,
-		Fstype:  "dir",
+		Image: pod.UserVolume{
+			Source: devFullName,
+		},
+		Fstype: "dir",
 	}, nil
 }
 
@@ -408,8 +414,10 @@ func (v *VBoxStorage) PrepareContainer(id, sharedDir string) (*hypervisor.Contai
 	return &hypervisor.ContainerInfo{
 		MountId: id,
 		Rootfs:  "/rootfs",
-		Image:   devFullName,
-		Fstype:  "ext4",
+		Image: pod.UserVolume{
+			Source: devFullName,
+		},
+		Fstype: "ext4",
 	}, nil
 }
 
