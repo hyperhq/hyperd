@@ -24,6 +24,18 @@ It has these top-level messages:
 	PodStatus
 	PodInfo
 	ImageInfo
+	PodStats
+	CpuStats
+	CpuUsage
+	BlkioStats
+	BlkioStatEntry
+	MemoryStats
+	MemoryStatsMemoryData
+	NetworkStats
+	TcpStat
+	InterfaceStats
+	FsStats
+	ContainersStats
 	PodInfoRequest
 	PodInfoResponse
 	PodListRequest
@@ -103,6 +115,10 @@ It has these top-level messages:
 	PodPauseResponse
 	PodUnpauseRequest
 	PodUnpauseResponse
+	PodLabelsRequest
+	PodLabelsResponse
+	PodStatsRequest
+	PodStatsResponse
 */
 package types
 
@@ -450,6 +466,351 @@ func (*ImageInfo) ProtoMessage()    {}
 func (m *ImageInfo) GetLabels() map[string]string {
 	if m != nil {
 		return m.Labels
+	}
+	return nil
+}
+
+type PodStats struct {
+	Cpu             *CpuStats          `protobuf:"bytes,1,opt,name=cpu" json:"cpu,omitempty"`
+	Block           *BlkioStats        `protobuf:"bytes,2,opt,name=block" json:"block,omitempty"`
+	Memory          *MemoryStats       `protobuf:"bytes,3,opt,name=memory" json:"memory,omitempty"`
+	Network         *NetworkStats      `protobuf:"bytes,4,opt,name=network" json:"network,omitempty"`
+	Filesystem      []*FsStats         `protobuf:"bytes,5,rep,name=filesystem" json:"filesystem,omitempty"`
+	Timestamp       int64              `protobuf:"varint,6,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	ContainersStats []*ContainersStats `protobuf:"bytes,7,rep,name=containersStats" json:"containersStats,omitempty"`
+}
+
+func (m *PodStats) Reset()         { *m = PodStats{} }
+func (m *PodStats) String() string { return proto.CompactTextString(m) }
+func (*PodStats) ProtoMessage()    {}
+
+func (m *PodStats) GetCpu() *CpuStats {
+	if m != nil {
+		return m.Cpu
+	}
+	return nil
+}
+
+func (m *PodStats) GetBlock() *BlkioStats {
+	if m != nil {
+		return m.Block
+	}
+	return nil
+}
+
+func (m *PodStats) GetMemory() *MemoryStats {
+	if m != nil {
+		return m.Memory
+	}
+	return nil
+}
+
+func (m *PodStats) GetNetwork() *NetworkStats {
+	if m != nil {
+		return m.Network
+	}
+	return nil
+}
+
+func (m *PodStats) GetFilesystem() []*FsStats {
+	if m != nil {
+		return m.Filesystem
+	}
+	return nil
+}
+
+func (m *PodStats) GetContainersStats() []*ContainersStats {
+	if m != nil {
+		return m.ContainersStats
+	}
+	return nil
+}
+
+type CpuStats struct {
+	Usage       *CpuUsage `protobuf:"bytes,1,opt,name=usage" json:"usage,omitempty"`
+	LoadAverage int32     `protobuf:"varint,2,opt,name=LoadAverage,proto3" json:"LoadAverage,omitempty"`
+}
+
+func (m *CpuStats) Reset()         { *m = CpuStats{} }
+func (m *CpuStats) String() string { return proto.CompactTextString(m) }
+func (*CpuStats) ProtoMessage()    {}
+
+func (m *CpuStats) GetUsage() *CpuUsage {
+	if m != nil {
+		return m.Usage
+	}
+	return nil
+}
+
+type CpuUsage struct {
+	Total  uint64   `protobuf:"varint,1,opt,name=total,proto3" json:"total,omitempty"`
+	PerCpu []uint64 `protobuf:"varint,2,rep,name=perCpu" json:"perCpu,omitempty"`
+	User   uint64   `protobuf:"varint,3,opt,name=user,proto3" json:"user,omitempty"`
+	System uint64   `protobuf:"varint,4,opt,name=system,proto3" json:"system,omitempty"`
+}
+
+func (m *CpuUsage) Reset()         { *m = CpuUsage{} }
+func (m *CpuUsage) String() string { return proto.CompactTextString(m) }
+func (*CpuUsage) ProtoMessage()    {}
+
+type BlkioStats struct {
+	IoServiceBytesRecursive []*BlkioStatEntry `protobuf:"bytes,1,rep,name=ioServiceBytesRecursive" json:"ioServiceBytesRecursive,omitempty"`
+	IoServicedRecursive     []*BlkioStatEntry `protobuf:"bytes,2,rep,name=ioServicedRecursive" json:"ioServicedRecursive,omitempty"`
+	IoQueuedRecursive       []*BlkioStatEntry `protobuf:"bytes,3,rep,name=ioQueuedRecursive" json:"ioQueuedRecursive,omitempty"`
+	IoServiceTimeRecursive  []*BlkioStatEntry `protobuf:"bytes,4,rep,name=ioServiceTimeRecursive" json:"ioServiceTimeRecursive,omitempty"`
+	IoWaitTimeRecursive     []*BlkioStatEntry `protobuf:"bytes,5,rep,name=ioWaitTimeRecursive" json:"ioWaitTimeRecursive,omitempty"`
+	IoMergedRecursive       []*BlkioStatEntry `protobuf:"bytes,6,rep,name=ioMergedRecursive" json:"ioMergedRecursive,omitempty"`
+	IoTimeRecursive         []*BlkioStatEntry `protobuf:"bytes,7,rep,name=ioTimeRecursive" json:"ioTimeRecursive,omitempty"`
+	SectorsRecursive        []*BlkioStatEntry `protobuf:"bytes,8,rep,name=sectorsRecursive" json:"sectorsRecursive,omitempty"`
+}
+
+func (m *BlkioStats) Reset()         { *m = BlkioStats{} }
+func (m *BlkioStats) String() string { return proto.CompactTextString(m) }
+func (*BlkioStats) ProtoMessage()    {}
+
+func (m *BlkioStats) GetIoServiceBytesRecursive() []*BlkioStatEntry {
+	if m != nil {
+		return m.IoServiceBytesRecursive
+	}
+	return nil
+}
+
+func (m *BlkioStats) GetIoServicedRecursive() []*BlkioStatEntry {
+	if m != nil {
+		return m.IoServicedRecursive
+	}
+	return nil
+}
+
+func (m *BlkioStats) GetIoQueuedRecursive() []*BlkioStatEntry {
+	if m != nil {
+		return m.IoQueuedRecursive
+	}
+	return nil
+}
+
+func (m *BlkioStats) GetIoServiceTimeRecursive() []*BlkioStatEntry {
+	if m != nil {
+		return m.IoServiceTimeRecursive
+	}
+	return nil
+}
+
+func (m *BlkioStats) GetIoWaitTimeRecursive() []*BlkioStatEntry {
+	if m != nil {
+		return m.IoWaitTimeRecursive
+	}
+	return nil
+}
+
+func (m *BlkioStats) GetIoMergedRecursive() []*BlkioStatEntry {
+	if m != nil {
+		return m.IoMergedRecursive
+	}
+	return nil
+}
+
+func (m *BlkioStats) GetIoTimeRecursive() []*BlkioStatEntry {
+	if m != nil {
+		return m.IoTimeRecursive
+	}
+	return nil
+}
+
+func (m *BlkioStats) GetSectorsRecursive() []*BlkioStatEntry {
+	if m != nil {
+		return m.SectorsRecursive
+	}
+	return nil
+}
+
+type BlkioStatEntry struct {
+	Name   string            `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Type   string            `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
+	Source string            `protobuf:"bytes,3,opt,name=source,proto3" json:"source,omitempty"`
+	Major  uint64            `protobuf:"varint,4,opt,name=major,proto3" json:"major,omitempty"`
+	Minor  uint64            `protobuf:"varint,5,opt,name=minor,proto3" json:"minor,omitempty"`
+	Stat   map[string]uint64 `protobuf:"bytes,6,rep,name=stat" json:"stat,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"`
+}
+
+func (m *BlkioStatEntry) Reset()         { *m = BlkioStatEntry{} }
+func (m *BlkioStatEntry) String() string { return proto.CompactTextString(m) }
+func (*BlkioStatEntry) ProtoMessage()    {}
+
+func (m *BlkioStatEntry) GetStat() map[string]uint64 {
+	if m != nil {
+		return m.Stat
+	}
+	return nil
+}
+
+type MemoryStats struct {
+	Usage            uint64                 `protobuf:"varint,1,opt,name=usage,proto3" json:"usage,omitempty"`
+	WorkingSet       uint64                 `protobuf:"varint,2,opt,name=workingSet,proto3" json:"workingSet,omitempty"`
+	Failcnt          uint64                 `protobuf:"varint,3,opt,name=failcnt,proto3" json:"failcnt,omitempty"`
+	ContainerData    *MemoryStatsMemoryData `protobuf:"bytes,4,opt,name=containerData" json:"containerData,omitempty"`
+	HierarchicalData *MemoryStatsMemoryData `protobuf:"bytes,5,opt,name=hierarchicalData" json:"hierarchicalData,omitempty"`
+}
+
+func (m *MemoryStats) Reset()         { *m = MemoryStats{} }
+func (m *MemoryStats) String() string { return proto.CompactTextString(m) }
+func (*MemoryStats) ProtoMessage()    {}
+
+func (m *MemoryStats) GetContainerData() *MemoryStatsMemoryData {
+	if m != nil {
+		return m.ContainerData
+	}
+	return nil
+}
+
+func (m *MemoryStats) GetHierarchicalData() *MemoryStatsMemoryData {
+	if m != nil {
+		return m.HierarchicalData
+	}
+	return nil
+}
+
+type MemoryStatsMemoryData struct {
+	Pgfault    uint64 `protobuf:"varint,1,opt,name=pgfault,proto3" json:"pgfault,omitempty"`
+	Pgmajfault uint64 `protobuf:"varint,2,opt,name=pgmajfault,proto3" json:"pgmajfault,omitempty"`
+}
+
+func (m *MemoryStatsMemoryData) Reset()         { *m = MemoryStatsMemoryData{} }
+func (m *MemoryStatsMemoryData) String() string { return proto.CompactTextString(m) }
+func (*MemoryStatsMemoryData) ProtoMessage()    {}
+
+type NetworkStats struct {
+	Interfaces []*InterfaceStats `protobuf:"bytes,1,rep,name=interfaces" json:"interfaces,omitempty"`
+	Tcp        *TcpStat          `protobuf:"bytes,2,opt,name=tcp" json:"tcp,omitempty"`
+	Tcp6       *TcpStat          `protobuf:"bytes,3,opt,name=tcp6" json:"tcp6,omitempty"`
+}
+
+func (m *NetworkStats) Reset()         { *m = NetworkStats{} }
+func (m *NetworkStats) String() string { return proto.CompactTextString(m) }
+func (*NetworkStats) ProtoMessage()    {}
+
+func (m *NetworkStats) GetInterfaces() []*InterfaceStats {
+	if m != nil {
+		return m.Interfaces
+	}
+	return nil
+}
+
+func (m *NetworkStats) GetTcp() *TcpStat {
+	if m != nil {
+		return m.Tcp
+	}
+	return nil
+}
+
+func (m *NetworkStats) GetTcp6() *TcpStat {
+	if m != nil {
+		return m.Tcp6
+	}
+	return nil
+}
+
+type TcpStat struct {
+	Established uint64 `protobuf:"varint,1,opt,name=established,proto3" json:"established,omitempty"`
+	SynSent     uint64 `protobuf:"varint,2,opt,name=synSent,proto3" json:"synSent,omitempty"`
+	SynRecv     uint64 `protobuf:"varint,3,opt,name=synRecv,proto3" json:"synRecv,omitempty"`
+	FinWait1    uint64 `protobuf:"varint,4,opt,name=finWait1,proto3" json:"finWait1,omitempty"`
+	FinWait2    uint64 `protobuf:"varint,5,opt,name=finWait2,proto3" json:"finWait2,omitempty"`
+	TimeWait    uint64 `protobuf:"varint,6,opt,name=timeWait,proto3" json:"timeWait,omitempty"`
+	Close       uint64 `protobuf:"varint,7,opt,name=close,proto3" json:"close,omitempty"`
+	CloseWait   uint64 `protobuf:"varint,8,opt,name=closeWait,proto3" json:"closeWait,omitempty"`
+	LastAck     uint64 `protobuf:"varint,9,opt,name=lastAck,proto3" json:"lastAck,omitempty"`
+	Listen      uint64 `protobuf:"varint,10,opt,name=listen,proto3" json:"listen,omitempty"`
+	Closing     uint64 `protobuf:"varint,11,opt,name=closing,proto3" json:"closing,omitempty"`
+}
+
+func (m *TcpStat) Reset()         { *m = TcpStat{} }
+func (m *TcpStat) String() string { return proto.CompactTextString(m) }
+func (*TcpStat) ProtoMessage()    {}
+
+type InterfaceStats struct {
+	Name      string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	RxBytes   uint64 `protobuf:"varint,2,opt,name=rxBytes,proto3" json:"rxBytes,omitempty"`
+	RxPackets uint64 `protobuf:"varint,3,opt,name=rxPackets,proto3" json:"rxPackets,omitempty"`
+	RxErrors  uint64 `protobuf:"varint,4,opt,name=rxErrors,proto3" json:"rxErrors,omitempty"`
+	RxDropped uint64 `protobuf:"varint,5,opt,name=rxDropped,proto3" json:"rxDropped,omitempty"`
+	TxBytes   uint64 `protobuf:"varint,6,opt,name=txBytes,proto3" json:"txBytes,omitempty"`
+	TxPackets uint64 `protobuf:"varint,7,opt,name=txPackets,proto3" json:"txPackets,omitempty"`
+	TxErrors  uint64 `protobuf:"varint,8,opt,name=txErrors,proto3" json:"txErrors,omitempty"`
+	TxDropped uint64 `protobuf:"varint,9,opt,name=txDropped,proto3" json:"txDropped,omitempty"`
+}
+
+func (m *InterfaceStats) Reset()         { *m = InterfaceStats{} }
+func (m *InterfaceStats) String() string { return proto.CompactTextString(m) }
+func (*InterfaceStats) ProtoMessage()    {}
+
+type FsStats struct {
+	Device          string `protobuf:"bytes,1,opt,name=device,proto3" json:"device,omitempty"`
+	Limit           uint64 `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
+	Usage           uint64 `protobuf:"varint,3,opt,name=usage,proto3" json:"usage,omitempty"`
+	Available       uint64 `protobuf:"varint,4,opt,name=available,proto3" json:"available,omitempty"`
+	ReadsCompleted  uint64 `protobuf:"varint,5,opt,name=readsCompleted,proto3" json:"readsCompleted,omitempty"`
+	ReadsMerged     uint64 `protobuf:"varint,6,opt,name=readsMerged,proto3" json:"readsMerged,omitempty"`
+	SectorsRead     uint64 `protobuf:"varint,7,opt,name=sectorsRead,proto3" json:"sectorsRead,omitempty"`
+	ReadTime        uint64 `protobuf:"varint,8,opt,name=readTime,proto3" json:"readTime,omitempty"`
+	WritesCompleted uint64 `protobuf:"varint,9,opt,name=writesCompleted,proto3" json:"writesCompleted,omitempty"`
+	WritesMerged    uint64 `protobuf:"varint,10,opt,name=writesMerged,proto3" json:"writesMerged,omitempty"`
+	SectorsWritten  uint64 `protobuf:"varint,11,opt,name=sectorsWritten,proto3" json:"sectorsWritten,omitempty"`
+	WriteTime       uint64 `protobuf:"varint,12,opt,name=writeTime,proto3" json:"writeTime,omitempty"`
+	IoInProgress    uint64 `protobuf:"varint,13,opt,name=ioInProgress,proto3" json:"ioInProgress,omitempty"`
+	IoTime          uint64 `protobuf:"varint,14,opt,name=ioTime,proto3" json:"ioTime,omitempty"`
+	WeightedIoTime  uint64 `protobuf:"varint,15,opt,name=weightedIoTime,proto3" json:"weightedIoTime,omitempty"`
+}
+
+func (m *FsStats) Reset()         { *m = FsStats{} }
+func (m *FsStats) String() string { return proto.CompactTextString(m) }
+func (*FsStats) ProtoMessage()    {}
+
+type ContainersStats struct {
+	ContainerID string        `protobuf:"bytes,1,opt,name=containerID,proto3" json:"containerID,omitempty"`
+	Cpu         *CpuStats     `protobuf:"bytes,2,opt,name=cpu" json:"cpu,omitempty"`
+	Block       *BlkioStats   `protobuf:"bytes,3,opt,name=block" json:"block,omitempty"`
+	Memory      *MemoryStats  `protobuf:"bytes,4,opt,name=memory" json:"memory,omitempty"`
+	Network     *NetworkStats `protobuf:"bytes,5,opt,name=network" json:"network,omitempty"`
+	Filesystem  []*FsStats    `protobuf:"bytes,6,rep,name=filesystem" json:"filesystem,omitempty"`
+	Timestamp   int64         `protobuf:"varint,7,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+}
+
+func (m *ContainersStats) Reset()         { *m = ContainersStats{} }
+func (m *ContainersStats) String() string { return proto.CompactTextString(m) }
+func (*ContainersStats) ProtoMessage()    {}
+
+func (m *ContainersStats) GetCpu() *CpuStats {
+	if m != nil {
+		return m.Cpu
+	}
+	return nil
+}
+
+func (m *ContainersStats) GetBlock() *BlkioStats {
+	if m != nil {
+		return m.Block
+	}
+	return nil
+}
+
+func (m *ContainersStats) GetMemory() *MemoryStats {
+	if m != nil {
+		return m.Memory
+	}
+	return nil
+}
+
+func (m *ContainersStats) GetNetwork() *NetworkStats {
+	if m != nil {
+		return m.Network
+	}
+	return nil
+}
+
+func (m *ContainersStats) GetFilesystem() []*FsStats {
+	if m != nil {
+		return m.Filesystem
 	}
 	return nil
 }
@@ -1456,6 +1817,53 @@ func (m *PodUnpauseResponse) Reset()         { *m = PodUnpauseResponse{} }
 func (m *PodUnpauseResponse) String() string { return proto.CompactTextString(m) }
 func (*PodUnpauseResponse) ProtoMessage()    {}
 
+type PodLabelsRequest struct {
+	PodID    string            `protobuf:"bytes,1,opt,name=podID,proto3" json:"podID,omitempty"`
+	Override bool              `protobuf:"varint,2,opt,name=override,proto3" json:"override,omitempty"`
+	Labels   map[string]string `protobuf:"bytes,3,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+}
+
+func (m *PodLabelsRequest) Reset()         { *m = PodLabelsRequest{} }
+func (m *PodLabelsRequest) String() string { return proto.CompactTextString(m) }
+func (*PodLabelsRequest) ProtoMessage()    {}
+
+func (m *PodLabelsRequest) GetLabels() map[string]string {
+	if m != nil {
+		return m.Labels
+	}
+	return nil
+}
+
+type PodLabelsResponse struct {
+}
+
+func (m *PodLabelsResponse) Reset()         { *m = PodLabelsResponse{} }
+func (m *PodLabelsResponse) String() string { return proto.CompactTextString(m) }
+func (*PodLabelsResponse) ProtoMessage()    {}
+
+type PodStatsRequest struct {
+	PodID string `protobuf:"bytes,1,opt,name=podID,proto3" json:"podID,omitempty"`
+}
+
+func (m *PodStatsRequest) Reset()         { *m = PodStatsRequest{} }
+func (m *PodStatsRequest) String() string { return proto.CompactTextString(m) }
+func (*PodStatsRequest) ProtoMessage()    {}
+
+type PodStatsResponse struct {
+	PodStats *PodStats `protobuf:"bytes,1,opt,name=podStats" json:"podStats,omitempty"`
+}
+
+func (m *PodStatsResponse) Reset()         { *m = PodStatsResponse{} }
+func (m *PodStatsResponse) String() string { return proto.CompactTextString(m) }
+func (*PodStatsResponse) ProtoMessage()    {}
+
+func (m *PodStatsResponse) GetPodStats() *PodStats {
+	if m != nil {
+		return m.PodStats
+	}
+	return nil
+}
+
 func init() {
 	proto.RegisterType((*ContainerPort)(nil), "types.ContainerPort")
 	proto.RegisterType((*EnvironmentVar)(nil), "types.EnvironmentVar")
@@ -1472,6 +1880,18 @@ func init() {
 	proto.RegisterType((*PodStatus)(nil), "types.PodStatus")
 	proto.RegisterType((*PodInfo)(nil), "types.PodInfo")
 	proto.RegisterType((*ImageInfo)(nil), "types.ImageInfo")
+	proto.RegisterType((*PodStats)(nil), "types.PodStats")
+	proto.RegisterType((*CpuStats)(nil), "types.CpuStats")
+	proto.RegisterType((*CpuUsage)(nil), "types.CpuUsage")
+	proto.RegisterType((*BlkioStats)(nil), "types.BlkioStats")
+	proto.RegisterType((*BlkioStatEntry)(nil), "types.BlkioStatEntry")
+	proto.RegisterType((*MemoryStats)(nil), "types.MemoryStats")
+	proto.RegisterType((*MemoryStatsMemoryData)(nil), "types.MemoryStatsMemoryData")
+	proto.RegisterType((*NetworkStats)(nil), "types.NetworkStats")
+	proto.RegisterType((*TcpStat)(nil), "types.TcpStat")
+	proto.RegisterType((*InterfaceStats)(nil), "types.InterfaceStats")
+	proto.RegisterType((*FsStats)(nil), "types.FsStats")
+	proto.RegisterType((*ContainersStats)(nil), "types.ContainersStats")
 	proto.RegisterType((*PodInfoRequest)(nil), "types.PodInfoRequest")
 	proto.RegisterType((*PodInfoResponse)(nil), "types.PodInfoResponse")
 	proto.RegisterType((*PodListRequest)(nil), "types.PodListRequest")
@@ -1551,6 +1971,10 @@ func init() {
 	proto.RegisterType((*PodPauseResponse)(nil), "types.PodPauseResponse")
 	proto.RegisterType((*PodUnpauseRequest)(nil), "types.PodUnpauseRequest")
 	proto.RegisterType((*PodUnpauseResponse)(nil), "types.PodUnpauseResponse")
+	proto.RegisterType((*PodLabelsRequest)(nil), "types.PodLabelsRequest")
+	proto.RegisterType((*PodLabelsResponse)(nil), "types.PodLabelsResponse")
+	proto.RegisterType((*PodStatsRequest)(nil), "types.PodStatsRequest")
+	proto.RegisterType((*PodStatsResponse)(nil), "types.PodStatsResponse")
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -1590,6 +2014,10 @@ type PublicAPIClient interface {
 	VMCreate(ctx context.Context, in *VMCreateRequest, opts ...grpc.CallOption) (*VMCreateResponse, error)
 	// VMRemove deletes a HyperVM by vmID
 	VMRemove(ctx context.Context, in *VMRemoveRequest, opts ...grpc.CallOption) (*VMRemoveResponse, error)
+	// SetPodLabels sets labels of given pod
+	SetPodLabels(ctx context.Context, in *PodLabelsRequest, opts ...grpc.CallOption) (*PodLabelsResponse, error)
+	// PodStats gets pod stats of a given pod
+	PodStats(ctx context.Context, in *PodStatsRequest, opts ...grpc.CallOption) (*PodStatsResponse, error)
 	// ContainerLogs gets the log of specified container
 	ContainerLogs(ctx context.Context, in *ContainerLogsRequest, opts ...grpc.CallOption) (PublicAPI_ContainerLogsClient, error)
 	// ContainerCreate creates a container in specified pod
@@ -1786,6 +2214,24 @@ func (c *publicAPIClient) VMCreate(ctx context.Context, in *VMCreateRequest, opt
 func (c *publicAPIClient) VMRemove(ctx context.Context, in *VMRemoveRequest, opts ...grpc.CallOption) (*VMRemoveResponse, error) {
 	out := new(VMRemoveResponse)
 	err := grpc.Invoke(ctx, "/types.PublicAPI/VMRemove", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *publicAPIClient) SetPodLabels(ctx context.Context, in *PodLabelsRequest, opts ...grpc.CallOption) (*PodLabelsResponse, error) {
+	out := new(PodLabelsResponse)
+	err := grpc.Invoke(ctx, "/types.PublicAPI/SetPodLabels", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *publicAPIClient) PodStats(ctx context.Context, in *PodStatsRequest, opts ...grpc.CallOption) (*PodStatsResponse, error) {
+	out := new(PodStatsResponse)
+	err := grpc.Invoke(ctx, "/types.PublicAPI/PodStats", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2073,6 +2519,10 @@ type PublicAPIServer interface {
 	VMCreate(context.Context, *VMCreateRequest) (*VMCreateResponse, error)
 	// VMRemove deletes a HyperVM by vmID
 	VMRemove(context.Context, *VMRemoveRequest) (*VMRemoveResponse, error)
+	// SetPodLabels sets labels of given pod
+	SetPodLabels(context.Context, *PodLabelsRequest) (*PodLabelsResponse, error)
+	// PodStats gets pod stats of a given pod
+	PodStats(context.Context, *PodStatsRequest) (*PodStatsResponse, error)
 	// ContainerLogs gets the log of specified container
 	ContainerLogs(*ContainerLogsRequest, PublicAPI_ContainerLogsServer) error
 	// ContainerCreate creates a container in specified pod
@@ -2302,6 +2752,30 @@ func _PublicAPI_VMRemove_Handler(srv interface{}, ctx context.Context, dec func(
 		return nil, err
 	}
 	out, err := srv.(PublicAPIServer).VMRemove(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func _PublicAPI_SetPodLabels_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
+	in := new(PodLabelsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	out, err := srv.(PublicAPIServer).SetPodLabels(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func _PublicAPI_PodStats_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
+	in := new(PodStatsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	out, err := srv.(PublicAPIServer).PodStats(ctx, in)
 	if err != nil {
 		return nil, err
 	}
@@ -2602,6 +3076,14 @@ var _PublicAPI_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "VMRemove",
 			Handler:    _PublicAPI_VMRemove_Handler,
+		},
+		{
+			MethodName: "SetPodLabels",
+			Handler:    _PublicAPI_SetPodLabels_Handler,
+		},
+		{
+			MethodName: "PodStats",
+			Handler:    _PublicAPI_PodStats_Handler,
 		},
 		{
 			MethodName: "ContainerCreate",

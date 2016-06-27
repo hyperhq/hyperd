@@ -3,7 +3,6 @@ syntax = "proto3";
 
 package types;
 
-
 // Types definitions for HyperContainer
 message ContainerPort {
     string name         = 1;
@@ -136,6 +135,126 @@ message ImageInfo {
     int64 created               = 5;
     int64 virtualSize           = 6;
     map<string,string> labels   = 7;
+}
+
+message PodStats {
+  CpuStats     cpu     = 1;
+  BlkioStats   block   = 2;
+  MemoryStats  memory  = 3;
+  NetworkStats network = 4;
+
+  repeated FsStats  filesystem  = 5;
+  int64             timestamp   = 6;
+
+  repeated ContainersStats containersStats = 7;
+}
+
+message CpuStats {
+  CpuUsage usage    = 1;
+  int32 LoadAverage = 2;
+}
+
+message CpuUsage {
+  uint64          total  = 1;
+  repeated uint64 perCpu = 2;
+  uint64          user   = 3;
+  uint64          system = 4;
+}
+
+message BlkioStats {
+  repeated BlkioStatEntry ioServiceBytesRecursive = 1;
+  repeated BlkioStatEntry ioServicedRecursive     = 2;
+  repeated BlkioStatEntry ioQueuedRecursive       = 3;
+  repeated BlkioStatEntry ioServiceTimeRecursive  = 4;
+  repeated BlkioStatEntry ioWaitTimeRecursive     = 5;
+  repeated BlkioStatEntry ioMergedRecursive       = 6;
+  repeated BlkioStatEntry ioTimeRecursive         = 7;
+  repeated BlkioStatEntry sectorsRecursive        = 8;
+}
+
+message BlkioStatEntry {
+  string name       = 1;
+  string type       = 2;
+  string source     = 3;
+  uint64 major      = 4;
+  uint64 minor      = 5;
+
+  map<string, uint64> stat = 6;
+}
+
+message MemoryStats {
+  uint64 usage      = 1;
+  uint64 workingSet = 2;
+  uint64 failcnt    = 3;
+
+  MemoryStatsMemoryData containerData     = 4;
+  MemoryStatsMemoryData hierarchicalData  = 5;
+}
+
+message MemoryStatsMemoryData {
+  uint64 pgfault    = 1;
+  uint64 pgmajfault = 2;
+}
+
+message NetworkStats {
+  repeated InterfaceStats interfaces = 1;
+  TcpStat tcp                 = 2;
+  TcpStat tcp6                = 3;
+}
+
+message TcpStat {
+  uint64 established = 1;
+  uint64 synSent     = 2;
+  uint64 synRecv     = 3;
+  uint64 finWait1    = 4;
+  uint64 finWait2    = 5;
+  uint64 timeWait    = 6;
+  uint64 close       = 7;
+  uint64 closeWait   = 8;
+  uint64 lastAck     = 9;
+  uint64 listen      = 10;
+  uint64 closing     = 11;
+}
+
+message InterfaceStats {
+  string name       = 1;
+  uint64 rxBytes    = 2;
+  uint64 rxPackets  = 3;
+  uint64 rxErrors   = 4;
+  uint64 rxDropped  = 5;
+  uint64 txBytes    = 6;
+  uint64 txPackets  = 7;
+  uint64 txErrors   = 8;
+  uint64 txDropped  = 9;
+}
+
+message FsStats {
+  string device          = 1;
+  uint64 limit           = 2;
+  uint64 usage           = 3;
+  uint64 available       = 4;
+  uint64 readsCompleted  = 5;
+  uint64 readsMerged     = 6;
+  uint64 sectorsRead     = 7;
+  uint64 readTime        = 8;
+  uint64 writesCompleted = 9;
+  uint64 writesMerged    = 10;
+  uint64 sectorsWritten  = 11;
+  uint64 writeTime       = 12;
+  uint64 ioInProgress    = 13;
+  uint64 ioTime          = 14;
+  uint64 weightedIoTime  = 15;
+}
+
+message ContainersStats {
+  string       containerID = 1;
+  CpuStats     cpu         = 2;
+  BlkioStats   block       = 3;
+  MemoryStats  memory      = 4;
+  NetworkStats network     = 5;
+
+  repeated FsStats    filesystem  = 6;
+  int64 timestamp                 = 7;
 }
 
 ////////////////////   PublicAPI Request/Response   ///////////////////////////
@@ -572,6 +691,22 @@ message PodUnpauseRequest {
 
 message PodUnpauseResponse {}
 
+message PodLabelsRequest{
+  string podID               = 1;
+  bool override              = 2;
+  map<string, string> labels = 3;
+}
+
+message PodLabelsResponse{}
+
+message PodStatsRequest {
+  string podID = 1;
+}
+
+message PodStatsResponse {
+  PodStats podStats = 1;
+}
+
 // PublicAPI defines the public APIs which are handled over TCP sockets.
 service PublicAPI {
     // PodList gets a list of pods
@@ -592,8 +727,6 @@ service PublicAPI {
     rpc PodPause(PodPauseRequest) returns (PodPauseResponse) {}
     // PodUnpause unpauses a pod
     rpc PodUnpause(PodUnpauseRequest) returns (PodUnpauseResponse) {}
-    // TODO: PodStats gets the statistics of a pod
-    // TODO: PodLabels updates labels of the specified pod
 
     // ContainerList gets a list of containers
     rpc ContainerList(ContainerListRequest) returns (ContainerListResponse) {}
@@ -609,6 +742,12 @@ service PublicAPI {
     rpc VMCreate(VMCreateRequest) returns (VMCreateResponse) {}
     // VMRemove deletes a HyperVM by vmID
     rpc VMRemove(VMRemoveRequest) returns (VMRemoveResponse) {}
+
+    // SetPodLabels sets labels of given pod
+    rpc SetPodLabels(PodLabelsRequest) returns (PodLabelsResponse) {}
+
+    // PodStats gets pod stats of a given pod
+    rpc PodStats(PodStatsRequest) returns (PodStatsResponse) {}
 
     // ContainerLogs gets the log of specified container
     rpc ContainerLogs(ContainerLogsRequest) returns (stream ContainerLogsResponse) {}
