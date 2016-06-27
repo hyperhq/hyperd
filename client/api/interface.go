@@ -12,7 +12,7 @@ import (
 type APIInterface interface {
 	Login(auth dockertypes.AuthConfig, response *dockertypes.AuthResponse) (remove bool, err error)
 
-	Attach(container, termTag string, tty bool, stdin io.ReadCloser, stdout, stderr io.Writer) error
+	Attach(container string, tty bool, stdin io.ReadCloser, stdout, stderr io.Writer) error
 	CreateExec(containerId string, command []byte, tty bool) (string, error)
 	StartExec(containerId, execId string, tty bool, stdin io.ReadCloser, stdout, stderr io.Writer) error
 
@@ -28,7 +28,7 @@ type APIInterface interface {
 
 	GetPodInfo(podName string) (*types.PodInfo, error)
 	CreatePod(spec interface{}) (string, int, error)
-	StartPod(podId, vmId, tag string, tty bool, stdin io.ReadCloser, stdout, stderr io.Writer) (string, error)
+	StartPod(podId, vmId string, attach, tty bool, stdin io.ReadCloser, stdout, stderr io.Writer) (string, error)
 	StopPod(podId, stopVm string) (int, string, error)
 	RmPod(id string) error
 	PausePod(podId string) error

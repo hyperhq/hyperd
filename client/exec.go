@@ -56,7 +56,7 @@ func (cli *HyperClient) HyperCmdExec(args ...string) error {
 	}
 
 	if opts.Tty {
-		if err := cli.monitorTtySize(podName, execId); err != nil {
+		if err := cli.monitorTtySize(containerId, execId); err != nil {
 			fmt.Printf("Monitor tty size fail for %s!\n", podName)
 		}
 		oldState, err := term.SetRawTerminal(cli.inFd)

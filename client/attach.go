@@ -26,7 +26,6 @@ func (cli *HyperClient) HyperCmdAttach(args ...string) error {
 	var (
 		podId       = args[0]
 		containerId = args[0]
-		tag         = cli.GetTag()
 		tty         bool
 	)
 
@@ -56,18 +55,17 @@ func (cli *HyperClient) HyperCmdAttach(args ...string) error {
 	}
 
 	if tty {
-
 		oldState, err := term.SetRawTerminal(cli.inFd)
 		if err != nil {
 			return err
 		}
 		defer term.RestoreTerminal(cli.inFd, oldState)
-		cli.monitorTtySize(podId, tag)
+		cli.monitorTtySize(containerId, "")
 	}
 
-	if err := cli.client.Attach(containerId, tag, tty, cli.in, cli.out, cli.err); err != nil {
+	if err := cli.client.Attach(containerId, tty, cli.in, cli.out, cli.err); err != nil {
 		return err
 	}
 
-	return cli.client.GetExitCode(containerId, tag)
+	return cli.client.GetExitCode(containerId, "")
 }

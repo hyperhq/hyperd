@@ -9,36 +9,24 @@ import (
 	"github.com/hyperhq/runv/hypervisor/types"
 )
 
-func (daemon *Daemon) Attach(stdin io.ReadCloser, stdout io.WriteCloser, key, id, tag string) error {
+func (daemon *Daemon) Attach(stdin io.ReadCloser, stdout io.WriteCloser, container string) error {
 	var (
-		podId     string
-		vmId      string
-		container string
-		err       error
+		vmId string
+		err  error
 	)
 
 	tty := &hypervisor.TtyIO{
-		ClientTag: tag,
-		Stdin:     stdin,
-		Stdout:    stdout,
-		Callback:  make(chan *types.VmResponse, 1),
+		Stdin:    stdin,
+		Stdout:   stdout,
+		Callback: make(chan *types.VmResponse, 1),
 	}
 
-	// We need find the vm id which running POD, and stop it
-	if key == "pod" {
-		podId = id
-		container = ""
-	} else {
-		container = id
-		pod, _, err := daemon.GetPodByContainerIdOrName(container)
-		if err != nil {
-			return err
-		}
-
-		podId = pod.Id
+	pod, _, err := daemon.GetPodByContainerIdOrName(container)
+	if err != nil {
+		return err
 	}
 
-	vmId, err = daemon.GetVmByPodId(podId)
+	vmId, err = daemon.GetVmByPodId(pod.Id)
 	if err != nil {
 		return err
 	}

@@ -6,13 +6,11 @@ import (
 	"net/url"
 )
 
-func (cli *Client) Attach(container, termTag string, tty bool, stdin io.ReadCloser, stdout, stderr io.Writer) error {
+func (cli *Client) Attach(container string, tty bool, stdin io.ReadCloser, stdout, stderr io.Writer) error {
 	v := url.Values{}
-	v.Set("type", "container")
-	v.Set("value", container)
-	v.Set("tag", termTag)
+	v.Set("container", container)
 
-	err := cli.hijackRequest("attach", termTag, &v, tty, stdin, stdout, stderr)
+	err := cli.hijackRequest("attach", &v, tty, stdin, stdout, stderr)
 	if err != nil {
 		fmt.Printf("attach failed: %s\n", err.Error())
 		return err

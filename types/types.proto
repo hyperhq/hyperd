@@ -570,8 +570,7 @@ message WaitResponse{
 
 message AttachMessage {
   string containerID   = 1;
-  string tag           = 2;
-  bytes  data          = 3;
+  bytes  data          = 2;
 }
 
 message ContainerCreateRequest {

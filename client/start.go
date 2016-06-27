@@ -33,7 +33,7 @@ func (cli *HyperClient) HyperCmdStart(args ...string) error {
 		vmId = args[1]
 	}
 
-	_, err = cli.client.StartPod(podId, vmId, "", false, nil, nil, nil)
+	_, err = cli.client.StartPod(podId, vmId, false, false, nil, nil, nil)
 	if err != nil {
 		return err
 	}

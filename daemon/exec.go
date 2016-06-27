@@ -57,10 +57,9 @@ func (daemon *Daemon) CreateExec(containerId, cmd string, terminal bool) (string
 
 func (daemon *Daemon) StartExec(stdin io.ReadCloser, stdout io.WriteCloser, containerId, execId string) error {
 	tty := &hypervisor.TtyIO{
-		ClientTag: execId,
-		Stdin:     stdin,
-		Stdout:    stdout,
-		Callback:  make(chan *types.VmResponse, 1),
+		Stdin:    stdin,
+		Stdout:   stdout,
+		Callback: make(chan *types.VmResponse, 1),
 	}
 
 	glog.V(1).Infof("Get container id is %s", containerId)

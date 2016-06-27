@@ -79,8 +79,7 @@ func SetupLoopbackAddress(vm *hypervisor.Vm, container, ip, operation string) er
 	}
 
 	tty := &hypervisor.TtyIO{
-		Callback:  make(chan *types.VmResponse, 1),
-		ClientTag: utils.RandStr(8, "alphanum"),
+		Callback: make(chan *types.VmResponse, 1),
 	}
 
 	vm.Pod.AddExec(container, execId, command, false)
@@ -128,8 +127,7 @@ func ApplyServices(vm *hypervisor.Vm, container string, services []pod.UserServi
 	}
 
 	tty := &hypervisor.TtyIO{
-		Callback:  make(chan *types.VmResponse, 1),
-		ClientTag: utils.RandStr(8, "alphanum"),
+		Callback: make(chan *types.VmResponse, 1),
 	}
 
 	vm.Pod.AddExec(container, execId, string(execcmd), false)

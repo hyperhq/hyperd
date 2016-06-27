@@ -9,21 +9,17 @@ import (
 	"github.com/hyperhq/runv/hypervisor/types"
 )
 
-func (cli *Client) StartPod(podId, vmId, tag string, tty bool, stdin io.ReadCloser, stdout, stderr io.Writer) (string, error) {
-	var attach = false
+func (cli *Client) StartPod(podId, vmId string, attach, tty bool, stdin io.ReadCloser, stdout, stderr io.Writer) (string, error) {
 	v := url.Values{}
 	v.Set("podId", podId)
 	v.Set("vmId", vmId)
 
-	if tag != "" {
-		attach = true
-		v.Set("tag", tag)
-	}
-
 	if !attach {
 		return cli.startPodWithoutTty(&v)
 	} else {
-		err := cli.hijackRequest("pod/start", tag, &v, tty, stdin, stdout, stderr)
+		v.Set("attach", "yes")
+
+		err := cli.hijackRequest("pod/start", &v, tty, stdin, stdout, stderr)
 		if err != nil {
 			fmt.Printf("StartPod failed: %s\n", err.Error())
 			return "", err

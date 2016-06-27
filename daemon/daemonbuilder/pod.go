@@ -27,15 +27,14 @@ import (
 
 // ContainerAttach attaches streams to the container cID. If stream is true, it streams the output.
 func (d Docker) ContainerAttach(cId string, stdin io.ReadCloser, stdout, stderr io.Writer, stream bool) error {
-	tag := pod.RandStr(8, "alphanum")
 	<-d.hyper.Ready
 
-	err := d.Daemon.Attach(stdin, ioutils.NopWriteCloser(stdout), "container", cId, tag)
+	err := d.Daemon.Attach(stdin, ioutils.NopWriteCloser(stdout), cId)
 	if err != nil {
 		return err
 	}
 
-	code, err := d.Daemon.ExitCode(cId, tag)
+	code, err := d.Daemon.ExitCode(cId, "")
 	if err != nil {
 		return err
 	}

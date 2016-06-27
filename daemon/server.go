@@ -52,8 +52,8 @@ func (daemon *Daemon) CmdAuthenticateToRegistry(config *types.AuthConfig) (strin
 	return daemon.Daemon.AuthenticateToRegistry(config)
 }
 
-func (daemon *Daemon) CmdAttach(stdin io.ReadCloser, stdout io.WriteCloser, key, id, tag string) error {
-	return daemon.Attach(stdin, stdout, key, id, tag)
+func (daemon *Daemon) CmdAttach(stdin io.ReadCloser, stdout io.WriteCloser, container string) error {
+	return daemon.Attach(stdin, stdout, container)
 }
 
 func (daemon *Daemon) CmdCommitImage(name string, cfg *types.ContainerCommitConfig) (*engine.Env, error) {
@@ -191,8 +191,8 @@ func (daemon *Daemon) CmdStopContainer(name string) (*engine.Env, error) {
 	return v, nil
 }
 
-func (daemon *Daemon) CmdExitCode(container, tag string) (int, error) {
-	return daemon.ExitCode(container, tag)
+func (daemon *Daemon) CmdExitCode(containerId, execId string) (int, error) {
+	return daemon.ExitCode(containerId, execId)
 }
 
 func (daemon *Daemon) CmdSystemInfo() (*apitypes.InfoResponse, error) {
@@ -443,8 +443,8 @@ func (daemon *Daemon) CmdKillPod(podId, container string, sig int64) (*engine.En
 	return v, nil
 }
 
-func (daemon *Daemon) CmdTtyResize(podId, tag string, h, w int) error {
-	return daemon.TtyResize(podId, tag, h, w)
+func (daemon *Daemon) CmdTtyResize(containerId, execId string, h, w int) error {
+	return daemon.TtyResize(containerId, execId, h, w)
 }
 
 func (daemon *Daemon) CmdCreateVm(cpu, mem int, async bool) (*engine.Env, error) {

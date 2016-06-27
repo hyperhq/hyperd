@@ -1147,8 +1147,7 @@ func (p *Pod) startLogging(daemon *Daemon) (err error) {
 	for _, c := range p.status.Containers {
 		var stdout, stderr io.Reader
 
-		tag := "log-" + utils.RandStr(8, "alphanum")
-		if stdout, stderr, err = p.vm.GetLogOutput(c.Id, tag, nil); err != nil {
+		if stdout, stderr, err = p.vm.GetLogOutput(c.Id, nil); err != nil {
 			return
 		}
 		c.Logs.Copier = logger.NewCopier(c.Id, map[string]io.Reader{"stdout": stdout, "stderr": stderr}, c.Logs.Driver)
@@ -1174,12 +1173,13 @@ func (p *Pod) AttachTtys(daemon *Daemon, streams []*hypervisor.TtyIO) (err error
 			break
 		}
 
-		err = p.vm.Attach(str, ttyContainers[idx].Id, nil)
+		containerId := ttyContainers[idx].Id
+		err = p.vm.Attach(str, containerId, nil)
 		if err != nil {
-			glog.Errorf("Failed to attach client %s before start pod", str.ClientTag)
+			glog.Errorf("Failed to attach to container %s before start pod", containerId)
 			return
 		}
-		glog.V(1).Infof("Attach client %s before start pod", str.ClientTag)
+		glog.V(1).Infof("Attach to container %s before start pod", containerId)
 	}
 
 	return nil

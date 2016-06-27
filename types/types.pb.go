@@ -1518,8 +1518,7 @@ func (*WaitResponse) ProtoMessage()    {}
 
 type AttachMessage struct {
 	ContainerID string `protobuf:"bytes,1,opt,name=containerID,proto3" json:"containerID,omitempty"`
-	Tag         string `protobuf:"bytes,2,opt,name=tag,proto3" json:"tag,omitempty"`
-	Data        []byte `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
+	Data        []byte `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
 }
 
 func (m *AttachMessage) Reset()         { *m = AttachMessage{} }

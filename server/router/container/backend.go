@@ -16,7 +16,7 @@ type Backend interface {
 	CmdKillContainer(name string, sig int64) (*engine.Env, error)
 	CmdStopContainer(name string) (*engine.Env, error)
 	CmdContainerRename(oldName, newName string) (*engine.Env, error)
-	CmdAttach(in io.ReadCloser, out io.WriteCloser, key, id, tag string) error
+	CmdAttach(in io.ReadCloser, out io.WriteCloser, id string) error
 	CmdCommitImage(name string, cfg *types.ContainerCommitConfig) (*engine.Env, error)
 	CmdTtyResize(podId, tag string, h, w int) error
 	CreateExec(id, cmd string, terminal bool) (string, error)

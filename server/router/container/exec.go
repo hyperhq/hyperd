@@ -65,11 +65,7 @@ func (s *containerRouter) postContainerAttach(ctx context.Context, w http.Respon
 		return err
 	}
 
-	key := r.Form.Get("type")
-	id := r.Form.Get("value")
-	tag := r.Form.Get("tag")
-	//remove := r.Form.Get("remove")
-
+	container := r.Form.Get("container")
 	// Setting up the streaming http interface.
 	inStream, outStream, err := httputils.HijackConnection(w)
 	if err != nil {
@@ -79,7 +75,7 @@ func (s *containerRouter) postContainerAttach(ctx context.Context, w http.Respon
 
 	fmt.Fprintf(outStream, "HTTP/1.1 101 UPGRADED\r\nContent-Type: application/vnd.docker.raw-stream\r\nConnection: Upgrade\r\nUpgrade: tcp\r\n\r\n")
 
-	return s.backend.CmdAttach(inStream, outStream.(io.WriteCloser), key, id, tag)
+	return s.backend.CmdAttach(inStream, outStream.(io.WriteCloser), container)
 }
 
 func (s *containerRouter) postTtyResize(ctx context.Context, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
@@ -95,8 +91,8 @@ func (s *containerRouter) postTtyResize(ctx context.Context, w http.ResponseWrit
 		return err
 	}
 
-	tag := r.Form.Get("tag")
-	podId := r.Form.Get("id")
+	containerId := r.Form.Get("container")
+	execId := r.Form.Get("exec")
 
-	return s.backend.CmdTtyResize(podId, tag, height, width)
+	return s.backend.CmdTtyResize(containerId, execId, height, width)
 }
