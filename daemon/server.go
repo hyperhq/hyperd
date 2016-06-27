@@ -191,10 +191,6 @@ func (daemon *Daemon) CmdStopContainer(name string) (*engine.Env, error) {
 	return v, nil
 }
 
-func (daemon *Daemon) CmdExec(stdin io.ReadCloser, stdout io.WriteCloser, key, id, cmd, tag string, terminal bool) error {
-	return daemon.Exec(stdin, stdout, key, id, cmd, tag, terminal)
-}
-
 func (daemon *Daemon) CmdExitCode(container, tag string) (int, error) {
 	return daemon.ExitCode(container, tag)
 }

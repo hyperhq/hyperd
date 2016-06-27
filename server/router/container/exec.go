@@ -23,17 +23,31 @@ func (s *containerRouter) getExitCode(ctx context.Context, w http.ResponseWriter
 	return httputils.WriteJSON(w, http.StatusOK, code)
 }
 
-func (s *containerRouter) postContainerExec(ctx context.Context, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+func (s *containerRouter) postContainerExecCreate(ctx context.Context, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
 	if err := httputils.ParseForm(r); err != nil {
 		return err
 	}
 
-	key := r.Form.Get("type")
-	id := r.Form.Get("value")
+	id := r.Form.Get("container")
 	command := r.Form.Get("command")
-	tag := r.Form.Get("tag")
 	tty := r.Form.Get("tty")
 	terminal := tty == "yes" || tty == "true" || tty == "on"
+
+	execId, err := s.backend.CreateExec(id, command, terminal)
+	if err != nil {
+		return err
+	}
+
+	return httputils.WriteJSON(w, http.StatusCreated, execId)
+}
+
+func (s *containerRouter) postContainerExecStart(ctx context.Context, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+	if err := httputils.ParseForm(r); err != nil {
+		return err
+	}
+
+	id := r.Form.Get("container")
+	execId := r.Form.Get("exec")
 
 	// Setting up the streaming http interface.
 	inStream, outStream, err := httputils.HijackConnection(w)
@@ -43,7 +57,7 @@ func (s *containerRouter) postContainerExec(ctx context.Context, w http.Response
 	defer httputils.CloseStreams(inStream, outStream)
 	fmt.Fprintf(outStream, "HTTP/1.1 101 UPGRADED\r\nContent-Type: application/vnd.docker.raw-stream\r\nConnection: Upgrade\r\nUpgrade: tcp\r\n\r\n")
 
-	return s.backend.CmdExec(inStream, outStream.(io.WriteCloser), key, id, command, tag, terminal)
+	return s.backend.StartExec(inStream, outStream.(io.WriteCloser), id, execId)
 }
 
 func (s *containerRouter) postContainerAttach(ctx context.Context, w http.ResponseWriter, r *http.Request, vars map[string]string) error {

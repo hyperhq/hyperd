@@ -8,12 +8,27 @@ import (
 	"io"
 )
 
-func (s *ServerRPC) ContainerExec(stream types.PublicAPI_ContainerExecServer) error {
-	req, err := stream.Recv()
-	if err != nil {
-		return err
-	}
+func (s *ServerRPC) ExecCreate(ctx context.Context, req *types.ExecCreateRequest) (*types.ExecCreateResponse, error) {
+	glog.V(3).Infof("create exec %v", req.String())
+
 	cmd, err := json.Marshal(req.Command)
+	if err != nil {
+		return nil, err
+	}
+
+	execId, err := s.daemon.CreateExec(req.ContainerID, string(cmd), req.Tty)
+	if err != nil {
+		glog.Errorf("ExecCreate error: %v", err)
+		return nil, err
+	}
+
+	return &types.ExecCreateResponse{
+		ExecID: execId,
+	}, nil
+}
+
+func (s *ServerRPC) ExecStart(stream types.PublicAPI_ExecStartServer) error {
+	req, err := stream.Recv()
 	if err != nil {
 		return err
 	}
@@ -26,7 +41,7 @@ func (s *ServerRPC) ContainerExec(stream types.PublicAPI_ContainerExecServer) er
 		for {
 			nr, err := outReader.Read(buf)
 			if nr > 0 {
-				if err := stream.Send(&types.ContainerExecResponse{buf[:nr]}); err != nil {
+				if err := stream.Send(&types.ExecStartResponse{buf[:nr]}); err != nil {
 					glog.Errorf("Send to stream error: %v", err)
 					return
 				}
@@ -64,7 +79,8 @@ func (s *ServerRPC) ContainerExec(stream types.PublicAPI_ContainerExecServer) er
 			}
 		}
 	}()
-	err = s.daemon.Exec(inReader, outWriter, "container", req.ContainerID, string(cmd), req.Tag, req.Tty)
+
+	err = s.daemon.StartExec(inReader, outWriter, req.ContainerID, req.ExecID)
 	if err != nil {
 		return err
 	}

@@ -1,22 +1,46 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"strconv"
 
 	"github.com/hyperhq/hyperd/lib/promise"
 )
 
-func (cli *Client) Exec(container, tag string, command []byte, tty bool, stdin io.ReadCloser, stdout, stderr io.Writer) error {
+func (cli *Client) CreateExec(container string, command []byte, tty bool) (string, error) {
+	var execId string
 
 	v := url.Values{}
-	v.Set("type", "container")
-	v.Set("value", container)
+	v.Set("container", container)
 	v.Set("command", string(command))
-	v.Set("tag", tag)
 	v.Set("tty", strconv.FormatBool(tty))
+
+	body, statusCode, err := readBody(cli.call("POST", "/exec/create?"+v.Encode(), nil, nil))
+	if err != nil {
+		return "", err
+	}
+
+	if statusCode != http.StatusCreated && statusCode != http.StatusOK {
+		return "", err
+	}
+
+	err = json.Unmarshal(body, &execId)
+	if err != nil {
+		return "", err
+	}
+
+	return execId, nil
+}
+
+func (cli *Client) StartExec(containerId, execId string, tty bool, stdin io.ReadCloser, stdout, stderr io.Writer) error {
+
+	v := url.Values{}
+	v.Set("container", containerId)
+	v.Set("exec", execId)
 
 	var (
 		hijacked = make(chan io.Closer)
@@ -31,7 +55,7 @@ func (cli *Client) Exec(container, tag string, command []byte, tty bool, stdin i
 	}()
 
 	errCh = promise.Go(func() error {
-		return cli.hijack("POST", "/exec?"+v.Encode(), tty, stdin, stdout, stdout, hijacked, nil, "")
+		return cli.hijack("POST", "/exec/start?"+v.Encode(), tty, stdin, stdout, stdout, hijacked, nil, "")
 	})
 
 	// Acknowledge the hijack before starting

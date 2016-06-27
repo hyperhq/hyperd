@@ -38,7 +38,8 @@ func (r *containerRouter) initRoutes() {
 		local.NewPostRoute("/container/commit", r.postContainerCommit),
 		local.NewPostRoute("/container/stop", r.postContainerStop),
 		local.NewPostRoute("/container/kill", r.postContainerKill),
-		local.NewPostRoute("/exec", r.postContainerExec),
+		local.NewPostRoute("/exec/create", r.postContainerExecCreate),
+		local.NewPostRoute("/exec/start", r.postContainerExecStart),
 		local.NewPostRoute("/attach", r.postContainerAttach),
 		local.NewPostRoute("/tty/resize", r.postTtyResize),
 		// PUT

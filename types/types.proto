@@ -531,15 +531,23 @@ message InfoResponse {
   string  name                    = 12;
 }
 
-message ContainerExecRequest{
+message ExecCreateRequest{
     string containerID      = 1;
     repeated string command = 2;
-    string tag              = 3;
-    bool   tty              = 4;
-    bytes  stdin            = 5;
+    bool   tty              = 3;
 }
 
-message ContainerExecResponse{
+message ExecCreateResponse{
+    string execID = 1;
+}
+
+message ExecStartRequest{
+    string containerID      = 1;
+    string execID           = 2;
+    bytes  stdin            = 3;
+}
+
+message ExecStartResponse{
     bytes stdout = 1;
 }
 
@@ -759,8 +767,10 @@ service PublicAPI {
     // TODO: ContainerLabels updates labels of the specified container
     // ContainerStop stops the specified container
     rpc ContainerStop(ContainerStopRequest) returns (ContainerStopResponse) {}
-    // ContainerExec execs a command in specified container
-    rpc ContainerExec(stream ContainerExecRequest) returns (stream ContainerExecResponse) {}
+    // ExecCreate creates exec in specified container
+    rpc ExecCreate(ExecCreateRequest) returns (ExecCreateResponse) {}
+    // ExecStart starts exec
+    rpc ExecStart(stream ExecStartRequest) returns (stream ExecStartResponse) {}
     // Attach attaches to the specified container
     rpc Attach(stream AttachMessage) returns (stream AttachMessage) {}
     // Wait gets the exit code of the specified container

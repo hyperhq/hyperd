@@ -13,7 +13,9 @@ type APIInterface interface {
 	Login(auth dockertypes.AuthConfig, response *dockertypes.AuthResponse) (remove bool, err error)
 
 	Attach(container, termTag string, tty bool, stdin io.ReadCloser, stdout, stderr io.Writer) error
-	Exec(container, tag string, command []byte, tty bool, stdin io.ReadCloser, stdout, stderr io.Writer) error
+	CreateExec(containerId string, command []byte, tty bool) (string, error)
+	StartExec(containerId, execId string, tty bool, stdin io.ReadCloser, stdout, stderr io.Writer) error
+
 	WinResize(id, tag string, height, width int) error
 
 	List(item, pod, vm string, aux bool) (*engine.Env, error)
