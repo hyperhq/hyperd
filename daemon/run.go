@@ -52,16 +52,15 @@ func (daemon *Daemon) createPodInternal(podId string, podSpec *apitypes.UserPod,
 	return pod, nil
 }
 
-func (daemon *Daemon) StartPod(stdin io.ReadCloser, stdout io.WriteCloser, podId, vmId, tag string) (int, string, error) {
+func (daemon *Daemon) StartPod(stdin io.ReadCloser, stdout io.WriteCloser, podId, vmId string, attach bool) (int, string, error) {
 	var ttys []*hypervisor.TtyIO = []*hypervisor.TtyIO{}
 
-	if tag != "" {
-		glog.V(1).Info("Pod Run with client terminal tag: ", tag)
+	if attach {
+		glog.V(1).Info("Run pod with tty attached")
 		ttys = append(ttys, &hypervisor.TtyIO{
-			Stdin:     stdin,
-			Stdout:    stdout,
-			ClientTag: tag,
-			Callback:  make(chan *types.VmResponse, 1),
+			Stdin:    stdin,
+			Stdout:   stdout,
+			Callback: make(chan *types.VmResponse, 1),
 		})
 	}
 

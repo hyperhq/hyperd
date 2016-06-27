@@ -1488,10 +1488,10 @@ func (m *ExecStartResponse) String() string { return proto.CompactTextString(m) 
 func (*ExecStartResponse) ProtoMessage()    {}
 
 type PodStartMessage struct {
-	PodID string `protobuf:"bytes,1,opt,name=podID,proto3" json:"podID,omitempty"`
-	VmID  string `protobuf:"bytes,2,opt,name=vmID,proto3" json:"vmID,omitempty"`
-	Tag   string `protobuf:"bytes,3,opt,name=tag,proto3" json:"tag,omitempty"`
-	Data  []byte `protobuf:"bytes,4,opt,name=data,proto3" json:"data,omitempty"`
+	PodID  string `protobuf:"bytes,1,opt,name=podID,proto3" json:"podID,omitempty"`
+	VmID   string `protobuf:"bytes,2,opt,name=vmID,proto3" json:"vmID,omitempty"`
+	Attach bool   `protobuf:"varint,3,opt,name=attach,proto3" json:"attach,omitempty"`
+	Data   []byte `protobuf:"bytes,4,opt,name=data,proto3" json:"data,omitempty"`
 }
 
 func (m *PodStartMessage) Reset()         { *m = PodStartMessage{} }

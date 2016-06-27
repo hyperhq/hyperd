@@ -13,7 +13,7 @@ type Backend interface {
 	CmdGetPodStats(podId string) (interface{}, error)
 	CmdCreatePod(podArgs string, autoremove bool) (*engine.Env, error)
 	CmdSetPodLabels(podId string, override bool, labels map[string]string) (*engine.Env, error)
-	CmdStartPod(in io.ReadCloser, out io.WriteCloser, podId, vmId, tag string) (*engine.Env, error)
+	CmdStartPod(in io.ReadCloser, out io.WriteCloser, podId, vmId string, attach bool) (*engine.Env, error)
 	CmdPausePod(podId string) error
 	CmdUnpausePod(podId string) error
 	CmdList(item, podId, vmId string, auxiliary bool) (*engine.Env, error)

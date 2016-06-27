@@ -554,7 +554,7 @@ message ExecStartResponse{
 message PodStartMessage {
   string podID  = 1;
   string vmID   = 2;
-  string tag    = 3;
+  bool   attach = 3;
   bytes  data   = 4;
 }
 

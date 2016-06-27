@@ -212,7 +212,7 @@ func (d Docker) ContainerStart(cId string, hostConfig *containertypes.HostConfig
 		return
 	}
 
-	if _, _, err = d.Daemon.StartPod(nil, nil, podId, vm.Id, ""); err != nil {
+	if _, _, err = d.Daemon.StartPod(nil, nil, podId, vm.Id, false); err != nil {
 		return
 	}
 
