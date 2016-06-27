@@ -10,6 +10,7 @@ import (
 
 type PodList struct {
 	pods       map[string]*Pod
+	names      map[string]*Pod
 	containers map[string]string
 	mu         *sync.RWMutex
 }
@@ -17,6 +18,7 @@ type PodList struct {
 func NewPodList() *PodList {
 	return &PodList{
 		pods:       make(map[string]*Pod),
+		names:      make(map[string]*Pod),
 		containers: make(map[string]string),
 		mu:         &sync.RWMutex{},
 	}
@@ -39,6 +41,7 @@ func (pl *PodList) Put(p *Pod) {
 		pl.pods = make(map[string]*Pod)
 	}
 	pl.pods[p.Id] = p
+	pl.names[p.status.Name] = p
 
 	if pl.containers == nil {
 		pl.containers = make(map[string]string)
@@ -55,6 +58,7 @@ func (pl *PodList) Delete(id string) {
 		for _, c := range p.status.Containers {
 			delete(pl.containers, c.Id)
 		}
+		delete(pl.names, p.status.Name)
 	}
 	delete(pl.pods, id)
 }
@@ -63,18 +67,11 @@ func (pl *PodList) GetByName(name string) (*Pod, bool) {
 	pl.mu.RLock()
 	defer pl.mu.RUnlock()
 
-	pod := pl.findUnsafe(func(p *Pod) bool {
-		if p.status.Name == name {
-			return true
-		}
-		return false
-	})
-
-	if pod != nil {
-		return pod, true
+	if pl.names == nil {
+		return nil, false
 	}
-
-	return nil, false
+	p, ok := pl.names[name]
+	return p, ok
 }
 
 func (pl *PodList) GetByContainerId(cid string) (*Pod, bool) {

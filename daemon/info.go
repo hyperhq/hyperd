@@ -17,7 +17,7 @@ func (daemon *Daemon) GetPodInfo(podName string) (types.PodInfo, error) {
 		ok      bool
 		imageid string
 	)
-	if strings.Contains(podName, "pod-") {
+	if strings.HasPrefix(podName, "pod-") {
 		pod, ok = daemon.PodList.Get(podName)
 		if !ok {
 			return types.PodInfo{}, fmt.Errorf("Can not get Pod info with pod ID(%s)", podName)
