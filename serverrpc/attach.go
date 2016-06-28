@@ -44,5 +44,5 @@ func (s *ServerRPC) Attach(stream types.PublicAPI_AttachServer) error {
 		}
 	}()
 
-	return s.daemon.Attach(ir, ow, "", req.ContainerID, req.Tag)
+	return s.daemon.Attach(ir, ow, req.ContainerID)
 }

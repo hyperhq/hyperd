@@ -14,7 +14,7 @@ import (
 	"github.com/hyperhq/hyperd/utils"
 )
 
-func (cli *Client) hijackRequest(method, tag string, v *url.Values, tty bool, stdin io.ReadCloser, stdout, stderr io.Writer) error {
+func (cli *Client) hijackRequest(method string, v *url.Values, tty bool, stdin io.ReadCloser, stdout, stderr io.Writer) error {
 	var (
 		hijacked = make(chan io.Closer)
 		errCh    chan error

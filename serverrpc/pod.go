@@ -36,8 +36,8 @@ func (s *ServerRPC) PodStart(stream types.PublicAPI_PodStartServer) error {
 	}
 	glog.V(3).Infof("PodStart with request %s", req.String())
 
-	if req.Tag == "" {
-		_, _, err := s.daemon.StartPod(nil, nil, req.PodID, req.VmID, req.Tag)
+	if !req.Attach {
+		_, _, err := s.daemon.StartPod(nil, nil, req.PodID, req.VmID, req.Attach)
 		if err != nil {
 			glog.Errorf("StartPod failed: %v", err)
 			return err
@@ -82,7 +82,7 @@ func (s *ServerRPC) PodStart(stream types.PublicAPI_PodStartServer) error {
 		}
 	}()
 
-	if _, _, err := s.daemon.StartPod(ir, ow, req.PodID, req.VmID, req.Tag); err != nil {
+	if _, _, err := s.daemon.StartPod(ir, ow, req.PodID, req.VmID, req.Attach); err != nil {
 		glog.Errorf("StartPod failed: %v", err)
 		return err
 	}

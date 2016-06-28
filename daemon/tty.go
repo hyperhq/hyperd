@@ -3,34 +3,16 @@ package daemon
 import (
 	"fmt"
 	"github.com/golang/glog"
-	"strings"
 )
 
-func (daemon *Daemon) TtyResize(podId, tag string, h, w int) error {
-	var (
-		container string
-		vmid      string
-		err       error
-	)
-
-	if strings.Contains(podId, "pod-") {
-		container = ""
-		vmid, err = daemon.GetVmByPodId(podId)
-		if err != nil {
-			return err
-		}
-	} else if strings.Contains(podId, "vm-") {
-		vmid = podId
-	} else {
-		container = podId
-		podId, err = daemon.GetPodByContainer(container)
-		if err != nil {
-			return err
-		}
-		vmid, err = daemon.GetVmByPodId(podId)
-		if err != nil {
-			return err
-		}
+func (daemon *Daemon) TtyResize(containerId, execId string, h, w int) error {
+	podId, err := daemon.GetPodByContainer(containerId)
+	if err != nil {
+		return err
+	}
+	vmid, err := daemon.GetVmByPodId(podId)
+	if err != nil {
+		return err
 	}
 
 	vm, ok := daemon.VmList.Get(vmid)
@@ -38,7 +20,7 @@ func (daemon *Daemon) TtyResize(podId, tag string, h, w int) error {
 		return fmt.Errorf("vm %s doesn't exist!", vmid)
 	}
 
-	err = vm.Tty(tag, h, w)
+	err = vm.Tty(containerId, execId, h, w)
 	if err != nil {
 		return err
 	}

@@ -197,7 +197,7 @@ func (daemon *Daemon) GetContainerInfo(name string) (types.ContainerInfo, error)
 
 	var (
 		pod     *Pod
-		c       *hypervisor.Container
+		c       *hypervisor.ContainerStatus
 		i       int = 0
 		imageid string
 		ok      bool

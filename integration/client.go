@@ -141,7 +141,7 @@ func (c *HyperClient) GetContainerLogs(container string) ([]byte, error) {
 }
 
 // PostAttach attach to a container or pod by id
-func (c *HyperClient) PostAttach(id, tag string) error {
+func (c *HyperClient) PostAttach(id string) error {
 	stream, err := c.client.Attach(c.ctx)
 	if err != nil {
 		return err
@@ -149,7 +149,6 @@ func (c *HyperClient) PostAttach(id, tag string) error {
 
 	req := types.AttachMessage{
 		ContainerID: id,
-		Tag:         tag,
 	}
 	if err := stream.Send(&req); err != nil {
 		return err
@@ -264,15 +263,28 @@ func (c *HyperClient) RemovePod(podID string) error {
 	return nil
 }
 
-// ContainerExec exec a command in a container with input stream in and output stream out
-func (c *HyperClient) ContainerExec(container, tag string, command []string, tty bool, stdin io.ReadCloser, stdout, stderr io.Writer) error {
-	request := types.ContainerExecRequest{
+// ContainerExecCreate creates exec in a container
+func (c *HyperClient) ContainerExecCreate(container string, command []string, tty bool) (string, error) {
+	req := types.ExecCreateRequest{
 		ContainerID: container,
 		Command:     command,
-		Tag:         tag,
 		Tty:         tty,
 	}
-	stream, err := c.client.ContainerExec(context.Background())
+	resp, err := c.client.ExecCreate(c.ctx, &req)
+	if err != nil {
+		return "", err
+	}
+
+	return resp.ExecID, nil
+}
+
+// ContainerExecStart starts exec in a container with input stream in and output stream out
+func (c *HyperClient) ContainerExecStart(containerId, execId string, stdin io.ReadCloser, stdout, stderr io.Writer) error {
+	request := types.ExecStartRequest{
+		ContainerID: containerId,
+		ExecID:      execId,
+	}
+	stream, err := c.client.ExecStart(context.Background())
 	if err != nil {
 		return err
 	}
@@ -310,7 +322,7 @@ func (c *HyperClient) ContainerExec(container, tag string, command []string, tty
 			for {
 				nr, err := stdin.Read(buf)
 				if nr > 0 {
-					if err := stream.Send(&types.ContainerExecRequest{Stdin: buf[:nr]}); err != nil {
+					if err := stream.Send(&types.ExecStartRequest{Stdin: buf[:nr]}); err != nil {
 						return err
 					}
 				}
@@ -334,22 +346,22 @@ func (c *HyperClient) ContainerExec(container, tag string, command []string, tty
 }
 
 // StartPod starts a pod by podID
-func (c *HyperClient) StartPod(podID, vmID, tag string) error {
+func (c *HyperClient) StartPod(podID, vmID string, attach bool) error {
 	stream, err := c.client.PodStart(context.Background())
 	if err != nil {
 		return err
 	}
 
 	req := types.PodStartMessage{
-		PodID: podID,
-		VmID:  vmID,
-		Tag:   tag,
+		PodID:  podID,
+		VmID:   vmID,
+		Attach: attach,
 	}
 	if err := stream.Send(&req); err != nil {
 		return err
 	}
 
-	if tag == "" {
+	if attach {
 		if _, err := stream.Recv(); err != nil {
 			return err
 		}

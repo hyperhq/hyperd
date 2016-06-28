@@ -26,14 +26,13 @@ func (cli *HyperClient) HyperCmdExec(args ...string) error {
 		}
 	}
 	if len(args) == 0 {
-		return fmt.Errorf("Can not accept the 'exec' command without POD/Container ID!")
+		return fmt.Errorf("Can not accept the 'exec' command without Container ID!")
 	}
 	if len(args) == 1 {
 		return fmt.Errorf("Can not accept the 'exec' command without command!")
 	}
 	var (
 		podName     = args[0]
-		tag         = cli.GetTag()
 		containerId string
 	)
 
@@ -51,8 +50,13 @@ func (cli *HyperClient) HyperCmdExec(args ...string) error {
 		return err
 	}
 
+	execId, err := cli.client.CreateExec(containerId, command, opts.Tty)
+	if err != nil {
+		return err
+	}
+
 	if opts.Tty {
-		if err := cli.monitorTtySize(podName, tag); err != nil {
+		if err := cli.monitorTtySize(containerId, execId); err != nil {
 			fmt.Printf("Monitor tty size fail for %s!\n", podName)
 		}
 		oldState, err := term.SetRawTerminal(cli.inFd)
@@ -62,10 +66,10 @@ func (cli *HyperClient) HyperCmdExec(args ...string) error {
 		defer term.RestoreTerminal(cli.inFd, oldState)
 	}
 
-	err = cli.client.Exec(containerId, tag, command, opts.Tty, cli.in, cli.out, cli.err)
+	err = cli.client.StartExec(containerId, execId, opts.Tty, cli.in, cli.out, cli.err)
 	if err != nil {
 		return err
 	}
 
-	return cli.client.GetExitCode(containerId, tag)
+	return cli.client.GetExitCode(containerId, execId)
 }

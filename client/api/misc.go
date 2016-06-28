@@ -20,10 +20,10 @@ func (e StatusError) Error() string {
 	return fmt.Sprintf("Status: %s, Code: %d", e.Status, e.StatusCode)
 }
 
-func (cli *Client) GetExitCode(container, tag string) error {
+func (cli *Client) GetExitCode(containerId, execId string) error {
 	v := url.Values{}
-	v.Set("container", container)
-	v.Set("tag", tag)
+	v.Set("container", containerId)
+	v.Set("exec", execId)
 	code := -1
 
 	stream, _, err := cli.call("GET", "/exitcode?"+v.Encode(), nil, nil)
@@ -62,12 +62,12 @@ func (cli *Client) AuthHeader(orig map[string][]string, auth types.AuthConfig) (
 	return orig, nil
 }
 
-func (cli *Client) WinResize(id, tag string, height, width int) error {
+func (cli *Client) WinResize(containerId, execId string, height, width int) error {
 	v := url.Values{}
 	v.Set("h", strconv.Itoa(height))
 	v.Set("w", strconv.Itoa(width))
-	v.Set("id", id)
-	v.Set("tag", tag)
+	v.Set("container", containerId)
+	v.Set("exec", execId)
 
 	_, _, err := readBody(cli.call("POST", "/tty/resize?"+v.Encode(), nil, nil))
 

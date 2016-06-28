@@ -84,7 +84,6 @@ func (cli *HyperClient) HyperCmdRun(args ...string) (err error) {
 		spec  pod.UserPod
 		code  int
 		async = true
-		tag   string
 		tty   = false
 	)
 	json.Unmarshal([]byte(podJson), &spec)
@@ -127,7 +126,6 @@ func (cli *HyperClient) HyperCmdRun(args ...string) (err error) {
 	}
 
 	if attach {
-		tag = cli.GetTag()
 		if opts.PodFile == "" && opts.K8s == "" {
 			tty = opts.Tty
 		} else {
@@ -137,7 +135,7 @@ func (cli *HyperClient) HyperCmdRun(args ...string) (err error) {
 		if tty {
 			p, err := cli.client.GetPodInfo(podId)
 			if err == nil {
-				cli.monitorTtySize(p.Spec.Containers[0].ContainerID, tag)
+				cli.monitorTtySize(p.Spec.Containers[0].ContainerID, "")
 			}
 
 			oldState, err := term.SetRawTerminal(cli.inFd)
@@ -149,7 +147,7 @@ func (cli *HyperClient) HyperCmdRun(args ...string) (err error) {
 
 	}
 
-	_, err = cli.client.StartPod(podId, vmId, tag, tty, cli.in, cli.out, cli.err)
+	_, err = cli.client.StartPod(podId, vmId, attach, tty, cli.in, cli.out, cli.err)
 	if err != nil {
 		return
 	}

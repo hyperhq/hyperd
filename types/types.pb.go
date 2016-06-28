@@ -79,8 +79,10 @@ It has these top-level messages:
 	DriverStatus
 	InfoRequest
 	InfoResponse
-	ContainerExecRequest
-	ContainerExecResponse
+	ExecCreateRequest
+	ExecCreateResponse
+	ExecStartRequest
+	ExecStartResponse
 	PodStartMessage
 	WaitRequest
 	WaitResponse
@@ -1449,31 +1451,47 @@ func (m *InfoResponse) GetDstatus() []*DriverStatus {
 	return nil
 }
 
-type ContainerExecRequest struct {
+type ExecCreateRequest struct {
 	ContainerID string   `protobuf:"bytes,1,opt,name=containerID,proto3" json:"containerID,omitempty"`
 	Command     []string `protobuf:"bytes,2,rep,name=command" json:"command,omitempty"`
-	Tag         string   `protobuf:"bytes,3,opt,name=tag,proto3" json:"tag,omitempty"`
-	Tty         bool     `protobuf:"varint,4,opt,name=tty,proto3" json:"tty,omitempty"`
-	Stdin       []byte   `protobuf:"bytes,5,opt,name=stdin,proto3" json:"stdin,omitempty"`
+	Tty         bool     `protobuf:"varint,3,opt,name=tty,proto3" json:"tty,omitempty"`
 }
 
-func (m *ContainerExecRequest) Reset()         { *m = ContainerExecRequest{} }
-func (m *ContainerExecRequest) String() string { return proto.CompactTextString(m) }
-func (*ContainerExecRequest) ProtoMessage()    {}
+func (m *ExecCreateRequest) Reset()         { *m = ExecCreateRequest{} }
+func (m *ExecCreateRequest) String() string { return proto.CompactTextString(m) }
+func (*ExecCreateRequest) ProtoMessage()    {}
 
-type ContainerExecResponse struct {
+type ExecCreateResponse struct {
+	ExecID string `protobuf:"bytes,1,opt,name=execID,proto3" json:"execID,omitempty"`
+}
+
+func (m *ExecCreateResponse) Reset()         { *m = ExecCreateResponse{} }
+func (m *ExecCreateResponse) String() string { return proto.CompactTextString(m) }
+func (*ExecCreateResponse) ProtoMessage()    {}
+
+type ExecStartRequest struct {
+	ContainerID string `protobuf:"bytes,1,opt,name=containerID,proto3" json:"containerID,omitempty"`
+	ExecID      string `protobuf:"bytes,2,opt,name=execID,proto3" json:"execID,omitempty"`
+	Stdin       []byte `protobuf:"bytes,3,opt,name=stdin,proto3" json:"stdin,omitempty"`
+}
+
+func (m *ExecStartRequest) Reset()         { *m = ExecStartRequest{} }
+func (m *ExecStartRequest) String() string { return proto.CompactTextString(m) }
+func (*ExecStartRequest) ProtoMessage()    {}
+
+type ExecStartResponse struct {
 	Stdout []byte `protobuf:"bytes,1,opt,name=stdout,proto3" json:"stdout,omitempty"`
 }
 
-func (m *ContainerExecResponse) Reset()         { *m = ContainerExecResponse{} }
-func (m *ContainerExecResponse) String() string { return proto.CompactTextString(m) }
-func (*ContainerExecResponse) ProtoMessage()    {}
+func (m *ExecStartResponse) Reset()         { *m = ExecStartResponse{} }
+func (m *ExecStartResponse) String() string { return proto.CompactTextString(m) }
+func (*ExecStartResponse) ProtoMessage()    {}
 
 type PodStartMessage struct {
-	PodID string `protobuf:"bytes,1,opt,name=podID,proto3" json:"podID,omitempty"`
-	VmID  string `protobuf:"bytes,2,opt,name=vmID,proto3" json:"vmID,omitempty"`
-	Tag   string `protobuf:"bytes,3,opt,name=tag,proto3" json:"tag,omitempty"`
-	Data  []byte `protobuf:"bytes,4,opt,name=data,proto3" json:"data,omitempty"`
+	PodID  string `protobuf:"bytes,1,opt,name=podID,proto3" json:"podID,omitempty"`
+	VmID   string `protobuf:"bytes,2,opt,name=vmID,proto3" json:"vmID,omitempty"`
+	Attach bool   `protobuf:"varint,3,opt,name=attach,proto3" json:"attach,omitempty"`
+	Data   []byte `protobuf:"bytes,4,opt,name=data,proto3" json:"data,omitempty"`
 }
 
 func (m *PodStartMessage) Reset()         { *m = PodStartMessage{} }
@@ -1500,8 +1518,7 @@ func (*WaitResponse) ProtoMessage()    {}
 
 type AttachMessage struct {
 	ContainerID string `protobuf:"bytes,1,opt,name=containerID,proto3" json:"containerID,omitempty"`
-	Tag         string `protobuf:"bytes,2,opt,name=tag,proto3" json:"tag,omitempty"`
-	Data        []byte `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
+	Data        []byte `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
 }
 
 func (m *AttachMessage) Reset()         { *m = AttachMessage{} }
@@ -1935,8 +1952,10 @@ func init() {
 	proto.RegisterType((*DriverStatus)(nil), "types.DriverStatus")
 	proto.RegisterType((*InfoRequest)(nil), "types.InfoRequest")
 	proto.RegisterType((*InfoResponse)(nil), "types.InfoResponse")
-	proto.RegisterType((*ContainerExecRequest)(nil), "types.ContainerExecRequest")
-	proto.RegisterType((*ContainerExecResponse)(nil), "types.ContainerExecResponse")
+	proto.RegisterType((*ExecCreateRequest)(nil), "types.ExecCreateRequest")
+	proto.RegisterType((*ExecCreateResponse)(nil), "types.ExecCreateResponse")
+	proto.RegisterType((*ExecStartRequest)(nil), "types.ExecStartRequest")
+	proto.RegisterType((*ExecStartResponse)(nil), "types.ExecStartResponse")
 	proto.RegisterType((*PodStartMessage)(nil), "types.PodStartMessage")
 	proto.RegisterType((*WaitRequest)(nil), "types.WaitRequest")
 	proto.RegisterType((*WaitResponse)(nil), "types.WaitResponse")
@@ -2028,8 +2047,10 @@ type PublicAPIClient interface {
 	// TODO: ContainerLabels updates labels of the specified container
 	// ContainerStop stops the specified container
 	ContainerStop(ctx context.Context, in *ContainerStopRequest, opts ...grpc.CallOption) (*ContainerStopResponse, error)
-	// ContainerExec execs a command in specified container
-	ContainerExec(ctx context.Context, opts ...grpc.CallOption) (PublicAPI_ContainerExecClient, error)
+	// ExecCreate creates exec in specified container
+	ExecCreate(ctx context.Context, in *ExecCreateRequest, opts ...grpc.CallOption) (*ExecCreateResponse, error)
+	// ExecStart starts exec
+	ExecStart(ctx context.Context, opts ...grpc.CallOption) (PublicAPI_ExecStartClient, error)
 	// Attach attaches to the specified container
 	Attach(ctx context.Context, opts ...grpc.CallOption) (PublicAPI_AttachClient, error)
 	// Wait gets the exit code of the specified container
@@ -2288,31 +2309,40 @@ func (c *publicAPIClient) ContainerStop(ctx context.Context, in *ContainerStopRe
 	return out, nil
 }
 
-func (c *publicAPIClient) ContainerExec(ctx context.Context, opts ...grpc.CallOption) (PublicAPI_ContainerExecClient, error) {
-	stream, err := grpc.NewClientStream(ctx, &_PublicAPI_serviceDesc.Streams[2], c.cc, "/types.PublicAPI/ContainerExec", opts...)
+func (c *publicAPIClient) ExecCreate(ctx context.Context, in *ExecCreateRequest, opts ...grpc.CallOption) (*ExecCreateResponse, error) {
+	out := new(ExecCreateResponse)
+	err := grpc.Invoke(ctx, "/types.PublicAPI/ExecCreate", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &publicAPIContainerExecClient{stream}
+	return out, nil
+}
+
+func (c *publicAPIClient) ExecStart(ctx context.Context, opts ...grpc.CallOption) (PublicAPI_ExecStartClient, error) {
+	stream, err := grpc.NewClientStream(ctx, &_PublicAPI_serviceDesc.Streams[2], c.cc, "/types.PublicAPI/ExecStart", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &publicAPIExecStartClient{stream}
 	return x, nil
 }
 
-type PublicAPI_ContainerExecClient interface {
-	Send(*ContainerExecRequest) error
-	Recv() (*ContainerExecResponse, error)
+type PublicAPI_ExecStartClient interface {
+	Send(*ExecStartRequest) error
+	Recv() (*ExecStartResponse, error)
 	grpc.ClientStream
 }
 
-type publicAPIContainerExecClient struct {
+type publicAPIExecStartClient struct {
 	grpc.ClientStream
 }
 
-func (x *publicAPIContainerExecClient) Send(m *ContainerExecRequest) error {
+func (x *publicAPIExecStartClient) Send(m *ExecStartRequest) error {
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *publicAPIContainerExecClient) Recv() (*ContainerExecResponse, error) {
-	m := new(ContainerExecResponse)
+func (x *publicAPIExecStartClient) Recv() (*ExecStartResponse, error) {
+	m := new(ExecStartResponse)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -2533,8 +2563,10 @@ type PublicAPIServer interface {
 	// TODO: ContainerLabels updates labels of the specified container
 	// ContainerStop stops the specified container
 	ContainerStop(context.Context, *ContainerStopRequest) (*ContainerStopResponse, error)
-	// ContainerExec execs a command in specified container
-	ContainerExec(PublicAPI_ContainerExecServer) error
+	// ExecCreate creates exec in specified container
+	ExecCreate(context.Context, *ExecCreateRequest) (*ExecCreateResponse, error)
+	// ExecStart starts exec
+	ExecStart(PublicAPI_ExecStartServer) error
 	// Attach attaches to the specified container
 	Attach(PublicAPI_AttachServer) error
 	// Wait gets the exit code of the specified container
@@ -2827,26 +2859,38 @@ func _PublicAPI_ContainerStop_Handler(srv interface{}, ctx context.Context, dec 
 	return out, nil
 }
 
-func _PublicAPI_ContainerExec_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(PublicAPIServer).ContainerExec(&publicAPIContainerExecServer{stream})
+func _PublicAPI_ExecCreate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
+	in := new(ExecCreateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	out, err := srv.(PublicAPIServer).ExecCreate(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
-type PublicAPI_ContainerExecServer interface {
-	Send(*ContainerExecResponse) error
-	Recv() (*ContainerExecRequest, error)
+func _PublicAPI_ExecStart_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(PublicAPIServer).ExecStart(&publicAPIExecStartServer{stream})
+}
+
+type PublicAPI_ExecStartServer interface {
+	Send(*ExecStartResponse) error
+	Recv() (*ExecStartRequest, error)
 	grpc.ServerStream
 }
 
-type publicAPIContainerExecServer struct {
+type publicAPIExecStartServer struct {
 	grpc.ServerStream
 }
 
-func (x *publicAPIContainerExecServer) Send(m *ContainerExecResponse) error {
+func (x *publicAPIExecStartServer) Send(m *ExecStartResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *publicAPIContainerExecServer) Recv() (*ContainerExecRequest, error) {
-	m := new(ContainerExecRequest)
+func (x *publicAPIExecStartServer) Recv() (*ExecStartRequest, error) {
+	m := new(ExecStartRequest)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -3094,6 +3138,10 @@ var _PublicAPI_serviceDesc = grpc.ServiceDesc{
 			Handler:    _PublicAPI_ContainerStop_Handler,
 		},
 		{
+			MethodName: "ExecCreate",
+			Handler:    _PublicAPI_ExecCreate_Handler,
+		},
+		{
 			MethodName: "Wait",
 			Handler:    _PublicAPI_Wait_Handler,
 		},
@@ -3139,8 +3187,8 @@ var _PublicAPI_serviceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 		{
-			StreamName:    "ContainerExec",
-			Handler:       _PublicAPI_ContainerExec_Handler,
+			StreamName:    "ExecStart",
+			Handler:       _PublicAPI_ExecStart_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
 		},

@@ -175,7 +175,7 @@ func showPodContainers(pod *hypervisor.PodStatus, aux bool) []string {
 	return rsp
 }
 
-func showContainer(c *hypervisor.Container) string {
+func showContainer(c *hypervisor.ContainerStatus) string {
 	var status string
 
 	switch c.Status {

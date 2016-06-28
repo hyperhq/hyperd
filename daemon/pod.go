@@ -38,7 +38,6 @@ type Pod struct {
 	vm           *hypervisor.Vm
 	ctnStartInfo []*hypervisor.ContainerInfo
 	volumes      map[string]*hypervisor.VolumeInfo
-	ttyList      map[string]*hypervisor.TtyIO
 
 	transiting chan bool
 	sync.RWMutex
@@ -286,7 +285,6 @@ func NewPod(podSpec *apitypes.UserPod, id string, data interface{}) (*Pod, error
 
 	p := &Pod{
 		Id:         id,
-		ttyList:    make(map[string]*hypervisor.TtyIO),
 		volumes:    make(map[string]*hypervisor.VolumeInfo),
 		transiting: make(chan bool, 1),
 	}
@@ -415,9 +413,7 @@ func (p *Pod) init(data interface{}) error {
 		return err
 	}
 
-	status := hypervisor.NewPod(p.Id, p.spec)
-	status.Handler.Handle = hyperHandlePodEvent
-	status.Handler.Data = data
+	status := hypervisor.NewPod(p.Id, p.spec, &hypervisor.HandleEvent{hyperHandlePodEvent, data})
 	status.ResourcePath = resPath
 
 	p.status = status
@@ -673,7 +669,7 @@ func (p *Pod) CreateVolumes(daemon *Daemon) error {
 }
 
 func (p *Pod) UpdateContainerStatus(jsons []*dockertypes.ContainerJSON) error {
-	p.status.Containers = []*hypervisor.Container{}
+	p.status.Containers = []*hypervisor.ContainerStatus{}
 	for idx, c := range p.spec.Containers {
 		if jsons[idx] == nil {
 			estr := fmt.Sprintf("container %s of pod %s does not have inspect json", c.Name, p.Id)
@@ -1057,6 +1053,8 @@ func (p *Pod) Cleanup(daemon *Daemon) {
 	p.cleanupMountsAndFiles(daemon.Storage, sharedDir)
 	p.cleanupEtcHosts()
 
+	p.status.CleanupExec()
+
 	if p.status.Status == types.S_POD_NONE {
 		daemon.RemovePodResource(p)
 	}
@@ -1149,8 +1147,7 @@ func (p *Pod) startLogging(daemon *Daemon) (err error) {
 	for _, c := range p.status.Containers {
 		var stdout, stderr io.Reader
 
-		tag := "log-" + utils.RandStr(8, "alphanum")
-		if stdout, stderr, err = p.vm.GetLogOutput(c.Id, tag, nil); err != nil {
+		if stdout, stderr, err = p.vm.GetLogOutput(c.Id, nil); err != nil {
 			return
 		}
 		c.Logs.Copier = logger.NewCopier(c.Id, map[string]io.Reader{"stdout": stdout, "stderr": stderr}, c.Logs.Driver)
@@ -1176,16 +1173,13 @@ func (p *Pod) AttachTtys(daemon *Daemon, streams []*hypervisor.TtyIO) (err error
 			break
 		}
 
-		p.Lock()
-		p.ttyList[str.ClientTag] = str
-		p.Unlock()
-
-		err = p.vm.Attach(str, ttyContainers[idx].Id, nil)
+		containerId := ttyContainers[idx].Id
+		err = p.vm.Attach(str, containerId, nil)
 		if err != nil {
-			glog.Errorf("Failed to attach client %s before start pod", str.ClientTag)
+			glog.Errorf("Failed to attach to container %s before start pod", containerId)
 			return
 		}
-		glog.V(1).Infof("Attach client %s before start pod", str.ClientTag)
+		glog.V(1).Infof("Attach to container %s before start pod", containerId)
 	}
 
 	return nil
@@ -1268,20 +1262,10 @@ func hyperHandlePodEvent(vmResponse *types.VmResponse, data interface{},
 	mypod *hypervisor.PodStatus, vm *hypervisor.Vm) bool {
 	daemon := data.(*Daemon)
 
-	switch vmResponse.Code {
-	case types.E_POD_FINISHED: // successfully exit
+	if vmResponse.Code == types.E_VM_SHUTDOWN { // vm exited, sucessful or not
 		stopLogger(mypod)
-		mypod.SetPodContainerStatus(vmResponse.Data.([]uint32))
-		vm.Status = types.S_VM_IDLE
-		return false
-	case types.E_VM_SHUTDOWN: // vm exited, sucessful or not
-		if mypod.Status == types.S_POD_RUNNING { // not received finished pod before
-			stopLogger(mypod)
-			mypod.Status = types.S_POD_FAILED
-			mypod.FinishedAt = time.Now().Format("2006-01-02T15:04:05Z")
-			mypod.SetContainerStatus(types.S_POD_FAILED)
-		}
 		daemon.PodStopped(mypod.Id)
+
 		if mypod.Type == "kubernetes" {
 			cleanup := false
 			switch mypod.Status {
@@ -1309,7 +1293,7 @@ func hyperHandlePodEvent(vmResponse *types.VmResponse, data interface{},
 			}
 		}
 		return true
-	default:
-		return false
 	}
+
+	return false
 }

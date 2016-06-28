@@ -113,33 +113,43 @@ func (p *podRouter) postPodStart(ctx context.Context, w http.ResponseWriter, r *
 		return err
 	}
 
+	attach := false
 	podId := r.Form.Get("podId")
 	vmId := r.Form.Get("vmId")
-	tag := r.Form.Get("tag")
+	if val := r.Form.Get("attach"); val == "yes" || val == "true" || val == "on" {
+		attach = true
+	}
 
-	if tag == "" {
-		env, err := p.backend.CmdStartPod(nil, nil, podId, vmId, tag)
-		if err != nil {
-			return err
-		}
+	var (
+		inStream  io.ReadCloser  = nil
+		outStream io.WriteCloser = nil
+	)
 
-		return env.WriteJSON(w, http.StatusOK)
-	} else {
+	if attach {
 		// Setting up the streaming http interface.
-		inStream, outStream, err := httputils.HijackConnection(w)
+		in, out, err := httputils.HijackConnection(w)
 		if err != nil {
 			return err
 		}
+
+		inStream = in
+		outStream = out.(io.WriteCloser)
 		defer httputils.CloseStreams(inStream, outStream)
 
 		fmt.Fprintf(outStream, "HTTP/1.1 101 UPGRADED\r\nContent-Type: application/vnd.docker.raw-stream\r\nConnection: Upgrade\r\nUpgrade: tcp\r\n\r\n")
+	}
 
-		if _, err = p.backend.CmdStartPod(inStream, outStream.(io.WriteCloser), podId, vmId, tag); err != nil {
-			return err
-		}
+	env, err := p.backend.CmdStartPod(inStream, outStream, podId, vmId, attach)
+	if err != nil {
+		return err
+	}
+
+	if attach {
 		w.WriteHeader(http.StatusNoContent)
 		return nil
 	}
+
+	return env.WriteJSON(w, http.StatusOK)
 }
 
 func (p *podRouter) postPodStop(ctx context.Context, w http.ResponseWriter, r *http.Request, vars map[string]string) error {

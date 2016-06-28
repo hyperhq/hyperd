@@ -57,22 +57,22 @@ func (cli *HyperClient) readStreamOutput(body io.ReadCloser, contentType string,
 	return nil
 }
 
-func (cli *HyperClient) resizeTty(id, tag string) {
+func (cli *HyperClient) resizeTty(containerId, execId string) {
 	height, width := cli.getTtySize()
 	if height == 0 && width == 0 {
 		return
 	}
-	cli.client.WinResize(id, tag, height, width)
+	cli.client.WinResize(containerId, execId, height, width)
 }
 
-func (cli *HyperClient) monitorTtySize(id, tag string) error {
+func (cli *HyperClient) monitorTtySize(containerId, execId string) error {
 	//cli.resizeTty(id, tag)
 
 	sigchan := make(chan os.Signal, 1)
 	signal.Notify(sigchan, syscall.SIGWINCH)
 	go func() {
 		for range sigchan {
-			cli.resizeTty(id, tag)
+			cli.resizeTty(containerId, execId)
 		}
 	}()
 	return nil
