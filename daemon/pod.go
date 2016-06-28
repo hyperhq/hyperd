@@ -1118,7 +1118,7 @@ func (p *Pod) getLogger(daemon *Daemon) (err error) {
 		if p.ctnStartInfo != nil && len(p.ctnStartInfo) > i {
 			ctx.ContainerEntrypoint = p.ctnStartInfo[i].Workdir
 			ctx.ContainerArgs = p.ctnStartInfo[i].Cmd
-			ctx.ContainerImageID = p.ctnStartInfo[i].Image
+			ctx.ContainerImageID = p.ctnStartInfo[i].Image.Source
 		}
 
 		if p.spec.LogConfig.Type == jsonfilelog.Name {
