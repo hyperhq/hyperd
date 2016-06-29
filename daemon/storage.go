@@ -39,7 +39,7 @@ type Storage interface {
 	Init() error
 	CleanUp() error
 
-	PrepareContainer(id, sharedir string) (*hypervisor.ContainerInfo, error)
+	PrepareContainer(ci *hypervisor.ContainerInfo, sharedir string) error
 	CleanupContainer(id, sharedDir string) error
 	InjectFile(src io.Reader, containerId, target, rootDir string, perm, uid, gid int) error
 	CreateVolume(daemon *Daemon, podId, shortName string) (*hypervisor.VolumeInfo, error)
@@ -158,27 +158,25 @@ func (dms *DevMapperStorage) CleanUp() error {
 	return dm.DMCleanup(dms.DmPoolData)
 }
 
-func (dms *DevMapperStorage) PrepareContainer(id, sharedDir string) (*hypervisor.ContainerInfo, error) {
-	if err := dm.CreateNewDevice(id, dms.DevPrefix, dms.RootPath()); err != nil {
-		return nil, err
+func (dms *DevMapperStorage) PrepareContainer(ci *hypervisor.ContainerInfo, sharedDir string) error {
+	if err := dm.CreateNewDevice(ci.MountId, dms.DevPrefix, dms.RootPath()); err != nil {
+		return err
 	}
-	devFullName, err := dm.MountContainerToSharedDir(id, sharedDir, dms.DevPrefix)
+	devFullName, err := dm.MountContainerToSharedDir(ci.MountId, sharedDir, dms.DevPrefix)
 	if err != nil {
 		glog.Error("got error when mount container to share dir ", err.Error())
-		return nil, err
+		return err
 	}
 	fstype, err := dm.ProbeFsType(devFullName)
 	if err != nil {
 		fstype = "ext4"
 	}
-	return &hypervisor.ContainerInfo{
-		MountId: id,
-		Rootfs:  "/rootfs",
-		Image: pod.UserVolume{
-			Source: devFullName,
-		},
-		Fstype: fstype,
-	}, nil
+
+	ci.Rootfs = "/rootfs"
+	ci.Fstype = fstype
+	ci.Image.Source = devFullName
+
+	return nil
 }
 
 func (dms *DevMapperStorage) CleanupContainer(id, sharedDir string) error {
@@ -277,21 +275,18 @@ func (*AufsStorage) Init() error { return nil }
 
 func (*AufsStorage) CleanUp() error { return nil }
 
-func (a *AufsStorage) PrepareContainer(id, sharedDir string) (*hypervisor.ContainerInfo, error) {
-	_, err := aufs.MountContainerToSharedDir(id, a.RootPath(), sharedDir, "")
+func (a *AufsStorage) PrepareContainer(ci *hypervisor.ContainerInfo, sharedDir string) error {
+	_, err := aufs.MountContainerToSharedDir(ci.MountId, a.RootPath(), sharedDir, "")
 	if err != nil {
 		glog.Error("got error when mount container to share dir ", err.Error())
-		return nil, err
+		return err
 	}
-	devFullName := "/" + id + "/rootfs"
-	return &hypervisor.ContainerInfo{
-		MountId: id,
-		Rootfs:  "",
-		Image: pod.UserVolume{
-			Source: devFullName,
-		},
-		Fstype: "dir",
-	}, nil
+
+	devFullName := "/" + ci.MountId + "/rootfs"
+	ci.Image.Source = devFullName
+	ci.Fstype = "dir"
+
+	return nil
 }
 
 func (a *AufsStorage) CleanupContainer(id, sharedDir string) error {
@@ -341,21 +336,17 @@ func (*OverlayFsStorage) Init() error { return nil }
 
 func (*OverlayFsStorage) CleanUp() error { return nil }
 
-func (o *OverlayFsStorage) PrepareContainer(id, sharedDir string) (*hypervisor.ContainerInfo, error) {
-	_, err := overlay.MountContainerToSharedDir(id, o.RootPath(), sharedDir, "")
+func (o *OverlayFsStorage) PrepareContainer(ci *hypervisor.ContainerInfo, sharedDir string) error {
+	_, err := overlay.MountContainerToSharedDir(ci.MountId, o.RootPath(), sharedDir, "")
 	if err != nil {
 		glog.Error("got error when mount container to share dir ", err.Error())
-		return nil, err
+		return err
 	}
-	devFullName := "/" + id + "/rootfs"
-	return &hypervisor.ContainerInfo{
-		MountId: id,
-		Rootfs:  "",
-		Image: pod.UserVolume{
-			Source: devFullName,
-		},
-		Fstype: "dir",
-	}, nil
+	devFullName := "/" + ci.MountId + "/rootfs"
+	ci.Image.Source = devFullName
+	ci.Fstype = "dir"
+
+	return nil
 }
 
 func (o *OverlayFsStorage) CleanupContainer(id, sharedDir string) error {
@@ -405,20 +396,18 @@ func (*VBoxStorage) Init() error { return nil }
 
 func (*VBoxStorage) CleanUp() error { return nil }
 
-func (v *VBoxStorage) PrepareContainer(id, sharedDir string) (*hypervisor.ContainerInfo, error) {
-	devFullName, err := vbox.MountContainerToSharedDir(id, v.RootPath(), "")
+func (v *VBoxStorage) PrepareContainer(ci *hypervisor.ContainerInfo, sharedDir string) error {
+	devFullName, err := vbox.MountContainerToSharedDir(ci.MountId, v.RootPath(), "")
 	if err != nil {
 		glog.Error("got error when mount container to share dir ", err.Error())
-		return nil, err
+		return err
 	}
-	return &hypervisor.ContainerInfo{
-		MountId: id,
-		Rootfs:  "/rootfs",
-		Image: pod.UserVolume{
-			Source: devFullName,
-		},
-		Fstype: "ext4",
-	}, nil
+
+	ci.Rootfs = "/rootfs"
+	ci.Image.Source = devFullName
+	ci.Fstype = "ext4"
+
+	return nil
 }
 
 func (v *VBoxStorage) CleanupContainer(id, sharedDir string) error {

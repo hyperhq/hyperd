@@ -919,32 +919,19 @@ func (p *Pod) setupMountsAndFiles(sd Storage) (err error) {
 		files[f.Name] = f
 	}
 
-	for i, c := range p.status.Containers {
-		var (
-			ci *hypervisor.ContainerInfo
-		)
+	for i := range p.status.Containers {
+		ci := p.ctnStartInfo[i]
 
-		mountId := p.ctnStartInfo[i].MountId
-		glog.Infof("container ID: %s, mountId %s\n", c.Id, mountId)
-		ci, err = sd.PrepareContainer(mountId, sharedDir)
+		glog.Infof("container ID: %s, mountId %s\n", ci.Id, ci.MountId)
+		err = sd.PrepareContainer(ci, sharedDir)
 		if err != nil {
 			return err
 		}
 
-		err = processInjectFiles(&p.spec.Containers[i], files, sd, mountId, sd.RootPath(), sharedDir)
+		err = processInjectFiles(&p.spec.Containers[i], files, sd, ci.MountId, sd.RootPath(), sharedDir)
 		if err != nil {
 			return err
 		}
-
-		ci.Id = c.Id
-		ci.User = p.ctnStartInfo[i].User
-		ci.Initialize = p.ctnStartInfo[i].Initialize
-		ci.Cmd = p.ctnStartInfo[i].Cmd
-		ci.Envs = p.ctnStartInfo[i].Envs
-		ci.Entrypoint = p.ctnStartInfo[i].Entrypoint
-		ci.Workdir = p.ctnStartInfo[i].Workdir
-
-		p.ctnStartInfo[i] = ci
 	}
 
 	return nil
