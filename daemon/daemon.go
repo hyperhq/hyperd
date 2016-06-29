@@ -28,8 +28,14 @@ import (
 )
 
 var (
-	DefaultResourcePath string = "/var/run/hyper/Pods"
+	DefaultLogPrefix string = "/var/run/hyper/Pods"
 )
+
+type GlobalLogConfig struct {
+	*pod.PodLogConfig
+	PathPrefix  string
+	PodIdInPath bool
+}
 
 type Daemon struct {
 	*docker.Daemon
@@ -48,7 +54,7 @@ type Daemon struct {
 	Host        string
 	Storage     Storage
 	Hypervisor  string
-	DefaultLog  *pod.PodLogConfig
+	DefaultLog  *GlobalLogConfig
 }
 
 func (daemon *Daemon) Restore() error {
@@ -255,9 +261,33 @@ func (daemon *Daemon) DefaultLogCfg(driver string, cfg map[string]string) {
 		driver = jsonfilelog.Name
 	}
 
-	daemon.DefaultLog = &pod.PodLogConfig{
-		Type:   driver,
-		Config: cfg,
+	var (
+		logPath   = DefaultLogPrefix
+		podInPath = true
+	)
+
+	if driver == jsonfilelog.Name {
+		if lp, ok := cfg["PodLogPrefix"]; ok {
+			logPath = lp
+			delete(cfg, "PodLogPrefix")
+		}
+
+		if pip, ok := cfg["PodIdInPath"]; ok {
+			pip = strings.ToLower(pip)
+			if pip == "" || pip == "false" || pip == "no" || pip == "0" {
+				podInPath = false
+			}
+			delete(cfg, "PodIdInPath")
+		}
+	}
+
+	daemon.DefaultLog = &GlobalLogConfig{
+		PodLogConfig: &pod.PodLogConfig{
+			Type:   driver,
+			Config: cfg,
+		},
+		PathPrefix:  logPath,
+		PodIdInPath: podInPath,
 	}
 }
 
