@@ -7,11 +7,11 @@ import (
 	"strconv"
 )
 
-func (cli *Client) ContainerLogs(container, since string, timestamp, follow bool, tail string) (io.ReadCloser, string, error) {
+func (cli *Client) ContainerLogs(container, since string, timestamp, follow, stdout, stderr bool, tail string) (io.ReadCloser, string, error) {
 	v := url.Values{}
 	v.Set("container", container)
-	v.Set("stdout", "yes")
-	v.Set("stderr", "yes")
+	v.Set("stdout", strconv.FormatBool(stdout))
+	v.Set("stderr", strconv.FormatBool(stderr))
 	v.Set("since", since)
 	v.Set("timestamps", strconv.FormatBool(timestamp))
 	v.Set("follow", strconv.FormatBool(follow))

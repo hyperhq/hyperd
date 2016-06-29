@@ -36,7 +36,7 @@ func (cli *HyperClient) HyperCmdLogs(args ...string) error {
 		return err
 	}
 
-	output, ctype, err := cli.client.ContainerLogs(args[0], opts.Since, opts.Times, opts.Follow, opts.Tail)
+	output, ctype, err := cli.client.ContainerLogs(args[0], opts.Since, opts.Times, opts.Follow, true, true, opts.Tail)
 	if err != nil {
 		return err
 	}

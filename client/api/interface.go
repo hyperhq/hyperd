@@ -22,7 +22,7 @@ type APIInterface interface {
 	GetContainerInfo(container string) (*types.ContainerInfo, error)
 	GetContainerByPod(podId string) (string, error)
 	GetExitCode(container, tag string) error
-	ContainerLogs(container, since string, timestamp, follow bool, tail string) (io.ReadCloser, string, error)
+	ContainerLogs(container, since string, timestamp, follow, stdout, stderr bool, tail string) (io.ReadCloser, string, error)
 	KillContainer(container string, sig int) error
 	StopContainer(container string) error
 
