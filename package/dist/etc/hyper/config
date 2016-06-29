@@ -53,3 +53,7 @@ Cbfs=/var/lib/hyper/cbfs-qboot.rom
 # It is recommended to specify the "cache" when VmFactoryPolicy is set,
 # otherwise it is a less efficient factory
 VmFactoryPolicy=
+
+[Log]
+# PodLogPrefix=/var/run/hyper/Pods
+# PodIdInPath=true

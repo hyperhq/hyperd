@@ -407,16 +407,7 @@ func (p *Pod) init(data interface{}) error {
 		return err
 	}
 
-	resPath := filepath.Join(DefaultResourcePath, p.Id)
-	if err := os.MkdirAll(resPath, os.FileMode(0755)); err != nil {
-		glog.Error("cannot create resource dir ", resPath)
-		return err
-	}
-
-	status := hypervisor.NewPod(p.Id, p.spec, &hypervisor.HandleEvent{hyperHandlePodEvent, data})
-	status.ResourcePath = resPath
-
-	p.status = status
+	p.status = hypervisor.NewPod(p.Id, p.spec, &hypervisor.HandleEvent{hyperHandlePodEvent, data})
 
 	return nil
 }
@@ -1104,6 +1095,15 @@ func (p *Pod) getLogger(daemon *Daemon) (err error) {
 	}
 	glog.V(1).Infof("configuring log driver [%s] for %s", p.spec.LogConfig.Type, p.Id)
 
+	prefix := daemon.DefaultLog.PathPrefix
+	if daemon.DefaultLog.PodIdInPath {
+		prefix = filepath.Join(prefix, p.Id)
+	}
+	if err = os.MkdirAll(prefix, os.FileMode(0755)); err != nil {
+		glog.Error("cannot create container log dir ", prefix)
+		return
+	}
+
 	for i, c := range p.status.Containers {
 		ctx := logger.Context{
 			Config:             p.spec.LogConfig.Config,
@@ -1120,7 +1120,7 @@ func (p *Pod) getLogger(daemon *Daemon) (err error) {
 		}
 
 		if p.spec.LogConfig.Type == jsonfilelog.Name {
-			ctx.LogPath = filepath.Join(p.status.ResourcePath, fmt.Sprintf("%s-json.log", c.Id))
+			ctx.LogPath = filepath.Join(prefix, fmt.Sprintf("%s-json.log", c.Id))
 			glog.V(1).Info("configure container log to ", ctx.LogPath)
 		}
 
