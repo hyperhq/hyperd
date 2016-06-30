@@ -18,7 +18,7 @@ func (daemon Daemon) PausePod(podId string) error {
 	}
 	defer pod.TransitionUnlock("pause")
 
-	vmId := pod.status.Vm
+	vmId := pod.PodStatus.Vm
 
 	vm, ok := daemon.VmList.Get(vmId)
 	if !ok {
@@ -29,8 +29,8 @@ func (daemon Daemon) PausePod(podId string) error {
 		return err
 	}
 
-	pod.status.SetContainerStatus(types.S_POD_PAUSED)
-	pod.status.Status = types.S_POD_PAUSED
+	pod.PodStatus.SetContainerStatus(types.S_POD_PAUSED)
+	pod.PodStatus.Status = types.S_POD_PAUSED
 	vm.Status = types.S_VM_PAUSED
 
 	return nil
@@ -57,9 +57,9 @@ func (daemon *Daemon) UnpausePod(podId string) error {
 	}
 	defer pod.TransitionUnlock("unpause")
 
-	vmId := pod.status.Vm
+	vmId := pod.PodStatus.Vm
 
-	if pod.status.Status != types.S_POD_PAUSED {
+	if pod.PodStatus.Status != types.S_POD_PAUSED {
 		return fmt.Errorf("pod is not paused")
 	}
 
@@ -72,8 +72,8 @@ func (daemon *Daemon) UnpausePod(podId string) error {
 		return err
 	}
 
-	pod.status.SetContainerStatus(types.S_POD_RUNNING)
-	pod.status.Status = types.S_POD_RUNNING
+	pod.PodStatus.SetContainerStatus(types.S_POD_RUNNING)
+	pod.PodStatus.Status = types.S_POD_RUNNING
 	vm.Status = types.S_VM_ASSOCIATED
 
 	return nil

@@ -33,6 +33,7 @@ import (
 
 type Container struct {
 	ApiContainer *apitypes.Container
+	CreatedAt    int64
 	mountID      string
 	fstype       string
 	rootfs       string

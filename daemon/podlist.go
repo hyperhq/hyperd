@@ -43,7 +43,7 @@ func (pl *PodList) Put(p *Pod) {
 	if pl.containers == nil {
 		pl.containers = make(map[string]string)
 	}
-	for _, c := range p.status.Containers {
+	for _, c := range p.PodStatus.Containers {
 		pl.containers[c.Id] = p.Id
 	}
 }
@@ -52,7 +52,7 @@ func (pl *PodList) Delete(id string) {
 	pl.mu.Lock()
 	defer pl.mu.Unlock()
 	if p, ok := pl.pods[id]; ok {
-		for _, c := range p.status.Containers {
+		for _, c := range p.PodStatus.Containers {
 			delete(pl.containers, c.Id)
 		}
 	}
@@ -64,7 +64,7 @@ func (pl *PodList) GetByName(name string) (*Pod, bool) {
 	defer pl.mu.RUnlock()
 
 	pod := pl.findUnsafe(func(p *Pod) bool {
-		if p.status.Name == name {
+		if p.PodStatus.Name == name {
 			return true
 		}
 		return false
@@ -90,7 +90,7 @@ func (pl *PodList) GetByContainerId(cid string) (*Pod, bool) {
 	}
 
 	pod := pl.findUnsafe(func(p *Pod) bool {
-		for _, c := range p.status.Containers {
+		for _, c := range p.PodStatus.Containers {
 			if c.Id == cid {
 				return true
 			}
@@ -114,7 +114,7 @@ func (pl *PodList) GetByContainerIdOrName(cid string) (*Pod, int, bool) {
 	}
 	if podid, ok := pl.containers[cid]; ok {
 		if p, ok := pl.pods[podid]; ok {
-			for idx, c := range p.status.Containers {
+			for idx, c := range p.PodStatus.Containers {
 				if c.Id == cid {
 					return p, idx, true
 				}
@@ -135,7 +135,7 @@ func (pl *PodList) GetByContainerIdOrName(cid string) (*Pod, int, bool) {
 		return nil, -1, false
 	} else if len(matchPods) == 1 {
 		if p, ok := pl.pods[matchPods[0]]; ok {
-			for idx, c := range p.status.Containers {
+			for idx, c := range p.PodStatus.Containers {
 				if c.Id == fullId {
 					return p, idx, true
 				}
@@ -151,7 +151,7 @@ func (pl *PodList) GetByContainerIdOrName(cid string) (*Pod, int, bool) {
 	}
 
 	pod := pl.findUnsafe(func(p *Pod) bool {
-		for i, c := range p.status.Containers {
+		for i, c := range p.PodStatus.Containers {
 			if c.Id == cid || c.Name == wslash {
 				idx = i
 				return true
@@ -171,7 +171,7 @@ func (pl *PodList) GetStatus(id string) (*hypervisor.PodStatus, bool) {
 	if !ok {
 		return nil, false
 	}
-	return p.status, true
+	return p.PodStatus, true
 }
 
 func (pl *PodList) CountRunning() int64 {
@@ -193,7 +193,7 @@ func (pl *PodList) CountStatus(status uint) (num int64) {
 	}
 
 	for _, pod := range pl.pods {
-		if pod.status.Status == status {
+		if pod.PodStatus.Status == status {
 			num++
 		}
 	}
@@ -211,7 +211,7 @@ func (pl *PodList) CountContainers() (num int64) {
 	}
 
 	for _, pod := range pl.pods {
-		num += int64(len(pod.status.Containers))
+		num += int64(len(pod.PodStatus.Containers))
 	}
 
 	return

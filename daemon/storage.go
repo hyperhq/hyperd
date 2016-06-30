@@ -162,7 +162,7 @@ func (dms *DevMapperStorage) PrepareContainer(ci *Container, sharedDir string) e
 	if err := dm.CreateNewDevice(ci.mountID, dms.DevPrefix, dms.RootPath()); err != nil {
 		return err
 	}
-	devFullName, err := dm.MountContainerToSharedDir(ci.ApiContainer.ContainerID, sharedDir, dms.DevPrefix)
+	devFullName, err := dm.MountContainerToSharedDir(ci.mountID, sharedDir, dms.DevPrefix)
 	if err != nil {
 		glog.Error("got error when mount container to share dir ", err.Error())
 		return err

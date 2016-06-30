@@ -119,9 +119,9 @@ func (daemon *Daemon) KillVm(vmId string) (int, string, error) {
 }
 
 func (p *Pod) AssociateVm(daemon *Daemon, vmId string) error {
-	if p.vm != nil && p.vm.Id != vmId {
-		return fmt.Errorf("pod %s already has vm %s, but trying to associate with %s", p.Id, p.vm.Id, vmId)
-	} else if p.vm != nil {
+	if p.VM != nil && p.VM.Id != vmId {
+		return fmt.Errorf("pod %s already has vm %s, but trying to associate with %s", p.Id, p.VM.Id, vmId)
+	} else if p.VM != nil {
 		return nil
 	}
 
@@ -131,17 +131,17 @@ func (p *Pod) AssociateVm(daemon *Daemon, vmId string) error {
 	}
 	glog.V(1).Infof("Get data for vm(%s) pod(%s)", vmId, p.Id)
 
-	p.vm = daemon.VmList.NewVm(vmId, p.spec.Resource.Vcpu, p.spec.Resource.Memory, false)
-	p.status.Vm = vmId
+	p.VM = daemon.VmList.NewVm(vmId, p.Spec.Resource.Vcpu, p.Spec.Resource.Memory, false)
+	p.PodStatus.Vm = vmId
 
-	err = p.vm.AssociateVm(p.status, vmData)
+	err = p.VM.AssociateVm(p.PodStatus, vmData)
 	if err != nil {
-		p.vm = nil
-		p.status.Vm = ""
+		p.VM = nil
+		p.PodStatus.Vm = ""
 		return err
 	}
 
-	daemon.VmList.Add(p.vm)
+	daemon.VmList.Add(p.VM)
 	return nil
 }
 
