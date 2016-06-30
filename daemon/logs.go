@@ -47,12 +47,12 @@ func (daemon *Daemon) GetContainerLogs(container string, config *ContainerLogsCo
 		return err
 	}
 
-	logReader, ok := pod.status.Containers[cidx].Logs.Driver.(logger.LogReader)
+	logReader, ok := pod.PodStatus.Containers[cidx].Logs.Driver.(logger.LogReader)
 	if !ok {
 		return fmt.Errorf("logger not support read")
 	}
 
-	follow := config.Follow && (pod.status.Status == types.S_POD_RUNNING)
+	follow := config.Follow && (pod.PodStatus.Status == types.S_POD_RUNNING)
 	tailLines, err = strconv.Atoi(config.Tail)
 	if err != nil {
 		tailLines = -1
@@ -72,7 +72,7 @@ func (daemon *Daemon) GetContainerLogs(container string, config *ContainerLogsCo
 
 	var outStream io.Writer = wf
 	errStream := outStream
-	if !pod.spec.Containers[cidx].Tty {
+	if !pod.Spec.Containers[cidx].Tty {
 		errStream = stdcopy.NewStdWriter(outStream, stdcopy.Stderr)
 		outStream = stdcopy.NewStdWriter(outStream, stdcopy.Stdout)
 	}

@@ -119,7 +119,7 @@ func (daemon *Daemon) Restore() error {
 		glog.Infof("%d pod have been loaded", daemon.PodList.CountAll())
 		daemon.PodList.Foreach(func(p *Pod) error {
 			glog.Infof("container in pod %s status: %v", p.Id, p.Status().Containers)
-			glog.Infof("container in pod %s spec: %v", p.Id, p.spec.Containers)
+			glog.Infof("container in pod %s spec: %v", p.Id, p.Spec.Containers)
 			return nil
 		})
 	}
@@ -337,7 +337,7 @@ func (daemon *Daemon) WritePodAndContainers(podId string) error {
 	}
 
 	containers := []string{}
-	for _, c := range p.status.Containers {
+	for _, c := range p.PodStatus.Containers {
 		containers = append(containers, c.Id)
 	}
 
@@ -349,7 +349,7 @@ func (daemon *Daemon) GetVmByPodId(podId string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("Not found Pod %s", podId)
 	}
-	return pod.status.Vm, nil
+	return pod.PodStatus.Vm, nil
 }
 
 func (daemon *Daemon) GetPodByContainer(containerId string) (string, error) {

@@ -76,11 +76,11 @@ func TestDNSInsertRegular(t *testing.T) {
 	for tag, input := range inputs {
 		var spec pod.UserPod
 		p := &Pod{
-			spec: nil,
+			Spec: nil,
 		}
 		if input != "" {
 			_ = json.Unmarshal([]byte(input), &spec)
-			p.spec = &spec
+			p.Spec = &spec
 		}
 		err := p.setupDNS()
 		if (errs[tag] != nil && (err == nil || errs[tag].Error() != err.Error())) || (err != nil && errs[tag] == nil) {
@@ -90,8 +90,8 @@ func TestDNSInsertRegular(t *testing.T) {
 		if err != nil {
 			continue
 		}
-		t.Logf("/%s/ got result: %v", tag, p.spec)
-		if !checks[tag](p.spec) {
+		t.Logf("/%s/ got result: %v", tag, p.Spec)
+		if !checks[tag](p.Spec) {
 			t.Log("process result is not correct")
 			t.Fail()
 		}

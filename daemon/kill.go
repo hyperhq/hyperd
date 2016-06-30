@@ -13,10 +13,10 @@ func (daemon *Daemon) KillContainer(name string, sig int64) error {
 		return fmt.Errorf("can not find container %s", name)
 	}
 
-	container := p.status.Containers[idx].Id
+	container := p.PodStatus.Containers[idx].Id
 	glog.V(1).Infof("found container %s to kill, signal %d", container, sig)
 
-	return p.vm.KillContainer(container, syscall.Signal(sig))
+	return p.VM.KillContainer(container, syscall.Signal(sig))
 }
 
 func (daemon *Daemon) KillPodContainers(podName, container string, sig int64) error {
@@ -28,10 +28,10 @@ func (daemon *Daemon) KillPodContainers(podName, container string, sig int64) er
 	var err error = nil
 	all := (container == "")
 	shot := false
-	for i := range p.status.Containers {
-		if all || p.status.Containers[i].Id == container {
+	for i := range p.PodStatus.Containers {
+		if all || p.PodStatus.Containers[i].Id == container {
 			glog.V(1).Infof("send signal %d to container %s", sig, container)
-			e := p.vm.KillContainer(p.status.Containers[i].Id, syscall.Signal(sig))
+			e := p.VM.KillContainer(p.PodStatus.Containers[i].Id, syscall.Signal(sig))
 			if e != nil {
 				err = e
 			}

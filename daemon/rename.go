@@ -6,7 +6,7 @@ func (daemon *Daemon) ContainerRename(oldname, newname string) error {
 	}
 
 	daemon.PodList.Find(func(p *Pod) bool {
-		for _, c := range p.status.Containers {
+		for _, c := range p.PodStatus.Containers {
 			if c.Name == "/"+oldname {
 				c.Name = "/" + newname
 				return true

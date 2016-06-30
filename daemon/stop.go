@@ -20,7 +20,7 @@ func (daemon *Daemon) PodStopped(podId string) {
 	pod.Lock()
 	defer pod.Unlock()
 
-	daemon.RemoveVm(pod.vm.Id)
+	daemon.RemoveVm(pod.VM.Id)
 
 	pod.Cleanup(daemon)
 }
@@ -36,7 +36,7 @@ func (daemon *Daemon) PodWait(podId string) {
 	// wait until PodStopped() was called
 	for {
 		pod.Lock()
-		if pod.vm == nil {
+		if pod.VM == nil {
 			break
 		}
 		pod.Unlock()
@@ -66,19 +66,19 @@ func (daemon *Daemon) StopPod(podId string) (int, string, error) {
 func (daemon *Daemon) StopPodWithinLock(pod *Pod) (int, string, error) {
 	// we need to set the 'RestartPolicy' of the pod to 'never' if stop command is invoked
 	// for kubernetes
-	if pod.status.Type == "kubernetes" {
-		pod.status.RestartPolicy = "never"
+	if pod.PodStatus.Type == "kubernetes" {
+		pod.PodStatus.RestartPolicy = "never"
 	}
 
 	pod.Lock()
-	if pod.vm == nil {
+	if pod.VM == nil {
 		pod.Unlock()
 		return types.E_VM_SHUTDOWN, "", nil
 	}
 
-	vm := pod.vm
+	vm := pod.VM
 
-	if pod.status.Status != types.S_POD_RUNNING {
+	if pod.PodStatus.Status != types.S_POD_RUNNING {
 		pod.Unlock()
 		glog.Errorf("Pod %s is not in running state, cannot be stopped", pod.Id)
 		return -1, "", fmt.Errorf("Pod %s is not in running state, cannot be stopped", pod.Id)
@@ -86,7 +86,7 @@ func (daemon *Daemon) StopPodWithinLock(pod *Pod) (int, string, error) {
 
 	pod.Unlock()
 
-	vmResponse := vm.StopPod(pod.status)
+	vmResponse := vm.StopPod(pod.PodStatus)
 
 	return vmResponse.Code, vmResponse.Cause, nil
 }
@@ -103,7 +103,7 @@ func (daemon *Daemon) StopContainer(container string) error {
 	}
 	defer pod.TransitionUnlock("stop")
 
-	containerId := pod.status.Containers[idx].Id
+	containerId := pod.PodStatus.Containers[idx].Id
 	glog.V(1).Infof("found container %s to stop", containerId)
 
 	return daemon.StopContainerWithinLock(pod, containerId)
@@ -112,12 +112,12 @@ func (daemon *Daemon) StopContainer(container string) error {
 func (daemon *Daemon) StopContainerWithinLock(pod *Pod, containerId string) error {
 	pod.Lock()
 
-	if pod.vm == nil {
+	if pod.VM == nil {
 		pod.Unlock()
 		return fmt.Errorf("pod is not started yet")
 	}
 
-	err := pod.vm.KillContainer(containerId, syscall.SIGKILL)
+	err := pod.VM.KillContainer(containerId, syscall.SIGKILL)
 	if err != nil {
 		pod.Unlock()
 		return err

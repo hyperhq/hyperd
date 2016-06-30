@@ -50,8 +50,8 @@ func (cli *HyperClient) HyperCmdAttach(args ...string) error {
 		}
 
 		podId = c.PodID
-		containerId = c.ContainerID
-		tty = c.Tty
+		containerId = c.Container.ContainerID
+		tty = c.Container.Tty
 	}
 
 	if tty {

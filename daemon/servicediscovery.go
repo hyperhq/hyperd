@@ -107,18 +107,18 @@ func (daemon *Daemon) GetServiceContainerInfo(podId string) (*hypervisor.Vm, str
 		return nil, "", fmt.Errorf("Cannot find Pod %s", podId)
 	}
 
-	if pod.status.Type != "service-discovery" || len(pod.status.Containers) <= 1 {
+	if pod.PodStatus.Type != "service-discovery" || len(pod.PodStatus.Containers) <= 1 {
 		return nil, "", fmt.Errorf("Pod %s doesn't have services discovery", podId)
 	}
 
-	container := pod.status.Containers[0].Id
+	container := pod.PodStatus.Containers[0].Id
 	glog.V(1).Infof("Get container id is %s", container)
 
-	if pod.vm == nil {
+	if pod.VM == nil {
 		return nil, "", fmt.Errorf("Cannot find VM for %s!", podId)
 	}
 
-	return pod.vm, container, nil
+	return pod.VM, container, nil
 }
 
 func ParseServiceDiscovery(id string, spec *pod.UserPod) error {

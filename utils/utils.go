@@ -12,6 +12,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var (
@@ -168,4 +169,19 @@ func GetHostIP() string {
 		}
 	}
 	return ""
+}
+
+func ParseTimeString(str string) (int64, error) {
+	t := time.Date(0, 0, 0, 0, 0, 0, 0, time.Local)
+	if str == "" {
+		return t.Unix(), nil
+	}
+
+	layout := "2006-01-02T15:04:05Z"
+	t, err := time.Parse(layout, str)
+	if err != nil {
+		return t.Unix(), err
+	}
+
+	return t.Unix(), nil
 }

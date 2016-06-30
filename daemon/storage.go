@@ -39,7 +39,7 @@ type Storage interface {
 	Init() error
 	CleanUp() error
 
-	PrepareContainer(ci *hypervisor.ContainerInfo, sharedir string) error
+	PrepareContainer(ci *Container, sharedir string) error
 	CleanupContainer(id, sharedDir string) error
 	InjectFile(src io.Reader, containerId, target, rootDir string, perm, uid, gid int) error
 	CreateVolume(daemon *Daemon, podId, shortName string) (*hypervisor.VolumeInfo, error)
@@ -158,11 +158,11 @@ func (dms *DevMapperStorage) CleanUp() error {
 	return dm.DMCleanup(dms.DmPoolData)
 }
 
-func (dms *DevMapperStorage) PrepareContainer(ci *hypervisor.ContainerInfo, sharedDir string) error {
-	if err := dm.CreateNewDevice(ci.MountId, dms.DevPrefix, dms.RootPath()); err != nil {
+func (dms *DevMapperStorage) PrepareContainer(ci *Container, sharedDir string) error {
+	if err := dm.CreateNewDevice(ci.mountID, dms.DevPrefix, dms.RootPath()); err != nil {
 		return err
 	}
-	devFullName, err := dm.MountContainerToSharedDir(ci.MountId, sharedDir, dms.DevPrefix)
+	devFullName, err := dm.MountContainerToSharedDir(ci.mountID, sharedDir, dms.DevPrefix)
 	if err != nil {
 		glog.Error("got error when mount container to share dir ", err.Error())
 		return err
@@ -172,9 +172,9 @@ func (dms *DevMapperStorage) PrepareContainer(ci *hypervisor.ContainerInfo, shar
 		fstype = "ext4"
 	}
 
-	ci.Rootfs = "/rootfs"
-	ci.Fstype = fstype
-	ci.Image.Source = devFullName
+	ci.rootfs = "/rootfs"
+	ci.fstype = fstype
+	ci.ApiContainer.Image = devFullName
 
 	return nil
 }
@@ -275,16 +275,16 @@ func (*AufsStorage) Init() error { return nil }
 
 func (*AufsStorage) CleanUp() error { return nil }
 
-func (a *AufsStorage) PrepareContainer(ci *hypervisor.ContainerInfo, sharedDir string) error {
-	_, err := aufs.MountContainerToSharedDir(ci.MountId, a.RootPath(), sharedDir, "")
+func (a *AufsStorage) PrepareContainer(ci *Container, sharedDir string) error {
+	_, err := aufs.MountContainerToSharedDir(ci.mountID, a.RootPath(), sharedDir, "")
 	if err != nil {
 		glog.Error("got error when mount container to share dir ", err.Error())
 		return err
 	}
 
-	devFullName := "/" + ci.MountId + "/rootfs"
-	ci.Image.Source = devFullName
-	ci.Fstype = "dir"
+	devFullName := "/" + ci.mountID + "/rootfs"
+	ci.ApiContainer.Image = devFullName
+	ci.fstype = "dir"
 
 	return nil
 }
@@ -336,15 +336,16 @@ func (*OverlayFsStorage) Init() error { return nil }
 
 func (*OverlayFsStorage) CleanUp() error { return nil }
 
-func (o *OverlayFsStorage) PrepareContainer(ci *hypervisor.ContainerInfo, sharedDir string) error {
-	_, err := overlay.MountContainerToSharedDir(ci.MountId, o.RootPath(), sharedDir, "")
+func (o *OverlayFsStorage) PrepareContainer(ci *Container, sharedDir string) error {
+	_, err := overlay.MountContainerToSharedDir(ci.mountID, o.RootPath(), sharedDir, "")
 	if err != nil {
 		glog.Error("got error when mount container to share dir ", err.Error())
 		return err
 	}
-	devFullName := "/" + ci.MountId + "/rootfs"
-	ci.Image.Source = devFullName
-	ci.Fstype = "dir"
+
+	devFullName := "/" + ci.mountID + "/rootfs"
+	ci.ApiContainer.Image = devFullName
+	ci.fstype = "dir"
 
 	return nil
 }
@@ -396,16 +397,16 @@ func (*VBoxStorage) Init() error { return nil }
 
 func (*VBoxStorage) CleanUp() error { return nil }
 
-func (v *VBoxStorage) PrepareContainer(ci *hypervisor.ContainerInfo, sharedDir string) error {
-	devFullName, err := vbox.MountContainerToSharedDir(ci.MountId, v.RootPath(), "")
+func (v *VBoxStorage) PrepareContainer(ci *Container, sharedDir string) error {
+	devFullName, err := vbox.MountContainerToSharedDir(ci.mountID, v.RootPath(), "")
 	if err != nil {
 		glog.Error("got error when mount container to share dir ", err.Error())
 		return err
 	}
 
-	ci.Rootfs = "/rootfs"
-	ci.Image.Source = devFullName
-	ci.Fstype = "ext4"
+	ci.rootfs = "/rootfs"
+	ci.ApiContainer.Image = devFullName
+	ci.fstype = "ext4"
 
 	return nil
 }

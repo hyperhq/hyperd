@@ -232,46 +232,20 @@ func (m *ContainerStatus) GetTerminated() *TermStatus {
 	return nil
 }
 
-// TODO: embed Container message to avoid repetition
 type ContainerInfo struct {
-	Name            string            `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	ContainerID     string            `protobuf:"bytes,2,opt,name=containerID,proto3" json:"containerID,omitempty"`
-	Image           string            `protobuf:"bytes,3,opt,name=image,proto3" json:"image,omitempty"`
-	ImageID         string            `protobuf:"bytes,4,opt,name=imageID,proto3" json:"imageID,omitempty"`
-	Commands        []string          `protobuf:"bytes,5,rep,name=commands" json:"commands,omitempty"`
-	Args            []string          `protobuf:"bytes,6,rep,name=args" json:"args,omitempty"`
-	WorkingDir      string            `protobuf:"bytes,7,opt,name=workingDir,proto3" json:"workingDir,omitempty"`
-	Ports           []*ContainerPort  `protobuf:"bytes,8,rep,name=ports" json:"ports,omitempty"`
-	Env             []*EnvironmentVar `protobuf:"bytes,9,rep,name=env" json:"env,omitempty"`
-	VolumeMounts    []*VolumeMount    `protobuf:"bytes,10,rep,name=volumeMounts" json:"volumeMounts,omitempty"`
-	Tty             bool              `protobuf:"varint,11,opt,name=tty,proto3" json:"tty,omitempty"`
-	ImagePullPolicy string            `protobuf:"bytes,12,opt,name=imagePullPolicy,proto3" json:"imagePullPolicy,omitempty"`
-	PodID           string            `protobuf:"bytes,13,opt,name=podID,proto3" json:"podID,omitempty"`
-	Status          *ContainerStatus  `protobuf:"bytes,14,opt,name=status" json:"status,omitempty"`
-	Labels          map[string]string `protobuf:"bytes,15,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	Container *Container       `protobuf:"bytes,1,opt,name=container" json:"container,omitempty"`
+	CreatedAt int64            `protobuf:"varint,2,opt,name=createdAt,proto3" json:"createdAt,omitempty"`
+	PodID     string           `protobuf:"bytes,3,opt,name=podID,proto3" json:"podID,omitempty"`
+	Status    *ContainerStatus `protobuf:"bytes,4,opt,name=status" json:"status,omitempty"`
 }
 
 func (m *ContainerInfo) Reset()         { *m = ContainerInfo{} }
 func (m *ContainerInfo) String() string { return proto.CompactTextString(m) }
 func (*ContainerInfo) ProtoMessage()    {}
 
-func (m *ContainerInfo) GetPorts() []*ContainerPort {
+func (m *ContainerInfo) GetContainer() *Container {
 	if m != nil {
-		return m.Ports
-	}
-	return nil
-}
-
-func (m *ContainerInfo) GetEnv() []*EnvironmentVar {
-	if m != nil {
-		return m.Env
-	}
-	return nil
-}
-
-func (m *ContainerInfo) GetVolumeMounts() []*VolumeMount {
-	if m != nil {
-		return m.VolumeMounts
+		return m.Container
 	}
 	return nil
 }
@@ -283,27 +257,21 @@ func (m *ContainerInfo) GetStatus() *ContainerStatus {
 	return nil
 }
 
-func (m *ContainerInfo) GetLabels() map[string]string {
-	if m != nil {
-		return m.Labels
-	}
-	return nil
-}
-
 type Container struct {
 	Name            string            `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	ContainerID     string            `protobuf:"bytes,2,opt,name=containerID,proto3" json:"containerID,omitempty"`
 	Image           string            `protobuf:"bytes,3,opt,name=image,proto3" json:"image,omitempty"`
 	ImageID         string            `protobuf:"bytes,4,opt,name=imageID,proto3" json:"imageID,omitempty"`
-	Commands        []string          `protobuf:"bytes,5,rep,name=commands" json:"commands,omitempty"`
-	Args            []string          `protobuf:"bytes,6,rep,name=args" json:"args,omitempty"`
-	WorkingDir      string            `protobuf:"bytes,7,opt,name=workingDir,proto3" json:"workingDir,omitempty"`
-	Ports           []*ContainerPort  `protobuf:"bytes,8,rep,name=ports" json:"ports,omitempty"`
-	Env             []*EnvironmentVar `protobuf:"bytes,9,rep,name=env" json:"env,omitempty"`
-	VolumeMounts    []*VolumeMount    `protobuf:"bytes,10,rep,name=volumeMounts" json:"volumeMounts,omitempty"`
-	Tty             bool              `protobuf:"varint,11,opt,name=tty,proto3" json:"tty,omitempty"`
-	ImagePullPolicy string            `protobuf:"bytes,12,opt,name=imagePullPolicy,proto3" json:"imagePullPolicy,omitempty"`
-	Labels          map[string]string `protobuf:"bytes,13,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	ImagePullPolicy string            `protobuf:"bytes,5,opt,name=imagePullPolicy,proto3" json:"imagePullPolicy,omitempty"`
+	WorkingDir      string            `protobuf:"bytes,6,opt,name=workingDir,proto3" json:"workingDir,omitempty"`
+	User            string            `protobuf:"bytes,7,opt,name=user,proto3" json:"user,omitempty"`
+	Tty             bool              `protobuf:"varint,8,opt,name=tty,proto3" json:"tty,omitempty"`
+	Commands        []string          `protobuf:"bytes,9,rep,name=commands" json:"commands,omitempty"`
+	Args            []string          `protobuf:"bytes,10,rep,name=args" json:"args,omitempty"`
+	Ports           []*ContainerPort  `protobuf:"bytes,11,rep,name=ports" json:"ports,omitempty"`
+	Env             []*EnvironmentVar `protobuf:"bytes,12,rep,name=env" json:"env,omitempty"`
+	VolumeMounts    []*VolumeMount    `protobuf:"bytes,13,rep,name=volumeMounts" json:"volumeMounts,omitempty"`
+	Labels          map[string]string `protobuf:"bytes,14,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
 
 func (m *Container) Reset()         { *m = Container{} }
@@ -426,11 +394,13 @@ func (m *PodStatus) GetContainerStatus() []*ContainerStatus {
 }
 
 type PodInfo struct {
-	Kind       string     `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
-	ApiVersion string     `protobuf:"bytes,2,opt,name=apiVersion,proto3" json:"apiVersion,omitempty"`
-	Vm         string     `protobuf:"bytes,3,opt,name=vm,proto3" json:"vm,omitempty"`
-	Spec       *PodSpec   `protobuf:"bytes,4,opt,name=spec" json:"spec,omitempty"`
-	Status     *PodStatus `protobuf:"bytes,5,opt,name=status" json:"status,omitempty"`
+	PodID      string     `protobuf:"bytes,1,opt,name=podID,proto3" json:"podID,omitempty"`
+	Kind       string     `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"`
+	ApiVersion string     `protobuf:"bytes,3,opt,name=apiVersion,proto3" json:"apiVersion,omitempty"`
+	Vm         string     `protobuf:"bytes,4,opt,name=vm,proto3" json:"vm,omitempty"`
+	CreatedAt  int64      `protobuf:"varint,5,opt,name=createdAt,proto3" json:"createdAt,omitempty"`
+	Spec       *PodSpec   `protobuf:"bytes,6,opt,name=spec" json:"spec,omitempty"`
+	Status     *PodStatus `protobuf:"bytes,7,opt,name=status" json:"status,omitempty"`
 }
 
 func (m *PodInfo) Reset()         { *m = PodInfo{} }
@@ -850,15 +820,24 @@ func (m *PodListRequest) String() string { return proto.CompactTextString(m) }
 func (*PodListRequest) ProtoMessage()    {}
 
 type PodListResult struct {
-	PodID   string `protobuf:"bytes,1,opt,name=podID,proto3" json:"podID,omitempty"`
-	PodName string `protobuf:"bytes,2,opt,name=podName,proto3" json:"podName,omitempty"`
-	VmID    string `protobuf:"bytes,3,opt,name=vmID,proto3" json:"vmID,omitempty"`
-	Status  string `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`
+	PodID     string            `protobuf:"bytes,1,opt,name=podID,proto3" json:"podID,omitempty"`
+	PodName   string            `protobuf:"bytes,2,opt,name=podName,proto3" json:"podName,omitempty"`
+	VmID      string            `protobuf:"bytes,3,opt,name=vmID,proto3" json:"vmID,omitempty"`
+	Status    string            `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`
+	CreatedAt int64             `protobuf:"varint,5,opt,name=createdAt,proto3" json:"createdAt,omitempty"`
+	Labels    map[string]string `protobuf:"bytes,6,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
 
 func (m *PodListResult) Reset()         { *m = PodListResult{} }
 func (m *PodListResult) String() string { return proto.CompactTextString(m) }
 func (*PodListResult) ProtoMessage()    {}
+
+func (m *PodListResult) GetLabels() map[string]string {
+	if m != nil {
+		return m.Labels
+	}
+	return nil
+}
 
 type PodListResponse struct {
 	PodList []*PodListResult `protobuf:"bytes,1,rep,name=podList" json:"podList,omitempty"`

@@ -40,5 +40,5 @@ func (cli *HyperClient) HyperCmdLogs(args ...string) error {
 	if err != nil {
 		return err
 	}
-	return cli.readStreamOutput(output, ctype, c.Tty, cli.out, cli.err)
+	return cli.readStreamOutput(output, ctype, c.Container.Tty, cli.out, cli.err)
 }

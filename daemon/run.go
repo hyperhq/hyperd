@@ -24,7 +24,7 @@ func (daemon *Daemon) CreatePod(podId string, podSpec *apitypes.UserPod) (*Pod, 
 	}
 
 	/* Create pod may change the pod spec */
-	spec, err := json.Marshal(p.spec)
+	spec, err := json.Marshal(p.Spec)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +101,7 @@ func (daemon *Daemon) StartInternal(p *Pod, vmId string, config interface{}, laz
 	}
 	defer p.TransitionUnlock("start")
 
-	if p.vm != nil {
+	if p.VM != nil {
 		return -1, "", fmt.Errorf("pod %s is already running", p.Id)
 	}
 
@@ -170,21 +170,21 @@ func (daemon *Daemon) SetPodLabels(podId string, override bool, labels map[strin
 	pod.Lock()
 	defer pod.Unlock()
 
-	if pod.spec.Labels == nil {
-		pod.spec.Labels = make(map[string]string)
+	if pod.Spec.Labels == nil {
+		pod.Spec.Labels = make(map[string]string)
 	}
 
 	for k := range labels {
-		if _, ok := pod.spec.Labels[k]; ok && !override {
+		if _, ok := pod.Spec.Labels[k]; ok && !override {
 			return fmt.Errorf("Can't update label %s without override", k)
 		}
 	}
 
 	for k, v := range labels {
-		pod.spec.Labels[k] = v
+		pod.Spec.Labels[k] = v
 	}
 
-	spec, err := json.Marshal(pod.spec)
+	spec, err := json.Marshal(pod.Spec)
 	if err != nil {
 		return err
 	}

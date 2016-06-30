@@ -48,23 +48,11 @@ message ContainerStatus {
     TermStatus terminated   = 6;
 }
 
-// TODO: embed Container message to avoid repetition
 message ContainerInfo {
-  string name                       = 1;
-  string containerID                = 2;
-  string image                      = 3;
-  string imageID                    = 4;
-  repeated string commands          = 5;
-  repeated string args              = 6;
-  string workingDir                 = 7;
-  repeated ContainerPort ports      = 8;
-  repeated EnvironmentVar env       = 9;
-  repeated VolumeMount volumeMounts = 10;
-  bool tty                          = 11;
-  string imagePullPolicy            = 12;
-  string podID                      = 13;
-  ContainerStatus status            = 14;
-  map<string, string> labels        = 15;
+  Container container       = 1;
+  int64 createdAt           = 2;
+  string podID              = 3;
+  ContainerStatus status    = 4;
 }
 
 message Container {
@@ -72,15 +60,16 @@ message Container {
   string containerID                = 2;
   string image                      = 3;
   string imageID                    = 4;
-  repeated string commands          = 5;
-  repeated string args              = 6;
-  string workingDir                 = 7;
-  repeated ContainerPort ports      = 8;
-  repeated EnvironmentVar env       = 9;
-  repeated VolumeMount volumeMounts = 10;
-  bool tty                          = 11;
-  string imagePullPolicy            = 12;
-  map<string, string> labels        = 13;
+  string imagePullPolicy            = 5;
+  string workingDir                 = 6;
+  string user                       = 7;
+  bool tty                          = 8;
+  repeated string commands          = 9;
+  repeated string args              = 10;
+  repeated ContainerPort ports      = 11;
+  repeated EnvironmentVar env       = 12;
+  repeated VolumeMount volumeMounts = 13;
+  map<string, string> labels        = 14;
 }
 
 message RBDVolumeSource {
@@ -120,11 +109,13 @@ message PodStatus {
 }
 
 message PodInfo {
-	string kind       = 1;
-	string apiVersion = 2;
-	string vm         = 3;
-	PodSpec spec      = 4;
-	PodStatus status  = 5;
+  string podID      = 1;
+  string kind       = 2;
+  string apiVersion = 3;
+  string vm         = 4;
+  int64 createdAt   = 5;
+  PodSpec spec      = 6;
+  PodStatus status  = 7;
 }
 
 message ImageInfo {
@@ -273,10 +264,12 @@ message PodListRequest {
 }
 
 message PodListResult {
-  string podID    = 1;
-  string podName  = 2;
-  string vmID     = 3;
-  string status   = 4;
+  string podID              = 1;
+  string podName            = 2;
+  string vmID               = 3;
+  string status             = 4;
+  int64 createdAt           = 5;
+  map<string,string> labels = 6;
 }
 
 message PodListResponse {
