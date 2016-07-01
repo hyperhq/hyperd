@@ -401,6 +401,7 @@ type PodInfo struct {
 	CreatedAt  int64      `protobuf:"varint,5,opt,name=createdAt,proto3" json:"createdAt,omitempty"`
 	Spec       *PodSpec   `protobuf:"bytes,6,opt,name=spec" json:"spec,omitempty"`
 	Status     *PodStatus `protobuf:"bytes,7,opt,name=status" json:"status,omitempty"`
+	PodName    string     `protobuf:"bytes,8,opt,name=podName,proto3" json:"podName,omitempty"`
 }
 
 func (m *PodInfo) Reset()         { *m = PodInfo{} }

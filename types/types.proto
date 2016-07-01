@@ -116,6 +116,7 @@ message PodInfo {
   int64 createdAt   = 5;
   PodSpec spec      = 6;
   PodStatus status  = 7;
+  string podName    = 8;
 }
 
 message ImageInfo {
