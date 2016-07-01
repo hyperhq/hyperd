@@ -160,6 +160,7 @@ func (daemon *Daemon) GetPodInfo(podName string) (types.PodInfo, error) {
 
 	return types.PodInfo{
 		PodID:      pod.Id,
+		PodName:    pod.Spec.Name,
 		Kind:       "Pod",
 		CreatedAt:  pod.CreatedAt,
 		ApiVersion: utils.APIVERSION,
