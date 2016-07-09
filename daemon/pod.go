@@ -1049,6 +1049,7 @@ func (p *Pod) Cleanup(daemon *Daemon) {
 	}
 
 	sharedDir := path.Join(hypervisor.BaseDir, p.VM.Id, hypervisor.ShareDirTag)
+	vmDir := path.Join(hypervisor.BaseDir, p.VM.Id)
 	p.VM = nil
 
 	daemon.db.DeleteVMByPod(p.Id)
@@ -1056,6 +1057,7 @@ func (p *Pod) Cleanup(daemon *Daemon) {
 	p.cleanupVolumes(daemon.Storage, sharedDir)
 	p.cleanupMountsAndFiles(daemon.Storage, sharedDir)
 	p.cleanupEtcHosts()
+	os.RemoveAll(vmDir)
 
 	p.PodStatus.CleanupExec()
 
