@@ -91,6 +91,62 @@ func (s *ServerRPC) ImagePull(req *types.ImagePullRequest, stream types.PublicAP
 	return pullResult
 }
 
+// ImageLoad loads an image from a tar archive or STDIN
+func (s *ServerRPC) ImageLoad(stream types.PublicAPI_ImageLoadServer) error {
+	inReader, inWriter := io.Pipe()
+	outReader, outWriter := io.Pipe()
+	var loadResult error
+	go func() {
+		defer outReader.Close()
+		buf := make([]byte, 512)
+		for {
+			nr, err := outReader.Read(buf)
+			if nr > 0 {
+				if err := stream.Send(&types.ImageLoadResponse{buf[:nr]}); err != nil {
+					glog.Errorf("Send to stream error: %v", err)
+					return
+				}
+			}
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				glog.Errorf("Read from pipe error: %v", err)
+				return
+			}
+		}
+
+	}()
+
+	go func() {
+		defer inWriter.Close()
+		for {
+			req, err := stream.Recv()
+			if err != nil && err != io.EOF {
+				glog.Errorf("Receive from stream error: %v", err)
+				return
+			}
+			if req != nil && req.Data != nil {
+				nw, ew := inWriter.Write(req.Data)
+				if ew != nil {
+					glog.Errorf("Write pipe error: %v", ew)
+					return
+				}
+				if nw != len(req.Data) {
+					glog.Errorf("Write data length is not enougt, write: %d success: %d", len(req.Data), nw)
+					return
+				}
+			}
+			if err == io.EOF {
+				break
+			}
+		}
+
+	}()
+	loadResult = s.daemon.CmdImageLoad(inReader, outWriter)
+	return loadResult
+}
+
 // ImagePush pushes a local image to registry
 func (s *ServerRPC) ImagePush(req *types.ImagePushRequest, stream types.PublicAPI_ImagePushServer) error {
 	glog.V(3).Infof("ImagePush with request %s", req.String())

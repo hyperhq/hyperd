@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"os"
 	"testing"
 
 	"github.com/hyperhq/hyperd/types"
@@ -466,4 +467,30 @@ func (s *TestSuite) TestGetPodStats(c *C) {
 	c.Logf("Got Pod Stats %+v", stats)
 	c.Assert(stats.Cpu, NotNil)
 	c.Assert(stats.Timestamp, NotNil)
+}
+
+func (s *TestSuite) TestLoadImage(c *C) {
+	stdin, err := os.Open("load_test/busybox.tar")
+	c.Assert(err, IsNil)
+
+	err = s.client.LoadImage(stdin, nil, nil)
+	c.Assert(err, IsNil)
+
+	list, err := s.client.GetImageList()
+	c.Assert(err, IsNil)
+	found := false
+	for _, img := range list {
+		for _, repo := range img.RepoTags {
+			if repo == "busybox:latest" {
+				found = true
+				break
+			}
+		}
+	}
+	c.Assert(found, Equals, true)
+}
+
+func (s *TestSuite) TestAuth(c *C) {
+	_, err := s.client.Auth("heartlock", "888888", "21521209@zju.edu.cn", "https://index.docker.io/v1/")
+	c.Assert(err, IsNil)
 }

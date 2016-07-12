@@ -55,6 +55,8 @@ It has these top-level messages:
 	VMCreateResponse
 	VMRemoveRequest
 	VMRemoveResponse
+	AuthRequest
+	AuthResponse
 	UserContainerPort
 	UserVolumeReference
 	UserFileReference
@@ -92,6 +94,8 @@ It has these top-level messages:
 	AuthConfig
 	ImagePullRequest
 	ImagePullResponse
+	ImageLoadRequest
+	ImageLoadResponse
 	ImagePushRequest
 	ImagePushResponse
 	ImageRemoveRequest
@@ -1011,6 +1015,27 @@ func (m *VMRemoveResponse) Reset()         { *m = VMRemoveResponse{} }
 func (m *VMRemoveResponse) String() string { return proto.CompactTextString(m) }
 func (*VMRemoveResponse) ProtoMessage()    {}
 
+type AuthRequest struct {
+	Username      string `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
+	Password      string `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
+	Auth          string `protobuf:"bytes,3,opt,name=auth,proto3" json:"auth,omitempty"`
+	Email         string `protobuf:"bytes,4,opt,name=email,proto3" json:"email,omitempty"`
+	Serveraddress string `protobuf:"bytes,5,opt,name=serveraddress,proto3" json:"serveraddress,omitempty"`
+	Registrytoken string `protobuf:"bytes,6,opt,name=registrytoken,proto3" json:"registrytoken,omitempty"`
+}
+
+func (m *AuthRequest) Reset()         { *m = AuthRequest{} }
+func (m *AuthRequest) String() string { return proto.CompactTextString(m) }
+func (*AuthRequest) ProtoMessage()    {}
+
+type AuthResponse struct {
+	Status string `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+}
+
+func (m *AuthResponse) Reset()         { *m = AuthResponse{} }
+func (m *AuthResponse) String() string { return proto.CompactTextString(m) }
+func (*AuthResponse) ProtoMessage()    {}
+
 type UserContainerPort struct {
 	HostPort      int32  `protobuf:"varint,1,opt,name=hostPort,proto3" json:"hostPort,omitempty"`
 	ContainerPort int32  `protobuf:"varint,2,opt,name=containerPort,proto3" json:"containerPort,omitempty"`
@@ -1567,6 +1592,22 @@ func (m *ImagePullResponse) Reset()         { *m = ImagePullResponse{} }
 func (m *ImagePullResponse) String() string { return proto.CompactTextString(m) }
 func (*ImagePullResponse) ProtoMessage()    {}
 
+type ImageLoadRequest struct {
+	Data []byte `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+}
+
+func (m *ImageLoadRequest) Reset()         { *m = ImageLoadRequest{} }
+func (m *ImageLoadRequest) String() string { return proto.CompactTextString(m) }
+func (*ImageLoadRequest) ProtoMessage()    {}
+
+type ImageLoadResponse struct {
+	Data []byte `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+}
+
+func (m *ImageLoadResponse) Reset()         { *m = ImageLoadResponse{} }
+func (m *ImageLoadResponse) String() string { return proto.CompactTextString(m) }
+func (*ImageLoadResponse) ProtoMessage()    {}
+
 type ImagePushRequest struct {
 	Repo string      `protobuf:"bytes,1,opt,name=repo,proto3" json:"repo,omitempty"`
 	Tag  string      `protobuf:"bytes,2,opt,name=tag,proto3" json:"tag,omitempty"`
@@ -1908,6 +1949,8 @@ func init() {
 	proto.RegisterType((*VMCreateResponse)(nil), "types.VMCreateResponse")
 	proto.RegisterType((*VMRemoveRequest)(nil), "types.VMRemoveRequest")
 	proto.RegisterType((*VMRemoveResponse)(nil), "types.VMRemoveResponse")
+	proto.RegisterType((*AuthRequest)(nil), "types.AuthRequest")
+	proto.RegisterType((*AuthResponse)(nil), "types.AuthResponse")
 	proto.RegisterType((*UserContainerPort)(nil), "types.UserContainerPort")
 	proto.RegisterType((*UserVolumeReference)(nil), "types.UserVolumeReference")
 	proto.RegisterType((*UserFileReference)(nil), "types.UserFileReference")
@@ -1945,6 +1988,8 @@ func init() {
 	proto.RegisterType((*AuthConfig)(nil), "types.AuthConfig")
 	proto.RegisterType((*ImagePullRequest)(nil), "types.ImagePullRequest")
 	proto.RegisterType((*ImagePullResponse)(nil), "types.ImagePullResponse")
+	proto.RegisterType((*ImageLoadRequest)(nil), "types.ImageLoadRequest")
+	proto.RegisterType((*ImageLoadResponse)(nil), "types.ImageLoadResponse")
 	proto.RegisterType((*ImagePushRequest)(nil), "types.ImagePushRequest")
 	proto.RegisterType((*ImagePushResponse)(nil), "types.ImagePushResponse")
 	proto.RegisterType((*ImageRemoveRequest)(nil), "types.ImageRemoveRequest")
@@ -2049,11 +2094,16 @@ type PublicAPIClient interface {
 	ImagePush(ctx context.Context, in *ImagePushRequest, opts ...grpc.CallOption) (PublicAPI_ImagePushClient, error)
 	// ImageRemove deletes a image from hyperd
 	ImageRemove(ctx context.Context, in *ImageRemoveRequest, opts ...grpc.CallOption) (*ImageRemoveResponse, error)
+	// TODO: ImageBuild builds a image from Dockerfile
+	// ImageLoad loads an image from stream
+	ImageLoad(ctx context.Context, opts ...grpc.CallOption) (PublicAPI_ImageLoadClient, error)
 	// TODO: Ping checks if hyperd is running (returns 'OK' on success)
 	// Info gets the info of hyperd
 	Info(ctx context.Context, in *InfoRequest, opts ...grpc.CallOption) (*InfoResponse, error)
 	// Version gets the version and apiVersion of hyperd
 	Version(ctx context.Context, in *VersionRequest, opts ...grpc.CallOption) (*VersionResponse, error)
+	// Auth auths a user to the specified docker registry
+	Auth(ctx context.Context, in *AuthRequest, opts ...grpc.CallOption) (*AuthResponse, error)
 }
 
 type publicAPIClient struct {
@@ -2478,6 +2528,37 @@ func (c *publicAPIClient) ImageRemove(ctx context.Context, in *ImageRemoveReques
 	return out, nil
 }
 
+func (c *publicAPIClient) ImageLoad(ctx context.Context, opts ...grpc.CallOption) (PublicAPI_ImageLoadClient, error) {
+	stream, err := grpc.NewClientStream(ctx, &_PublicAPI_serviceDesc.Streams[6], c.cc, "/types.PublicAPI/ImageLoad", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &publicAPIImageLoadClient{stream}
+	return x, nil
+}
+
+type PublicAPI_ImageLoadClient interface {
+	Send(*ImageLoadRequest) error
+	Recv() (*ImageLoadResponse, error)
+	grpc.ClientStream
+}
+
+type publicAPIImageLoadClient struct {
+	grpc.ClientStream
+}
+
+func (x *publicAPIImageLoadClient) Send(m *ImageLoadRequest) error {
+	return x.ClientStream.SendMsg(m)
+}
+
+func (x *publicAPIImageLoadClient) Recv() (*ImageLoadResponse, error) {
+	m := new(ImageLoadResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 func (c *publicAPIClient) Info(ctx context.Context, in *InfoRequest, opts ...grpc.CallOption) (*InfoResponse, error) {
 	out := new(InfoResponse)
 	err := grpc.Invoke(ctx, "/types.PublicAPI/Info", in, out, c.cc, opts...)
@@ -2490,6 +2571,15 @@ func (c *publicAPIClient) Info(ctx context.Context, in *InfoRequest, opts ...grp
 func (c *publicAPIClient) Version(ctx context.Context, in *VersionRequest, opts ...grpc.CallOption) (*VersionResponse, error) {
 	out := new(VersionResponse)
 	err := grpc.Invoke(ctx, "/types.PublicAPI/Version", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *publicAPIClient) Auth(ctx context.Context, in *AuthRequest, opts ...grpc.CallOption) (*AuthResponse, error) {
+	out := new(AuthResponse)
+	err := grpc.Invoke(ctx, "/types.PublicAPI/Auth", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2565,11 +2655,16 @@ type PublicAPIServer interface {
 	ImagePush(*ImagePushRequest, PublicAPI_ImagePushServer) error
 	// ImageRemove deletes a image from hyperd
 	ImageRemove(context.Context, *ImageRemoveRequest) (*ImageRemoveResponse, error)
+	// TODO: ImageBuild builds a image from Dockerfile
+	// ImageLoad loads an image from stream
+	ImageLoad(PublicAPI_ImageLoadServer) error
 	// TODO: Ping checks if hyperd is running (returns 'OK' on success)
 	// Info gets the info of hyperd
 	Info(context.Context, *InfoRequest) (*InfoResponse, error)
 	// Version gets the version and apiVersion of hyperd
 	Version(context.Context, *VersionRequest) (*VersionResponse, error)
+	// Auth auths a user to the specified docker registry
+	Auth(context.Context, *AuthRequest) (*AuthResponse, error)
 }
 
 func RegisterPublicAPIServer(s *grpc.Server, srv PublicAPIServer) {
@@ -3017,6 +3112,32 @@ func _PublicAPI_ImageRemove_Handler(srv interface{}, ctx context.Context, dec fu
 	return out, nil
 }
 
+func _PublicAPI_ImageLoad_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(PublicAPIServer).ImageLoad(&publicAPIImageLoadServer{stream})
+}
+
+type PublicAPI_ImageLoadServer interface {
+	Send(*ImageLoadResponse) error
+	Recv() (*ImageLoadRequest, error)
+	grpc.ServerStream
+}
+
+type publicAPIImageLoadServer struct {
+	grpc.ServerStream
+}
+
+func (x *publicAPIImageLoadServer) Send(m *ImageLoadResponse) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func (x *publicAPIImageLoadServer) Recv() (*ImageLoadRequest, error) {
+	m := new(ImageLoadRequest)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 func _PublicAPI_Info_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
 	in := new(InfoRequest)
 	if err := dec(in); err != nil {
@@ -3035,6 +3156,18 @@ func _PublicAPI_Version_Handler(srv interface{}, ctx context.Context, dec func(i
 		return nil, err
 	}
 	out, err := srv.(PublicAPIServer).Version(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func _PublicAPI_Auth_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
+	in := new(AuthRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	out, err := srv.(PublicAPIServer).Auth(ctx, in)
 	if err != nil {
 		return nil, err
 	}
@@ -3153,6 +3286,10 @@ var _PublicAPI_serviceDesc = grpc.ServiceDesc{
 			MethodName: "Version",
 			Handler:    _PublicAPI_Version_Handler,
 		},
+		{
+			MethodName: "Auth",
+			Handler:    _PublicAPI_Auth_Handler,
+		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
@@ -3187,6 +3324,12 @@ var _PublicAPI_serviceDesc = grpc.ServiceDesc{
 			StreamName:    "ImagePush",
 			Handler:       _PublicAPI_ImagePush_Handler,
 			ServerStreams: true,
+		},
+		{
+			StreamName:    "ImageLoad",
+			Handler:       _PublicAPI_ImageLoad_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
 		},
 	},
 }

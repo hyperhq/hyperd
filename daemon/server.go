@@ -395,6 +395,11 @@ func (daemon *Daemon) CmdImagePull(image, tag string, authConfig *types.AuthConf
 	return daemon.Daemon.PullImage(ref, metaHeaders, authConfig, output)
 }
 
+func (daemon *Daemon) CmdImageLoad(stdin io.ReadCloser, stdout io.WriteCloser) error {
+	return daemon.Daemon.LoadImage(stdin, stdout)
+
+}
+
 func (daemon *Daemon) CmdImagePush(repo, tag string, authConfig *types.AuthConfig, metaHeaders map[string][]string, output io.Writer) error {
 	// Special case: "pull -a" may send an image name with a
 	// trailing :. This is ugly, but let's not break API
