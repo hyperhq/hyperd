@@ -55,8 +55,8 @@ Clone hyperd and runv in GoPath
 
     > mkdir -p ${GOPATH}/src/github.com/hyperhq
     > cd ${GOPATH}/src/github.com/hyperhq
-	> git clone https://github.com/hyperhq/runv.git runv
-	> git clone https://github.com/hyperhq/hyperd.git hyperd
+    > git clone https://github.com/hyperhq/runv.git runv
+    > git clone https://github.com/hyperhq/hyperd.git hyperd
 
 And make sure you have `go` (>= 1.4) , `device-mapper-devel`, and `autotools`, go into the `hyper` dir
 
@@ -64,9 +64,7 @@ And make sure you have `go` (>= 1.4) , `device-mapper-devel`, and `autotools`, g
     > ./configure
     > make
 
-Then you can get the binaries `hyperd` daemon and `hyperctl` cmdline tool.
-
-You may also need the kernel and initrd from [HyperStart](https://github.com/hyperhq/hyperstart) to run HyperContainer.
+Then you can find the binaries `hyperd` daemon and `hyperctl` cmdline tool in current directory. Before running those commands, a config file needs to be placed at `/etc/hyper/config` directory, and you can find a sample under `${TOP}/package/dist/etc/hyper/config`. `Kernel` and `Initrd` are required for starting the hyperd daemon, you can find those files from [HyperStart](https://github.com/hyperhq/hyperstart) project.
 
 
 ## Find out more
