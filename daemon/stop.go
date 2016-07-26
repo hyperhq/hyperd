@@ -45,8 +45,8 @@ func (daemon *Daemon) PodWait(podId string) {
 	pod.Unlock()
 }
 
-func (daemon *Daemon) StopPod(podId string) (int, string, error) {
-	glog.Infof("Prepare to stop the POD: %s", podId)
+func (daemon *Daemon) StopPod(podIdOrName string) (int, string, error) {
+	glog.Infof("Prepare to stop the POD: %s", podIdOrName)
 	// find the vm id which running POD, and stop it
 	var pod *Pod
 	var ok bool
@@ -62,8 +62,8 @@ func (daemon *Daemon) StopPod(podId string) (int, string, error) {
 	}
 
 	if !pod.TransitionLock("stop") {
-		glog.Errorf("Pod %s is under other operation", podId)
-		return -1, "", fmt.Errorf("Pod %s is under other operation", podId)
+		glog.Errorf("Pod %s is under other operation", podIdOrName)
+		return -1, "", fmt.Errorf("Pod %s is under other operation", podIdOrName)
 	}
 	defer pod.TransitionUnlock("stop")
 

@@ -417,8 +417,8 @@ func (daemon *Daemon) CmdImagePush(repo, tag string, authConfig *types.AuthConfi
 	return daemon.Daemon.PushImage(ref, metaHeaders, authConfig, output)
 }
 
-func (daemon *Daemon) CmdStopPod(podId, stopVm string) (*engine.Env, error) {
-	code, cause, err := daemon.StopPod(podId)
+func (daemon *Daemon) CmdStopPod(podIdOrName, stopVm string) (*engine.Env, error) {
+	code, cause, err := daemon.StopPod(podIdOrName)
 	if err != nil {
 		return nil, err
 	}
@@ -426,7 +426,7 @@ func (daemon *Daemon) CmdStopPod(podId, stopVm string) (*engine.Env, error) {
 	// Prepare the VM status to client
 	v := &engine.Env{}
 
-	v.Set("ID", podId)
+	v.Set("ID", podIdOrName)
 	v.SetInt("Code", code)
 	v.Set("Cause", cause)
 
