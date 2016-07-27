@@ -11,7 +11,7 @@ import (
 
 func (daemon *Daemon) PodStopped(podId string) {
 	// find the vm id which running POD, and stop it
-	pod, ok := daemon.PodList.Get(podId)
+	pod, ok := daemon.PodList.GetByIdOrName(podId)
 	if !ok {
 		glog.Errorf("Can not find pod(%s)", podId)
 		return
@@ -27,7 +27,7 @@ func (daemon *Daemon) PodStopped(podId string) {
 
 func (daemon *Daemon) PodWait(podId string) {
 	// find the vm id which running POD, and stop it
-	pod, ok := daemon.PodList.Get(podId)
+	pod, ok := daemon.PodList.GetByIdOrName(podId)
 	if !ok {
 		glog.Errorf("Can not find pod(%s)", podId)
 		return
@@ -48,17 +48,10 @@ func (daemon *Daemon) PodWait(podId string) {
 func (daemon *Daemon) StopPod(podIdOrName string) (int, string, error) {
 	glog.Infof("Prepare to stop the POD: %s", podIdOrName)
 	// find the vm id which running POD, and stop it
-	var pod *Pod
-	var ok bool
-	pod, ok = daemon.PodList.Get(podIdOrName)
+	pod, ok := daemon.PodList.GetByIdOrName(podIdOrName)
 	if !ok {
-		// Can't find it via id, try name
-		pod, ok = daemon.PodList.GetByName(podIdOrName)
-
-		if !ok {
-			glog.Errorf("Can not find pod(%s)", podIdOrName)
-			return -1, "", fmt.Errorf("Can not find pod(%s)", podIdOrName)
-		}
+		glog.Errorf("Can not find pod(%s)", podIdOrName)
+		return -1, "", fmt.Errorf("Can not find pod(%s)", podIdOrName)
 	}
 
 	if !pod.TransitionLock("stop") {

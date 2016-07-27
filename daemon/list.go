@@ -15,7 +15,7 @@ func (daemon *Daemon) ListVMs(podId, vmId string) ([]*hypervisor.Vm, error) {
 
 	if podId != "" {
 		var ok bool
-		pod, ok = daemon.PodList.Get(podId)
+		pod, ok = daemon.PodList.GetByIdOrName(podId)
 		if !ok || (pod == nil) {
 			return nil, fmt.Errorf("Cannot find specified pod %s", podId)
 		}
@@ -58,7 +58,7 @@ func (daemon *Daemon) ListPods(podId, vmId string) ([]*Pod, error) {
 
 	if podId != "" {
 		var ok bool
-		pod, ok = daemon.PodList.Get(podId)
+		pod, ok = daemon.PodList.GetByIdOrName(podId)
 		if !ok || (pod == nil) {
 			return nil, fmt.Errorf("Cannot find specified pod %s", podId)
 		}
@@ -123,7 +123,7 @@ func (daemon *Daemon) ListContainers(podId, vmId string, auxiliary bool) ([]*hyp
 
 	if podId != "" {
 		var ok bool
-		pod, ok = daemon.PodList.Get(podId)
+		pod, ok = daemon.PodList.GetByIdOrName(podId)
 		if !ok || (pod == nil) {
 			return nil, fmt.Errorf("Cannot find specified pod %s", podId)
 		}
