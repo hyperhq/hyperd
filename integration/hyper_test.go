@@ -491,6 +491,6 @@ func (s *TestSuite) TestLoadImage(c *C) {
 }
 
 func (s *TestSuite) TestAuth(c *C) {
-	_, err := s.client.Auth("heartlock", "888888", "21521209@zju.edu.cn", "https://index.docker.io/v1/")
+	_, err := s.client.Auth("heartlock", "123456", "21521209@zju.edu.cn", "https://index.docker.io/v1/")
 	c.Assert(err, IsNil)
 }
