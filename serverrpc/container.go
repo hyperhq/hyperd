@@ -33,3 +33,16 @@ func (s *ServerRPC) ContainerStop(c context.Context, req *types.ContainerStopReq
 
 	return &types.ContainerStopResponse{}, nil
 }
+
+// ContainerRename rename a container
+func (s *ServerRPC) ContainerRename(c context.Context, req *types.ContainerRenameRequest) (*types.ContainerRenameResponse, error) {
+	glog.V(3).Infof("ContainerRename with request %v", req.String())
+
+	err := s.daemon.ContainerRename(req.OldContainerName, req.NewContainerName)
+	if err != nil {
+		glog.Errorf("ContainerRename error: %v", err)
+		return nil, err
+	}
+
+	return &types.ContainerRenameResponse{}, nil
+}

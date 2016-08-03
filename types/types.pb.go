@@ -89,6 +89,8 @@ It has these top-level messages:
 	AttachMessage
 	ContainerCreateRequest
 	ContainerCreateResponse
+	ContainerRenameRequest
+	ContainerRenameResponse
 	AuthConfig
 	ImagePullRequest
 	ImagePullResponse
@@ -1529,6 +1531,22 @@ func (m *ContainerCreateResponse) Reset()         { *m = ContainerCreateResponse
 func (m *ContainerCreateResponse) String() string { return proto.CompactTextString(m) }
 func (*ContainerCreateResponse) ProtoMessage()    {}
 
+type ContainerRenameRequest struct {
+	OldContainerName string `protobuf:"bytes,1,opt,name=oldContainerName,proto3" json:"oldContainerName,omitempty"`
+	NewContainerName string `protobuf:"bytes,2,opt,name=newContainerName,proto3" json:"newContainerName,omitempty"`
+}
+
+func (m *ContainerRenameRequest) Reset()         { *m = ContainerRenameRequest{} }
+func (m *ContainerRenameRequest) String() string { return proto.CompactTextString(m) }
+func (*ContainerRenameRequest) ProtoMessage()    {}
+
+type ContainerRenameResponse struct {
+}
+
+func (m *ContainerRenameResponse) Reset()         { *m = ContainerRenameResponse{} }
+func (m *ContainerRenameResponse) String() string { return proto.CompactTextString(m) }
+func (*ContainerRenameResponse) ProtoMessage()    {}
+
 type AuthConfig struct {
 	Username      string `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
 	Password      string `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
@@ -1942,6 +1960,8 @@ func init() {
 	proto.RegisterType((*AttachMessage)(nil), "types.AttachMessage")
 	proto.RegisterType((*ContainerCreateRequest)(nil), "types.ContainerCreateRequest")
 	proto.RegisterType((*ContainerCreateResponse)(nil), "types.ContainerCreateResponse")
+	proto.RegisterType((*ContainerRenameRequest)(nil), "types.ContainerRenameRequest")
+	proto.RegisterType((*ContainerRenameResponse)(nil), "types.ContainerRenameResponse")
 	proto.RegisterType((*AuthConfig)(nil), "types.AuthConfig")
 	proto.RegisterType((*ImagePullRequest)(nil), "types.ImagePullRequest")
 	proto.RegisterType((*ImagePullResponse)(nil), "types.ImagePullResponse")
@@ -2021,7 +2041,8 @@ type PublicAPIClient interface {
 	ContainerLogs(ctx context.Context, in *ContainerLogsRequest, opts ...grpc.CallOption) (PublicAPI_ContainerLogsClient, error)
 	// ContainerCreate creates a container in specified pod
 	ContainerCreate(ctx context.Context, in *ContainerCreateRequest, opts ...grpc.CallOption) (*ContainerCreateResponse, error)
-	// TODO: ContainerRename renames a container
+	// ContainerRename renames a container
+	ContainerRename(ctx context.Context, in *ContainerRenameRequest, opts ...grpc.CallOption) (*ContainerRenameResponse, error)
 	// TODO: ContainerCommit commits the changes of the specified container
 	// TODO: ContainerSignal sends a singla to specified container
 	// TODO: ContainerLabels updates labels of the specified container
@@ -2274,6 +2295,15 @@ func (x *publicAPIContainerLogsClient) Recv() (*ContainerLogsResponse, error) {
 func (c *publicAPIClient) ContainerCreate(ctx context.Context, in *ContainerCreateRequest, opts ...grpc.CallOption) (*ContainerCreateResponse, error) {
 	out := new(ContainerCreateResponse)
 	err := grpc.Invoke(ctx, "/types.PublicAPI/ContainerCreate", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *publicAPIClient) ContainerRename(ctx context.Context, in *ContainerRenameRequest, opts ...grpc.CallOption) (*ContainerRenameResponse, error) {
+	out := new(ContainerRenameResponse)
+	err := grpc.Invoke(ctx, "/types.PublicAPI/ContainerRename", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2537,7 +2567,8 @@ type PublicAPIServer interface {
 	ContainerLogs(*ContainerLogsRequest, PublicAPI_ContainerLogsServer) error
 	// ContainerCreate creates a container in specified pod
 	ContainerCreate(context.Context, *ContainerCreateRequest) (*ContainerCreateResponse, error)
-	// TODO: ContainerRename renames a container
+	// ContainerRename renames a container
+	ContainerRename(context.Context, *ContainerRenameRequest) (*ContainerRenameResponse, error)
 	// TODO: ContainerCommit commits the changes of the specified container
 	// TODO: ContainerSignal sends a singla to specified container
 	// TODO: ContainerLabels updates labels of the specified container
@@ -2821,6 +2852,18 @@ func _PublicAPI_ContainerCreate_Handler(srv interface{}, ctx context.Context, de
 		return nil, err
 	}
 	out, err := srv.(PublicAPIServer).ContainerCreate(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func _PublicAPI_ContainerRename_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
+	in := new(ContainerRenameRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	out, err := srv.(PublicAPIServer).ContainerRename(ctx, in)
 	if err != nil {
 		return nil, err
 	}
@@ -3112,6 +3155,10 @@ var _PublicAPI_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ContainerCreate",
 			Handler:    _PublicAPI_ContainerCreate_Handler,
+		},
+		{
+			MethodName: "ContainerRename",
+			Handler:    _PublicAPI_ContainerRename_Handler,
 		},
 		{
 			MethodName: "ContainerStop",

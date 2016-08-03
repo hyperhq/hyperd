@@ -576,6 +576,13 @@ message ContainerCreateResponse {
   string containerID = 1;
 }
 
+message ContainerRenameRequest {
+  string oldContainerName = 1;
+  string newContainerName = 2;
+}
+
+message ContainerRenameResponse {}
+
 message AuthConfig {
   string username = 1;
   string password = 2;
@@ -754,7 +761,8 @@ service PublicAPI {
     rpc ContainerLogs(ContainerLogsRequest) returns (stream ContainerLogsResponse) {}
     // ContainerCreate creates a container in specified pod
     rpc ContainerCreate(ContainerCreateRequest) returns (ContainerCreateResponse) {}
-    // TODO: ContainerRename renames a container
+    // ContainerRename renames a container
+    rpc ContainerRename(ContainerRenameRequest) returns (ContainerRenameResponse) {}
     // TODO: ContainerCommit commits the changes of the specified container
     // TODO: ContainerSignal sends a singla to specified container
     // TODO: ContainerLabels updates labels of the specified container
