@@ -494,3 +494,41 @@ func (s *TestSuite) TestPing(c *C) {
 	c.Assert(err, IsNil)
 	c.Logf("Got HyperdStats %v", resp)
 }
+
+func (s *TestSuite) TestSendContainerSignal(c *C) {
+	sigKill := int64(9)
+	spec := types.UserPod{
+		Id: "busybox",
+	}
+
+	pod, err := s.client.CreatePod(&spec)
+	c.Assert(err, IsNil)
+	c.Logf("Pod created: %s", pod)
+
+	defer func() {
+		err = s.client.RemovePod(pod)
+		c.Assert(err, IsNil)
+	}()
+
+	container, err := s.client.CreateContainer(pod, &types.UserContainer{Image: "busybox"})
+	c.Assert(err, IsNil)
+	c.Logf("Container created: %s", container)
+
+	err = s.client.StartPod(pod)
+	c.Assert(err, IsNil)
+
+	containerInfo, err := s.client.GetContainerInfo(container)
+	c.Assert(err, IsNil)
+	c.Assert(containerInfo.Status.Phase, Equals, "running")
+
+	err = s.client.ContainerSignal(pod, container, sigKill)
+	c.Assert(err, IsNil)
+
+	exitCode, err := s.client.Wait(container, "", false)
+	c.Assert(err, IsNil)
+	c.Assert(exitCode, Equals, int32(137))
+
+	containerInfo, err = s.client.GetContainerInfo(container)
+	c.Assert(err, IsNil)
+	c.Assert(containerInfo.Status.Phase, Equals, "failed")
+}

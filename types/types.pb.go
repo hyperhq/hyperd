@@ -133,6 +133,8 @@ It has these top-level messages:
 	PodStatsResponse
 	PingRequest
 	PingResponse
+	ContainerSignalRequest
+	ContainerSignalResponse
 	PersistPodLayout
 	PersistPodMeta
 	SandboxPersistInfo
@@ -2022,6 +2024,23 @@ func (m *PingResponse) Reset()         { *m = PingResponse{} }
 func (m *PingResponse) String() string { return proto.CompactTextString(m) }
 func (*PingResponse) ProtoMessage()    {}
 
+type ContainerSignalRequest struct {
+	PodID       string `protobuf:"bytes,1,opt,name=podID,proto3" json:"podID,omitempty"`
+	ContainerID string `protobuf:"bytes,2,opt,name=containerID,proto3" json:"containerID,omitempty"`
+	Signal      int64  `protobuf:"varint,3,opt,name=signal,proto3" json:"signal,omitempty"`
+}
+
+func (m *ContainerSignalRequest) Reset()         { *m = ContainerSignalRequest{} }
+func (m *ContainerSignalRequest) String() string { return proto.CompactTextString(m) }
+func (*ContainerSignalRequest) ProtoMessage()    {}
+
+type ContainerSignalResponse struct {
+}
+
+func (m *ContainerSignalResponse) Reset()         { *m = ContainerSignalResponse{} }
+func (m *ContainerSignalResponse) String() string { return proto.CompactTextString(m) }
+func (*ContainerSignalResponse) ProtoMessage()    {}
+
 func init() {
 	proto.RegisterType((*ContainerPort)(nil), "types.ContainerPort")
 	proto.RegisterType((*EnvironmentVar)(nil), "types.EnvironmentVar")
@@ -2146,6 +2165,8 @@ func init() {
 	proto.RegisterType((*PodStatsResponse)(nil), "types.PodStatsResponse")
 	proto.RegisterType((*PingRequest)(nil), "types.PingRequest")
 	proto.RegisterType((*PingResponse)(nil), "types.PingResponse")
+	proto.RegisterType((*ContainerSignalRequest)(nil), "types.ContainerSignalRequest")
+	proto.RegisterType((*ContainerSignalResponse)(nil), "types.ContainerSignalResponse")
 	proto.RegisterEnum("types.UserContainer_ContainerType", UserContainer_ContainerType_name, UserContainer_ContainerType_value)
 }
 
@@ -2168,7 +2189,7 @@ type PublicAPIClient interface {
 	PodStart(ctx context.Context, in *PodStartRequest, opts ...grpc.CallOption) (*PodStartResponse, error)
 	// PodStop stops a pod
 	PodStop(ctx context.Context, in *PodStopRequest, opts ...grpc.CallOption) (*PodStopResponse, error)
-	// PodSignal sends a singal to all containers of specified pod
+	// PodSignal sends a signal to all containers of specified pod
 	PodSignal(ctx context.Context, in *PodSignalRequest, opts ...grpc.CallOption) (*PodSignalResponse, error)
 	// PodPause pauses a pod
 	PodPause(ctx context.Context, in *PodPauseRequest, opts ...grpc.CallOption) (*PodPauseResponse, error)
@@ -2195,7 +2216,8 @@ type PublicAPIClient interface {
 	// ContainerRename renames a container
 	ContainerRename(ctx context.Context, in *ContainerRenameRequest, opts ...grpc.CallOption) (*ContainerRenameResponse, error)
 	// TODO: ContainerCommit commits the changes of the specified container
-	// TODO: ContainerSignal sends a singla to specified container
+	// ContainerSignal sends a signal to specified container
+	ContainerSignal(ctx context.Context, in *ContainerSignalRequest, opts ...grpc.CallOption) (*ContainerSignalResponse, error)
 	// TODO: ContainerLabels updates labels of the specified container
 	// ContainerStop stops the specified container
 	ContainerStop(ctx context.Context, in *ContainerStopRequest, opts ...grpc.CallOption) (*ContainerStopResponse, error)
@@ -2427,6 +2449,15 @@ func (c *publicAPIClient) ContainerStart(ctx context.Context, in *ContainerStart
 func (c *publicAPIClient) ContainerRename(ctx context.Context, in *ContainerRenameRequest, opts ...grpc.CallOption) (*ContainerRenameResponse, error) {
 	out := new(ContainerRenameResponse)
 	err := grpc.Invoke(ctx, "/types.PublicAPI/ContainerRename", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *publicAPIClient) ContainerSignal(ctx context.Context, in *ContainerSignalRequest, opts ...grpc.CallOption) (*ContainerSignalResponse, error) {
+	out := new(ContainerSignalResponse)
+	err := grpc.Invoke(ctx, "/types.PublicAPI/ContainerSignal", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2682,7 +2713,7 @@ type PublicAPIServer interface {
 	PodStart(context.Context, *PodStartRequest) (*PodStartResponse, error)
 	// PodStop stops a pod
 	PodStop(context.Context, *PodStopRequest) (*PodStopResponse, error)
-	// PodSignal sends a singal to all containers of specified pod
+	// PodSignal sends a signal to all containers of specified pod
 	PodSignal(context.Context, *PodSignalRequest) (*PodSignalResponse, error)
 	// PodPause pauses a pod
 	PodPause(context.Context, *PodPauseRequest) (*PodPauseResponse, error)
@@ -2709,7 +2740,8 @@ type PublicAPIServer interface {
 	// ContainerRename renames a container
 	ContainerRename(context.Context, *ContainerRenameRequest) (*ContainerRenameResponse, error)
 	// TODO: ContainerCommit commits the changes of the specified container
-	// TODO: ContainerSignal sends a singla to specified container
+	// ContainerSignal sends a signal to specified container
+	ContainerSignal(context.Context, *ContainerSignalRequest) (*ContainerSignalResponse, error)
 	// TODO: ContainerLabels updates labels of the specified container
 	// ContainerStop stops the specified container
 	ContainerStop(context.Context, *ContainerStopRequest) (*ContainerStopResponse, error)
@@ -2980,6 +3012,18 @@ func _PublicAPI_ContainerRename_Handler(srv interface{}, ctx context.Context, de
 		return nil, err
 	}
 	out, err := srv.(PublicAPIServer).ContainerRename(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func _PublicAPI_ContainerSignal_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
+	in := new(ContainerSignalRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	out, err := srv.(PublicAPIServer).ContainerSignal(ctx, in)
 	if err != nil {
 		return nil, err
 	}
@@ -3299,6 +3343,10 @@ var _PublicAPI_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ContainerRename",
 			Handler:    _PublicAPI_ContainerRename_Handler,
+		},
+		{
+			MethodName: "ContainerSignal",
+			Handler:    _PublicAPI_ContainerSignal_Handler,
 		},
 		{
 			MethodName: "ContainerStop",
