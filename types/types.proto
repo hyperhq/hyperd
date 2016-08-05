@@ -708,6 +708,12 @@ message PodStatsResponse {
   PodStats podStats = 1;
 }
 
+message PingRequest {}
+
+message PingResponse {
+  string hyperdStats = 1;
+}
+
 // PublicAPI defines the public APIs which are handled over TCP sockets.
 service PublicAPI {
     // PodList gets a list of pods
@@ -788,7 +794,8 @@ service PublicAPI {
     // TODO: ImageBuild builds a image from Dockerfile
     // TODO: ImageLoad loads a image from stream
 
-    // TODO: Ping checks if hyperd is running (returns 'OK' on success)
+    // Ping checks if hyperd is running (returns 'OK' on success)
+    rpc Ping(PingRequest) returns (PingResponse) {}
     // Info gets the info of hyperd
     rpc Info(InfoRequest) returns (InfoResponse) {}
     // Version gets the version and apiVersion of hyperd

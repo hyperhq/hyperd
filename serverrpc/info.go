@@ -59,3 +59,8 @@ func (s *ServerRPC) Version(c context.Context, req *types.VersionRequest) (*type
 		ApiVersion: GRPC_API_VERSION,
 	}, nil
 }
+
+// Ping checks if hyperd is running (returns 'OK' on success)
+func (s *ServerRPC) Ping(c context.Context, req *types.PingRequest) (*types.PingResponse, error) {
+	return &types.PingResponse{HyperdStats: "OK"}, nil
+}
