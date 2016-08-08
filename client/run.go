@@ -50,6 +50,7 @@ func (cli *HyperClient) HyperCmdRun(args ...string) (err error) {
 	)
 	var parser = gflag.NewParser(&opts, gflag.Default|gflag.IgnoreUnknown)
 	parser.Usage = "run [OPTIONS] IMAGE [COMMAND] [ARG...]\n\nCreate a pod, and launch a new VM to run the pod"
+	argsBeforeParsing := args
 	args, err = parser.ParseArgs(args)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {
@@ -70,6 +71,7 @@ func (cli *HyperClient) HyperCmdRun(args ...string) (err error) {
 			return fmt.Errorf("%s: \"run\" requires a minimum of 1 argument, please provide the image.", os.Args[0])
 		}
 		attach = !opts.Detach
+		args = cli.ExtractFullCommand(args, argsBeforeParsing)
 		podJson, err = cli.JsonFromCmdline(args, opts.Env, opts.Portmap, opts.LogDriver, opts.LogOpts,
 			opts.Name, opts.Workdir, opts.RestartPolicy, opts.Cpu, opts.Memory, opts.Tty, opts.Labels, opts.EntryPoint)
 	}
@@ -288,6 +290,20 @@ func (cli *HyperClient) JsonFromCmdline(cmdArgs, cmdEnvs, cmdPortmaps []string, 
 
 	jsonString, _ := json.Marshal(userPod)
 	return string(jsonString), nil
+}
+
+func (cli *HyperClient) ExtractFullCommand(parsedArgs []string, origArgs []string) []string {
+	imageName := parsedArgs[0]
+	var cmdStartIndex = 0
+
+	for idx, arg := range origArgs {
+		if arg == imageName {
+			cmdStartIndex = idx
+			break
+		}
+	}
+
+	return origArgs[cmdStartIndex:]
 }
 
 func parsePortMapping(portmap string) (*pod.UserContainerPort, error) {
