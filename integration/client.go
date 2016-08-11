@@ -614,3 +614,17 @@ func (c *HyperClient) Info() (*types.InfoResponse, error) {
 
 	return info, nil
 }
+
+// Ping checks if hyperd is running (returns 'OK' on success)
+func (c *HyperClient) Ping() (*types.PingResponse, error) {
+	resp, err := c.client.Ping(
+		c.ctx,
+		&types.PingRequest{},
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
+}

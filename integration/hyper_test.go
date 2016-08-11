@@ -467,3 +467,9 @@ func (s *TestSuite) TestGetPodStats(c *C) {
 	c.Assert(stats.Cpu, NotNil)
 	c.Assert(stats.Timestamp, NotNil)
 }
+
+func (s *TestSuite) TestPing(c *C) {
+	resp, err := s.client.Ping()
+	c.Assert(err, IsNil)
+	c.Logf("Got HyperdStats %v", resp)
+}
