@@ -195,6 +195,16 @@ func (daemon *Daemon) CmdExitCode(containerId, execId string) (int, error) {
 	return daemon.ExitCode(containerId, execId)
 }
 
+func (daemon *Daemon) CmdDeleteContainer(name string) (*engine.Env, error) {
+	err := daemon.RemoveContainer(name)
+	if err != nil {
+		glog.Errorf("fail to remove container %s: %v", name, err)
+		return nil, err
+	}
+	v := &engine.Env{}
+	return v, nil
+}
+
 func (daemon *Daemon) CmdSystemInfo() (*apitypes.InfoResponse, error) {
 	sys, err := daemon.Daemon.SystemInfo()
 	if err != nil {

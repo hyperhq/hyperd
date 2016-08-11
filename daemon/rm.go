@@ -1,10 +1,13 @@
 package daemon
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path"
+	"strings"
 
+	"github.com/docker/docker/pkg/version"
 	dockertypes "github.com/docker/engine-api/types"
 	"github.com/golang/glog"
 	"github.com/hyperhq/hyperd/utils"
@@ -73,4 +76,80 @@ func (daemon *Daemon) RemovePodContainer(p *Pod) {
 		}
 	}
 	daemon.db.DeleteP2C(p.Id)
+}
+
+func (daemon *Daemon) RemoveContainer(containerId string) error {
+	pod, idx, ok := daemon.PodList.GetByContainerIdOrName(containerId)
+	if !ok {
+		return fmt.Errorf("can not find container %s", containerId)
+	}
+
+	if !pod.TransitionLock("rm") {
+		glog.Errorf("Pod %s is under other operation", pod.Id)
+		return fmt.Errorf("Pod %s is under other operation", pod.Id)
+	}
+	defer pod.TransitionUnlock("rm")
+
+	if pod.PodStatus.Status == types.S_POD_RUNNING {
+		if pod.PodStatus.Containers[idx].Status == types.S_POD_RUNNING {
+			return fmt.Errorf("Container %s is still running, stop it first", containerId)
+		}
+		if err := pod.VM.RemoveContainer(containerId); err != nil {
+			return err
+		}
+	}
+
+	pod.Lock()
+	defer pod.Unlock()
+
+	pod.Status().DeleteContainer(containerId)
+
+	daemon.PodList.Put(pod)
+	if err := daemon.WritePodAndContainers(pod.Id); err != nil {
+		glog.Errorf("Found an error while saving the Containers info: %v", err)
+		return err
+	}
+
+	r, err := daemon.ContainerInspect(containerId, false, version.Version("1.21"))
+	if err != nil {
+		return err
+	}
+
+	if err := daemon.Daemon.ContainerRm(containerId, &dockertypes.ContainerRmConfig{}); err != nil {
+		return err
+	}
+
+	rsp, ok := r.(*dockertypes.ContainerJSON)
+	if !ok {
+		return fmt.Errorf("fail to unpack container json response for %s of %s", containerId, pod.Id)
+	}
+	name := strings.TrimLeft(rsp.Name, "/")
+	for i, c := range pod.Spec.Containers {
+		if name == c.Name {
+			pod.Spec.Containers = append(pod.Spec.Containers[:i], pod.Spec.Containers[i+1:]...)
+			break
+		}
+	}
+	podSpec, err := json.Marshal(pod.Spec)
+	if err != nil {
+		glog.Errorf("Marshal podspec %v failed: %v", pod.Spec, err)
+		return err
+	}
+	if err = daemon.db.UpdatePod(pod.Id, podSpec); err != nil {
+		glog.Errorf("Found an error while saving the POD file: %v", err)
+		return err
+	}
+
+	jsons, err := pod.TryLoadContainers(daemon)
+	if err != nil {
+		return err
+	}
+	if err = pod.ParseContainerJsons(daemon, jsons); err != nil {
+		glog.Errorf("Found an error while parsing the Containers json: %v", err)
+		return err
+	}
+
+	daemon.PodList.Put(pod)
+
+	return nil
 }

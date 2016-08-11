@@ -33,3 +33,16 @@ func (s *ServerRPC) ContainerStop(c context.Context, req *types.ContainerStopReq
 
 	return &types.ContainerStopResponse{}, nil
 }
+
+// ContainerRemove deletes the specified container
+func (s *ServerRPC) ContainerRemove(c context.Context, req *types.ContainerRemoveRequest) (*types.ContainerRemoveResponse, error) {
+	glog.V(3).Infof("ContainerRemove with  request %v", req.String())
+
+	err := s.daemon.RemoveContainer(req.ContainerID)
+	if err != nil {
+		glog.Errorf("ContainerRemove error: %v", err)
+		return nil, err
+	}
+
+	return &types.ContainerRemoveResponse{}, nil
+}

@@ -44,5 +44,6 @@ func (r *containerRouter) initRoutes() {
 		local.NewPostRoute("/tty/resize", r.postTtyResize),
 		// PUT
 		// DELETE
+		local.NewDeleteRoute("/container", r.deleteContainer),
 	}
 }
