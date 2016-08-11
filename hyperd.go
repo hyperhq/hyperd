@@ -22,8 +22,6 @@ import (
 	"github.com/hyperhq/runv/hypervisor"
 
 	"github.com/docker/docker/pkg/parsers/kernel"
-	runvutils "github.com/hyperhq/runv/lib/utils"
-	"github.com/kardianos/osext"
 )
 
 type Options struct {
@@ -50,7 +48,7 @@ func main() {
 		return
 	}
 
-	fnd := flag.Bool("nondaemon", false, "Not daemonize")
+	fnd := flag.Bool("nondaemon", false, "[deprecated flag]") // TODO: remove it when 0.8 is released
 	flDisableIptables := flag.Bool("noniptables", false, "Don't enable iptables rules")
 	flConfig := flag.String("config", "", "Config file for hyperd")
 	flHost := flag.String("host", "", "Host for hyperd")
@@ -67,20 +65,8 @@ func main() {
 		return
 	}
 
-	if !*fnd {
-		path, err := osext.Executable()
-		if err != nil {
-			fmt.Printf("cannot find self executable path for %s: %v\n", os.Args[0], err)
-			os.Exit(-1)
-		}
-
-		_, err = runvutils.ExecInDaemon(path, append([]string{os.Args[0], "--nondaemon"}, os.Args[1:]...))
-		if err != nil {
-			fmt.Println("failed to daemonize hyperd")
-			os.Exit(-1)
-		}
-
-		return
+	if *fnd {
+		fmt.Printf("flag --nondaemon is deprecated\n")
 	}
 
 	var opt = &Options{
@@ -99,7 +85,6 @@ func printHelp() {
   %s [OPTIONS]
 
 Application Options:
-  --nondaemon            Not daemonize
   --config=""            Configuration for %s
   --v=0                  Log level for V logs
   --log_dir              Log directory

@@ -5,7 +5,7 @@ After=network.target
 Requires=
 
 [Service]
-ExecStart=/usr/bin/hyperd --nondaemon --log_dir=/var/log/hyper
+ExecStart=/usr/bin/hyperd --log_dir=/var/log/hyper
 MountFlags=shared
 LimitNOFILE=1048576
 LimitNPROC=1048576
