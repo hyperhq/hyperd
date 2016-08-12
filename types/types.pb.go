@@ -121,6 +121,8 @@ It has these top-level messages:
 	PodLabelsResponse
 	PodStatsRequest
 	PodStatsResponse
+	PingRequest
+	PingResponse
 */
 package types
 
@@ -1861,6 +1863,21 @@ func (m *PodStatsResponse) GetPodStats() *PodStats {
 	return nil
 }
 
+type PingRequest struct {
+}
+
+func (m *PingRequest) Reset()         { *m = PingRequest{} }
+func (m *PingRequest) String() string { return proto.CompactTextString(m) }
+func (*PingRequest) ProtoMessage()    {}
+
+type PingResponse struct {
+	HyperdStats string `protobuf:"bytes,1,opt,name=hyperdStats,proto3" json:"hyperdStats,omitempty"`
+}
+
+func (m *PingResponse) Reset()         { *m = PingResponse{} }
+func (m *PingResponse) String() string { return proto.CompactTextString(m) }
+func (*PingResponse) ProtoMessage()    {}
+
 func init() {
 	proto.RegisterType((*ContainerPort)(nil), "types.ContainerPort")
 	proto.RegisterType((*EnvironmentVar)(nil), "types.EnvironmentVar")
@@ -1974,6 +1991,8 @@ func init() {
 	proto.RegisterType((*PodLabelsResponse)(nil), "types.PodLabelsResponse")
 	proto.RegisterType((*PodStatsRequest)(nil), "types.PodStatsRequest")
 	proto.RegisterType((*PodStatsResponse)(nil), "types.PodStatsResponse")
+	proto.RegisterType((*PingRequest)(nil), "types.PingRequest")
+	proto.RegisterType((*PingResponse)(nil), "types.PingResponse")
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -2049,7 +2068,8 @@ type PublicAPIClient interface {
 	ImagePush(ctx context.Context, in *ImagePushRequest, opts ...grpc.CallOption) (PublicAPI_ImagePushClient, error)
 	// ImageRemove deletes a image from hyperd
 	ImageRemove(ctx context.Context, in *ImageRemoveRequest, opts ...grpc.CallOption) (*ImageRemoveResponse, error)
-	// TODO: Ping checks if hyperd is running (returns 'OK' on success)
+	// Ping checks if hyperd is running (returns 'OK' on success)
+	Ping(ctx context.Context, in *PingRequest, opts ...grpc.CallOption) (*PingResponse, error)
 	// Info gets the info of hyperd
 	Info(ctx context.Context, in *InfoRequest, opts ...grpc.CallOption) (*InfoResponse, error)
 	// Version gets the version and apiVersion of hyperd
@@ -2478,6 +2498,15 @@ func (c *publicAPIClient) ImageRemove(ctx context.Context, in *ImageRemoveReques
 	return out, nil
 }
 
+func (c *publicAPIClient) Ping(ctx context.Context, in *PingRequest, opts ...grpc.CallOption) (*PingResponse, error) {
+	out := new(PingResponse)
+	err := grpc.Invoke(ctx, "/types.PublicAPI/Ping", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *publicAPIClient) Info(ctx context.Context, in *InfoRequest, opts ...grpc.CallOption) (*InfoResponse, error) {
 	out := new(InfoResponse)
 	err := grpc.Invoke(ctx, "/types.PublicAPI/Info", in, out, c.cc, opts...)
@@ -2565,7 +2594,8 @@ type PublicAPIServer interface {
 	ImagePush(*ImagePushRequest, PublicAPI_ImagePushServer) error
 	// ImageRemove deletes a image from hyperd
 	ImageRemove(context.Context, *ImageRemoveRequest) (*ImageRemoveResponse, error)
-	// TODO: Ping checks if hyperd is running (returns 'OK' on success)
+	// Ping checks if hyperd is running (returns 'OK' on success)
+	Ping(context.Context, *PingRequest) (*PingResponse, error)
 	// Info gets the info of hyperd
 	Info(context.Context, *InfoRequest) (*InfoResponse, error)
 	// Version gets the version and apiVersion of hyperd
@@ -3017,6 +3047,18 @@ func _PublicAPI_ImageRemove_Handler(srv interface{}, ctx context.Context, dec fu
 	return out, nil
 }
 
+func _PublicAPI_Ping_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
+	in := new(PingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	out, err := srv.(PublicAPIServer).Ping(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func _PublicAPI_Info_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
 	in := new(InfoRequest)
 	if err := dec(in); err != nil {
@@ -3144,6 +3186,10 @@ var _PublicAPI_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ImageRemove",
 			Handler:    _PublicAPI_ImageRemove_Handler,
+		},
+		{
+			MethodName: "Ping",
+			Handler:    _PublicAPI_Ping_Handler,
 		},
 		{
 			MethodName: "Info",
