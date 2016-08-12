@@ -249,6 +249,21 @@ func (c *HyperClient) CreateContainer(podID string, spec *types.UserContainer) (
 	return resp.ContainerID, nil
 }
 
+// RenameContainer renames a container
+func (c *HyperClient) RenameContainer(oldName string, newName string) error {
+	req := types.ContainerRenameRequest{
+		OldContainerName: oldName,
+		NewContainerName: newName,
+	}
+	_, err := c.client.ContainerRename(c.ctx, &req)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // RemovePod removes a pod by podID
 func (c *HyperClient) RemovePod(podID string) error {
 	_, err := c.client.PodRemove(

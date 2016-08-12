@@ -210,6 +210,37 @@ func (s *TestSuite) TestCreateContainer(c *C) {
 	c.Assert(err, IsNil)
 }
 
+func (s *TestSuite) TestRenameContainer(c *C) {
+	err := s.client.PullImage("busybox", "latest", nil)
+	c.Assert(err, IsNil)
+
+	spec := types.UserPod{}
+	pod, err := s.client.CreatePod(&spec)
+	c.Assert(err, IsNil)
+	c.Logf("Pod created: %s", pod)
+
+	container, err := s.client.CreateContainer(pod, &types.UserContainer{
+		Image: "busybox",
+	})
+	c.Assert(err, IsNil)
+	c.Logf("Container created: %s", container)
+
+	info, err := s.client.GetContainerInfo(container)
+	c.Assert(err, IsNil)
+
+	oldName := info.Container.Name[1:]
+	newName := "busybox0123456789"
+	err = s.client.RenameContainer(oldName, newName)
+	c.Assert(err, IsNil)
+
+	info, err = s.client.GetContainerInfo(container)
+	c.Assert(err, IsNil)
+	c.Assert(info.Container.Name[1:], Equals, newName)
+
+	err = s.client.RemovePod(pod)
+	c.Assert(err, IsNil)
+}
+
 func (s *TestSuite) TestPullImage(c *C) {
 	err := s.client.PullImage("alpine", "latest", nil)
 	c.Assert(err, IsNil)
