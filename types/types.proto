@@ -349,6 +349,19 @@ message VMRemoveResponse {
   string cause  = 2;
 }
 
+message AuthRequest {
+    string username         = 1;
+    string password         = 2;
+    string auth             = 3;
+    string email            = 4;
+    string serveraddress    = 5;
+    string registrytoken    = 6;
+}
+
+message AuthResponse {
+    string status   = 1;    
+}
+
 message UserContainerPort {
   int32 hostPort      = 1;
   int32 containerPort = 2;
@@ -595,6 +608,16 @@ message ImagePullResponse {
   bytes data = 1;
 }
 
+message ImageLoadRequest {
+     bytes data = 1;
+
+}
+
+message ImageLoadResponse {
+    bytes data = 1;
+
+}
+
 message ImagePushRequest {
   string repo     = 1;
   string tag      = 2;
@@ -786,12 +809,13 @@ service PublicAPI {
     // ImageRemove deletes a image from hyperd
     rpc ImageRemove(ImageRemoveRequest) returns (ImageRemoveResponse) {}
     // TODO: ImageBuild builds a image from Dockerfile
-    // TODO: ImageLoad loads a image from stream
-
+    // ImageLoad loads an image from stream
+    rpc ImageLoad(stream ImageLoadRequest) returns (stream ImageLoadResponse) {}
     // TODO: Ping checks if hyperd is running (returns 'OK' on success)
     // Info gets the info of hyperd
     rpc Info(InfoRequest) returns (InfoResponse) {}
     // Version gets the version and apiVersion of hyperd
     rpc Version(VersionRequest) returns (VersionResponse) {}
-    // TODO: Auth auths a user to the specified docker registry
+    // Auth auths a user to the specified docker registry
+    rpc Auth(AuthRequest) returns (AuthResponse) {}
 }

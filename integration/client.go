@@ -519,6 +519,64 @@ func (c *HyperClient) PushImage(repo, tag string, out io.Writer) error {
 	return nil
 }
 
+func (c *HyperClient) LoadImage(stdin io.ReadCloser, stdout, stderr io.Writer) error {
+	stream, err := c.client.ImageLoad(context.Background())
+	if err != nil {
+		return err
+	}
+	var recvStdoutError chan error
+	if stdout != nil || stderr != nil {
+		recvStdoutError = promise.Go(func() (err error) {
+			for {
+				in, err := stream.Recv()
+				if err != nil && err != io.EOF {
+					return err
+				}
+				if in != nil && in.Data != nil {
+					nw, ew := stdout.Write(in.Data)
+					if ew != nil {
+						return ew
+					}
+					if nw != len(in.Data) {
+						return io.ErrShortWrite
+					}
+				}
+				if err == io.EOF {
+					break
+				}
+			}
+			return nil
+		})
+	}
+	if stdin != nil {
+		go func() error {
+			defer stream.CloseSend()
+			buf := make([]byte, 512)
+			for {
+				nr, err := stdin.Read(buf)
+				if nr > 0 {
+					if err := stream.Send(&types.ImageLoadRequest{Data: buf[:nr]}); err != nil {
+						return err
+					}
+				}
+				if err == io.EOF {
+					break
+				}
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		}()
+	}
+	if stdout != nil || stderr != nil {
+		if err := <-recvStdoutError; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // DeleteService deletes user service by podID and service content
 func (c *HyperClient) DeleteService(podID string, services []*types.UserService) error {
 	_, err := c.client.ServiceDelete(
@@ -613,4 +671,17 @@ func (c *HyperClient) Info() (*types.InfoResponse, error) {
 	}
 
 	return info, nil
+}
+
+// Auth
+func (c *HyperClient) Auth(username, passwd, email, serveraddress string) (*types.AuthResponse, error) {
+	response, err := c.client.Auth(
+		c.ctx,
+		&types.AuthRequest{Username: username, Password: passwd, Email: email, Serveraddress: serveraddress},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
 }
