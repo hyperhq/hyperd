@@ -48,8 +48,7 @@ function start_hyperd()
   sudo "${HYPER_OUTPUT_HOSTBIN}/hyperd" \
     --host="tcp://127.0.0.1:${API_PORT}" \
     --v=3 \
-    --config="${config}" \
-    --nondaemon 1>&2 &
+    --config="${config}" 1>&2 &
   HYPERD_PID=$!
 
   if [ "$sdriver" == "devicemapper" ]; then
