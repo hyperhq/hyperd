@@ -123,13 +123,14 @@ func (daemon *Daemon) GetServiceContainerInfo(podId string) (*hypervisor.Vm, str
 
 func ParseServiceDiscovery(id string, spec *pod.UserPod) error {
 	var containers []pod.UserContainer
+	var serviceType string = "service-discovery"
 	var serviceDir string = path.Join(utils.HYPER_ROOT, "services", id)
 
-	if len(spec.Services) == 0 {
+	if len(spec.Services) == 0 || spec.Type == serviceType {
 		return nil
 	}
 
-	spec.Type = "service-discovery"
+	spec.Type = serviceType
 	serviceContainer := pod.UserContainer{
 		Name:    ServiceDiscoveryContainerName(spec.Name),
 		Image:   servicediscovery.ServiceImage,
