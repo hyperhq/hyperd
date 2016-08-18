@@ -9,6 +9,7 @@ import (
 	"path"
 	"syscall"
 
+	"github.com/golang/glog"
 	"github.com/hyperhq/hyperd/utils"
 )
 
@@ -80,16 +81,20 @@ func cleanupHosts(podID string) error {
 	var hostsDir = path.Join(utils.HYPER_ROOT, "hosts", podID)
 	var hostsPath = path.Join(hostsDir, defaultHostsFilename)
 
+	glog.Infof("cleanupHosts %s, %s", hostsDir, hostsPath)
 	_, err := os.Stat(hostsPath)
 	if err != nil {
 		if os.IsNotExist(err) {
+			glog.Infof("cannot find %s", hostsPath)
 			return nil
 		}
 
+		glog.Infof("cannot stat %s, err %v", hostsPath, err)
 		return err
 	}
 	// try unmount hostsDir
 	if err := syscall.Unmount(hostsDir, syscall.MNT_DETACH); err != nil {
+		glog.Infof("unmount %s failed, %v", hostsDir, err)
 		return err
 	}
 

@@ -44,6 +44,15 @@ func (daemon *Daemon) createPodInternal(podId string, podSpec *apitypes.UserPod,
 		return nil, err
 	}
 
+	defer func() {
+		if err != nil {
+			pod.Lock()
+			glog.Infof("create pod %s failed, cleanup", podId)
+			pod.Cleanup(daemon)
+			pod.Unlock()
+		}
+	}()
+
 	// Creation
 	if err = pod.DoCreate(daemon); err != nil {
 		return nil, err
