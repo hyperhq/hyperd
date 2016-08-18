@@ -11,21 +11,27 @@ import (
 	"github.com/hyperhq/runv/hypervisor/types"
 )
 
+const (
+	E_NOT_FOUND       = -2
+	E_UNDER_OPERATION = -1
+	E_OK              = 0
+)
+
 func (daemon *Daemon) CleanPod(podId string) (int, string, error) {
 	var (
-		code  = 0
+		code  = E_OK
 		cause = ""
 		err   error
 	)
 
 	pod, ok := daemon.PodList.Get(podId)
 	if !ok {
-		return -1, "", fmt.Errorf("Can not find that Pod(%s)", podId)
+		return E_NOT_FOUND, "", fmt.Errorf("Can not find that Pod(%s)", podId)
 	}
 
 	if !pod.TransitionLock("rm") {
 		glog.Errorf("Pod %s is under other operation", podId)
-		return -1, "", fmt.Errorf("Pod %s is under other operation", podId)
+		return E_UNDER_OPERATION, "", fmt.Errorf("Pod %s is under other operation", podId)
 	}
 	defer pod.TransitionUnlock("rm")
 
