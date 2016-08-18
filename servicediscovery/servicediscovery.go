@@ -15,11 +15,12 @@ import (
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/pod"
 	"github.com/hyperhq/runv/hypervisor/types"
+	"github.com/hyperhq/runv/lib/linuxsignal"
 )
 
 var (
 	ServiceVolume string = "/usr/local/etc/haproxy/"
-	ServiceImage  string = "haproxy:1.4"
+	ServiceImage  string = "haproxy:1.5"
 	ServiceConfig string = "haproxy.cfg"
 )
 
@@ -102,9 +103,6 @@ func SetupLoopbackAddress(vm *hypervisor.Vm, container, ip, operation string) er
 
 func ApplyServices(vm *hypervisor.Vm, container string, services []pod.UserService) error {
 	// Update lo ip addresses
-	var command []string
-	execId := fmt.Sprintf("exec-%s", utils.RandStr(10, "alpha"))
-
 	oldServices, err := GetServices(vm, container)
 	if err != nil {
 		return err
@@ -118,34 +116,7 @@ func ApplyServices(vm *hypervisor.Vm, container string, services []pod.UserServi
 	config := path.Join(ServiceVolume, ServiceConfig)
 	vm.WriteFile(container, config, GenerateServiceConfig(services))
 
-	command = append(command, "sh")
-	command = append(command, "-c")
-	command = append(command, "haproxy -f /usr/local/etc/haproxy/haproxy.cfg -p /var/run/haproxy.pid -sf `cat /var/run/haproxy.pid`")
-	execcmd, err := json.Marshal(command)
-	if err != nil {
-		return err
-	}
-
-	tty := &hypervisor.TtyIO{
-		Callback: make(chan *types.VmResponse, 1),
-	}
-
-	vm.Pod.AddExec(container, execId, string(execcmd), false)
-	defer vm.Pod.DeleteExec(execId)
-
-	if err := vm.Exec(container, execId, string(execcmd), false, tty); err != nil {
-		return err
-	}
-
-	es := vm.Pod.GetExec(execId)
-	if es == nil {
-		return fmt.Errorf("cannot find exec status for %s: %s", command, execId)
-	}
-	if es.ExitCode != 0 {
-		return fmt.Errorf("exec %s on container %s failed with exit code %d", command, container, es.ExitCode)
-	}
-
-	return nil
+	return vm.KillContainer(container, linuxsignal.SIGHUP)
 }
 
 func GetServices(vm *hypervisor.Vm, container string) ([]pod.UserService, error) {

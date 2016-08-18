@@ -151,8 +151,8 @@ __EOF__
   hyper::test::pull_image busybox
   hyper::test::check_image busybox
 
-  hyper::test::pull_image "haproxy:1.4"
-  hyper::test::check_image "haproxy" "1.4"
+  hyper::test::pull_image "haproxy:1.5"
+  hyper::test::check_image "haproxy" "1.5"
 
   ########################
   # gRPC API integration #
