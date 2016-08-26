@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/types"
@@ -104,10 +105,10 @@ func filterPodContainers(pod *hypervisor.PodStatus, aux bool) []*hypervisor.Cont
 	results := make([]*hypervisor.ContainerStatus, 0)
 
 	filterServiceDiscovery := !aux && (pod.Type == "service-discovery")
-	proxyName := "/" + ServiceDiscoveryContainerName(pod.Name)
 
 	for _, c := range pod.Containers {
-		if filterServiceDiscovery && c.Name == proxyName {
+		// NOTE(harry) filter out containers ended with "service-discovery" which is for internal usage
+		if filterServiceDiscovery && strings.HasSuffix(c.Name, "service-discovery") {
 			continue
 		}
 		results = append(results, c)
