@@ -166,5 +166,5 @@ func ParseServiceDiscovery(id string, spec *pod.UserPod) error {
 }
 
 func ServiceDiscoveryContainerName(podName string) string {
-	return podName + "-service-discovery"
+	return podName + "-" + utils.RandStr(10, "alpha") + "-service-discovery"
 }
