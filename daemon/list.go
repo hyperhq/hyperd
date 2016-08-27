@@ -166,7 +166,7 @@ func (daemon *Daemon) ListContainers(podId, vmId string, auxiliary bool) ([]*hyp
 	return results, nil
 }
 
-func (daemon *Daemon) List(item, podId, vmId string, auxiliary bool) (map[string][]string, error) {
+func (daemon *Daemon) List(item, podId, vmId string, auxiliary bool, quiet bool) (map[string][]string, error) {
 	var (
 		list                  = make(map[string][]string)
 		vmJsonResponse        = []string{}
@@ -184,7 +184,11 @@ func (daemon *Daemon) List(item, podId, vmId string, auxiliary bool) (map[string
 		}
 
 		for _, vm := range VMs {
-			vmJsonResponse = append(vmJsonResponse, vm.Id+":"+daemon.showVM(vm))
+			if quiet {
+				vmJsonResponse = append(vmJsonResponse, vm.Id)
+			} else {
+				vmJsonResponse = append(vmJsonResponse, vm.Id+":"+daemon.showVM(vm))
+			}
 		}
 
 		list["vmData"] = vmJsonResponse
@@ -197,7 +201,11 @@ func (daemon *Daemon) List(item, podId, vmId string, auxiliary bool) (map[string
 		}
 
 		for _, p := range pods {
-			podJsonResponse = append(podJsonResponse, p.Id+":"+daemon.showPod(p.PodStatus))
+			if quiet {
+				podJsonResponse = append(podJsonResponse, p.Id)
+			} else {
+				podJsonResponse = append(podJsonResponse, p.Id+":"+daemon.showPod(p.PodStatus))
+			}
 		}
 
 		list["podData"] = podJsonResponse
@@ -210,7 +218,11 @@ func (daemon *Daemon) List(item, podId, vmId string, auxiliary bool) (map[string
 		}
 
 		for _, c := range containers {
-			containerJsonResponse = append(containerJsonResponse, daemon.showContainer(c))
+			if quiet {
+				containerJsonResponse = append(containerJsonResponse, daemon.showContainerId(c))
+			} else {
+				containerJsonResponse = append(containerJsonResponse, daemon.showContainer(c))
+			}
 		}
 
 		list["cData"] = containerJsonResponse
@@ -304,4 +316,8 @@ func (daemon *Daemon) GetContainerStatus(state uint32) string {
 
 func (daemon *Daemon) showContainer(c *hypervisor.ContainerStatus) string {
 	return c.Id + ":" + c.Name + ":" + c.PodId + ":" + daemon.GetContainerStatus(c.Status)
+}
+
+func (daemon *Daemon) showContainerId(c *hypervisor.ContainerStatus) string {
+	return c.Id
 }
