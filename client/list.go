@@ -11,8 +11,9 @@ import (
 
 func (cli *HyperClient) HyperCmdList(args ...string) error {
 	var opts struct {
-		Pod string `short:"p" long:"pod" value-name:"\"\"" description:"only list the specified pod"`
-		VM  string `short:"m" long:"vm" value-name:"\"\"" description:"only list resources on the specified vm"`
+		Pod   string `short:"p" long:"pod" value-name:"\"\"" description:"only list the specified pod"`
+		VM    string `short:"m" long:"vm" value-name:"\"\"" description:"only list resources on the specified vm"`
+		Quiet bool   `short:"q" long:"quiet" value-name:"\"\"" description:"Quiet mode"`
 	}
 
 	var parser = gflag.NewParser(&opts, gflag.Default|gflag.IgnoreUnknown)
@@ -66,32 +67,53 @@ func (cli *HyperClient) HyperCmdList(args ...string) error {
 
 	//fmt.Printf("Item is %s\n", item)
 	if item == "vm" {
-		fmt.Fprintln(w, "VM name\tStatus")
+		if !opts.Quiet {
+			fmt.Fprintln(w, "VM name\tStatus")
+		}
+
 		for _, vm := range vmResponse {
 			fields := strings.Split(vm, ":")
-			fmt.Fprintf(w, "%s\t%s\n", fields[0], fields[2])
+			if opts.Quiet {
+				fmt.Fprintf(w, "%s\n", fields[0])
+			} else {
+				fmt.Fprintf(w, "%s\t%s\n", fields[0], fields[2])
+			}
 		}
 	}
 
 	if item == "pod" {
-		fmt.Fprintln(w, "POD ID\tPOD Name\tVM name\tStatus")
+		if !opts.Quiet {
+			fmt.Fprintln(w, "POD ID\tPOD Name\tVM name\tStatus")
+		}
+
 		for _, p := range podResponse {
 			fields := strings.Split(p, ":")
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", fields[0], fields[1], fields[2], fields[3])
+			if opts.Quiet {
+				fmt.Fprintf(w, "%s\n", fields[0])
+			} else {
+				fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", fields[0], fields[1], fields[2], fields[3])
+			}
 		}
 	}
 
 	if item == "container" {
-		fmt.Fprintln(w, "Container ID\tName\tPOD ID\tStatus")
+		if !opts.Quiet {
+			fmt.Fprintln(w, "Container ID\tName\tPOD ID\tStatus")
+		}
+
 		for _, c := range containerResponse {
 			fields := strings.Split(c, ":")
-			name := fields[1]
-			if len(name) > 0 {
-				if name[0] == '/' {
-					name = name[1:]
+			if opts.Quiet {
+				fmt.Fprintf(w, "%s\n", fields[0])
+			} else {
+				name := fields[1]
+				if len(name) > 0 {
+					if name[0] == '/' {
+						name = name[1:]
+					}
 				}
+				fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", fields[0], name, fields[2], fields[3])
 			}
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", fields[0], name, fields[2], fields[3])
 		}
 	}
 	w.Flush()
