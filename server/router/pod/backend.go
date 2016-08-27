@@ -16,7 +16,7 @@ type Backend interface {
 	CmdStartPod(in io.ReadCloser, out io.WriteCloser, podId, vmId string, attach bool) (*engine.Env, error)
 	CmdPausePod(podId string) error
 	CmdUnpausePod(podId string) error
-	CmdList(item, podId, vmId string, auxiliary bool) (*engine.Env, error)
+	CmdList(item, podId, vmId string, auxiliary bool, quiet bool) (*engine.Env, error)
 	CmdStopPod(podId, stopVm string) (*engine.Env, error)
 	CmdKillPod(podName, container string, signal int64) (*engine.Env, error)
 	CmdCleanPod(podId string) (*engine.Env, error)
