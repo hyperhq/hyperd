@@ -76,10 +76,8 @@ func (cli *HyperClient) HyperCmdList(args ...string) error {
 			if opts.Quiet {
 				fmt.Fprintf(w, "%s\n", vm)
 			} else {
-				for _, vm := range vmResponse {
-					fields := strings.Split(vm, ":")
-					fmt.Fprintf(w, "%s\t%s\n", fields[0], fields[2])
-				}
+				fields := strings.Split(vm, ":")
+				fmt.Fprintf(w, "%s\t%s\n", fields[0], fields[2])
 			}
 		}
 	}
@@ -93,10 +91,8 @@ func (cli *HyperClient) HyperCmdList(args ...string) error {
 			if opts.Quiet {
 				fmt.Fprintf(w, "%s\n", p)
 			} else {
-				for _, p := range podResponse {
-					fields := strings.Split(p, ":")
-					fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", fields[0], fields[1], fields[2], fields[3])
-				}
+				fields := strings.Split(p, ":")
+				fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", fields[0], fields[1], fields[2], fields[3])
 			}
 		}
 	}
