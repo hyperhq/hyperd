@@ -1,6 +1,6 @@
 Summary:            Hyper Container is a VM based docker runtime
 Name:               hyper-container
-Version:            0.6
+Version:            0.6.2
 Release:            1%{?dist}
 License:            Apache License, Version 2.0
 Group:              System Environment/Base
@@ -53,6 +53,8 @@ rm -rf %{buildroot}
 /lib/systemd/system/hyperd.service
 
 %changelog
+* Mon Aug 29 2016 Hyper Dev Team <dev@hyper.sh> - 0.6.2-1
+- update source to 0.6.2
 * Thu Apr 28 2016 Hyper Dev Team <dev@hyper.sh> - 0.6-1
 - update source to 0.6
 - rename package
