@@ -20,5 +20,5 @@ curl -sSL http://wiki.qemu-project.org/download/qemu-2.4.1.tar.bz2 > ${CENTOS_DI
 
 sed -e "s#%PROJECT_ROOT%#${PROJECT}#g" ${CENTOS_DIR}/centos-rpm.pod.in > ${CENTOS_DIR}/centos-rpm.pod
 
-${PROJECT}/hyperctl run -a --rm -p ${CENTOS_DIR}/centos-rpm.pod
+hyperctl run -a --rm -p ${CENTOS_DIR}/centos-rpm.pod
 

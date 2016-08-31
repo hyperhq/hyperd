@@ -20,5 +20,5 @@ git archive --format=tar.gz master > ${FEDORA_DIR}/rpm/SOURCES/hyperstart-${VERS
 
 sed -e "s#%PROJECT_ROOT%#${PROJECT}#g" ${FEDORA_DIR}/fedora-rpm.pod.in > ${FEDORA_DIR}/fedora-rpm.pod
 
-${PROJECT}/hyperctl run -a --rm -p ${FEDORA_DIR}/fedora-rpm.pod
+hyperctl run -a --rm -p ${FEDORA_DIR}/fedora-rpm.pod
 
