@@ -39,6 +39,11 @@ func (daemon *Daemon) CmdImages(args, filter string, all bool) (*engine.Env, err
 		for _, r := range i.RepoTags {
 			imagesList = append(imagesList, r+":"+id[1]+":"+created+":"+size)
 		}
+		if len(i.RepoTags) == 0 {
+			slice := strings.Split(i.RepoDigests[0], "@")
+			repoTag := slice[0] + ":" + "<none>"
+			imagesList = append(imagesList, repoTag+":"+id[1]+":"+created+":"+size)
+		}
 	}
 
 	v := &engine.Env{}
