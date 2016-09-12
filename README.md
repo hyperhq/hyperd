@@ -51,11 +51,10 @@ For information on using the command line, just type `hyperctl`. You may use
 
 ## Build From Source
 
-Clone hyperd and runv in GoPath
+Clone hyperd in GoPath
 
     > mkdir -p ${GOPATH}/src/github.com/hyperhq
     > cd ${GOPATH}/src/github.com/hyperhq
-    > git clone https://github.com/hyperhq/runv.git runv
     > git clone https://github.com/hyperhq/hyperd.git hyperd
 
 And make sure you have `go` (>= 1.4) , `device-mapper-devel`, and `autotools`, go into the `hyper` dir

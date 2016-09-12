@@ -1,0 +1,10 @@
+HyperHQ
+Copyright 2015 HyperHQ, Inc.
+
+This product includes software developed at HyperHQ, Inc. (https://www.hyper.sh).
+
+This product contains software (https://github.com/golang/glog) developed by Google, Inc.
+It is licensed under the Apache License Version 2.0.
+
+This product contains software (https://github.com/riobard/go-virtualbox) developed
+by Riobard Zhan, much appreciated for his work.
