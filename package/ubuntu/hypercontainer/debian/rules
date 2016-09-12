@@ -27,7 +27,7 @@ override_dh_auto_install:
 	cp -aT hyperctl debian/hypercontainer/usr/bin/hyperctl
 
 override_dh_auto_clean:
-	rm -rf go hyperd/hyperd hyperd/hyperctl
+	rm -rf go hyperd hyperctl
 
 %:
 	dh $@
