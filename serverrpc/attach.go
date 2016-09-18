@@ -22,23 +22,42 @@ func (s *ServerRPC) Attach(stream types.PublicAPI_AttachServer) error {
 	go func() {
 		for {
 			cmd, err := stream.Recv()
-			if err != nil {
+			if err == io.EOF {
 				return
 			}
-			if _, err := iw.Write(cmd.Data); err != nil {
+			if err != nil {
+				glog.Errorf("Receive from stream error: %v", err)
+				return
+			}
+
+			n, err := iw.Write(cmd.Data)
+			if err != nil {
+				glog.Errorf("Write pipe error: %v", err)
+				return
+			}
+			if n != len(cmd.Data) {
+				glog.Errorf("Write data length is not enough, write: %d, success: %d", len(cmd.Data), n)
 				return
 			}
 		}
 	}()
 
 	go func() {
+		defer or.Close()
 		for {
 			res := make([]byte, 512)
 			n, err := or.Read(res)
-			if err != nil {
+			if n > 0 {
+				if err := stream.Send(&types.AttachMessage{Data: res[:n]}); err != nil {
+					glog.Errorf("Send to stream error: %v", err)
+					return
+				}
+			}
+			if err == io.EOF {
 				return
 			}
-			if err := stream.Send(&types.AttachMessage{Data: res[:n]}); err != nil {
+			if err != nil {
+				glog.Errorf("Read from pipe error: %v", err)
 				return
 			}
 		}
