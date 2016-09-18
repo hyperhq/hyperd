@@ -1,0 +1,17 @@
+Source: hyperstart
+Section: admin
+Priority: optional
+Maintainer: Hyper Dev Team <dev@hyper.sh>
+Build-Depends: debhelper (>=9)
+Standards-Version: 3.9.6
+Homepage: http://hypercontainer.io
+Vcs-Git: git://github.com/hyperhq/hyperstart.git
+Vcs-Browser: https://github.com/hyperhq/hyperstart
+
+Package: hyperstart
+Architecture: amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: The init Task for HyperContainer
+ Hyperstart is the initrd for hyper VM, hyperstart 
+ includes the kernel and initrd, qboot bios and cbfs rom
+ image.
