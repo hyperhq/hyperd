@@ -20,10 +20,11 @@ type WindowSize struct {
 }
 
 type TtyIO struct {
-	Stdin    io.ReadCloser
-	Stdout   io.WriteCloser
-	Stderr   io.WriteCloser
-	Callback chan *types.VmResponse
+	Stdin     io.ReadCloser
+	Stdout    io.Writer
+	Stderr    io.Writer
+	OutCloser io.Closer
+	Callback  chan *types.VmResponse
 }
 
 func (tty *TtyIO) WaitForFinish() error {
@@ -37,11 +38,19 @@ func (tty *TtyIO) WaitForFinish() error {
 	if tty.Stdin != nil {
 		tty.Stdin.Close()
 	}
-	if tty.Stdout != nil {
-		tty.Stdout.Close()
-	}
-	if tty.Stderr != nil {
-		tty.Stderr.Close()
+	if tty.OutCloser != nil {
+		tty.OutCloser.Close()
+	} else {
+		cf := func(w io.Writer) {
+			if w == nil {
+				return
+			}
+			if c, ok := w.(io.WriteCloser); ok {
+				c.Close()
+			}
+		}
+		cf(tty.Stdout)
+		cf(tty.Stderr)
 	}
 
 	return nil
@@ -244,11 +253,19 @@ func (tty *TtyIO) Close() {
 		if tty.Stdin != nil {
 			tty.Stdin.Close()
 		}
-		if tty.Stdout != nil {
-			tty.Stdout.Close()
-		}
-		if tty.Stderr != nil {
-			tty.Stderr.Close()
+		if tty.OutCloser != nil {
+			tty.OutCloser.Close()
+		} else {
+			cf := func(w io.Writer) {
+				if w == nil {
+					return
+				}
+				if c, ok := w.(io.WriteCloser); ok {
+					c.Close()
+				}
+			}
+			cf(tty.Stdout)
+			cf(tty.Stderr)
 		}
 	}
 }

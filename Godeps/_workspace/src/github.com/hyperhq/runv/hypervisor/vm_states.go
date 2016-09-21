@@ -254,13 +254,6 @@ func (ctx *VmContext) startPod() {
 	}
 }
 
-func (ctx *VmContext) stopPod() {
-	ctx.setTimeout(30)
-	ctx.vm <- &hyperstartCmd{
-		Code: hyperstartapi.INIT_STOPPOD,
-	}
-}
-
 func (ctx *VmContext) exitVM(err bool, msg string, hasPod bool, wait bool) {
 	ctx.wait = wait
 	if hasPod {
@@ -314,9 +307,12 @@ func commonStateHandler(ctx *VmContext, ev VmEvent, hasPod bool) bool {
 			ctx.Become(stateDestroying, StateDestroying)
 		}
 	case ERROR_INTERRUPTED:
-		glog.Info("Connection interrupted, quit...")
-		ctx.exitVM(true, "connection to VM broken", false, false)
-		ctx.onVmExit(hasPod)
+		interruptEv := ev.(*Interrupted)
+		glog.Info("Connection interrupted: %s, quit...", interruptEv.Reason)
+		ctx.exitVM(true, fmt.Sprintf("connection to VM broken: %s", interruptEv.Reason), false, false)
+		if hasPod {
+			ctx.reclaimDevice()
+		}
 	case COMMAND_SHUTDOWN:
 		glog.Info("got shutdown command, shutting down")
 		ctx.exitVM(false, "", hasPod, ev.(*ShutdownCommand).Wait)
@@ -509,6 +505,18 @@ func stateStarting(ctx *VmContext, ev VmEvent) {
 				ctx.Become(stateRunning, StateRunning)
 				glog.Info("pod start success ", string(ack.msg))
 			}
+		case EVENT_POD_FINISH:
+			/*
+				Though in hyperstart, ack to start pod is sent before pod finished, but the ack
+				is sent to hub in goroutine, this will cause pod finished is received before ack
+				and cause unexcepted pod finished event in stateStarting. since pod finished event
+				will be removed in future, simply handle pod finished in stateStarting here to avoid
+				this bug.
+			*/
+			go func() {
+				time.Sleep(time.Millisecond)
+				ctx.Hub <- ev
+			}()
 		case ERROR_CMD_FAIL:
 			ack := ev.(*CommandError)
 			if ack.reply.Code == hyperstartapi.INIT_STARTPOD {
@@ -535,9 +543,6 @@ func stateRunning(ctx *VmContext, ev VmEvent) {
 		ctx.Become(stateTerminating, StateTerminating)
 	} else {
 		switch ev.Event() {
-		case COMMAND_STOP_POD:
-			ctx.stopPod()
-			ctx.Become(statePodStopping, StatePodStopping)
 		case COMMAND_RELEASE:
 			glog.Info("pod is running, got release command, let VM fly")
 			ctx.Become(nil, StateNone)
@@ -573,6 +578,7 @@ func stateRunning(ctx *VmContext, ev VmEvent) {
 	}
 }
 
+// TODO: remove this state
 func statePodStopping(ctx *VmContext, ev VmEvent) {
 	if processed := commonStateHandler(ctx, ev, true); processed {
 	} else {
@@ -590,14 +596,14 @@ func statePodStopping(ctx *VmContext, ev VmEvent) {
 		case COMMAND_ACK:
 			ack := ev.(*CommandAck)
 			glog.V(1).Infof("[Stopping] got init ack to %d", ack.reply.Code)
-			if ack.reply.Code == hyperstartapi.INIT_STOPPOD {
+			if ack.reply.Code == hyperstartapi.INIT_STOPPOD_DEPRECATED {
 				glog.Info("POD stopped ", string(ack.msg))
 				ctx.detachDevice()
 				ctx.Become(stateCleaning, StateCleaning)
 			}
 		case ERROR_CMD_FAIL:
 			ack := ev.(*CommandError)
-			if ack.reply.Code == hyperstartapi.INIT_STOPPOD {
+			if ack.reply.Code == hyperstartapi.INIT_STOPPOD_DEPRECATED {
 				ctx.unsetTimeout()
 				ctx.shutdownVM(true, "Stop pod failed as init report")
 				ctx.Become(stateTerminating, StateTerminating)
@@ -648,7 +654,8 @@ func stateTerminating(ctx *VmContext, ev VmEvent) {
 		glog.Warning("VM did not exit in time, try to stop it")
 		ctx.poweroffVM(true, "vm terminating timeout")
 	case ERROR_INTERRUPTED:
-		glog.V(1).Info("Connection interrupted while terminating")
+		interruptEv := ev.(*Interrupted)
+		glog.V(1).Info("Connection interrupted while terminating: %s", interruptEv.Reason)
 	case GENERIC_OPERATION:
 		ctx.handleGenericOperation(ev.(*GenericOperation))
 	default:
@@ -723,7 +730,8 @@ func stateDestroying(ctx *VmContext, ev VmEvent) {
 				glog.Info("VM Context closed.")
 			}
 		case ERROR_INTERRUPTED:
-			glog.V(1).Info("Connection interrupted while destroying")
+			interruptEv := ev.(*Interrupted)
+			glog.V(1).Info("Connection interrupted while destroying: %s", interruptEv.Reason)
 		case COMMAND_RELEASE:
 			glog.Info("vm destroying, got release")
 			ctx.reportVmShutdown()

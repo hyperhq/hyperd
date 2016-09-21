@@ -21,6 +21,12 @@ type BootConfig struct {
 	Bios             string
 	Cbfs             string
 	Vbox             string
+
+	// For network QoS (kilobytes/s)
+	InboundAverage  string
+	InboundPeak     string
+	OutboundAverage string
+	OutboundPeak    string
 }
 
 type HostNicInfo struct {

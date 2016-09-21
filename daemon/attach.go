@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/golang/glog"
+
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/types"
 )
@@ -21,7 +23,7 @@ func (daemon *Daemon) Attach(stdin io.ReadCloser, stdout io.WriteCloser, contain
 		Callback: make(chan *types.VmResponse, 1),
 	}
 
-	pod, _, err := daemon.GetPodByContainerIdOrName(container)
+	pod, idx, err := daemon.GetPodByContainerIdOrName(container)
 	if err != nil {
 		return err
 	}
@@ -35,6 +37,12 @@ func (daemon *Daemon) Attach(stdin io.ReadCloser, stdout io.WriteCloser, contain
 	if !ok {
 		err = fmt.Errorf("Can find VM whose Id is %s!", vmId)
 		return err
+	}
+
+	if !pod.Spec.Containers[idx].Tty {
+		tty.Stderr = stdcopy.NewStdWriter(stdout, stdcopy.Stderr)
+		tty.Stdout = stdcopy.NewStdWriter(stdout, stdcopy.Stdout)
+		tty.OutCloser = stdout
 	}
 
 	err = vm.Attach(tty, container, nil)

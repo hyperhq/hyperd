@@ -39,11 +39,11 @@ type imageInfo struct {
 type volume struct {
 	info         *BlockDescriptor
 	pos          volumePosition
-	readOnly     map[int]bool
+	readOnly     map[int][]bool
 	dockerVolume bool
 }
 
-type volumePosition map[int]string //containerIdx -> mpoint
+type volumePosition map[int][]string //containerIdx -> mpoint
 
 type processingList struct {
 	adding   *processingMap
@@ -105,8 +105,8 @@ func (ctx *VmContext) initContainerInfo(index int, target *hyperstartapi.Contain
 	vols := []hyperstartapi.VolumeDescriptor{}
 	fsmap := []hyperstartapi.FsmapDescriptor{}
 	for _, v := range spec.Volumes {
-		ctx.devices.volumeMap[v.Volume].pos[index] = v.Path
-		ctx.devices.volumeMap[v.Volume].readOnly[index] = v.ReadOnly
+		ctx.devices.volumeMap[v.Volume].pos[index] = append(ctx.devices.volumeMap[v.Volume].pos[index], v.Path)
+		ctx.devices.volumeMap[v.Volume].readOnly[index] = append(ctx.devices.volumeMap[v.Volume].readOnly[index], v.ReadOnly)
 	}
 
 	envs := make([]hyperstartapi.EnvironmentVar, len(spec.Envs))
@@ -202,8 +202,8 @@ func (ctx *VmContext) initVolumeMap(spec *pod.UserPod) {
 	//classify volumes, and generate device info and progress info
 	for _, vol := range spec.Volumes {
 		v := &volume{
-			pos:      make(map[int]string),
-			readOnly: make(map[int]bool),
+			pos:      make(map[int][]string),
+			readOnly: make(map[int][]bool),
 		}
 
 		if vol.Source == "" || vol.Driver == "" {
@@ -277,13 +277,15 @@ func (ctx *VmContext) setVolumeInfo(info *VolumeInfo) {
 	} else {
 		vol.info.Fstype = ""
 		for i, mount := range vol.pos {
-			glog.V(1).Infof("insert volume %s to %s on %d", info.Name, mount, i)
-			ctx.vmSpec.Containers[i].Fsmap = append(ctx.vmSpec.Containers[i].Fsmap, hyperstartapi.FsmapDescriptor{
-				Source:       info.Filepath,
-				Path:         mount,
-				ReadOnly:     vol.readOnly[i],
-				DockerVolume: info.DockerVolume,
-			})
+			for j, m := range mount {
+				glog.V(1).Infof("insert volume %s to %s on %d", info.Name, m, i)
+				ctx.vmSpec.Containers[i].Fsmap = append(ctx.vmSpec.Containers[i].Fsmap, hyperstartapi.FsmapDescriptor{
+					Source:       info.Filepath,
+					Path:         m,
+					ReadOnly:     vol.readOnly[i][j],
+					DockerVolume: info.DockerVolume,
+				})
+			}
 		}
 	}
 }
@@ -351,15 +353,17 @@ func (ctx *VmContext) blockdevInserted(info *BlockdevInsertedEvent) {
 		volume.info.DeviceName = info.DeviceName
 		volume.info.ScsiId = info.ScsiId
 		for c, vol := range volume.pos {
-			ctx.vmSpec.Containers[c].Volumes = append(ctx.vmSpec.Containers[c].Volumes,
-				hyperstartapi.VolumeDescriptor{
-					Device:       info.DeviceName,
-					Addr:         info.ScsiAddr,
-					Mount:        vol,
-					Fstype:       volume.info.Fstype,
-					ReadOnly:     volume.readOnly[c],
-					DockerVolume: volume.dockerVolume,
-				})
+			for i, mount := range vol {
+				ctx.vmSpec.Containers[c].Volumes = append(ctx.vmSpec.Containers[c].Volumes,
+					hyperstartapi.VolumeDescriptor{
+						Device:       info.DeviceName,
+						Addr:         info.ScsiAddr,
+						Mount:        mount,
+						Fstype:       volume.info.Fstype,
+						ReadOnly:     volume.readOnly[c][i],
+						DockerVolume: volume.dockerVolume,
+					})
+			}
 		}
 	}
 
