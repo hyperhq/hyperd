@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/golang/glog"
+
 	"github.com/hyperhq/hyperd/utils"
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/hypervisor/types"
@@ -87,6 +89,12 @@ func (daemon *Daemon) StartExec(stdin io.ReadCloser, stdout io.WriteCloser, cont
 	if !ok {
 		err = fmt.Errorf("Can not find VM whose Id is %s!", vmId)
 		return err
+	}
+
+	if !es.Terminal {
+		tty.Stderr = stdcopy.NewStdWriter(stdout, stdcopy.Stderr)
+		tty.Stdout = stdcopy.NewStdWriter(stdout, stdcopy.Stdout)
+		tty.OutCloser = stdout
 	}
 
 	if err := vm.Exec(es.Container, es.Id, es.Cmds, es.Terminal, tty); err != nil {
