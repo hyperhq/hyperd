@@ -219,8 +219,8 @@ func RandStr(strSize int, randType string) string {
 }
 
 //validate
-// 1. volume name, file name is unique
-// 2. source mount to only one pos in one container
+// 1. volume name + mount point is unique
+// 2. file name is unique
 // 3. container should not use volume/file not in volume/file list
 // 4. environment var should be uniq in one container
 func (pod *UserPod) Validate() error {
@@ -346,7 +346,7 @@ func keySet(ilist interface{}) (bool, map[string]bool) {
 }
 
 func (vol UserVolume) key() string          { return vol.Name }
-func (vol UserVolumeReference) key() string { return vol.Volume }
+func (vol UserVolumeReference) key() string { return "vol:" + vol.Volume + "/mnt:" + vol.Path }
 func (f UserFile) key() string              { return f.Name }
 func (env UserEnvironmentVar) key() string  { return env.Env }
 

@@ -3,11 +3,12 @@ package hypervisor
 import (
 	"encoding/json"
 	"errors"
+	"sync"
+
 	"github.com/golang/glog"
 	hyperstartapi "github.com/hyperhq/runv/hyperstart/api/json"
 	"github.com/hyperhq/runv/hypervisor/pod"
 	"github.com/hyperhq/runv/hypervisor/types"
-	"sync"
 )
 
 type PersistVolumeInfo struct {
@@ -64,14 +65,11 @@ func (ctx *VmContext) dump() (*PersistInfo, error) {
 
 	for _, vol := range ctx.devices.volumeMap {
 		info.VolumeList[vid] = vol.info.dump()
-		mps := len(vol.pos)
-		info.VolumeList[vid].Containers = make([]int, mps)
-		info.VolumeList[vid].MontPoints = make([]string, mps)
-		i := 0
-		for idx, mp := range vol.pos {
-			info.VolumeList[vid].Containers[i] = idx
-			info.VolumeList[vid].MontPoints[i] = mp
-			i++
+		for idx, mount := range vol.pos {
+			for _, mp := range mount {
+				info.VolumeList[vid].Containers = append(info.VolumeList[vid].Containers, idx)
+				info.VolumeList[vid].MontPoints = append(info.VolumeList[vid].MontPoints, mp)
+			}
 		}
 		vid++
 	}
@@ -170,13 +168,13 @@ func (pinfo *PersistInfo) vmContext(hub chan VmEvent, client chan *types.VmRespo
 		} else {
 			v := &volume{
 				info:     binfo,
-				pos:      make(map[int]string),
-				readOnly: make(map[int]bool),
+				pos:      make(map[int][]string),
+				readOnly: make(map[int][]bool),
 			}
 			for i := 0; i < len(vol.Containers); i++ {
 				idx := vol.Containers[i]
-				v.pos[idx] = vol.MontPoints[i]
-				v.readOnly[idx] = ctx.vmSpec.Containers[idx].RoLookup(vol.MontPoints[i])
+				v.pos[idx] = append(v.pos[idx], vol.MontPoints[i])
+				v.readOnly[idx] = append(v.readOnly[idx], ctx.vmSpec.Containers[idx].RoLookup(vol.MontPoints[i]))
 			}
 			ctx.devices.volumeMap[vol.Name] = v
 		}

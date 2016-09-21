@@ -366,8 +366,13 @@ func (vm *Vm) ReadFile(container, target string) ([]byte, error) {
 
 func (vm *Vm) KillContainer(container string, signal syscall.Signal) error {
 	return vm.GenericOperation("KillContainer", func(ctx *VmContext, result chan<- error) {
+		if ctx.current != StateRunning {
+			glog.V(1).Infof("container %s is already stopped, in %s", container, ctx.current)
+			result <- fmt.Errorf("container %s is already stopped", container)
+			return
+		}
 		ctx.killCmd(container, signal, result)
-	}, StateRunning)
+	}, StateRunning, StateTerminating, StateDestroying)
 }
 
 func (vm *Vm) AddRoute() error {

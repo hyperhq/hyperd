@@ -56,7 +56,6 @@ type NewContainerCommand struct {
 
 type OnlineCpuMemCommand struct{}
 
-type StopPodCommand struct{}
 type ShutdownCommand struct {
 	Wait bool
 }
@@ -211,7 +210,6 @@ func (qe *NetDevInsertedEvent) Event() int   { return EVENT_INTERFACE_INSERTED }
 func (qe *NetDevRemovedEvent) Event() int    { return EVENT_INTERFACE_EJECTED }
 func (qe *RunPodCommand) Event() int         { return COMMAND_RUN_POD }
 func (qe *GetPodStatsCommand) Event() int    { return COMMAND_GET_POD_STATS }
-func (qe *StopPodCommand) Event() int        { return COMMAND_STOP_POD }
 func (qe *ReplacePodCommand) Event() int     { return COMMAND_REPLACE_POD }
 func (qe *NewContainerCommand) Event() int   { return COMMAND_NEWCONTAINER }
 func (qe *OnlineCpuMemCommand) Event() int   { return COMMAND_ONLINECPUMEM }

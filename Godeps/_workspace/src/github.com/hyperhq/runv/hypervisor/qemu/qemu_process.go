@@ -125,12 +125,14 @@ func launchQemu(qc *QemuContext, ctx *hypervisor.VmContext) {
 	}
 
 	args := qc.arguments(ctx)
+	args = append(args, "-daemonize", "-pidfile", qc.qemuPidFile, "-D", qc.qemuLogFile.Name)
 
 	if glog.V(1) {
 		glog.Info("cmdline arguments: ", strings.Join(args, " "))
+		glog.Infof("qemu log file: %s", qc.qemuLogFile.Name)
 	}
 
-	cmd := exec.Command(qemu, append(args, "-daemonize", "-pidfile", qc.qemuPidFile, "-D", qc.qemuLogFile.Name)...)
+	cmd := exec.Command(qemu, args...)
 
 	stdout := bytes.NewBuffer([]byte{})
 	stderr := bytes.NewBuffer([]byte{})
