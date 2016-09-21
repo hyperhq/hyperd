@@ -1,12 +1,15 @@
 package integration
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io"
 	"time"
 
 	"github.com/hyperhq/hyperd/lib/promise"
 	"github.com/hyperhq/hyperd/types"
+
+	"github.com/docker/docker/pkg/stdcopy"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
@@ -140,12 +143,111 @@ func (c *HyperClient) GetContainerLogs(container string) ([]byte, error) {
 	return ret, nil
 }
 
+type StreamExtractor interface {
+	Extract(orig []byte) ([]byte, []byte, error)
+}
+
+type RawExtractor struct{}
+
+const (
+	// Stdin represents standard input stream type.
+	Stdin stdcopy.StdType = iota
+	// Stdout represents standard output stream type.
+	Stdout
+	// Stderr represents standard error steam type.
+	Stderr
+
+	stdWriterPrefixLen = 8
+	stdWriterFdIndex   = 0
+	stdWriterSizeIndex = 4
+)
+
+type StdcopyExtractor struct {
+	readingHead bool
+	current     stdcopy.StdType
+	remain      int
+
+	headbuf []byte
+	headlen int
+}
+
+func NewExtractor(tty bool) StreamExtractor {
+	if tty {
+		return &RawExtractor{}
+	}
+	return &StdcopyExtractor{
+		readingHead: true,
+		headbuf:     make([]byte, stdWriterPrefixLen),
+	}
+}
+
+func (r *RawExtractor) Extract(orig []byte) ([]byte, []byte, error) {
+	return orig, nil, nil
+}
+
+func (s *StdcopyExtractor) Extract(orig []byte) ([]byte, []byte, error) {
+	var (
+		stdout = []byte{}
+		stderr = []byte{}
+	)
+	for len(orig) > 0 {
+		if s.readingHead {
+			hrl := stdWriterPrefixLen - s.headlen //hrl -- head remain length
+			if len(orig) < hrl {
+				copy(s.headbuf[s.headlen:], orig)
+				s.headlen += len(orig)
+				return stdout, stderr, nil
+			}
+
+			copy(s.headbuf[s.headlen:], orig[:hrl])
+			orig = orig[hrl:]
+			s.headlen = 0
+
+			stype := stdcopy.StdType(s.headbuf[stdWriterFdIndex])
+			if stype != Stdout && stype != Stderr {
+				return stdout, stderr, fmt.Errorf("invalid stream type %x", stype)
+			}
+
+			s.current = stype
+			s.remain = int(binary.BigEndian.Uint32(s.headbuf[stdWriterSizeIndex : stdWriterSizeIndex+4]))
+			s.readingHead = false
+		}
+
+		var (
+			msg []byte
+			ml  int
+		)
+		if len(orig) < s.remain {
+			s.remain -= len(orig)
+			ml = len(orig)
+		} else {
+			ml = s.remain
+			s.readingHead = true
+			s.remain = 0
+		}
+
+		msg = orig[:ml]
+		orig = orig[ml:]
+
+		switch s.current {
+		case Stdout:
+			stdout = append(stdout, msg...)
+		case Stderr:
+			stderr = append(stderr, msg...)
+		}
+	}
+	return stdout, stderr, nil
+
+}
+
 // PostAttach attach to a container or pod by id
-func (c *HyperClient) PostAttach(id string) error {
+func (c *HyperClient) PostAttach(id string, tty bool) error {
 	stream, err := c.client.Attach(c.ctx)
 	if err != nil {
 		return err
 	}
+
+	extractor := NewExtractor(tty)
 
 	req := types.AttachMessage{
 		ContainerID: id,
@@ -165,7 +267,13 @@ func (c *HyperClient) PostAttach(id string) error {
 	if err != nil {
 		return err
 	}
-	if string(res.Data) != "Hello Hyper\n" {
+
+	out, _, err := extractor.Extract(res.Data)
+	if err != nil {
+		return err
+	}
+
+	if string(out) != "Hello Hyper\n" {
 		return fmt.Errorf("post attach response error\n")
 	}
 
@@ -294,7 +402,7 @@ func (c *HyperClient) ContainerExecCreate(container string, command []string, tt
 }
 
 // ContainerExecStart starts exec in a container with input stream in and output stream out
-func (c *HyperClient) ContainerExecStart(containerId, execId string, stdin io.ReadCloser, stdout, stderr io.Writer) error {
+func (c *HyperClient) ContainerExecStart(containerId, execId string, stdin io.ReadCloser, stdout, stderr io.Writer, tty bool) error {
 	request := types.ExecStartRequest{
 		ContainerID: containerId,
 		ExecID:      execId,
@@ -306,6 +414,7 @@ func (c *HyperClient) ContainerExecStart(containerId, execId string, stdin io.Re
 	if err := stream.Send(&request); err != nil {
 		return err
 	}
+	extractor := NewExtractor(tty)
 	var recvStdoutError chan error
 	if stdout != nil || stderr != nil {
 		recvStdoutError = promise.Go(func() (err error) {
@@ -315,12 +424,28 @@ func (c *HyperClient) ContainerExecStart(containerId, execId string, stdin io.Re
 					return err
 				}
 				if in != nil && in.Stdout != nil {
-					nw, ew := stdout.Write(in.Stdout)
-					if ew != nil {
-						return ew
+					so, se, ee := extractor.Extract(in.Stdout)
+					if ee != nil {
+						return ee
 					}
-					if nw != len(in.Stdout) {
-						return io.ErrShortWrite
+					if len(so) > 0 {
+						nw, ew := stdout.Write(so)
+						if ew != nil {
+							return ew
+						}
+						if nw != len(so) {
+							return io.ErrShortWrite
+						}
+					}
+					if len(se) > 0 {
+						nw, ew := stdout.Write(se)
+						if ew != nil {
+							return ew
+						}
+						if nw != len(se) {
+							return io.ErrShortWrite
+						}
+
 					}
 				}
 				if err == io.EOF {

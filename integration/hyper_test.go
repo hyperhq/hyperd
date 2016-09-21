@@ -104,7 +104,7 @@ func (s *TestSuite) TestPostAttach(c *C) {
 	podInfo, err := s.client.GetPodInfo(pod)
 	c.Assert(err, IsNil)
 
-	err = s.client.PostAttach(podInfo.Status.ContainerStatus[0].ContainerID)
+	err = s.client.PostAttach(podInfo.Status.ContainerStatus[0].ContainerID, false)
 	c.Assert(err, IsNil)
 }
 
