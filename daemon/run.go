@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/golang/glog"
 	apitypes "github.com/hyperhq/hyperd/types"
 	"github.com/hyperhq/runv/hypervisor"
@@ -64,15 +65,6 @@ func (daemon *Daemon) createPodInternal(podId string, podSpec *apitypes.UserPod,
 func (daemon *Daemon) StartPod(stdin io.ReadCloser, stdout io.WriteCloser, podId, vmId string, attach bool) (int, string, error) {
 	var ttys []*hypervisor.TtyIO = []*hypervisor.TtyIO{}
 
-	if attach {
-		glog.V(1).Info("Run pod with tty attached")
-		ttys = append(ttys, &hypervisor.TtyIO{
-			Stdin:    stdin,
-			Stdout:   stdout,
-			Callback: make(chan *types.VmResponse, 1),
-		})
-	}
-
 	glog.Infof("pod:%s, vm:%s", podId, vmId)
 
 	p, ok := daemon.PodList.Get(podId)
@@ -80,6 +72,21 @@ func (daemon *Daemon) StartPod(stdin io.ReadCloser, stdout io.WriteCloser, podId
 		return -1, "", fmt.Errorf("The pod(%s) can not be found, please create it first", podId)
 	}
 	var lazy bool = hypervisor.HDriver.SupportLazyMode() && vmId == ""
+
+	if attach {
+		glog.V(1).Info("Run pod with tty attached")
+		tty := &hypervisor.TtyIO{
+			Stdin:    stdin,
+			Stdout:   stdout,
+			Callback: make(chan *types.VmResponse, 1),
+		}
+		if !p.Spec.Containers[0].Tty {
+			tty.Stderr = stdcopy.NewStdWriter(stdout, stdcopy.Stderr)
+			tty.Stdout = stdcopy.NewStdWriter(stdout, stdcopy.Stdout)
+			tty.OutCloser = stdout
+		}
+		ttys = append(ttys, tty)
+	}
 
 	code, cause, err := daemon.StartInternal(p, vmId, nil, lazy, ttys)
 	if err != nil {
