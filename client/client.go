@@ -50,7 +50,7 @@ func NewHyperClient(proto, addr string, tlsConfig *tls.Config) *HyperClient {
 		client:        api.NewClient(proto, addr, tlsConfig),
 		in:            os.Stdin,
 		out:           os.Stdout,
-		err:           os.Stdout,
+		err:           os.Stderr,
 		inFd:          inFd,
 		outFd:         outFd,
 		isTerminalIn:  isTerminalIn,
