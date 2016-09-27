@@ -9,7 +9,7 @@ if [ $# -gt 0 ] ; then
 fi
 
 # install addtional pkgs in order to build deb pkg
-sudo apt-get install -y autoconf automake pkg-config libdevmapper-dev libsqlite3-dev libvirt-dev golang -qq
+sudo apt-get install -y autoconf automake pkg-config libdevmapper-dev libsqlite3-dev libvirt-dev libxen-dev uuid-dev golang xen-hypervisor-4.6-amd64 -qq
 
 # get hyperd tar ball
 cd $PROJECT
