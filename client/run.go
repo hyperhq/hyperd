@@ -335,11 +335,16 @@ func parseVolume(volStr string) (*pod.UserVolume, *pod.UserVolumeReference, erro
 		return nil, nil, fmt.Errorf("flag format should be like : --volume=[host-src:]container-dest[:rw|ro]")
 	}
 
+	if !strings.HasPrefix(destPath, "/") {
+		return nil, nil, fmt.Errorf("The container-dir must always be an absolute path")
+	}
+
 	if srcName == "" {
 		// Set default volume driver and use destPath as volume Name
 		volDriver = ""
 		_, volName = filepath.Split(destPath)
 	} else {
+		srcName, _ = filepath.Abs(srcName)
 		_, volName = filepath.Split(srcName)
 		// Auto create the source folder on the host , otherwise hyperd will complain
 		if _, err := os.Stat(srcName); err != nil && os.IsNotExist(err) {
