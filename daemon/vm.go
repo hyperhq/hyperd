@@ -142,6 +142,12 @@ func (p *Pod) AssociateVm(daemon *Daemon, vmId string) error {
 	}
 
 	daemon.VmList.Add(p.VM)
+
+	err = p.startLogging(daemon)
+	if err != nil {
+		glog.Errorf("fail to start logging for pod %s: %v", p.Id, err)
+	}
+
 	return nil
 }
 
