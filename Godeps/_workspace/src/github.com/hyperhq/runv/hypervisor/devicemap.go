@@ -679,7 +679,7 @@ func interfaceGot(index int, pciAddr int, name string, inf *network.Settings) (*
 	var mask net.IP = tmp
 
 	rt := []*RouteRule{}
-	/* Route rule is generated automaticly on first interface,
+	/* Route rule is generated automatically on first interface,
 	 * or generated on the gateway configured interface. */
 	if (index == 0 && inf.Automatic) || (!inf.Automatic && inf.Gateway != "") {
 		rt = append(rt, &RouteRule{

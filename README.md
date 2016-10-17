@@ -32,7 +32,7 @@ HyperContainer - Hypervisor-agnostic Docker Runtime
 
 ## Requirements
 
-- QEMU 2.0 or later
+- QEMU 2.0 or later (QEMU 2.6 or later for ARM64 Architecture)
 - Xen 4.5 and VT enabled host (for Xen support)
 
 ## Installation

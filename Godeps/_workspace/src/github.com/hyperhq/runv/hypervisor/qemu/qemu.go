@@ -1,6 +1,7 @@
 package qemu
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -116,13 +117,11 @@ func (qd *QemuDriver) LoadContext(persisted map[string]interface{}) (hypervisor.
 	l, ok := persisted["log"]
 	if !ok {
 		return nil, errors.New("cannot read the qemu log filename info from persist info")
-	} else {
-		switch l.(type) {
-		case QemuLogFile:
-			log = l.(QemuLogFile)
-		default:
-			return nil, errors.New("wrong qemu log filename type in persist info")
-		}
+	}
+	if bytes, err := json.Marshal(l); err != nil {
+		return nil, fmt.Errorf("wrong qemu log filename type in persist info: %v", err)
+	} else if err = json.Unmarshal(bytes, &log); err != nil {
+		return nil, fmt.Errorf("wrong qemu log filename type in persist info: %v", err)
 	}
 
 	return &QemuContext{
