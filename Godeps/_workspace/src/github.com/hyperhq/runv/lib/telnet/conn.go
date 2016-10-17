@@ -234,7 +234,7 @@ loop:
 		return
 	}
 	if retry {
-		// This bad rune was a begining of telnet command. Try read next rune.
+		// This bad rune was a beginning of telnet command. Try read next rune.
 		goto loop
 	}
 	// Return escaped IAC as unicode.ReplacementChar

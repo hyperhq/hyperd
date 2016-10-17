@@ -191,7 +191,7 @@ func (vm *Vm) handlePodEvent(mypod *PodStatus) {
 		case types.E_POD_FINISHED: // successfully exit
 			mypod.SetPodContainerStatus(Response.Data.([]uint32))
 			vm.Status = types.S_VM_IDLE
-		case types.E_VM_SHUTDOWN: // vm exited, sucessful or not
+		case types.E_VM_SHUTDOWN: // vm exited, successful or not
 			if mypod.Status == types.S_POD_RUNNING { // not received finished pod before
 				mypod.Status = types.S_POD_FAILED
 				mypod.FinishedAt = time.Now().Format("2006-01-02T15:04:05Z")
