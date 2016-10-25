@@ -21,10 +21,10 @@ Kernel=/var/lib/hyper/kernel
 Initrd=/var/lib/hyper/hyper-initrd.img
 
 # BIOS image, qboot bios will accelarate the bootup
-Bios=/var/lib/hyper/bios-qboot.bin
+# Bios=/var/lib/hyper/bios-qboot.bin
 
 # CBFS coreboot fs for boot image, if it is set, Kernel and Initrd will be ignored
-Cbfs=/var/lib/hyper/cbfs-qboot.rom
+# Cbfs=/var/lib/hyper/cbfs-qboot.rom
 
 # Boot CDROOM for "vbox" hypervisor (for mac only)
 # Vbox=/opt/hyper/static/iso/hyper-vbox-boot.iso
