@@ -185,3 +185,16 @@ func ParseTimeString(str string) (int64, error) {
 
 	return t.Unix(), nil
 }
+
+func RsplitN(s, sep string, n int) []string {
+	if n == 0 {
+		return nil
+	}
+
+	ret := strings.Split(s, sep)
+	for n > 0 && len(ret) > n {
+		ret[1] = ret[0] + sep + ret[1]
+		ret = ret[1:]
+	}
+	return ret
+}
