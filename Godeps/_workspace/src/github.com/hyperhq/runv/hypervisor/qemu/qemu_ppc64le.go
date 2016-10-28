@@ -44,7 +44,6 @@ func (qc *QemuContext) arguments(ctx *hypervisor.VmContext) []string {
 	return []string{
 		"-machine", "pseries,accel=kvm,usb=off", "-global", "kvm-pit.lost_tick_policy=discard", "-cpu", "host",
 		"-kernel", boot.Kernel, "-initrd", boot.Initrd,
-		"-machine", "pseries,accel=kvm,usb=off", "-cpu", "host",
 		"-realtime", "mlock=off", "-no-user-config", "-nodefaults",
 		"-rtc", "base=utc,driftfix=slew", "-no-reboot", "-display", "none", "-boot", "strict=on",
 		"-m", memParams, "-smp", cpuParams,
