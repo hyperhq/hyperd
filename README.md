@@ -14,7 +14,7 @@ HyperContainer - Hypervisor-agnostic Docker Runtime
 ## Why HyperContainer?
 -----------
 
-**HyperContainer combines the best from both world: VM and Container**.
+**HyperContainer combines the best from both worlds: VM and Container**.
 
 | -  | Container | VM | HyperContainer | 
 |---|---|---|---|
