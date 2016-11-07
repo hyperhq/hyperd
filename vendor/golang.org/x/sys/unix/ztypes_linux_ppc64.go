@@ -184,6 +184,14 @@ type RawSockaddrUnix struct {
 	Path   [108]int8
 }
 
+type RawSockaddrVsock struct {
+	Family   uint16
+	Reserved uint16
+	Port     uint32
+	Cid      uint32
+	Zero     [4]uint8
+}
+
 type RawSockaddrLinklayer struct {
 	Family   uint16
 	Protocol uint16
