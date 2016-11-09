@@ -2,14 +2,14 @@
 
 PROJECT=$(readlink -f $(dirname $0)/../../..)
 UBUNTU_DIR=${PROJECT}/package/ubuntu/hypercontainer
-VERSION=0.6.2
+VERSION=0.7.0
 
 if [ $# -gt 0 ] ; then
     VERSION=$1
 fi
 
 # install addtional pkgs in order to build deb pkg
-sudo apt-get install -y autoconf automake pkg-config libdevmapper-dev libsqlite3-dev libvirt-dev libxen-dev uuid-dev golang xen-hypervisor-4.6-amd64 -qq
+sudo apt-get install -y autoconf automake pkg-config dh-make libdevmapper-dev libsqlite3-dev libvirt-dev libxen-dev uuid-dev golang xen-system-amd64 -qq
 
 # get hyperd tar ball
 cd $PROJECT

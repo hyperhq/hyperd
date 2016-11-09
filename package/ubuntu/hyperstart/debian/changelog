@@ -1,3 +1,9 @@
+hyperstart (0.7.0-1) xenial; urgency=low
+
+  * Release 0.7.0
+
+ -- Hyper Dev Team <dev@hyper.sh>  Fri, 29 Oct 2016 22:30:08 +0800
+
 hyperstart (0.6.2-1) xenial; urgency=low
 
   * Initial release

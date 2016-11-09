@@ -1,3 +1,15 @@
+hypercontainer (0.7.0-2) xenial; urgency=low
+
+  * add service and config file to package
+
+ -- Hyper Dev Team <dev@hyper.sh>  Sat, 30 Oct 2016 16:21:08 +0800
+
+hypercontainer (0.7.0-1) xenial; urgency=low
+
+  * Release 0.7.0
+
+ -- Hyper Dev Team <dev@hyper.sh>  Fri, 29 Oct 2016 22:30:08 +0800
+
 hypercontainer (0.6.2-1) xenial; urgency=low
 
   * Initial release
