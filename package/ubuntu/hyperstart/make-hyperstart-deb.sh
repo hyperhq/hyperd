@@ -2,14 +2,14 @@
 
 PROJECT=$(readlink -f $(dirname $0)/../../..)
 UBUNTU_DIR=${PROJECT}/package/ubuntu/hyperstart
-VERSION=0.6.2
+VERSION=0.7.0
 
 if [ $# -gt 0 ] ; then
     VERSION=$1
 fi
 
 # install addtional pkgs in order to build deb pkg
-sudo apt-get install -y autoconf automake pkg-config
+sudo apt-get install -y autoconf automake pkg-config dh-make
 
 # get hyperstart tar ball
 cd $PROJECT/../hyperstart
