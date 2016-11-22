@@ -77,6 +77,14 @@ func (pl *PodList) GetByName(name string) (*Pod, bool) {
 	return nil, false
 }
 
+func (pl *PodList) GetByIdOrName(podIdOrName string) (*Pod, bool) {
+	if strings.Contains(podIdOrName, "pod-") {
+		return pl.Get(podIdOrName)
+	} else {
+		return pl.GetByName(podIdOrName)
+	}
+}
+
 func (pl *PodList) GetByContainerId(cid string) (*Pod, bool) {
 	pl.mu.RLock()
 	defer pl.mu.RUnlock()

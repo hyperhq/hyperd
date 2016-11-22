@@ -8,7 +8,7 @@ import (
 )
 
 func (daemon Daemon) PausePod(podId string) error {
-	pod, ok := daemon.PodList.Get(podId)
+	pod, ok := daemon.PodList.GetByIdOrName(podId)
 	if !ok {
 		return fmt.Errorf("Can not get Pod info with pod ID(%s)", podId)
 	}
@@ -47,7 +47,7 @@ func (daemon Daemon) PauseContainer(container string) error {
 }
 
 func (daemon *Daemon) UnpausePod(podId string) error {
-	pod, ok := daemon.PodList.Get(podId)
+	pod, ok := daemon.PodList.GetByIdOrName(podId)
 	if !ok {
 		return fmt.Errorf("Can not get Pod info with pod ID(%s)", podId)
 	}

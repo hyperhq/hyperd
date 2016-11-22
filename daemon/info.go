@@ -176,7 +176,7 @@ func (daemon *Daemon) GetPodStats(podId string) (interface{}, error) {
 		ok  bool
 	)
 	if strings.Contains(podId, "pod-") {
-		pod, ok = daemon.PodList.Get(podId)
+		pod, ok = daemon.PodList.GetByIdOrName(podId)
 		if !ok {
 			return nil, fmt.Errorf("Can not get Pod stats with pod ID(%s)", podId)
 		}

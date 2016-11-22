@@ -24,7 +24,7 @@ func (daemon *Daemon) CleanPod(podId string) (int, string, error) {
 		err   error
 	)
 
-	pod, ok := daemon.PodList.Get(podId)
+	pod, ok := daemon.PodList.GetByIdOrName(podId)
 	if !ok {
 		return E_NOT_FOUND, "", fmt.Errorf("Can not find that Pod(%s)", podId)
 	}

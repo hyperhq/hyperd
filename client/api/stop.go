@@ -19,9 +19,9 @@ func (cli *Client) StopContainer(container string) error {
 	return nil
 }
 
-func (cli *Client) StopPod(podId, stopVm string) (int, string, error) {
+func (cli *Client) StopPod(podIdOrName, stopVm string) (int, string, error) {
 	v := url.Values{}
-	v.Set("podId", podId)
+	v.Set("podIdOrName", podIdOrName)
 	v.Set("stopVm", stopVm)
 	body, _, err := readBody(cli.call("POST", "/pod/stop?"+v.Encode(), nil, nil))
 	if err != nil {

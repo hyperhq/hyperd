@@ -26,7 +26,7 @@ func (cli *HyperClient) HyperCmdStop(args ...string) error {
 		}
 	}
 	if len(args) == 0 {
-		return fmt.Errorf("\"stop\" requires a minimum of 1 argument, please provide POD ID.\n")
+		return fmt.Errorf("\"stop\" requires a minimum of 1 argument, please provide POD ID or POD Name.\n")
 	}
 
 	stopVm := "yes"

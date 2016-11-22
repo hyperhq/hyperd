@@ -157,10 +157,10 @@ func (p *podRouter) postPodStop(ctx context.Context, w http.ResponseWriter, r *h
 		return err
 	}
 
-	podId := r.Form.Get("podId")
+	podIdOrName := r.Form.Get("podIdOrName")
 	stopVm := r.Form.Get("stopVm")
 
-	env, err := p.backend.CmdStopPod(podId, stopVm)
+	env, err := p.backend.CmdStopPod(podIdOrName, stopVm)
 	if err != nil {
 		return err
 	}

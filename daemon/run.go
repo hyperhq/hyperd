@@ -67,7 +67,7 @@ func (daemon *Daemon) StartPod(stdin io.ReadCloser, stdout io.WriteCloser, podId
 
 	glog.Infof("pod:%s, vm:%s", podId, vmId)
 
-	p, ok := daemon.PodList.Get(podId)
+	p, ok := daemon.PodList.GetByIdOrName(podId)
 	if !ok {
 		return -1, "", fmt.Errorf("The pod(%s) can not be found, please create it first", podId)
 	}
@@ -133,7 +133,7 @@ func (daemon *Daemon) StartInternal(p *Pod, vmId string, config interface{}, laz
 func (daemon *Daemon) RestartPod(mypod *hypervisor.PodStatus) error {
 	// Remove the pod
 	// The pod is stopped, the vm is gone
-	pod, ok := daemon.PodList.Get(mypod.Id)
+	pod, ok := daemon.PodList.GetByIdOrName(mypod.Id)
 	if ok {
 		daemon.RemovePodContainer(pod)
 	}
@@ -172,7 +172,7 @@ func (daemon *Daemon) SetPodLabels(podId string, override bool, labels map[strin
 	var pod *Pod
 	var ok bool
 	if strings.Contains(podId, "pod-") {
-		pod, ok = daemon.PodList.Get(podId)
+		pod, ok = daemon.PodList.GetByIdOrName(podId)
 		if !ok {
 			return fmt.Errorf("Can not get Pod info with pod ID(%s)", podId)
 		}
