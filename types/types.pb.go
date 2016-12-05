@@ -7,6 +7,7 @@ Package types is a generated protocol buffer package.
 
 It is generated from these files:
 	types.proto
+	persist.proto
 
 It has these top-level messages:
 	ContainerPort
@@ -59,6 +60,7 @@ It has these top-level messages:
 	UserVolumeReference
 	UserFileReference
 	UserUser
+	Ulimit
 	UserContainer
 	UserResource
 	UserFile
@@ -68,6 +70,7 @@ It has these top-level messages:
 	UserServiceBackend
 	UserService
 	PodLogConfig
+	PortMapping
 	PortmappingWhiteList
 	UserPod
 	PodCreateRequest
@@ -125,6 +128,12 @@ It has these top-level messages:
 	PodStatsResponse
 	PingRequest
 	PingResponse
+	PersistPodLayout
+	PersistPodMeta
+	SandboxPersistInfo
+	PersistContainer
+	PersistVolume
+	PersistInterface
 */
 package types
 
@@ -141,6 +150,26 @@ import (
 var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
+
+type UserContainer_ContainerType int32
+
+const (
+	UserContainer_REGULAR UserContainer_ContainerType = 0
+	UserContainer_SERVICE UserContainer_ContainerType = 99
+)
+
+var UserContainer_ContainerType_name = map[int32]string{
+	0:  "REGULAR",
+	99: "SERVICE",
+}
+var UserContainer_ContainerType_value = map[string]int32{
+	"REGULAR": 0,
+	"SERVICE": 99,
+}
+
+func (x UserContainer_ContainerType) String() string {
+	return proto.EnumName(UserContainer_ContainerType_name, int32(x))
+}
 
 // Types definitions for HyperContainer
 type ContainerPort struct {
@@ -1027,26 +1056,42 @@ func (m *UserContainerPort) String() string { return proto.CompactTextString(m) 
 func (*UserContainerPort) ProtoMessage()    {}
 
 type UserVolumeReference struct {
-	Path     string `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
-	Volume   string `protobuf:"bytes,2,opt,name=volume,proto3" json:"volume,omitempty"`
-	ReadOnly bool   `protobuf:"varint,3,opt,name=readOnly,proto3" json:"readOnly,omitempty"`
+	Path     string      `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
+	Volume   string      `protobuf:"bytes,2,opt,name=volume,proto3" json:"volume,omitempty"`
+	ReadOnly bool        `protobuf:"varint,3,opt,name=readOnly,proto3" json:"readOnly,omitempty"`
+	Detail   *UserVolume `protobuf:"bytes,4,opt,name=detail" json:"detail,omitempty"`
 }
 
 func (m *UserVolumeReference) Reset()         { *m = UserVolumeReference{} }
 func (m *UserVolumeReference) String() string { return proto.CompactTextString(m) }
 func (*UserVolumeReference) ProtoMessage()    {}
 
+func (m *UserVolumeReference) GetDetail() *UserVolume {
+	if m != nil {
+		return m.Detail
+	}
+	return nil
+}
+
 type UserFileReference struct {
-	Path     string `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
-	Filename string `protobuf:"bytes,2,opt,name=filename,proto3" json:"filename,omitempty"`
-	Perm     string `protobuf:"bytes,3,opt,name=perm,proto3" json:"perm,omitempty"`
-	User     string `protobuf:"bytes,4,opt,name=user,proto3" json:"user,omitempty"`
-	Group    string `protobuf:"bytes,5,opt,name=group,proto3" json:"group,omitempty"`
+	Path     string    `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
+	Filename string    `protobuf:"bytes,2,opt,name=filename,proto3" json:"filename,omitempty"`
+	Perm     string    `protobuf:"bytes,3,opt,name=perm,proto3" json:"perm,omitempty"`
+	User     string    `protobuf:"bytes,4,opt,name=user,proto3" json:"user,omitempty"`
+	Group    string    `protobuf:"bytes,5,opt,name=group,proto3" json:"group,omitempty"`
+	Detail   *UserFile `protobuf:"bytes,6,opt,name=detail" json:"detail,omitempty"`
 }
 
 func (m *UserFileReference) Reset()         { *m = UserFileReference{} }
 func (m *UserFileReference) String() string { return proto.CompactTextString(m) }
 func (*UserFileReference) ProtoMessage()    {}
+
+func (m *UserFileReference) GetDetail() *UserFile {
+	if m != nil {
+		return m.Detail
+	}
+	return nil
+}
 
 type UserUser struct {
 	Name             string   `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -1058,21 +1103,35 @@ func (m *UserUser) Reset()         { *m = UserUser{} }
 func (m *UserUser) String() string { return proto.CompactTextString(m) }
 func (*UserUser) ProtoMessage()    {}
 
+type Ulimit struct {
+	Name string `protobuf:"bytes,1,opt,name=Name,proto3" json:"Name,omitempty"`
+	Hard uint64 `protobuf:"varint,2,opt,name=Hard,proto3" json:"Hard,omitempty"`
+	Soft uint64 `protobuf:"varint,3,opt,name=Soft,proto3" json:"Soft,omitempty"`
+}
+
+func (m *Ulimit) Reset()         { *m = Ulimit{} }
+func (m *Ulimit) String() string { return proto.CompactTextString(m) }
+func (*Ulimit) ProtoMessage()    {}
+
 type UserContainer struct {
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Image         string                 `protobuf:"bytes,2,opt,name=image,proto3" json:"image,omitempty"`
-	Workdir       string                 `protobuf:"bytes,3,opt,name=workdir,proto3" json:"workdir,omitempty"`
-	RestartPolicy string                 `protobuf:"bytes,4,opt,name=restartPolicy,proto3" json:"restartPolicy,omitempty"`
-	Tty           bool                   `protobuf:"varint,5,opt,name=tty,proto3" json:"tty,omitempty"`
-	Sysctl        map[string]string      `protobuf:"bytes,6,rep,name=sysctl" json:"sysctl,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	Envs          []*EnvironmentVar      `protobuf:"bytes,7,rep,name=envs" json:"envs,omitempty"`
-	Command       []string               `protobuf:"bytes,8,rep,name=command" json:"command,omitempty"`
-	Entrypoint    []string               `protobuf:"bytes,9,rep,name=entrypoint" json:"entrypoint,omitempty"`
-	Ports         []*UserContainerPort   `protobuf:"bytes,10,rep,name=ports" json:"ports,omitempty"`
-	Volumes       []*UserVolumeReference `protobuf:"bytes,11,rep,name=volumes" json:"volumes,omitempty"`
-	Files         []*UserFileReference   `protobuf:"bytes,12,rep,name=files" json:"files,omitempty"`
-	User          *UserUser              `protobuf:"bytes,13,opt,name=user" json:"user,omitempty"`
-	Labels        map[string]string      `protobuf:"bytes,14,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	Name          string                      `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Image         string                      `protobuf:"bytes,2,opt,name=image,proto3" json:"image,omitempty"`
+	Workdir       string                      `protobuf:"bytes,3,opt,name=workdir,proto3" json:"workdir,omitempty"`
+	RestartPolicy string                      `protobuf:"bytes,4,opt,name=restartPolicy,proto3" json:"restartPolicy,omitempty"`
+	Tty           bool                        `protobuf:"varint,5,opt,name=tty,proto3" json:"tty,omitempty"`
+	Sysctl        map[string]string           `protobuf:"bytes,6,rep,name=sysctl" json:"sysctl,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	Envs          []*EnvironmentVar           `protobuf:"bytes,7,rep,name=envs" json:"envs,omitempty"`
+	Command       []string                    `protobuf:"bytes,8,rep,name=command" json:"command,omitempty"`
+	Entrypoint    []string                    `protobuf:"bytes,9,rep,name=entrypoint" json:"entrypoint,omitempty"`
+	Ports         []*UserContainerPort        `protobuf:"bytes,10,rep,name=ports" json:"ports,omitempty"`
+	Volumes       []*UserVolumeReference      `protobuf:"bytes,11,rep,name=volumes" json:"volumes,omitempty"`
+	Files         []*UserFileReference        `protobuf:"bytes,12,rep,name=files" json:"files,omitempty"`
+	User          *UserUser                   `protobuf:"bytes,13,opt,name=user" json:"user,omitempty"`
+	Labels        map[string]string           `protobuf:"bytes,14,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	Id            string                      `protobuf:"bytes,15,opt,name=id,proto3" json:"id,omitempty"`
+	Type          UserContainer_ContainerType `protobuf:"varint,16,opt,name=type,proto3,enum=types.UserContainer_ContainerType" json:"type,omitempty"`
+	StopSignal    string                      `protobuf:"bytes,17,opt,name=StopSignal,proto3" json:"StopSignal,omitempty"`
+	Ulimits       []*Ulimit                   `protobuf:"bytes,18,rep,name=ulimits" json:"ulimits,omitempty"`
 }
 
 func (m *UserContainer) Reset()         { *m = UserContainer{} }
@@ -1128,6 +1187,13 @@ func (m *UserContainer) GetLabels() map[string]string {
 	return nil
 }
 
+func (m *UserContainer) GetUlimits() []*Ulimit {
+	if m != nil {
+		return m.Ulimits
+	}
+	return nil
+}
+
 type UserResource struct {
 	Vcpu   int32 `protobuf:"varint,1,opt,name=vcpu,proto3" json:"vcpu,omitempty"`
 	Memory int32 `protobuf:"varint,2,opt,name=memory,proto3" json:"memory,omitempty"`
@@ -1161,8 +1227,9 @@ func (*UserVolumeOption) ProtoMessage()    {}
 type UserVolume struct {
 	Name   string            `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Source string            `protobuf:"bytes,2,opt,name=source,proto3" json:"source,omitempty"`
-	Driver string            `protobuf:"bytes,3,opt,name=driver,proto3" json:"driver,omitempty"`
+	Format string            `protobuf:"bytes,3,opt,name=format,proto3" json:"format,omitempty"`
 	Option *UserVolumeOption `protobuf:"bytes,4,opt,name=option" json:"option,omitempty"`
+	Fstype string            `protobuf:"bytes,5,opt,name=fstype,proto3" json:"fstype,omitempty"`
 }
 
 func (m *UserVolume) Reset()         { *m = UserVolume{} }
@@ -1182,6 +1249,7 @@ type UserInterface struct {
 	Ifname  string `protobuf:"bytes,3,opt,name=ifname,proto3" json:"ifname,omitempty"`
 	Mac     string `protobuf:"bytes,4,opt,name=mac,proto3" json:"mac,omitempty"`
 	Gateway string `protobuf:"bytes,5,opt,name=gateway,proto3" json:"gateway,omitempty"`
+	Tap     string `protobuf:"bytes,6,opt,name=tap,proto3" json:"tap,omitempty"`
 }
 
 func (m *UserInterface) Reset()         { *m = UserInterface{} }
@@ -1231,6 +1299,16 @@ func (m *PodLogConfig) GetConfig() map[string]string {
 	return nil
 }
 
+type PortMapping struct {
+	ContainerPort string `protobuf:"bytes,1,opt,name=containerPort,proto3" json:"containerPort,omitempty"`
+	HostPort      string `protobuf:"bytes,2,opt,name=hostPort,proto3" json:"hostPort,omitempty"`
+	Protocol      string `protobuf:"bytes,3,opt,name=protocol,proto3" json:"protocol,omitempty"`
+}
+
+func (m *PortMapping) Reset()         { *m = PortMapping{} }
+func (m *PortMapping) String() string { return proto.CompactTextString(m) }
+func (*PortMapping) ProtoMessage()    {}
+
 type PortmappingWhiteList struct {
 	// allowed internal networks in CIDR format for portmapping
 	// Those networks could visit all container ports if portmapping is enabled
@@ -1261,6 +1339,7 @@ type UserPod struct {
 	Interfaces            []*UserInterface      `protobuf:"bytes,13,rep,name=interfaces" json:"interfaces,omitempty"`
 	Services              []*UserService        `protobuf:"bytes,14,rep,name=services" json:"services,omitempty"`
 	PortmappingWhiteLists *PortmappingWhiteList `protobuf:"bytes,15,opt,name=portmappingWhiteLists" json:"portmappingWhiteLists,omitempty"`
+	Portmappings          []*PortMapping        `protobuf:"bytes,16,rep,name=portmappings" json:"portmappings,omitempty"`
 }
 
 func (m *UserPod) Reset()         { *m = UserPod{} }
@@ -1326,6 +1405,13 @@ func (m *UserPod) GetServices() []*UserService {
 func (m *UserPod) GetPortmappingWhiteLists() *PortmappingWhiteList {
 	if m != nil {
 		return m.PortmappingWhiteLists
+	}
+	return nil
+}
+
+func (m *UserPod) GetPortmappings() []*PortMapping {
+	if m != nil {
+		return m.Portmappings
 	}
 	return nil
 }
@@ -1947,6 +2033,7 @@ func init() {
 	proto.RegisterType((*UserVolumeReference)(nil), "types.UserVolumeReference")
 	proto.RegisterType((*UserFileReference)(nil), "types.UserFileReference")
 	proto.RegisterType((*UserUser)(nil), "types.UserUser")
+	proto.RegisterType((*Ulimit)(nil), "types.Ulimit")
 	proto.RegisterType((*UserContainer)(nil), "types.UserContainer")
 	proto.RegisterType((*UserResource)(nil), "types.UserResource")
 	proto.RegisterType((*UserFile)(nil), "types.UserFile")
@@ -1956,6 +2043,7 @@ func init() {
 	proto.RegisterType((*UserServiceBackend)(nil), "types.UserServiceBackend")
 	proto.RegisterType((*UserService)(nil), "types.UserService")
 	proto.RegisterType((*PodLogConfig)(nil), "types.PodLogConfig")
+	proto.RegisterType((*PortMapping)(nil), "types.PortMapping")
 	proto.RegisterType((*PortmappingWhiteList)(nil), "types.PortmappingWhiteList")
 	proto.RegisterType((*UserPod)(nil), "types.UserPod")
 	proto.RegisterType((*PodCreateRequest)(nil), "types.PodCreateRequest")
@@ -2013,6 +2101,7 @@ func init() {
 	proto.RegisterType((*PodStatsResponse)(nil), "types.PodStatsResponse")
 	proto.RegisterType((*PingRequest)(nil), "types.PingRequest")
 	proto.RegisterType((*PingResponse)(nil), "types.PingResponse")
+	proto.RegisterEnum("types.UserContainer_ContainerType", UserContainer_ContainerType_name, UserContainer_ContainerType_value)
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -2048,10 +2137,6 @@ type PublicAPIClient interface {
 	ImageList(ctx context.Context, in *ImageListRequest, opts ...grpc.CallOption) (*ImageListResponse, error)
 	// VMList gets a list of HyperVMs
 	VMList(ctx context.Context, in *VMListRequest, opts ...grpc.CallOption) (*VMListResponse, error)
-	// VMCreate creates a HyperVM with specified CPU and memory
-	VMCreate(ctx context.Context, in *VMCreateRequest, opts ...grpc.CallOption) (*VMCreateResponse, error)
-	// VMRemove deletes a HyperVM by vmID
-	VMRemove(ctx context.Context, in *VMRemoveRequest, opts ...grpc.CallOption) (*VMRemoveResponse, error)
 	// SetPodLabels sets labels of given pod
 	SetPodLabels(ctx context.Context, in *PodLabelsRequest, opts ...grpc.CallOption) (*PodLabelsResponse, error)
 	// PodStats gets pod stats of a given pod
@@ -2238,24 +2323,6 @@ func (c *publicAPIClient) ImageList(ctx context.Context, in *ImageListRequest, o
 func (c *publicAPIClient) VMList(ctx context.Context, in *VMListRequest, opts ...grpc.CallOption) (*VMListResponse, error) {
 	out := new(VMListResponse)
 	err := grpc.Invoke(ctx, "/types.PublicAPI/VMList", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *publicAPIClient) VMCreate(ctx context.Context, in *VMCreateRequest, opts ...grpc.CallOption) (*VMCreateResponse, error) {
-	out := new(VMCreateResponse)
-	err := grpc.Invoke(ctx, "/types.PublicAPI/VMCreate", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *publicAPIClient) VMRemove(ctx context.Context, in *VMRemoveRequest, opts ...grpc.CallOption) (*VMRemoveResponse, error) {
-	out := new(VMRemoveResponse)
-	err := grpc.Invoke(ctx, "/types.PublicAPI/VMRemove", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2584,10 +2651,6 @@ type PublicAPIServer interface {
 	ImageList(context.Context, *ImageListRequest) (*ImageListResponse, error)
 	// VMList gets a list of HyperVMs
 	VMList(context.Context, *VMListRequest) (*VMListResponse, error)
-	// VMCreate creates a HyperVM with specified CPU and memory
-	VMCreate(context.Context, *VMCreateRequest) (*VMCreateResponse, error)
-	// VMRemove deletes a HyperVM by vmID
-	VMRemove(context.Context, *VMRemoveRequest) (*VMRemoveResponse, error)
 	// SetPodLabels sets labels of given pod
 	SetPodLabels(context.Context, *PodLabelsRequest) (*PodLabelsResponse, error)
 	// PodStats gets pod stats of a given pod
@@ -2801,30 +2864,6 @@ func _PublicAPI_VMList_Handler(srv interface{}, ctx context.Context, dec func(in
 		return nil, err
 	}
 	out, err := srv.(PublicAPIServer).VMList(ctx, in)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func _PublicAPI_VMCreate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
-	in := new(VMCreateRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	out, err := srv.(PublicAPIServer).VMCreate(ctx, in)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func _PublicAPI_VMRemove_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
-	in := new(VMRemoveRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	out, err := srv.(PublicAPIServer).VMRemove(ctx, in)
 	if err != nil {
 		return nil, err
 	}
@@ -3177,14 +3216,6 @@ var _PublicAPI_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "VMList",
 			Handler:    _PublicAPI_VMList_Handler,
-		},
-		{
-			MethodName: "VMCreate",
-			Handler:    _PublicAPI_VMCreate_Handler,
-		},
-		{
-			MethodName: "VMRemove",
-			Handler:    _PublicAPI_VMRemove_Handler,
 		},
 		{
 			MethodName: "SetPodLabels",

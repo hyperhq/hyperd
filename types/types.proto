@@ -357,9 +357,10 @@ message UserContainerPort {
 }
 
 message UserVolumeReference {
-  string path   = 1;
-  string volume = 2;
-  bool readOnly = 3;
+  string path       = 1;
+  string volume     = 2;
+  bool readOnly     = 3;
+  UserVolume detail = 4;
 }
 
 message UserFileReference {
@@ -368,12 +369,19 @@ message UserFileReference {
   string perm     = 3;
   string user     = 4;
   string group    = 5;
+  UserFile detail = 6;
 }
 
 message UserUser {
   string name                       = 1;
   string group                      = 2;
   repeated string additionalGroups  = 3;
+}
+
+message Ulimit {
+  string Name = 1;
+  uint64 Hard = 2;
+  uint64 Soft = 3;
 }
 
 message UserContainer {
@@ -391,6 +399,14 @@ message UserContainer {
   repeated UserFileReference files      = 12;
   UserUser user                         = 13;
   map<string, string> labels            = 14;
+  string id                             = 15;
+  enum ContainerType {
+    REGULAR = 0;
+    SERVICE = 99;
+  }
+  ContainerType type                    = 16;
+  string StopSignal                     = 17;
+  repeated Ulimit ulimits               = 18;
 }
 
 message UserResource {
@@ -414,8 +430,9 @@ message UserVolumeOption {
 message UserVolume {
   string name             = 1;
   string source           = 2;
-  string driver           = 3;
+  string format           = 3;
   UserVolumeOption option = 4;
+  string fstype           = 5;
 }
 
 message UserInterface {
@@ -424,6 +441,7 @@ message UserInterface {
   string ifname = 3;
   string mac    = 4;
   string gateway  = 5;
+  string tap    = 6;
 }
 
 message UserServiceBackend {
@@ -441,6 +459,12 @@ message UserService {
 message PodLogConfig {
   string type                 = 1;
   map<string, string> config  = 2;
+}
+
+message PortMapping {
+  string containerPort = 1;
+  string hostPort      = 2;
+  string protocol      = 3;
 }
 
 message PortmappingWhiteList {
@@ -469,6 +493,7 @@ message UserPod {
   repeated UserInterface interfaces          = 13;
   repeated UserService services              = 14;
   PortmappingWhiteList portmappingWhiteLists = 15;
+  repeated PortMapping portmappings          = 16;
 }
 
 message PodCreateRequest {
@@ -752,10 +777,6 @@ service PublicAPI {
 
     // VMList gets a list of HyperVMs
     rpc VMList(VMListRequest) returns (VMListResponse) {}
-    // VMCreate creates a HyperVM with specified CPU and memory
-    rpc VMCreate(VMCreateRequest) returns (VMCreateResponse) {}
-    // VMRemove deletes a HyperVM by vmID
-    rpc VMRemove(VMRemoveRequest) returns (VMRemoveResponse) {}
 
     // SetPodLabels sets labels of given pod
     rpc SetPodLabels(PodLabelsRequest) returns (PodLabelsResponse) {}
