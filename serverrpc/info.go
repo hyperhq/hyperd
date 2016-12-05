@@ -22,7 +22,7 @@ func (s *ServerRPC) PodInfo(c context.Context, req *types.PodInfoRequest) (*type
 	}
 
 	return &types.PodInfoResponse{
-		PodInfo: &info,
+		PodInfo: info,
 	}, nil
 }
 
@@ -37,7 +37,7 @@ func (s *ServerRPC) ContainerInfo(c context.Context, req *types.ContainerInfoReq
 	}
 
 	return &types.ContainerInfoResponse{
-		ContainerInfo: &info,
+		ContainerInfo: info,
 	}, nil
 }
 

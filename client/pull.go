@@ -5,7 +5,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/hyperhq/runv/hypervisor/pod"
+	apitype "github.com/hyperhq/hyperd/types"
 
 	"github.com/docker/docker/reference"
 	"github.com/docker/docker/registry"
@@ -59,7 +59,7 @@ func (cli *HyperClient) PullImage(imageName string) error {
 	return cli.readStreamOutput(body, ctype, cli.isTerminalOut, cli.out, cli.err)
 }
 
-func (cli *HyperClient) PullImages(spec *pod.UserPod) error {
+func (cli *HyperClient) PullImages(spec *apitype.UserPod) error {
 	for i := range spec.Containers {
 		if err := cli.PullImage(spec.Containers[i].Image); err != nil {
 			return err

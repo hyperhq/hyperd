@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/hyperhq/runv/hypervisor/pod"
+	apitype "github.com/hyperhq/hyperd/types"
 
 	gflag "github.com/jessevdk/go-flags"
 	"net/http"
@@ -35,7 +35,7 @@ func (cli *HyperClient) HyperCmdCreate(args ...string) error {
 		return err
 	}
 
-	var tmpPod pod.UserPod
+	var tmpPod apitype.UserPod
 	if err := json.Unmarshal([]byte(jsonbody), &tmpPod); err != nil {
 		return err
 	}

@@ -8,18 +8,14 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/Unknwon/goconfig"
 	"github.com/docker/docker/opts"
 	"github.com/docker/docker/pkg/reexec"
 	"github.com/golang/glog"
 	"github.com/hyperhq/hyperd/daemon"
-	"github.com/hyperhq/hyperd/daemon/graphdriver/vbox"
 	"github.com/hyperhq/hyperd/server"
 	"github.com/hyperhq/hyperd/serverrpc"
+	"github.com/hyperhq/hyperd/types"
 	"github.com/hyperhq/hyperd/utils"
-	"github.com/hyperhq/runv/driverloader"
-	"github.com/hyperhq/runv/factory"
-	"github.com/hyperhq/runv/hypervisor"
 
 	"github.com/docker/docker/pkg/parsers/kernel"
 )
@@ -102,49 +98,35 @@ Help Options:
 }
 
 func mainDaemon(opt *Options) {
-	config := opt.Config
-	glog.V(1).Infof("The config file is %s", config)
-	if config == "" {
-		config = "/etc/hyper/config"
-	}
-	if _, err := os.Stat(config); err != nil {
-		if os.IsNotExist(err) {
-			glog.Errorf("Can not find config file(%s)", config)
-			return
-		}
-		glog.Errorf(err.Error())
+	c := types.NewHyperConfig(opt.Config)
+	if c == nil {
 		return
 	}
+	c.DisableIptables = c.DisableIptables || opt.DisableIptables
 
-	os.Setenv("HYPER_CONFIG", config)
-	cfg, err := goconfig.LoadConfigFile(config)
-	if err != nil {
-		glog.Errorf("Read config file (%s) failed, %s", config, err.Error())
-		return
-	}
-
-	hyperRoot, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Root")
-
-	if hyperRoot == "" {
-		hyperRoot = "/var/lib/hyper"
-	}
-	utils.HYPER_ROOT = hyperRoot
-	if _, err := os.Stat(hyperRoot); err != nil {
-		if err := os.MkdirAll(hyperRoot, 0755); err != nil {
+	c.AdvertiseEnv()
+	if _, err := os.Stat(c.Root); err != nil {
+		if err := os.MkdirAll(c.Root, 0755); err != nil {
 			glog.Errorf(err.Error())
 			return
 		}
 	}
 
-	storageDriver, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "StorageDriver")
-	daemon.InitDockerCfg(strings.Split(opt.Mirrors, ","), strings.Split(opt.InsecureRegistries, ","), storageDriver, hyperRoot)
-	d, err := daemon.NewDaemon(cfg)
+	daemon.InitDockerCfg(strings.Split(opt.Mirrors, ","), strings.Split(opt.InsecureRegistries, ","), c.StorageDriver, c.Root)
+	d, err := daemon.NewDaemon(c)
 	if err != nil {
 		glog.Errorf("The hyperd create failed, %s", err.Error())
 		return
 	}
 
-	vbox.Register(d)
+	// Set the daemon object as the global varibal
+	// which will be used for puller and builder
+	utils.SetDaemon(d)
+
+	if err := d.Restore(); err != nil {
+		glog.Warningf("Fail to restore the previous VM")
+		return
+	}
 
 	serverConfig := &server.Config{}
 
@@ -182,46 +164,12 @@ func mainDaemon(opt *Options) {
 
 	api.InitRouters(d)
 
-	driver, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Hypervisor")
-	driver = strings.ToLower(driver)
-	if hypervisor.HDriver, err = driverloader.Probe(driver); err != nil {
-		glog.Warningf("%s", err.Error())
-		glog.Errorf("Please specify the correct and available hypervisor, such as 'kvm', 'qemu-kvm',  'libvirt', 'xen', 'qemu', 'vbox' or ''")
-		return
-	} else {
-		d.Hypervisor = driver
-		glog.Infof("The hypervisor's driver is %s", driver)
-	}
-
-	disableIptables := cfg.MustBool(goconfig.DEFAULT_SECTION, "DisableIptables", false)
-	if err = hypervisor.InitNetwork(d.BridgeIface, d.BridgeIP, disableIptables || opt.DisableIptables); err != nil {
-		glog.Errorf("InitNetwork failed, %s", err.Error())
-		return
-	}
-
-	defaultLog, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Logger")
-	defaultLogCfg, _ := cfg.GetSection("Log")
-	d.DefaultLogCfg(defaultLog, defaultLogCfg)
-
-	// Set the daemon object as the global varibal
-	// which will be used for puller and builder
-	utils.SetDaemon(d)
-
-	if err := d.Restore(); err != nil {
-		glog.Warningf("Fail to restore the previous VM")
-		return
-	}
-
-	vmFactoryPolicy, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "VmFactoryPolicy")
-	d.Factory = factory.NewFromPolicy(d.Kernel, d.Initrd, vmFactoryPolicy)
-
-	rpcHost, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "gRPCHost")
-	if rpcHost != "" {
+	if c.GRPCHost != "" {
 		rpcServer := serverrpc.NewServerRPC(d)
 		defer rpcServer.Stop()
 
 		go func() {
-			err := rpcServer.Serve(rpcHost)
+			err := rpcServer.Serve(c.GRPCHost)
 			if err != nil {
 				glog.Fatalf("Hyper serve RPC error: %v", err)
 			}
@@ -239,10 +187,7 @@ func mainDaemon(opt *Options) {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGHUP)
 
-	glog.V(0).Infof("Hyper daemon: %s %s",
-		utils.VERSION,
-		utils.GITCOMMIT,
-	)
+	glog.V(0).Infof("Hyper daemon: %s %s", utils.VERSION, utils.GITCOMMIT)
 
 	// Daemon is fully initialized and handling API traffic
 	// Wait for serve API job to complete
@@ -261,7 +206,6 @@ func mainDaemon(opt *Options) {
 		d.DestroyAllVm()
 		break
 	}
-	d.Factory.CloseFactory()
 	api.Close()
 	d.Shutdown()
 }

@@ -6,7 +6,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"strconv"
 
 	"github.com/golang/glog"
 	"github.com/hyperhq/hyperd/server/httputils"
@@ -69,13 +68,9 @@ func (p *podRouter) postPodCreate(ctx context.Context, w http.ResponseWriter, r 
 	}
 
 	podArgs, _ := ioutil.ReadAll(r.Body)
-	autoRemove := false
-	if r.Form.Get("remove") == "yes" || r.Form.Get("remove") == "true" {
-		autoRemove = true
-	}
-	glog.V(1).Infof("Args string is %s, autoremove %v", string(podArgs), autoRemove)
+	glog.V(1).Infof("Args string is %s", string(podArgs))
 
-	env, err := p.backend.CmdCreatePod(string(podArgs), autoRemove)
+	env, err := p.backend.CmdCreatePod(string(podArgs))
 	if err != nil {
 		return err
 	}
@@ -221,41 +216,6 @@ func (p *podRouter) postPodUnpause(ctx context.Context, w http.ResponseWriter, r
 	return nil
 }
 
-func (p *podRouter) postVmCreate(ctx context.Context, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
-	if err := httputils.ParseForm(r); err != nil {
-		return err
-	}
-
-	var (
-		cpu   = 1
-		mem   = 128
-		async = false
-		err   error
-	)
-	if value := r.Form.Get("cpu"); value != "" {
-		cpu, err = strconv.Atoi(value)
-		if err != nil {
-			return err
-		}
-	}
-	if value := r.Form.Get("mem"); value != "" {
-		mem, err = strconv.Atoi(value)
-		if err != nil {
-			return err
-		}
-	}
-	if r.Form.Get("async") == "yes" || r.Form.Get("async") == "true" {
-		async = true
-	}
-
-	env, err := p.backend.CmdCreateVm(cpu, mem, async)
-	if err != nil {
-		return err
-	}
-
-	return env.WriteJSON(w, http.StatusOK)
-}
-
 func (p *podRouter) deletePod(ctx context.Context, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
 	if err := httputils.ParseForm(r); err != nil {
 		return err
@@ -263,20 +223,6 @@ func (p *podRouter) deletePod(ctx context.Context, w http.ResponseWriter, r *htt
 
 	podId := r.Form.Get("podId")
 	env, err := p.backend.CmdCleanPod(podId)
-	if err != nil {
-		return err
-	}
-
-	return env.WriteJSON(w, http.StatusOK)
-}
-
-func (p *podRouter) deleteVm(ctx context.Context, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
-	if err := httputils.ParseForm(r); err != nil {
-		return err
-	}
-
-	vmId := r.Form.Get("vm")
-	env, err := p.backend.CmdKillVm(vmId)
 	if err != nil {
 		return err
 	}
