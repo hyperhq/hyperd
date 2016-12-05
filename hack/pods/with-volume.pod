@@ -37,11 +37,11 @@
 	"volumes": [{
             "name": "log",
             "source": "",
-            "driver": ""
+            "format": ""
 	},{
             "name": "tmp",
             "source": "TMPDIR",
-            "driver": "vfs"
+            "format": "vfs"
 	}],
 	"tty": true
 }
