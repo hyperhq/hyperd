@@ -69,8 +69,16 @@ func (d *DaemonDB) UpdatePodVolume(podId, volname string, data []byte) error {
 	return d.Update(keyVolume(podId, volname), data)
 }
 
+func (d *DaemonDB) GetPodVolume(podId, volname string) ([]byte, error) {
+	return d.db.Get(keyVolume(podId, volname), nil)
+}
+
 func (d *DaemonDB) ListPodVolumes(podId string) ([][]byte, error) {
 	return d.PrefixList(prefixVolume(podId), nil)
+}
+
+func (d *DaemonDB) DeletePodVolume(podId, volName string) error {
+	return d.db.Delete(keyVolume(podId, volName), nil)
 }
 
 func (d *DaemonDB) DeletePodVolumes(podId string) error {
@@ -219,7 +227,11 @@ func (d *DaemonDB) PrefixList2Chan(prefix []byte, keyFilter KeyFilter) chan *KVP
 		for iter.Next() {
 			glog.V(3).Infof("got key from leveldb %s", string(iter.Key()))
 			if keyFilter == nil || keyFilter(iter.Key()) {
-				ch <- &KVPair{append([]byte{}, iter.Key()...), append([]byte{}, iter.Value()...)}
+				k := make([]byte, 0, len(iter.Key()))
+				v := make([]byte, 0, len(iter.Value()))
+				copy(k, iter.Key())
+				copy(v, iter.Value())
+				ch <- &KVPair{k, v}
 			}
 		}
 		iter.Release()

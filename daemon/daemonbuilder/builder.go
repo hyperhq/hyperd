@@ -17,8 +17,6 @@ import (
 	"github.com/docker/engine-api/types"
 	"github.com/docker/engine-api/types/container"
 	"github.com/hyperhq/hyperd/daemon"
-	"github.com/hyperhq/runv/hypervisor"
-	hypertypes "github.com/hyperhq/runv/hypervisor/types"
 )
 
 // Docker implements builder.Backend for the docker Daemon object.
@@ -34,8 +32,6 @@ type Hyper struct {
 	CopyPods  map[string]string
 	BasicPods map[string]string
 	Ready     chan bool
-	Status    chan *hypertypes.VmResponse
-	Vm        *hypervisor.Vm
 }
 
 // ensure Docker implements builder.Backend
@@ -46,7 +42,6 @@ func (d *Docker) InitHyper() {
 		make(map[string]string),
 		make(map[string]string),
 		make(chan bool, 1),
-		nil, nil,
 	}
 }
 

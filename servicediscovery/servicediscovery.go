@@ -11,9 +11,9 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+	apitypes "github.com/hyperhq/hyperd/types"
 	"github.com/hyperhq/hyperd/utils"
 	"github.com/hyperhq/runv/hypervisor"
-	"github.com/hyperhq/runv/hypervisor/pod"
 	"github.com/hyperhq/runv/hypervisor/types"
 	"github.com/hyperhq/runv/lib/linuxsignal"
 )
@@ -24,7 +24,7 @@ var (
 	ServiceConfig string = "haproxy.cfg"
 )
 
-func UpdateLoopbackAddress(vm *hypervisor.Vm, container string, oldServices, newServices []pod.UserService) error {
+func UpdateLoopbackAddress(vm *hypervisor.Vm, container string, oldServices, newServices []*apitypes.UserService) error {
 	addedIPs := make([]string, 0, 1)
 	deletedIPs := make([]string, 0, 1)
 
@@ -83,25 +83,27 @@ func SetupLoopbackAddress(vm *hypervisor.Vm, container, ip, operation string) er
 		Callback: make(chan *types.VmResponse, 1),
 	}
 
-	vm.Pod.AddExec(container, execId, command, false)
-	defer vm.Pod.DeleteExec(execId)
+	result := vm.WaitProcess(false, []string{execId}, 60)
+	if result == nil {
+		return fmt.Errorf("can not wait %s, id: %s", command, execId)
+	}
 
 	if err := vm.Exec(container, execId, string(execcmd), false, tty); err != nil {
 		return err
 	}
 
-	es := vm.Pod.GetExec(execId)
-	if es == nil {
-		return fmt.Errorf("cannot find exec status for %s: %s", command, execId)
+	r, ok := <-result
+	if !ok {
+		return fmt.Errorf("exec failed %s: %s", command, execId)
 	}
-	if es.ExitCode != 0 {
-		return fmt.Errorf("exec %s on container %s failed with exit code %d", command, container, es.ExitCode)
+	if r.Code != 0 {
+		return fmt.Errorf("exec %s on container %s failed with exit code %d", command, container, r.Code)
 	}
 
 	return nil
 }
 
-func ApplyServices(vm *hypervisor.Vm, container string, services []pod.UserService) error {
+func ApplyServices(vm *hypervisor.Vm, container string, services []*apitypes.UserService) error {
 	// Update lo ip addresses
 	oldServices, err := GetServices(vm, container)
 	if err != nil {
@@ -119,8 +121,8 @@ func ApplyServices(vm *hypervisor.Vm, container string, services []pod.UserServi
 	return vm.KillContainer(container, linuxsignal.SIGHUP)
 }
 
-func GetServices(vm *hypervisor.Vm, container string) ([]pod.UserService, error) {
-	var services []pod.UserService
+func GetServices(vm *hypervisor.Vm, container string) ([]*apitypes.UserService, error) {
+	var services []*apitypes.UserService
 	config := path.Join(ServiceVolume, ServiceConfig)
 
 	data, err := vm.ReadFile(container, config)
@@ -137,7 +139,7 @@ func GetServices(vm *hypervisor.Vm, container string) ([]pod.UserService, error)
 		if len(first) > 0 {
 			var t1, t2, t3, t4 string
 			if string(first[0][:]) == "frontend" {
-				s := pod.UserService{
+				s := &apitypes.UserService{
 					Protocol: "TCP",
 				}
 
@@ -152,12 +154,12 @@ func GetServices(vm *hypervisor.Vm, container string) ([]pod.UserService, error)
 				if err != nil {
 					return nil, err
 				}
-				s.ServicePort = int(port)
+				s.ServicePort = int32(port)
 
 				services = append(services, s)
 			} else if string(first[0][:]) == "\tserver" {
 				var idx int
-				var h pod.UserServiceBackend
+				var h = &apitypes.UserServiceBackend{}
 				_, err := fmt.Fscanf(reader, "%s %s %s %s", &t1, &t2, &t3, &t4)
 				if err != nil {
 					return nil, err
@@ -169,7 +171,7 @@ func GetServices(vm *hypervisor.Vm, container string) ([]pod.UserService, error)
 				if err != nil {
 					return nil, err
 				}
-				h.HostPort = int(port)
+				h.HostPort = int32(port)
 
 				idxs := strings.Split(t2, "-")
 				idxLong, err := strconv.ParseInt(idxs[1], 10, 32)
@@ -185,7 +187,7 @@ func GetServices(vm *hypervisor.Vm, container string) ([]pod.UserService, error)
 	return services, nil
 }
 
-func GenerateServiceConfig(services []pod.UserService) []byte {
+func GenerateServiceConfig(services []*apitypes.UserService) []byte {
 	data := []byte{}
 
 	globalConfig := fmt.Sprintf("global\n\t#chroot\t/var/lib/haproxy\n\tpidfile\t/var/run/haproxy.pid\n\tmaxconn\t4000\n\t#user\thaproxy\n\t#group\thaproxy\n\tdaemon\ndefaults\n\tmode\ttcp\n\tretries\t3\n\ttimeout queue\t1m\n\ttimeout connect\t10s\n\ttimeout client\t1m\n\ttimeout server\t1m\n\ttimeout check\t10s\n\tmaxconn\t3000\n")
@@ -208,7 +210,7 @@ func GenerateServiceConfig(services []pod.UserService) []byte {
 	return data
 }
 
-func checkHaproxyConfig(services []pod.UserService, config string) error {
+func checkHaproxyConfig(services []*apitypes.UserService, config string) error {
 	var err error
 	glog.V(1).Infof("haproxy config: %s\n", config)
 	if _, err = os.Stat(config); err != nil && os.IsNotExist(err) {
@@ -218,12 +220,12 @@ func checkHaproxyConfig(services []pod.UserService, config string) error {
 	return err
 }
 
-func PrepareServices(userPod *pod.UserPod, podId string) error {
+func PrepareServices(services []*apitypes.UserService, podId string) error {
 	var serviceDir string = path.Join(utils.HYPER_ROOT, "services", podId)
 	var config string = path.Join(serviceDir, ServiceConfig)
 	var err error
 
-	if len(userPod.Services) == 0 {
+	if len(services) == 0 {
 		return nil
 	}
 
@@ -231,5 +233,5 @@ func PrepareServices(userPod *pod.UserPod, podId string) error {
 		return err
 	}
 
-	return checkHaproxyConfig(userPod.Services, config)
+	return checkHaproxyConfig(services, config)
 }

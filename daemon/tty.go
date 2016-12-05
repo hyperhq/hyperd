@@ -6,21 +6,14 @@ import (
 )
 
 func (daemon *Daemon) TtyResize(containerId, execId string, h, w int) error {
-	podId, err := daemon.GetPodByContainer(containerId)
-	if err != nil {
-		return err
-	}
-	vmid, err := daemon.GetVmByPodId(podId)
-	if err != nil {
-		return err
-	}
-
-	vm, ok := daemon.VmList.Get(vmid)
+	p, id, ok := daemon.PodList.GetByContainerIdOrName(containerId)
 	if !ok {
-		return fmt.Errorf("vm %s doesn't exist!", vmid)
+		err := fmt.Errorf("cannot find container %s", containerId)
+		glog.Error(err)
+		return err
 	}
 
-	err = vm.Tty(containerId, execId, h, w)
+	err := p.TtyResize(id, execId, h, w)
 	if err != nil {
 		return err
 	}

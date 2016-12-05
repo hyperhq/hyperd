@@ -2,306 +2,150 @@ package daemon
 
 import (
 	"fmt"
-	"strings"
 
-	"github.com/hyperhq/runv/hypervisor"
-	"github.com/hyperhq/runv/hypervisor/types"
+	"github.com/hyperhq/hypercontainer-utils/hlog"
+	"github.com/hyperhq/hyperd/daemon/pod"
+	apitypes "github.com/hyperhq/hyperd/types"
 )
 
-func (daemon *Daemon) ListVMs(podId, vmId string) ([]*hypervisor.Vm, error) {
+type pMatcher func(p *pod.XPod) (match, quit bool)
+
+func (daemon *Daemon) snapshotPodList(podId, vmId string) []*pod.XPod {
 	var (
-		pod *Pod           = nil
-		vm  *hypervisor.Vm = nil
+		pl = []*pod.XPod{}
 	)
 
 	if podId != "" {
-		var ok bool
-		pod, ok = daemon.PodList.Get(podId)
-		if !ok || (pod == nil) {
-			return nil, fmt.Errorf("Cannot find specified pod %s", podId)
+		p, ok := daemon.PodList.Get(podId)
+		if ok {
+			pl = append(pl, p)
 		}
+		if vmId != "" && p.SandboxName() != vmId {
+			return []*pod.XPod{}
+		}
+		return pl
 	}
 
 	if vmId != "" {
-		var ok bool
-		vm, ok = daemon.VmList.Get(vmId)
-		if !ok || (vm == nil) {
-			return nil, fmt.Errorf("Cannot find specified vm %s", vmId)
-		}
-	}
-
-	results := make([]*hypervisor.Vm, 0)
-	if pod == nil && vm == nil {
-		daemon.VmList.Foreach(func(vm *hypervisor.Vm) error {
-			results = append(results, vm)
-			return nil
+		p := daemon.PodList.Find(func(p *pod.XPod) bool {
+			return p.SandboxName() == vmId
 		})
-	} else if pod != nil && vm == nil {
-		if pod.VM != nil {
-			results = append(results, pod.VM)
+		if p != nil {
+			pl = append(pl, p)
 		}
-	} else if pod == nil && vm != nil {
-		results = append(results, vm)
-	} else {
-		if pod.PodStatus.Vm == vm.Id {
-			results = append(results, vm)
-		}
+		return pl
 	}
 
-	return results, nil
+	daemon.PodList.Foreach(func(p *pod.XPod) error {
+		pl = append(pl, p)
+		return nil
+	})
+	return pl
 }
 
-func (daemon *Daemon) ListPods(podId, vmId string) ([]*Pod, error) {
+func (daemon *Daemon) ListContainers(podId, vmId string, auxiliary bool) ([]*apitypes.ContainerListResult, error) {
 	var (
-		pod *Pod           = nil
-		vm  *hypervisor.Vm = nil
+		cids   []string
+		result = []*apitypes.ContainerListResult{}
 	)
-
-	if podId != "" {
-		var ok bool
-		pod, ok = daemon.PodList.Get(podId)
-		if !ok || (pod == nil) {
-			return nil, fmt.Errorf("Cannot find specified pod %s", podId)
+	pl := daemon.snapshotPodList(podId, vmId)
+	for _, p := range pl {
+		if auxiliary {
+			cids = p.ContainerIds()
+		} else {
+			cids = p.ContainerIdsOf(apitypes.UserContainer_REGULAR)
 		}
-	}
-
-	if vmId != "" {
-		var ok bool
-		vm, ok = daemon.VmList.Get(vmId)
-		if !ok || (vm == nil) {
-			return nil, fmt.Errorf("Cannot find specified vm %s", vmId)
-		}
-	}
-
-	results := make([]*Pod, 0)
-	if pod == nil && vm == nil {
-		daemon.PodList.Foreach(func(p *Pod) error {
-			if p.PodStatus.Status != types.S_POD_NONE {
-				results = append(results, p)
+		for _, cid := range cids {
+			status := p.ContainerBriefStatus(cid)
+			if status != nil {
+				result = append(result, status)
 			}
-			return nil
-		})
-	} else if pod != nil && vm == nil {
-		if pod.PodStatus.Status != types.S_POD_NONE {
-			results = append(results, pod)
 		}
-	} else if pod == nil && vm != nil {
-		daemon.PodList.Foreach(func(p *Pod) error {
-			if p.PodStatus.Vm == vmId && p.PodStatus.Status != types.S_POD_NONE {
-				results = append(results, p)
-			}
-			return nil
-		})
-	} else {
-		if pod.PodStatus.Vm == vmId && pod.PodStatus.Status != types.S_POD_NONE {
-			results = append(results, pod)
-		}
-	}
 
-	return results, nil
+	}
+	return result, nil
 }
 
-func filterPodContainers(pod *hypervisor.PodStatus, aux bool) []*hypervisor.ContainerStatus {
-	results := make([]*hypervisor.ContainerStatus, 0)
-
-	filterServiceDiscovery := !aux && (pod.Type == "service-discovery")
-
-	for _, c := range pod.Containers {
-		// NOTE(harry) filter out containers ended with "service-discovery" which is for internal usage
-		if filterServiceDiscovery && strings.HasSuffix(c.Name, "service-discovery") {
-			continue
+func (daemon *Daemon) ListPods(podId, vmId string) ([]*apitypes.PodListResult, error) {
+	pl := daemon.snapshotPodList(podId, vmId)
+	result := make([]*apitypes.PodListResult, 0, len(pl))
+	for _, p := range pl {
+		if s := p.BriefStatus(); s != nil {
+			result = append(result, s)
 		}
-		results = append(results, c)
 	}
-	return results
+	return result, nil
 }
 
-func (daemon *Daemon) ListContainers(podId, vmId string, auxiliary bool) ([]*hypervisor.ContainerStatus, error) {
-	var (
-		pod *Pod           = nil
-		vm  *hypervisor.Vm = nil
-	)
-
-	if podId != "" {
-		var ok bool
-		pod, ok = daemon.PodList.Get(podId)
-		if !ok || (pod == nil) {
-			return nil, fmt.Errorf("Cannot find specified pod %s", podId)
+func (daemon *Daemon) ListVMs(podId, vmId string) ([]*apitypes.VMListResult, error) {
+	pl := daemon.snapshotPodList(podId, vmId)
+	result := make([]*apitypes.VMListResult, 0, len(pl))
+	for _, p := range pl {
+		if s := p.SandboxBriefStatus(); s != nil {
+			result = append(result, s)
 		}
 	}
 
-	if vmId != "" {
-		var ok bool
-		vm, ok = daemon.VmList.Get(vmId)
-		if !ok || (vm == nil) {
-			return nil, fmt.Errorf("Cannot find specified vm %s", vmId)
-		}
-	}
-
-	results := make([]*hypervisor.ContainerStatus, 0)
-	if pod == nil && vm == nil {
-		daemon.PodList.Foreach(func(p *Pod) error {
-			filteredContainers := filterPodContainers(p.PodStatus, auxiliary)
-			results = append(results, filteredContainers...)
-			return nil
-		})
-	} else if pod != nil && vm == nil {
-		filteredContainers := filterPodContainers(pod.PodStatus, auxiliary)
-		results = append(results, filteredContainers...)
-	} else if pod == nil && vm != nil {
-		daemon.PodList.Foreach(func(p *Pod) error {
-			if p.PodStatus.Vm == vmId {
-				filteredContainers := filterPodContainers(p.PodStatus, auxiliary)
-				results = append(results, filteredContainers...)
-			}
-			return nil
-		})
-	} else {
-		if pod.PodStatus.Vm == vmId {
-			filteredContainers := filterPodContainers(pod.PodStatus, auxiliary)
-			results = append(results, filteredContainers...)
-		}
-	}
-
-	return results, nil
+	return result, nil
 }
 
 func (daemon *Daemon) List(item, podId, vmId string, auxiliary bool) (map[string][]string, error) {
 	var (
+		pl = []*pod.XPod{}
+
 		list                  = make(map[string][]string)
 		vmJsonResponse        = []string{}
 		podJsonResponse       = []string{}
 		containerJsonResponse = []string{}
 	)
+	hlog.Log(hlog.INFO, "got list request for %s (pod: %s, vm: %s, include aux container: %v)", item, podId, vmId, auxiliary)
 	if item != "pod" && item != "container" && item != "vm" {
 		return list, fmt.Errorf("Can not support %s list!", item)
 	}
 
-	if item == "vm" {
-		VMs, err := daemon.ListVMs(podId, vmId)
-		if err != nil {
-			return list, err
-		}
+	pl = daemon.snapshotPodList(podId, vmId)
 
-		for _, vm := range VMs {
-			vmJsonResponse = append(vmJsonResponse, vm.Id+":"+daemon.showVM(vm))
+	for _, p := range pl {
+		if p.IsNone() {
+			p.Log(pod.TRACE, "listing: ignore none status pod")
+			continue
 		}
+		switch item {
+		case "vm":
+			vm := p.SandboxName()
+			if vm == "" {
+				continue
+			}
+			vmJsonResponse = append(vmJsonResponse, p.SandboxStatusString())
+		case "pod":
+			podJsonResponse = append(podJsonResponse, p.StatusString())
+		case "container":
+			var cids []string
+			if auxiliary {
+				cids = p.ContainerIds()
+			} else {
+				cids = p.ContainerIdsOf(apitypes.UserContainer_REGULAR)
+			}
+			for _, cid := range cids {
+				status := p.ContainerStatusString(cid)
+				if status != "" {
+					containerJsonResponse = append(containerJsonResponse, status)
+				}
+			}
+		}
+	}
 
+	switch item {
+	case "vm":
 		list["vmData"] = vmJsonResponse
-	}
-
-	if item == "pod" {
-		pods, err := daemon.ListPods(podId, vmId)
-		if err != nil {
-			return list, err
-		}
-
-		for _, p := range pods {
-			podJsonResponse = append(podJsonResponse, p.Id+":"+daemon.showPod(p.PodStatus))
-		}
-
+		hlog.Log(hlog.TRACE, "list vm result: %v", vmJsonResponse)
+	case "pod":
 		list["podData"] = podJsonResponse
-	}
-
-	if item == "container" {
-		containers, err := daemon.ListContainers(podId, vmId, auxiliary)
-		if err != nil {
-			return list, err
-		}
-
-		for _, c := range containers {
-			containerJsonResponse = append(containerJsonResponse, daemon.showContainer(c))
-		}
-
+		hlog.Log(hlog.TRACE, "list pod result: %v", podJsonResponse)
+	case "container":
 		list["cData"] = containerJsonResponse
+		hlog.Log(hlog.TRACE, "list container result: %v", containerJsonResponse)
 	}
 
 	return list, nil
-}
-
-func (daemon *Daemon) GetVMStatus(state uint) string {
-	var status string
-
-	switch state {
-	case types.S_VM_ASSOCIATED:
-		status = "associated"
-		break
-	case types.S_VM_IDLE:
-		status = "idle"
-		break
-	case types.S_VM_PAUSED:
-		status = "pasued"
-		break
-	default:
-		status = ""
-		break
-	}
-
-	return status
-}
-
-func (daemon *Daemon) showVM(v *hypervisor.Vm) string {
-
-	p := ""
-	if v.Pod != nil {
-		p = v.Pod.Id
-	}
-
-	return p + ":" + daemon.GetVMStatus(v.Status)
-}
-
-func (daemon *Daemon) GetPodStatus(state uint, podType string) string {
-	var status string
-
-	switch state {
-	case types.S_POD_RUNNING:
-		status = "running"
-	case types.S_POD_CREATED:
-		status = "pending"
-	case types.S_POD_FAILED:
-		status = "failed"
-		if podType == "kubernetes" {
-			status = "failed(kubernetes)"
-		}
-	case types.S_POD_PAUSED:
-		status = "paused"
-	case types.S_POD_SUCCEEDED:
-		status = "succeeded"
-		if podType == "kubernetes" {
-			status = "succeeded(kubernetes)"
-		}
-	default:
-		status = ""
-	}
-
-	return status
-}
-
-func (daemon *Daemon) showPod(pod *hypervisor.PodStatus) string {
-	return pod.Name + ":" + pod.Vm + ":" + daemon.GetPodStatus(pod.Status, pod.Type)
-}
-
-func (daemon *Daemon) GetContainerStatus(state uint32) string {
-	var status string
-
-	switch state {
-	case types.S_POD_RUNNING:
-		status = "running"
-	case types.S_POD_CREATED:
-		status = "pending"
-	case types.S_POD_FAILED:
-		status = "failed"
-	case types.S_POD_SUCCEEDED:
-		status = "succeeded"
-	case types.S_POD_PAUSED:
-		status = "paused"
-	default:
-		status = ""
-	}
-
-	return status
-}
-
-func (daemon *Daemon) showContainer(c *hypervisor.ContainerStatus) string {
-	return c.Id + ":" + c.Name + ":" + c.PodId + ":" + daemon.GetContainerStatus(c.Status)
 }
