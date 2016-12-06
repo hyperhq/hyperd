@@ -47,6 +47,7 @@ function start_hyperd()
   hyper::log::status "Starting hyperd"
   sudo "${HYPER_OUTPUT_HOSTBIN}/hyperd" \
     --host="tcp://127.0.0.1:${API_PORT}" \
+    --logtostderr \
     --v=3 \
     --config="${config}" 1>&2 &
   HYPERD_PID=$!

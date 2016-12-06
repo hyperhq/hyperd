@@ -51,7 +51,6 @@ func main() {
 	flMirrors := flag.String("registry_mirror", "", "Prefered docker registry mirror")
 	flInsecureRegistries := flag.String("insecure_registry", "", "Enable insecure registry communication")
 	flHelp := flag.Bool("help", false, "Print help message for Hyperd daemon")
-	flag.Set("alsologtostderr", "true")
 	flag.Set("log_dir", "/var/log/hyper/")
 	os.MkdirAll("/var/log/hyper/", 0755)
 	flag.Usage = func() { printHelp() }
