@@ -1,6 +1,7 @@
 package hypervisor
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -8,21 +9,23 @@ import (
 	"syscall"
 	"time"
 
-	"encoding/json"
-
 	"github.com/golang/glog"
+	"github.com/hyperhq/runv/api"
 	hyperstartapi "github.com/hyperhq/runv/hyperstart/api/json"
-	"github.com/hyperhq/runv/hypervisor/pod"
 	"github.com/hyperhq/runv/hypervisor/types"
+	"github.com/hyperhq/runv/lib/utils"
 )
 
 type Vm struct {
-	Id     string
-	Pod    *PodStatus
-	Status uint
-	Cpu    int
-	Mem    int
-	Lazy   bool
+	Id string
+
+	ctx *VmContext
+
+	//Pod    *PodStatus
+	//Status uint
+	Cpu  int
+	Mem  int
+	Lazy bool
 
 	Hub     chan VmEvent
 	clients *Fanout
@@ -43,82 +46,59 @@ func (vm *Vm) ReleaseResponseChan(ch chan *types.VmResponse) {
 
 func (vm *Vm) Launch(b *BootConfig) (err error) {
 	var (
-		PodEvent = make(chan VmEvent, 128)
-		Status   = make(chan *types.VmResponse, 128)
+		vmEvent = make(chan VmEvent, 128)
+		Status  = make(chan *types.VmResponse, 128)
+		ctx     *VmContext
 	)
 
-	if vm.Lazy {
-		go LazyVmLoop(vm.Id, PodEvent, Status, b)
-	} else {
-		go VmLoop(vm.Id, PodEvent, Status, b)
+	ctx, err = InitContext(vm.Id, vmEvent, Status, nil, b)
+	if err != nil {
+		Status <- &types.VmResponse{
+			VmId:  vm.Id,
+			Code:  types.E_BAD_REQUEST,
+			Cause: err.Error(),
+		}
+		return err
+
 	}
 
-	vm.Hub = PodEvent
+	go ctx.Launch()
+	vm.ctx = ctx
+	//}
+
+	vm.Hub = vmEvent
 	vm.clients = CreateFanout(Status, 128, false)
 
 	return nil
 }
 
-func (vm *Vm) Kill() (int, string, error) {
-	Status, err := vm.GetResponseChan()
-	if err != nil {
-		return -1, "", err
-	}
-
-	var Response *types.VmResponse
-	shutdownPodEvent := &ShutdownCommand{Wait: false}
-	vm.Hub <- shutdownPodEvent
-	// wait for the VM response
-	stop := false
-	for !stop {
-		var ok bool
-		Response, ok = <-Status
-		if !ok || Response == nil || Response.Code == types.E_VM_SHUTDOWN || Response.Code == types.E_FAILED {
-			vm.ReleaseResponseChan(Status)
-			vm.clients = nil
-			stop = true
-		}
-		if Response != nil {
-			glog.V(1).Infof("Got response: %d: %s", Response.Code, Response.Cause)
-		} else {
-			glog.V(1).Infof("Nil response from status chan")
-		}
-	}
-
-	if Response == nil {
-		return types.E_VM_SHUTDOWN, "", nil
-	}
-
-	return Response.Code, Response.Cause, nil
-}
-
 // This function will only be invoked during daemon start
-func (vm *Vm) AssociateVm(mypod *PodStatus, data []byte) error {
-	glog.V(1).Infof("Associate the POD(%s) with VM(%s)", mypod.Id, mypod.Vm)
+func (vm *Vm) AssociateVm(data []byte) error {
+	glog.V(1).Infof("Associate the POD(%s) with VM(%s)", vm.Id)
 	var (
 		PodEvent = make(chan VmEvent, 128)
 		Status   = make(chan *types.VmResponse, 128)
 	)
 
-	VmAssociate(mypod.Vm, PodEvent, Status, mypod.Wg, data)
+	VmAssociate(vm.Id, PodEvent, Status, data)
 
 	ass := <-Status
 	if ass.Code != types.E_OK {
-		glog.Errorf("cannot associate with vm: %s, error status %d (%s)", mypod.Vm, ass.Code, ass.Cause)
+		glog.Errorf("cannot associate with vm: %s, error status %d (%s)", vm.Id, ass.Code, ass.Cause)
 		return errors.New("load vm status failed")
 	}
-	go vm.handlePodEvent(mypod)
-
+	//	go vm.handlePodEvent(mypod)
+	//
 	vm.Hub = PodEvent
 	vm.clients = CreateFanout(Status, 128, false)
 
-	mypod.Status = types.S_POD_RUNNING
-	mypod.StartedAt = time.Now().Format("2006-01-02T15:04:05Z")
-	mypod.SetContainerStatus(types.S_POD_RUNNING)
-
-	vm.Status = types.S_VM_ASSOCIATED
-	vm.Pod = mypod
-
+	//	mypod.Status = types.S_POD_RUNNING
+	//	mypod.StartedAt = time.Now().Format("2006-01-02T15:04:05Z")
+	//	mypod.SetContainerStatus(types.S_POD_RUNNING)
+	//
+	//	//vm.Status = types.S_VM_ASSOCIATED
+	//	//vm.Pod = mypod
+	//
 	return nil
 }
 
@@ -131,16 +111,7 @@ func (vm *Vm) ReleaseVm() (int, error) {
 	}
 	defer vm.ReleaseResponseChan(Status)
 
-	if vm.Status == types.S_VM_IDLE {
-		shutdownPodEvent := &ShutdownCommand{Wait: false}
-		vm.Hub <- shutdownPodEvent
-		for {
-			Response = <-Status
-			if Response.Code == types.E_VM_SHUTDOWN {
-				break
-			}
-		}
-	} else {
+	if vm.ctx.current == StateRunning {
 		releasePodEvent := &ReleaseVMCommand{}
 		vm.Hub <- releasePodEvent
 		for {
@@ -158,171 +129,238 @@ func (vm *Vm) ReleaseVm() (int, error) {
 	return types.E_OK, nil
 }
 
-func (vm *Vm) handlePodEvent(mypod *PodStatus) {
-	glog.V(1).Infof("hyperHandlePodEvent pod %s, vm %s", mypod.Id, vm.Id)
+func (vm *Vm) WaitVm(timeout int) <-chan bool {
+	var (
+		result      = make(chan bool)
+		timeoutChan <-chan time.Time
+	)
+
+	if timeout >= 0 {
+		timeoutChan = time.After(time.Duration(timeout) * time.Second)
+	} else {
+		timeoutChan = make(chan time.Time, 1)
+	}
 
 	Status, err := vm.GetResponseChan()
 	if err != nil {
+		vm.ctx.Log(ERROR, "fail to get response channel: %v", err)
+		return nil
+	}
+
+	go func() {
+		defer vm.ReleaseResponseChan(Status)
+		for {
+			select {
+			case response, ok := <-Status:
+				if !ok {
+					vm.ctx.Log(WARNING, "status chan broken during waiting vm, it should be closed")
+					result <- false
+					return
+				}
+				if response.Code == types.E_VM_SHUTDOWN {
+					vm.ctx.Log(INFO, "wait vm: vm exited")
+					result <- true
+					return
+
+				}
+			case <-timeoutChan:
+				vm.ctx.Log(WARNING, "timeout while waiting vm")
+				close(result)
+				return
+			}
+		}
+
+	}()
+
+	return result
+}
+
+func (vm *Vm) WaitProcess(isContainer bool, ids []string, timeout int) <-chan *api.ProcessExit {
+	var (
+		waiting     = make(map[string]struct{})
+		result      = make(chan *api.ProcessExit, len(ids))
+		timeoutChan <-chan time.Time
+		waitEvent   = types.E_CONTAINER_FINISHED
+	)
+
+	if !isContainer {
+		waitEvent = types.E_EXEC_FINISHED
+	}
+
+	for _, id := range ids {
+		waiting[id] = struct{}{}
+	}
+
+	if timeout >= 0 {
+		timeoutChan = time.After(time.Duration(timeout) * time.Second)
+	} else {
+		timeoutChan = make(chan time.Time, 1)
+	}
+
+	Status, err := vm.GetResponseChan()
+	if err != nil {
+		vm.ctx.Log(ERROR, "fail to get response channel: %v", err)
+		return nil
+	}
+
+	go func() {
+		defer vm.ReleaseResponseChan(Status)
+		for len(waiting) > 0 {
+			select {
+			case response, ok := <-Status:
+				if !ok || response.Code == types.E_VM_SHUTDOWN {
+					vm.ctx.Log(WARNING, "status chan broken during waiting containers: %#v", waiting)
+					close(result)
+					return
+				}
+				if response.Code == waitEvent {
+					ps, _ := response.Data.(*types.ProcessFinished)
+					if _, ok := waiting[ps.Id]; ok {
+						result <- &api.ProcessExit{
+							Id:         ps.Id,
+							Code:       int(ps.Code),
+							FinishedAt: time.Now().UTC(),
+						}
+						delete(waiting, ps.Id)
+						select {
+						case ps.Ack <- true:
+							vm.ctx.Log(TRACE, "got shut down msg, acked here")
+						default:
+							vm.ctx.Log(TRACE, "got shut down msg, acked somewhere")
+						}
+					}
+				}
+			case <-timeoutChan:
+				vm.ctx.Log(WARNING, "timeout while waiting result of containers: %#v", waiting)
+				close(result)
+				return
+			}
+		}
+		close(result)
+	}()
+
+	return result
+}
+
+//func (vm *Vm) handlePodEvent(mypod *PodStatus) {
+//	glog.V(1).Infof("hyperHandlePodEvent pod %s, vm %s", mypod.Id, vm.Id)
+//
+//	Status, err := vm.GetResponseChan()
+//	if err != nil {
+//		return
+//	}
+//	defer vm.ReleaseResponseChan(Status)
+//
+//	exit := false
+//	mypod.Wg.Add(1)
+//	for {
+//		Response, ok := <-Status
+//		if !ok {
+//			break
+//		}
+//
+//		switch Response.Code {
+//		case types.E_CONTAINER_FINISHED:
+//			ps, ok := Response.Data.(*types.ProcessFinished)
+//			if ok {
+//				mypod.SetOneContainerStatus(ps.Id, ps.Code)
+//				close(ps.Ack)
+//			}
+//		case types.E_EXEC_FINISHED:
+//			ps, ok := Response.Data.(*types.ProcessFinished)
+//			if ok {
+//				mypod.SetExecStatus(ps.Id, ps.Code)
+//				close(ps.Ack)
+//			}
+//		case types.E_POD_FINISHED: // successfully exit
+//			mypod.SetPodContainerStatus(Response.Data.([]uint32))
+//			//vm.Status = types.S_VM_IDLE
+//		case types.E_VM_SHUTDOWN: // vm exited, sucessful or not
+//			if mypod.Status == types.S_POD_RUNNING { // not received finished pod before
+//				mypod.Status = types.S_POD_FAILED
+//				mypod.FinishedAt = time.Now().Format("2006-01-02T15:04:05Z")
+//				mypod.SetContainerStatus(types.S_POD_FAILED)
+//			}
+//			mypod.Vm = ""
+//			exit = true
+//		}
+//
+//		if mypod.Handler != nil {
+//			mypod.Handler.Handle(Response, mypod.Handler.Data, mypod, vm)
+//		}
+//
+//		if exit {
+//			vm.clients = nil
+//			break
+//		}
+//	}
+//	mypod.Wg.Done()
+//}
+
+func (vm *Vm) InitSandbox(config *api.SandboxConfig) {
+	if vm.ctx == nil {
+		vm.ctx.Log(ERROR, "%v", NewNotReadyError(vm.Id))
 		return
+	}
+
+	vm.ctx.SetNetworkEnvironment(config)
+	vm.ctx.startPod()
+}
+
+func (vm *Vm) WaitInit() api.Result {
+	Status, err := vm.GetResponseChan()
+	if err != nil {
+		vm.ctx.Log(ERROR, "failed to get status chan to monitor startpod: %v", err)
+		return api.NewResultBase(vm.Id, false, err.Error())
 	}
 	defer vm.ReleaseResponseChan(Status)
 
-	exit := false
-	mypod.Wg.Add(1)
+	for {
+		s, ok := <-Status
+		if !ok {
+			return api.NewResultBase(vm.Id, false, "status channel broken")
+		}
+
+		switch s.Code {
+		case types.E_OK:
+			return api.NewResultBase(vm.Id, true, "set sandbox config successfully")
+		case types.E_FAILED, types.E_VM_SHUTDOWN:
+			return api.NewResultBase(vm.Id, false, "set sandbox config failed")
+		default:
+			vm.ctx.Log(DEBUG, "got message %#v while waiting start pod command finish")
+		}
+	}
+}
+
+func (vm *Vm) Shutdown() api.Result {
+	if vm.ctx.current != StateRunning {
+		return api.NewResultBase(vm.Id, false, "not in running state")
+	}
+	Status, err := vm.GetResponseChan()
+	if err != nil {
+		return api.NewResultBase(vm.Id, false, "fail to get response chan")
+	}
+	defer vm.ReleaseResponseChan(Status)
+
+	vm.Hub <- &ShutdownCommand{}
 	for {
 		Response, ok := <-Status
 		if !ok {
-			break
+			return api.NewResultBase(vm.Id, false, "status channel broken")
 		}
-
-		switch Response.Code {
-		case types.E_CONTAINER_FINISHED:
-			ps, ok := Response.Data.(*types.ProcessFinished)
-			if ok {
-				mypod.SetOneContainerStatus(ps.Id, ps.Code)
-				close(ps.Ack)
-			}
-		case types.E_EXEC_FINISHED:
-			ps, ok := Response.Data.(*types.ProcessFinished)
-			if ok {
-				mypod.SetExecStatus(ps.Id, ps.Code)
-				close(ps.Ack)
-			}
-		case types.E_POD_FINISHED: // successfully exit
-			mypod.SetPodContainerStatus(Response.Data.([]uint32))
-			vm.Status = types.S_VM_IDLE
-		case types.E_VM_SHUTDOWN: // vm exited, successful or not
-			if mypod.Status == types.S_POD_RUNNING { // not received finished pod before
-				mypod.Status = types.S_POD_FAILED
-				mypod.FinishedAt = time.Now().Format("2006-01-02T15:04:05Z")
-				mypod.SetContainerStatus(types.S_POD_FAILED)
-			}
-			mypod.Vm = ""
-			exit = true
-		}
-
-		if mypod.Handler != nil {
-			mypod.Handler.Handle(Response, mypod.Handler.Data, mypod, vm)
-		}
-
-		if exit {
-			vm.clients = nil
-			break
-		}
-	}
-	mypod.Wg.Done()
-}
-
-func (vm *Vm) StartPod(mypod *PodStatus, userPod *pod.UserPod,
-	cList []*ContainerInfo, vList map[string]*VolumeInfo) *types.VmResponse {
-	mypod.Vm = vm.Id
-	var ok bool = false
-	vm.Pod = mypod
-	vm.Status = types.S_VM_ASSOCIATED
-
-	var response *types.VmResponse
-
-	if mypod.Status == types.S_POD_RUNNING {
-		err := fmt.Errorf("The pod(%s) is running, can not start it", mypod.Id)
-		response = &types.VmResponse{
-			Code:  -1,
-			Cause: err.Error(),
-			Data:  nil,
-		}
-		return response
-	}
-
-	if mypod.Type == "kubernetes" && mypod.Status != types.S_POD_CREATED {
-		err := fmt.Errorf("The pod(%s) is finished with kubernetes type, can not start it again",
-			mypod.Id)
-		response = &types.VmResponse{
-			Code:  -1,
-			Cause: err.Error(),
-			Data:  nil,
-		}
-		return response
-	}
-
-	Status, err := vm.GetResponseChan()
-	if err != nil {
-		return errorResponse(err.Error())
-	}
-	defer vm.ReleaseResponseChan(Status)
-
-	go vm.handlePodEvent(mypod)
-
-	runPodEvent := &RunPodCommand{
-		Spec:       userPod,
-		Containers: cList,
-		Volumes:    vList,
-		Wg:         mypod.Wg,
-	}
-
-	vm.Hub <- runPodEvent
-
-	// wait for the VM response
-	for {
-		response, ok = <-Status
-		if !ok {
-			response = &types.VmResponse{
-				Code:  -1,
-				Cause: "Start pod failed",
-				Data:  nil,
-			}
-			glog.V(1).Infof("return response %v", response)
-			break
-		}
-		glog.V(1).Infof("Get the response from VM, VM id is %s!", response.VmId)
-		if response.Code == types.E_VM_RUNNING {
-			continue
-		}
-		if response.VmId == vm.Id {
-			break
-		}
-	}
-
-	if response.Data != nil {
-		mypod.Status = types.S_POD_RUNNING
-		mypod.StartedAt = time.Now().Format("2006-01-02T15:04:05Z")
-		// Set the container status to online
-		mypod.SetContainerStatus(types.S_POD_RUNNING)
-	}
-
-	return response
-}
-
-func (vm *Vm) StopPod(mypod *PodStatus) *types.VmResponse {
-	var Response *types.VmResponse
-
-	Status, err := vm.GetResponseChan()
-	if err != nil {
-		return errorResponse(err.Error())
-	}
-	defer vm.ReleaseResponseChan(Status)
-
-	if mypod.Status != types.S_POD_RUNNING {
-		return errorResponse("The POD has already stoppod")
-	}
-
-	mypod.Wg.Add(1)
-	shutdownPodEvent := &ShutdownCommand{Wait: true}
-	vm.Hub <- shutdownPodEvent
-	// wait for the VM response
-	for {
-		Response = <-Status
 		glog.V(1).Infof("Got response: %d: %s", Response.Code, Response.Cause)
 		if Response.Code == types.E_VM_SHUTDOWN {
-			mypod.Vm = ""
-			break
+			return api.NewResultBase(vm.Id, true, "set sandbox config successfully")
 		}
 	}
-	// wait for goroutines exit
-	mypod.Wg.Wait()
+}
 
-	mypod.Status = types.S_POD_FAILED
-	mypod.SetContainerStatus(types.S_POD_FAILED)
-
-	return Response
+// TODO: should we provide a method to force kill vm
+func (vm *Vm) Kill() {
+	vm.GenericOperation("KillSandbox", func(ctx *VmContext, result chan<- error) {
+		ctx.poweroffVM(false, "API Kill Sandbox")
+		result <- nil
+	}, StateRunning, StateTerminating)
 }
 
 func (vm *Vm) WriteFile(container, target string, data []byte) error {
@@ -377,30 +415,20 @@ func (vm *Vm) KillContainer(container string, signal syscall.Signal) error {
 
 func (vm *Vm) AddRoute() error {
 	return vm.GenericOperation("AddRoute", func(ctx *VmContext, result chan<- error) {
-		if len(ctx.vmSpec.Routes) == 0 {
-			result <- nil
-			return
-		}
+		routes := ctx.networks.getRoutes()
 
 		ctx.vm <- &hyperstartCmd{
 			Code:    hyperstartapi.INIT_SETUPROUTE,
-			Message: hyperstartapi.Routes{Routes: ctx.vmSpec.Routes},
+			Message: hyperstartapi.Routes{Routes: routes},
 			result:  result,
 		}
 	}, StateRunning)
 }
 
-func (vm *Vm) AddNic(idx int, name string, info pod.UserInterface) error {
-	var (
-		failEvent     *DeviceFailed
-		createdEvent  *InterfaceCreated
-		insertedEvent *NetDevInsertedEvent
-	)
-
-	client := make(chan VmEvent, 1)
+func (vm *Vm) AddNic(info *api.InterfaceDescription) error {
+	client := make(chan api.Result, 1)
 	vm.SendGenericOperation("CreateInterface", func(ctx *VmContext, result chan<- error) {
-		addr := ctx.nextPciAddr()
-		go ctx.ConfigureInterface(idx, addr, name, info, client)
+		go ctx.AddInterface(info, client)
 	}, StateRunning)
 
 	ev, ok := <-client
@@ -408,61 +436,34 @@ func (vm *Vm) AddNic(idx int, name string, info pod.UserInterface) error {
 		return fmt.Errorf("internal error")
 	}
 
-	if failEvent, ok = ev.(*DeviceFailed); ok {
-		if failEvent.Session != nil {
-			return fmt.Errorf("failed while waiting %s",
-				EventString(failEvent.Session.Event()))
-		}
+	if !ev.IsSuccess() {
 		return fmt.Errorf("allocate device failed")
-	} else if createdEvent, ok = ev.(*InterfaceCreated); !ok {
-		return fmt.Errorf("get unexpected event %s", EventString(ev.Event()))
 	}
 
-	vm.SendGenericOperation("InterfaceCreated", func(ctx *VmContext, result chan<- error) {
-		ctx.interfaceCreated(createdEvent, false, client)
+	return vm.GenericOperation("InterfaceInserted", func(ctx *VmContext, result chan<- error) {
+		if ctx.LogLevel(TRACE) {
+			glog.Infof("finial vmSpec.Interface is %#v", ctx.networks.getInterface(info.Id))
+		}
+
+		ctx.updateInterface(info.Id, result)
+	}, StateRunning)
+}
+
+func (vm *Vm) DeleteNic(id string) error {
+	client := make(chan api.Result, 1)
+	vm.SendGenericOperation("NetDevRemovedEvent", func(ctx *VmContext, result chan<- error) {
+		ctx.RemoveInterface(id, client)
 	}, StateRunning)
 
-	ev, ok = <-client
+	ev, ok := <-client
 	if !ok {
 		return fmt.Errorf("internal error")
 	}
 
-	if failEvent, ok = ev.(*DeviceFailed); ok {
-		if failEvent.Session != nil {
-			return fmt.Errorf("failed while waiting %s",
-				EventString(failEvent.Session.Event()))
-		}
-		return fmt.Errorf("allocate device failed")
-	} else if insertedEvent, ok = ev.(*NetDevInsertedEvent); !ok {
-		return fmt.Errorf("get unexpected event %s", EventString(ev.Event()))
+	if !ev.IsSuccess() {
+		return fmt.Errorf("remove device failed")
 	}
-
-	return vm.GenericOperation("InterfaceInserted", func(ctx *VmContext, result chan<- error) {
-		ctx.netdevInserted(insertedEvent)
-		glog.Infof("finial vmSpec.Interfaces is %v", ctx.vmSpec.Interfaces)
-		glog.Infof("finial vmSpec.Routes is %v", ctx.vmSpec.Routes)
-
-		ctx.updateInterface(idx, result)
-	}, StateRunning)
-}
-
-func (vm *Vm) DeleteNic(idx int) error {
-
-	vm.SendGenericOperation("NetDevRemovedEvent", func(ctx *VmContext, result chan<- error) {
-		ctx.removeInterfaceByLinkIndex(idx)
-	}, StateRunning)
-
 	return nil
-}
-
-func (vm *Vm) GetNextNicNameInVM() string {
-	name := make(chan string, 1)
-
-	vm.SendGenericOperation("GetNextNicName", func(ctx *VmContext, result chan<- error) {
-		ctx.GetNextNicName(name)
-	}, StateRunning)
-
-	return <-name
 }
 
 // TODO: deprecated api, it will be removed after the hyper.git updated
@@ -566,13 +567,103 @@ func (vm *Vm) AddProcess(container, execId string, terminal bool, args []string,
 	return tty.WaitForFinish()
 }
 
-func (vm *Vm) NewContainer(c *pod.UserContainer, info *ContainerInfo) error {
-	newContainerCommand := &NewContainerCommand{
-		container: c,
-		info:      info,
+func (vm *Vm) AddVolume(vol *api.VolumeDescription) api.Result {
+	if vm.ctx == nil || vm.ctx.current != StateRunning {
+		glog.Errorf("VM is not ready for insert volume %#v", vol)
+		return NewNotReadyError(vm.Id)
 	}
 
-	vm.Hub <- newContainerCommand
+	result := make(chan api.Result, 1)
+	vm.ctx.AddVolume(vol, result)
+	return <-result
+}
+
+func (vm *Vm) AddContainer(c *api.ContainerDescription) api.Result {
+	if vm.ctx == nil || vm.ctx.current != StateRunning {
+		return NewNotReadyError(vm.Id)
+	}
+
+	result := make(chan api.Result, 1)
+	vm.ctx.AddContainer(c, result)
+	return <-result
+}
+
+func (vm *Vm) RemoveContainer(id string) api.Result {
+	result := make(chan api.Result, 1)
+	vm.ctx.RemoveContainer(id, result)
+	return <-result
+}
+
+func (vm *Vm) RemoveVolume(name string) api.Result {
+	result := make(chan api.Result, 1)
+	vm.ctx.RemoveVolume(name, result)
+	return <-result
+}
+
+func (vm *Vm) RemoveContainers(ids ...string) (bool, map[string]api.Result) {
+	return vm.batchWaitResult(ids, vm.ctx.RemoveContainer)
+}
+
+func (vm *Vm) RemoveVolumes(names ...string) (bool, map[string]api.Result) {
+	return vm.batchWaitResult(names, vm.ctx.RemoveVolume)
+}
+
+type waitResultOp func(string, chan<- api.Result)
+
+func (vm *Vm) batchWaitResult(names []string, op waitResultOp) (bool, map[string]api.Result) {
+	var (
+		success = true
+		result  = map[string]api.Result{}
+		wl      = map[string]struct{}{}
+		r       = make(chan api.Result, len(names))
+	)
+
+	for _, name := range names {
+		if _, ok := wl[name]; !ok {
+			wl[name] = struct{}{}
+			go op(name, r)
+		}
+	}
+
+	for len(wl) > 0 {
+		rsp, ok := <-r
+		if !ok {
+			vm.ctx.Log(ERROR, "fail to wait channels for op %v on %v", op, names)
+			return false, result
+		}
+		if !rsp.IsSuccess() {
+			vm.ctx.Log(ERROR, "batch op %v on %s is not success: %s", op, rsp.ResultId(), rsp.Message())
+			success = false
+		}
+		vm.ctx.Log(DEBUG, "batch op %v on %s returned: %s", op, rsp.Message())
+		if _, ok := wl[rsp.ResultId()]; ok {
+			delete(wl, rsp.ResultId())
+			result[rsp.ResultId()] = rsp
+		}
+	}
+
+	return success, result
+}
+
+func (vm *Vm) StartContainer(id string) error {
+
+	err := vm.GenericOperation("NewContainer", func(ctx *VmContext, result chan<- error) {
+		ctx.newContainer(id, result)
+	}, StateInit, StateRunning)
+
+	if err != nil {
+		return fmt.Errorf("Create new container failed: %v", err)
+	}
+	vm.ctx.Log(DEBUG, "container %s started, setup stdin if needed", id)
+	vm.GenericOperation("StartNewContainerStdin", func(ctx *VmContext, result chan<- error) {
+		// start stdin. TODO: find the correct idx if parallel multi INIT_NEWCONTAINER
+		if cc, ok := ctx.containers[id]; ok {
+			ctx.ptys.startStdin(cc.process.Stdio, cc.process.Terminal)
+		}
+		result <- nil
+	}, StateInit, StateRunning)
+
+	vm.ctx.Log(DEBUG, "container %s start: done.", id)
 	return nil
 }
 
@@ -590,9 +681,9 @@ func (vm *Vm) Tty(containerId, execId string, row, column int) error {
 func (vm *Vm) Stats() *types.VmResponse {
 	var response *types.VmResponse
 
-	if nil == vm.Pod || vm.Pod.Status != types.S_POD_RUNNING {
-		return errorResponse("The pod is not running, can not get stats for it")
-	}
+	//if nil == vm.Pod || vm.Pod.Status != types.S_POD_RUNNING {
+	//	return errorResponse("The pod is not running, can not get stats for it")
+	//}
 
 	Status, err := vm.GetResponseChan()
 	if err != nil {
@@ -669,6 +760,23 @@ func (vm *Vm) Save(path string) error {
 	}, StateInit, StateRunning)
 }
 
+func (vm *Vm) GetIPAddrs() []string {
+	ips := []string{}
+
+	err := vm.GenericOperation("GetIP", func(ctx *VmContext, result chan<- error) {
+		res := ctx.networks.getIpAddrs()
+		ips = append(ips, res...)
+
+		result <- nil
+	}, StateRunning)
+
+	if err != nil {
+		glog.Errorf("get pod ip failed: %v", err)
+	}
+
+	return ips
+}
+
 func (vm *Vm) SendGenericOperation(name string, op func(ctx *VmContext, result chan<- error), states ...string) <-chan error {
 	result := make(chan error, 1)
 	goe := &GenericOperation{
@@ -695,12 +803,11 @@ func errorResponse(cause string) *types.VmResponse {
 
 func NewVm(vmId string, cpu, memory int, lazy bool) *Vm {
 	return &Vm{
-		Id:     vmId,
-		Pod:    nil,
-		Lazy:   lazy,
-		Status: types.S_VM_IDLE,
-		Cpu:    cpu,
-		Mem:    memory,
+		Id: vmId,
+		//Pod:    nil,
+		Lazy: lazy,
+		Cpu:  cpu,
+		Mem:  memory,
 	}
 }
 
@@ -708,7 +815,7 @@ func GetVm(vmId string, b *BootConfig, waitStarted, lazy bool) (vm *Vm, err erro
 	id := vmId
 	if id == "" {
 		for {
-			id = fmt.Sprintf("vm-%s", pod.RandStr(10, "alpha"))
+			id = fmt.Sprintf("vm-%s", utils.RandStr(10, "alpha"))
 			if _, err = os.Stat(BaseDir + "/" + id); os.IsNotExist(err) {
 				break
 			}

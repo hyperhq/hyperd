@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"crypto/rand"
 	"net"
 	"time"
 )
@@ -23,4 +24,26 @@ func UnixSocketConnect(name string) (conn net.Conn, err error) {
 	}
 
 	return
+}
+
+func RandStr(strSize int, randType string) string {
+	var dictionary string
+	if randType == "alphanum" {
+		dictionary = "0123456789abcdefghijklmnopqrstuvwxyz"
+	}
+
+	if randType == "alpha" {
+		dictionary = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+	}
+
+	if randType == "number" {
+		dictionary = "0123456789"
+	}
+
+	var bytes = make([]byte, strSize)
+	rand.Read(bytes)
+	for k, v := range bytes {
+		bytes[k] = dictionary[v%byte(len(dictionary))]
+	}
+	return string(bytes)
 }

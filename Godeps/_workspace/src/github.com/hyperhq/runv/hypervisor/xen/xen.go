@@ -217,26 +217,27 @@ func (xc *XenContext) Stats(ctx *hypervisor.VmContext) (*types.PodStats, error) 
 
 func (xc *XenContext) Close() {}
 
-func (xc *XenContext) AddDisk(ctx *hypervisor.VmContext, sourceType string, blockInfo *hypervisor.BlockDescriptor) {
+func (xc *XenContext) AddDisk(ctx *hypervisor.VmContext, sourceType string, blockInfo *hypervisor.DiskDescriptor, result chan<- hypervisor.VmEvent) {
 	name := blockInfo.Name
 	filename := blockInfo.Filename
 	format := blockInfo.Format
 	id := blockInfo.ScsiId
 
-	go diskRoutine(true, xc, ctx, name, sourceType, filename, format, id, nil)
+	go diskRoutine(true, xc, ctx, name, sourceType, filename, format, id, nil, result)
 }
 
-func (xc *XenContext) RemoveDisk(ctx *hypervisor.VmContext, blockInfo *hypervisor.BlockDescriptor, callback hypervisor.VmEvent) {
+func (xc *XenContext) RemoveDisk(ctx *hypervisor.VmContext, blockInfo *hypervisor.DiskDescriptor, callback hypervisor.VmEvent, result chan<- hypervisor.VmEvent) {
 	filename := blockInfo.Filename
 	format := blockInfo.Format
 	id := blockInfo.ScsiId
 
-	go diskRoutine(false, xc, ctx, "", "", filename, format, id, callback)
+	go diskRoutine(false, xc, ctx, "", "", filename, format, id, callback, result)
 }
 
 func (xc *XenContext) AddNic(ctx *hypervisor.VmContext, host *hypervisor.HostNicInfo, guest *hypervisor.GuestNicInfo, result chan<- hypervisor.VmEvent) {
 	go func() {
 		callback := &hypervisor.NetDevInsertedEvent{
+			Id:         host.Id,
 			Index:      guest.Index,
 			DeviceName: guest.Device,
 			Address:    guest.Busaddr,
@@ -280,16 +281,16 @@ func (xc *XenContext) AddNic(ctx *hypervisor.VmContext, host *hypervisor.HostNic
 	}()
 }
 
-func (xc *XenContext) RemoveNic(ctx *hypervisor.VmContext, n *hypervisor.InterfaceCreated, callback hypervisor.VmEvent) {
+func (xc *XenContext) RemoveNic(ctx *hypervisor.VmContext, n *hypervisor.InterfaceCreated, callback hypervisor.VmEvent, result chan<- hypervisor.VmEvent) {
 	go func() {
 		res := HyperxlNicRemove(xc.driver.Ctx, (uint32)(xc.domId), n.MacAddr)
 		if res == 0 {
 			glog.V(1).Infof("nic %s remove succeeded", n.DeviceName)
-			ctx.Hub <- callback
+			result <- callback
 			return
 		}
 		glog.Errorf("nic %s remove failed", n.DeviceName)
-		ctx.Hub <- &hypervisor.DeviceFailed{
+		result <- &hypervisor.DeviceFailed{
 			Session: callback,
 		}
 	}()
@@ -300,7 +301,7 @@ func (xd *XenDriver) SupportLazyMode() bool {
 }
 
 func diskRoutine(add bool, xc *XenContext, ctx *hypervisor.VmContext,
-	name, sourceType, filename, format string, id int, callback hypervisor.VmEvent) {
+	name, sourceType, filename, format string, id int, callback hypervisor.VmEvent, result chan<- hypervisor.VmEvent) {
 	backend := LIBXL_DISK_BACKEND_TAP
 	if strings.HasPrefix(filename, "/dev/") {
 		backend = LIBXL_DISK_BACKEND_PHY
@@ -327,12 +328,12 @@ func diskRoutine(add bool, xc *XenContext, ctx *hypervisor.VmContext,
 	}
 	if res == 0 {
 		glog.V(1).Infof("Disk %s (%s) %s succeeded", devName, filename, op)
-		ctx.Hub <- callback
+		result <- callback
 		return
 	}
 
 	glog.Errorf("Disk %s (%s) insert %s failed", devName, filename, op)
-	ctx.Hub <- &hypervisor.DeviceFailed{
+	result <- &hypervisor.DeviceFailed{
 		Session: callback,
 	}
 }

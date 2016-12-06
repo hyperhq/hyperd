@@ -2,10 +2,11 @@ package hypervisor
 
 import (
 	"errors"
-	"github.com/hyperhq/runv/hypervisor/network"
-	"github.com/hyperhq/runv/hypervisor/pod"
-	"github.com/hyperhq/runv/hypervisor/types"
 	"os"
+
+	"github.com/hyperhq/runv/api"
+	"github.com/hyperhq/runv/hypervisor/network"
+	"github.com/hyperhq/runv/hypervisor/types"
 )
 
 type BootConfig struct {
@@ -30,6 +31,7 @@ type BootConfig struct {
 }
 
 type HostNicInfo struct {
+	Id      string
 	Fd      uint64
 	Device  string
 	Mac     string
@@ -64,11 +66,11 @@ type DriverContext interface {
 	Associate(ctx *VmContext)
 	Dump() (map[string]interface{}, error)
 
-	AddDisk(ctx *VmContext, sourceType string, blockInfo *BlockDescriptor)
-	RemoveDisk(ctx *VmContext, blockInfo *BlockDescriptor, callback VmEvent)
+	AddDisk(ctx *VmContext, sourceType string, blockInfo *DiskDescriptor, result chan<- VmEvent)
+	RemoveDisk(ctx *VmContext, blockInfo *DiskDescriptor, callback VmEvent, result chan<- VmEvent)
 
 	AddNic(ctx *VmContext, host *HostNicInfo, guest *GuestNicInfo, result chan<- VmEvent)
-	RemoveNic(ctx *VmContext, n *InterfaceCreated, callback VmEvent)
+	RemoveNic(ctx *VmContext, n *InterfaceCreated, callback VmEvent, result chan<- VmEvent)
 
 	SetCpus(ctx *VmContext, cpus int, result chan<- error)
 	AddMem(ctx *VmContext, slot, size int, result chan<- error)
@@ -80,9 +82,9 @@ type DriverContext interface {
 
 	Pause(ctx *VmContext, pause bool, result chan<- error)
 
-	ConfigureNetwork(vmId, requestedIP string, maps []pod.UserContainerPort, config pod.UserInterface) (*network.Settings, error)
-	AllocateNetwork(vmId, requestedIP string, maps []pod.UserContainerPort) (*network.Settings, error)
-	ReleaseNetwork(vmId, releasedIP string, maps []pod.UserContainerPort, file *os.File) error
+	ConfigureNetwork(vmId, requestedIP string, config *api.InterfaceDescription) (*network.Settings, error)
+	AllocateNetwork(vmId, requestedIP string) (*network.Settings, error)
+	ReleaseNetwork(vmId, releasedIP string, file *os.File) error
 
 	Stats(ctx *VmContext) (*types.PodStats, error)
 
@@ -133,15 +135,17 @@ func (ec *EmptyContext) Dump() (map[string]interface{}, error) {
 	return map[string]interface{}{"hypervisor": "empty"}, nil
 }
 
-func (ec *EmptyContext) AddDisk(ctx *VmContext, sourceType string, blockInfo *BlockDescriptor) {}
+func (ec *EmptyContext) AddDisk(ctx *VmContext, sourceType string, blockInfo *DiskDescriptor, result chan<- VmEvent) {
+}
 
-func (ec *EmptyContext) RemoveDisk(ctx *VmContext, blockInfo *BlockDescriptor, callback VmEvent) {
+func (ec *EmptyContext) RemoveDisk(ctx *VmContext, blockInfo *DiskDescriptor, callback VmEvent, result chan<- VmEvent) {
 }
 
 func (ec *EmptyContext) AddNic(ctx *VmContext, host *HostNicInfo, guest *GuestNicInfo, result chan<- VmEvent) {
 }
 
-func (ec *EmptyContext) RemoveNic(ctx *VmContext, n *InterfaceCreated, callback VmEvent) {}
+func (ec *EmptyContext) RemoveNic(ctx *VmContext, n *InterfaceCreated, callback VmEvent, result chan<- VmEvent) {
+}
 
 func (ec *EmptyContext) SetCpus(ctx *VmContext, cpus int, result chan<- error) {}
 func (ec *EmptyContext) AddMem(ctx *VmContext, slot, size int, result chan<- error) {
@@ -157,18 +161,15 @@ func (ec *EmptyContext) Pause(ctx *VmContext, pause bool, result chan<- error) {
 
 func (ec *EmptyContext) BuildinNetwork() bool { return false }
 
-func (ec *EmptyContext) ConfigureNetwork(vmId, requestedIP string,
-	maps []pod.UserContainerPort, config pod.UserInterface) (*network.Settings, error) {
+func (ec *EmptyContext) ConfigureNetwork(vmId, requestedIP string, config *api.InterfaceDescription) (*network.Settings, error) {
 	return nil, nil
 }
 
-func (ec *EmptyContext) AllocateNetwork(vmId, requestedIP string,
-	maps []pod.UserContainerPort) (*network.Settings, error) {
+func (ec *EmptyContext) AllocateNetwork(vmId, requestedIP string) (*network.Settings, error) {
 	return nil, nil
 }
 
-func (ec *EmptyContext) ReleaseNetwork(vmId, releasedIP string,
-	maps []pod.UserContainerPort, file *os.File) error {
+func (ec *EmptyContext) ReleaseNetwork(vmId, releasedIP string, file *os.File) error {
 	return nil
 }
 

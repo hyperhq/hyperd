@@ -1,0 +1,99 @@
+syntax = "proto3";
+
+package api;
+
+message SandboxConfig {
+    string hostname = 1;
+    repeated string dns = 2;
+    NeighborNetworks neighbors = 3;
+}
+
+message ContainerDescription {
+    string id = 1;
+
+    // Static Info, got from client input
+    string name = 2;
+    string image = 3;
+
+    // User content or user specified behavior
+    map<string, string> labels = 4;
+    bool tty = 5;
+    string stopSignal = 6;
+
+    // Creation Info, got during creation
+    VolumeDescription rootVolume = 7;
+    string mountId = 8;
+    string rootPath = 9;
+
+    // runtime info, combined during creation
+    UserGroupInfo UGI = 10;
+    map<string, string> envs = 11;
+    string workdir = 12;
+    string path = 13;
+    repeated string args = 14;
+    repeated Rlimit rlimits = 15;
+    map<string, string> sysctl = 16;
+    map<string, VolumeReference> volumes = 17;
+
+    bool initialize = 24;
+}
+
+message VolumeDescription {
+    string name = 1;
+    string source = 2;
+    string format = 3; //"raw" (or "qcow2" later) for volume, "vfs" for dir path
+    string fstype = 4; //"xfs", "ext4" etc. for block dev, or "dir" for dir path
+    VolumeOption options = 8;
+    bool dockerVolume = 9;
+}
+
+message InterfaceDescription {
+    string id = 1;
+    bool lo = 2;
+    string bridge = 3;
+    string ip = 4;
+    string mac = 5;
+    string gw = 6;
+    string tapName = 7;
+}
+
+message PortDescription {
+    int32 hostPort = 1;
+    int32 containerPort = 2;
+    string protocol = 3;
+}
+
+message NeighborNetworks {
+    repeated string internalNetworks = 1;
+    repeated string externalNetworks = 2;
+}
+
+message VolumeReference {
+    string name = 1;
+    repeated VolumeMount mountPoints = 2;
+}
+
+message VolumeMount {
+    string path = 1;
+    bool readOnly = 2;
+}
+
+message VolumeOption {
+    string user = 1;
+    repeated string monitors = 2;
+    string keyring = 3;
+    int32 bytesPerSec = 4;
+    int32 iops = 5;
+}
+
+message UserGroupInfo {
+    string user = 1;
+    string group = 2;
+    repeated string additionalGroups = 3;
+}
+
+message Rlimit {
+    string type = 1;
+    uint64 hard = 2;
+    uint64 soft = 3;
+}

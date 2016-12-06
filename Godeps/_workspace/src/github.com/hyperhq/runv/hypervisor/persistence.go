@@ -2,12 +2,9 @@ package hypervisor
 
 import (
 	"encoding/json"
-	"errors"
-	"sync"
 
 	"github.com/golang/glog"
 	hyperstartapi "github.com/hyperhq/runv/hyperstart/api/json"
-	"github.com/hyperhq/runv/hypervisor/pod"
 	"github.com/hyperhq/runv/hypervisor/types"
 )
 
@@ -32,7 +29,6 @@ type PersistNetworkInfo struct {
 type PersistInfo struct {
 	Id          string
 	DriverInfo  map[string]interface{}
-	UserSpec    *pod.UserPod
 	VmSpec      *hyperstartapi.Pod
 	HwStat      *VmHwStatus
 	VolumeList  []*PersistVolumeInfo
@@ -46,44 +42,47 @@ func (ctx *VmContext) dump() (*PersistInfo, error) {
 	}
 
 	info := &PersistInfo{
-		Id:          ctx.Id,
-		DriverInfo:  dr,
-		UserSpec:    ctx.userSpec,
-		VmSpec:      ctx.vmSpec,
-		HwStat:      ctx.dumpHwInfo(),
-		VolumeList:  make([]*PersistVolumeInfo, len(ctx.devices.imageMap)+len(ctx.devices.volumeMap)),
-		NetworkList: make([]*PersistNetworkInfo, len(ctx.devices.networkMap)),
+		Id:         ctx.Id,
+		DriverInfo: dr,
+		//UserSpec:    ctx.userSpec,
+		//VmSpec:      ctx.vmSpec,
+		HwStat: ctx.dumpHwInfo(),
+		//VolumeList:  make([]*PersistVolumeInfo, len(ctx.devices.imageMap)+len(ctx.devices.volumeMap)),
+		//NetworkList: make([]*PersistNetworkInfo, len(ctx.devices.networkMap)),
 	}
 
-	vid := 0
-	for _, image := range ctx.devices.imageMap {
-		info.VolumeList[vid] = image.info.dump()
-		info.VolumeList[vid].Containers = []int{image.pos}
-		info.VolumeList[vid].MontPoints = []string{"/"}
-		vid++
-	}
-
-	for _, vol := range ctx.devices.volumeMap {
-		info.VolumeList[vid] = vol.info.dump()
-		for idx, mount := range vol.pos {
-			for _, mp := range mount {
-				info.VolumeList[vid].Containers = append(info.VolumeList[vid].Containers, idx)
-				info.VolumeList[vid].MontPoints = append(info.VolumeList[vid].MontPoints, mp)
-			}
-		}
-		vid++
-	}
-
-	nid := 0
-	for _, nic := range ctx.devices.networkMap {
-		info.NetworkList[nid] = &PersistNetworkInfo{
-			Index:      nic.Index,
-			PciAddr:    nic.PCIAddr,
-			DeviceName: nic.DeviceName,
-			IpAddr:     nic.IpAddr,
-		}
-		nid++
-	}
+	//vid := 0
+	//for _, image := range ctx.devices.imageMap {
+	//	info.VolumeList[vid] = image.info.dump()
+	//	info.VolumeList[vid].Containers = []int{image.pos}
+	//	info.VolumeList[vid].MontPoints = []string{"/"}
+	//	vid++
+	//}
+	//
+	//for _, vol := range ctx.devices.volumeMap {
+	//	info.VolumeList[vid] = vol.info.dump()
+	//	mps := len(vol.pos)
+	//	info.VolumeList[vid].Containers = make([]int, mps)
+	//	info.VolumeList[vid].MontPoints = make([]string, mps)
+	//	i := 0
+	//	for idx, mp := range vol.pos {
+	//		info.VolumeList[vid].Containers[i] = idx
+	//		info.VolumeList[vid].MontPoints[i] = mp
+	//		i++
+	//	}
+	//	vid++
+	//}
+	//
+	//nid := 0
+	//for _, nic := range ctx.devices.networkMap {
+	//	info.NetworkList[nid] = &PersistNetworkInfo{
+	//		Index:      nic.Index,
+	//		PciAddr:    nic.PCIAddr,
+	//		DeviceName: nic.DeviceName,
+	//		IpAddr:     nic.IpAddr,
+	//	}
+	//	nid++
+	//}
 
 	return info, nil
 }
@@ -102,7 +101,7 @@ func (ctx *VmContext) loadHwStatus(pinfo *PersistInfo) {
 	ctx.ptys.attachId = pinfo.HwStat.AttachId
 }
 
-func (blk *BlockDescriptor) dump() *PersistVolumeInfo {
+func (blk *DiskDescriptor) dump() *PersistVolumeInfo {
 	return &PersistVolumeInfo{
 		Name:       blk.Name,
 		Filename:   blk.Filename,
@@ -113,8 +112,8 @@ func (blk *BlockDescriptor) dump() *PersistVolumeInfo {
 	}
 }
 
-func (vol *PersistVolumeInfo) blockInfo() *BlockDescriptor {
-	return &BlockDescriptor{
+func (vol *PersistVolumeInfo) blockInfo() *DiskDescriptor {
+	return &DiskDescriptor{
 		Name:       vol.Name,
 		Filename:   vol.Filename,
 		Format:     vol.Format,
@@ -134,8 +133,7 @@ func (pinfo *PersistInfo) serialize() ([]byte, error) {
 	return json.Marshal(pinfo)
 }
 
-func (pinfo *PersistInfo) vmContext(hub chan VmEvent, client chan *types.VmResponse,
-	wg *sync.WaitGroup) (*VmContext, error) {
+func (pinfo *PersistInfo) vmContext(hub chan VmEvent, client chan *types.VmResponse) (*VmContext, error) {
 
 	dc, err := HDriver.LoadContext(pinfo.DriverInfo)
 	if err != nil {
@@ -148,46 +146,46 @@ func (pinfo *PersistInfo) vmContext(hub chan VmEvent, client chan *types.VmRespo
 		return nil, err
 	}
 
-	ctx.vmSpec = pinfo.VmSpec
-	ctx.userSpec = pinfo.UserSpec
-	ctx.wg = wg
+	//ctx.vmSpec = pinfo.VmSpec
+	//ctx.userSpec = pinfo.UserSpec
+	//ctx.wg = wg
 
 	ctx.loadHwStatus(pinfo)
 
-	for _, vol := range pinfo.VolumeList {
-		binfo := vol.blockInfo()
-		if len(vol.Containers) != len(vol.MontPoints) {
-			return nil, errors.New("persistent data corrupt, volume info mismatch")
-		}
-		if len(vol.MontPoints) == 1 && vol.MontPoints[0] == "/" {
-			img := &imageInfo{
-				info: binfo,
-				pos:  vol.Containers[0],
-			}
-			ctx.devices.imageMap[vol.Name] = img
-		} else {
-			v := &volume{
-				info:     binfo,
-				pos:      make(map[int][]string),
-				readOnly: make(map[int][]bool),
-			}
-			for i := 0; i < len(vol.Containers); i++ {
-				idx := vol.Containers[i]
-				v.pos[idx] = append(v.pos[idx], vol.MontPoints[i])
-				v.readOnly[idx] = append(v.readOnly[idx], ctx.vmSpec.Containers[idx].RoLookup(vol.MontPoints[i]))
-			}
-			ctx.devices.volumeMap[vol.Name] = v
-		}
-	}
-
-	for _, nic := range pinfo.NetworkList {
-		ctx.devices.networkMap[nic.Index] = &InterfaceCreated{
-			Index:      nic.Index,
-			PCIAddr:    nic.PciAddr,
-			DeviceName: nic.DeviceName,
-			IpAddr:     nic.IpAddr,
-		}
-	}
+	//for _, vol := range pinfo.VolumeList {
+	//	binfo := vol.blockInfo()
+	//	if len(vol.Containers) != len(vol.MontPoints) {
+	//		return nil, errors.New("persistent data corrupt, volume info mismatch")
+	//	}
+	//	if len(vol.MontPoints) == 1 && vol.MontPoints[0] == "/" {
+	//		img := &imageInfo{
+	//			info: binfo,
+	//			pos:  vol.Containers[0],
+	//		}
+	//		ctx.devices.imageMap[vol.Name] = img
+	//	} else {
+	//		v := &volume{
+	//			info:     binfo,
+	//			pos:      make(map[int]string),
+	//			readOnly: make(map[int][]bool),
+	//		}
+	//		for i := 0; i < len(vol.Containers); i++ {
+	//			idx := vol.Containers[i]
+	//			v.pos[idx] = vol.MontPoints[i]
+	//			v.readOnly[idx] = ctx.vmSpec.Containers[idx].RoLookup(vol.MontPoints[i])
+	//		}
+	//		ctx.devices.volumeMap[vol.Name] = v
+	//	}
+	//}
+	//
+	//for _, nic := range pinfo.NetworkList {
+	//	ctx.devices.networkMap[nic.Index] = &InterfaceCreated{
+	//		Index:      nic.Index,
+	//		PCIAddr:    nic.PciAddr,
+	//		DeviceName: nic.DeviceName,
+	//		IpAddr:     nic.IpAddr,
+	//	}
+	//}
 
 	return ctx, nil
 }

@@ -5,8 +5,8 @@ package xen
 import (
 	"os"
 
+	"github.com/hyperhq/runv/api"
 	"github.com/hyperhq/runv/hypervisor/network"
-	"github.com/hyperhq/runv/hypervisor/pod"
 )
 
 func (xd *XenDriver) BuildinNetwork() bool {
@@ -17,17 +17,14 @@ func (xd *XenDriver) InitNetwork(bIface, bIP string, disableIptables bool) error
 	return nil
 }
 
-func (xc *XenContext) ConfigureNetwork(vmId, requestedIP string,
-	maps []pod.UserContainerPort, config pod.UserInterface) (*network.Settings, error) {
+func (xc *XenContext) ConfigureNetwork(vmId, requestedIP string, config *api.InterfaceDescription) (*network.Settings, error) {
 	return nil, nil
 }
 
-func (xc *XenContext) AllocateNetwork(vmId, requestedIP string,
-	maps []pod.UserContainerPort) (*network.Settings, error) {
+func (xc *XenContext) AllocateNetwork(vmId, requestedIP string) (*network.Settings, error) {
 	return nil, nil
 }
 
-func (xc *XenContext) ReleaseNetwork(vmId, releasedIP string, maps []pod.UserContainerPort,
-	file *os.File) error {
+func (xc *XenContext) ReleaseNetwork(vmId, releasedIP string, file *os.File) error {
 	return nil
 }

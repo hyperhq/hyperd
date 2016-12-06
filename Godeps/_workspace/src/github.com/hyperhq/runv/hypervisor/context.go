@@ -1,14 +1,13 @@
 package hypervisor
 
 import (
-	"encoding/json"
+	"fmt"
 	"os"
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
+	"github.com/hyperhq/runv/api"
 	hyperstartapi "github.com/hyperhq/runv/hyperstart/api/json"
-	"github.com/hyperhq/runv/hypervisor/pod"
 	"github.com/hyperhq/runv/hypervisor/types"
 )
 
@@ -48,57 +47,66 @@ type VmContext struct {
 	pciAddr int //next available pci addr for pci hotplug
 	scsiId  int //next available scsi id for scsi hotplug
 
-	InterfaceCount int
+	//	InterfaceCount int
 
 	ptys *pseudoTtys
 
 	// Specification
-	userSpec *pod.UserPod
-	vmSpec   *hyperstartapi.Pod
-	vmExec   map[string]*hyperstartapi.ExecCommand
-	devices  *deviceMap
+	volumes    map[string]*DiskContext
+	containers map[string]*ContainerContext
+	networks   *NetworkContext
 
-	progress *processingList
+	// internal states
+	vmExec map[string]*hyperstartapi.ExecCommand
 
 	// Internal Helper
 	handler stateHandler
 	current string
 	timer   *time.Timer
 
+	logPrefix string
+
 	lock *sync.Mutex //protect update of context
 	wg   *sync.WaitGroup
-	wait bool
 }
 
 type stateHandler func(ctx *VmContext, event VmEvent)
 
+func NewVmSpec() *hyperstartapi.Pod {
+	return &hyperstartapi.Pod{
+		ShareDir: ShareDirTag,
+	}
+}
+
 func InitContext(id string, hub chan VmEvent, client chan *types.VmResponse, dc DriverContext, boot *BootConfig) (*VmContext, error) {
-	var err error = nil
+	var (
+		vmChannel = make(chan *hyperstartCmd, 128)
 
-	vmChannel := make(chan *hyperstartCmd, 128)
+		//dir and sockets:
+		homeDir         = BaseDir + "/" + id + "/"
+		hyperSockName   = homeDir + HyperSockName
+		ttySockName     = homeDir + TtySockName
+		consoleSockName = homeDir + ConsoleSockName
+		shareDir        = homeDir + ShareDirTag
+		ctx             *VmContext
+	)
 
-	//dir and sockets:
-	homeDir := BaseDir + "/" + id + "/"
-	hyperSockName := homeDir + HyperSockName
-	ttySockName := homeDir + TtySockName
-	consoleSockName := homeDir + ConsoleSockName
-	shareDir := homeDir + ShareDirTag
+	err := os.MkdirAll(shareDir, 0755)
+	if err != nil {
+		ctx.Log(ERROR, "cannot make dir %s: %v", shareDir, err)
+		return nil, err
+	}
 
 	if dc == nil {
 		dc = HDriver.InitContext(homeDir)
-	}
-	err = os.MkdirAll(shareDir, 0755)
-	if err != nil {
-		glog.Error("cannot make dir", shareDir, err.Error())
-		return nil, err
-	}
-	defer func() {
-		if err != nil {
-			os.Remove(homeDir)
+		if dc == nil {
+			err := fmt.Errorf("cannot create driver context of %s", homeDir)
+			ctx.Log(ERROR, "init failed: %v", err)
+			return nil, err
 		}
-	}()
+	}
 
-	return &VmContext{
+	ctx = &VmContext{
 		Id:              id,
 		Boot:            boot,
 		PauseState:      PauseStateUnpaused,
@@ -114,18 +122,19 @@ func InitContext(id string, hub chan VmEvent, client chan *types.VmResponse, dc 
 		TtySockName:     ttySockName,
 		ConsoleSockName: consoleSockName,
 		ShareDir:        shareDir,
-		InterfaceCount:  InterfaceCount,
 		timer:           nil,
-		handler:         stateInit,
-		current:         StateInit,
-		userSpec:        nil,
-		vmSpec:          nil,
+		handler:         stateRunning,
+		current:         StateRunning,
+		volumes:         make(map[string]*DiskContext),
+		containers:      make(map[string]*ContainerContext),
+		networks:        NewNetworkContext(),
 		vmExec:          make(map[string]*hyperstartapi.ExecCommand),
-		devices:         newDeviceMap(),
-		progress:        newProcessingList(),
+		logPrefix:       fmt.Sprintf("SB[%s] ", id),
 		lock:            &sync.Mutex{},
-		wait:            false,
-	}, nil
+	}
+	ctx.networks.sandbox = ctx
+
+	return ctx, nil
 }
 
 func (ctx *VmContext) setTimeout(seconds int) {
@@ -153,10 +162,10 @@ func (ctx *VmContext) reset() {
 	ctx.scsiId = 0
 	//do not reset attach id here, let it increase
 
-	ctx.userSpec = nil
-	ctx.vmSpec = nil
-	ctx.devices = newDeviceMap()
-	ctx.progress = newProcessingList()
+	ctx.containers = make(map[string]*ContainerContext)
+	ctx.volumes = make(map[string]*DiskContext)
+	ctx.networks = NewNetworkContext()
+	ctx.networks.sandbox = ctx
 
 	ctx.lock.Unlock()
 }
@@ -183,7 +192,7 @@ func (ctx *VmContext) LookupExecBySession(session uint64) string {
 
 	for id, exec := range ctx.vmExec {
 		if exec.Process.Stdio == session {
-			glog.V(1).Infof("found exec %s whose session is %v", id, session)
+			ctx.Log(DEBUG, "found exec %s whose session is %v", id, session)
 			return id
 		}
 	}
@@ -202,31 +211,14 @@ func (ctx *VmContext) LookupBySession(session uint64) string {
 	ctx.lock.Lock()
 	defer ctx.lock.Unlock()
 
-	if ctx.vmSpec == nil {
-		return ""
-	}
-	for idx, c := range ctx.vmSpec.Containers {
-		if c.Process.Stdio == session {
-			glog.V(1).Infof("found container %s whose session is %v at %d", c.Id, session, idx)
-			return c.Id
+	for id, c := range ctx.containers {
+		if c.process.Stdio == session {
+			ctx.Log(DEBUG, "found container %s whose session is %v", c.Id, session)
+			return id
 		}
 	}
-	glog.V(1).Infof("can not found container whose session is %s", session)
+	ctx.Log(DEBUG, "can not found container whose session is %s", session)
 	return ""
-}
-
-func (ctx *VmContext) Lookup(container string) int {
-	if container == "" || ctx.vmSpec == nil {
-		return -1
-	}
-	for idx, c := range ctx.vmSpec.Containers {
-		if c.Id == container {
-			glog.V(1).Infof("found container %s at %d", container, idx)
-			return idx
-		}
-	}
-	glog.V(1).Infof("can not found container %s", container)
-	return -1
 }
 
 func (ctx *VmContext) Close() {
@@ -234,6 +226,7 @@ func (ctx *VmContext) Close() {
 	defer ctx.lock.Unlock()
 	ctx.ptys.closePendingTtys()
 	ctx.unsetTimeout()
+	ctx.networks.close()
 	ctx.DCtx.Close()
 	close(ctx.vm)
 	close(ctx.client)
@@ -242,103 +235,168 @@ func (ctx *VmContext) Close() {
 	ctx.current = "None"
 }
 
-func (ctx *VmContext) tryClose() bool {
-	if ctx.deviceReady() {
-		glog.V(1).Info("no more device to release/remove/umount, quit")
-		ctx.Close()
-		return true
-	}
-	return false
-}
-
 func (ctx *VmContext) Become(handler stateHandler, desc string) {
 	orig := ctx.current
 	ctx.lock.Lock()
 	ctx.handler = handler
 	ctx.current = desc
 	ctx.lock.Unlock()
-	glog.V(1).Infof("VM %s: state change from %s to '%s'", ctx.Id, orig, desc)
+	ctx.Log(DEBUG, "state change from %s to '%s'", orig, desc)
 }
 
-// InitDeviceContext will init device info in context
-func (ctx *VmContext) InitDeviceContext(spec *pod.UserPod, wg *sync.WaitGroup,
-	cInfo []*ContainerInfo, vInfo map[string]*VolumeInfo) {
-
+// User API
+func (ctx *VmContext) SetNetworkEnvironment(net *api.SandboxConfig) {
 	ctx.lock.Lock()
 	defer ctx.lock.Unlock()
 
-	/* Update interface count accourding to user pod */
-	ret := len(spec.Interfaces)
-	if ret != 0 {
-		ctx.InterfaceCount = ret
+	ctx.networks.SandboxConfig = net
+}
+
+func (ctx *VmContext) AddPortmapping(ports []*api.PortDescription) {
+	ctx.lock.Lock()
+	defer ctx.lock.Unlock()
+}
+
+func (ctx *VmContext) AddInterface(inf *api.InterfaceDescription, result chan api.Result) {
+	ctx.lock.Lock()
+	defer ctx.lock.Unlock()
+
+	ctx.networks.addInterface(inf, result)
+}
+
+func (ctx *VmContext) RemoveInterface(id string, result chan api.Result) {
+	ctx.lock.Lock()
+	defer ctx.lock.Unlock()
+
+	ctx.networks.removeInterface(id, result)
+}
+
+func (ctx *VmContext) AddContainer(c *api.ContainerDescription, result chan api.Result) {
+	ctx.lock.Lock()
+	defer ctx.lock.Unlock()
+
+	if ctx.LogLevel(TRACE) {
+		ctx.Log(TRACE, "add container %#v", c)
 	}
 
-	for i := 0; i < ctx.InterfaceCount; i++ {
-		ctx.progress.adding.networks[i] = true
+	if _, ok := ctx.containers[c.Id]; ok {
+		estr := fmt.Sprintf("duplicate container %s", c.Name)
+		ctx.Log(ERROR, estr)
+		result <- NewSpecError(c.Id, estr)
+		return
+	}
+	cc := &ContainerContext{
+		ContainerDescription: c,
+		fsmap:                []*hyperstartapi.FsmapDescriptor{},
+		vmVolumes:            []*hyperstartapi.VolumeDescriptor{},
+		sandbox:              ctx,
+		logPrefix:            fmt.Sprintf("SB[%s] Con[%s] ", ctx.Id, c.Id),
 	}
 
-	if cInfo == nil {
-		cInfo = []*ContainerInfo{}
-	}
-
-	if vInfo == nil {
-		vInfo = make(map[string]*VolumeInfo)
-	}
-
-	ctx.initVolumeMap(spec)
-
-	if glog.V(3) {
-		for i, c := range cInfo {
-			glog.Infof("#%d Container Info:", i)
-			b, err := json.MarshalIndent(c, "...|", "    ")
-			if err == nil {
-				glog.Info("\n", string(b))
-			}
+	wgDisk := &sync.WaitGroup{}
+	added := []string{}
+	rollback := func() {
+		for _, d := range added {
+			ctx.volumes[d].unwait(c.Id)
 		}
 	}
 
-	containers := make([]hyperstartapi.Container, len(spec.Containers))
+	//TODO: should we validate container before we add them to volumeMap?
+	for vn := range c.Volumes {
+		entry, ok := ctx.volumes[vn]
+		if !ok {
+			estr := fmt.Sprintf("volume %s does not exist in volume map", vn)
+			cc.Log(ERROR, estr)
+			rollback()
+			result <- NewSpecError(c.Id, estr)
+			return
+		}
 
-	for i, container := range spec.Containers {
-		ctx.initContainerInfo(i, &containers[i], &container)
-		ctx.setContainerInfo(i, &containers[i], cInfo[i])
+		entry.wait(c.Id, wgDisk)
+		added = append(added, vn)
+	}
 
-		containers[i].Process.Stdio = ctx.ptys.attachId
-		ctx.ptys.attachId++
-		if !container.Tty {
-			containers[i].Process.Stderr = ctx.ptys.attachId
-			ctx.ptys.attachId++
+	//prepare runtime environment
+	cc.configProcess()
+
+	cc.root = NewDiskContext(ctx, c.RootVolume)
+	cc.root.isRootVol = true
+	cc.root.insert(nil)
+	cc.root.wait(c.Id, wgDisk)
+
+	ctx.containers[c.Id] = cc
+
+	go cc.add(wgDisk, result)
+
+	return
+}
+
+func (ctx *VmContext) RemoveContainer(id string, result chan<- api.Result) {
+	ctx.lock.Lock()
+	defer ctx.lock.Unlock()
+
+	cc, ok := ctx.containers[id]
+	if !ok {
+		ctx.Log(WARNING, "container %s not exist", id)
+		result <- api.NewResultBase(id, true, "not exist")
+		return
+	}
+
+	for v := range cc.Volumes {
+		if vol, ok := ctx.volumes[v]; ok {
+			vol.unwait(id)
 		}
 	}
 
-	hostname := spec.Hostname
-	if len(hostname) == 0 {
-		hostname = spec.Name
-	}
-	if len(hostname) > 64 {
-		hostname = spec.Name[:64]
+	cc.root.unwait(id)
+
+	ctx.Log(INFO, "remove container %s", id)
+	delete(ctx.containers, id)
+	cc.root.remove(result)
+}
+
+func (ctx *VmContext) AddVolume(vol *api.VolumeDescription, result chan api.Result) {
+	ctx.lock.Lock()
+	defer ctx.lock.Unlock()
+
+	if _, ok := ctx.volumes[vol.Name]; ok {
+		estr := fmt.Sprintf("duplicate volume %s", vol.Name)
+		ctx.Log(WARNING, estr)
+		result <- api.NewResultBase(vol.Name, true, estr)
+		return
 	}
 
-	vmspec := &hyperstartapi.Pod{
-		Hostname:   hostname,
-		Containers: containers,
-		Dns:        spec.Dns,
-		Interfaces: nil,
-		Routes:     nil,
-		ShareDir:   ShareDirTag,
-	}
-	if spec.PortmappingWhiteLists != nil {
-		vmspec.PortmappingWhiteLists = &hyperstartapi.PortmappingWhiteList{
-			InternalNetworks: spec.PortmappingWhiteLists.InternalNetworks,
-			ExternalNetworks: spec.PortmappingWhiteLists.ExternalNetworks,
-		}
-	}
-	ctx.vmSpec = vmspec
+	dc := NewDiskContext(ctx, vol)
 
-	for _, vol := range vInfo {
-		ctx.setVolumeInfo(vol)
+	if vol.IsDir() {
+		ctx.Log(INFO, "return volume add success for dir %s", vol.Name)
+		result <- api.NewResultBase(vol.Name, true, "")
+	} else {
+		ctx.Log(DEBUG, "insert disk for volume %s", vol.Name)
+		dc.insert(result)
 	}
 
-	ctx.userSpec = spec
-	ctx.wg = wg
+	ctx.volumes[vol.Name] = dc
+}
+
+func (ctx *VmContext) RemoveVolume(name string, result chan<- api.Result) {
+	ctx.lock.Lock()
+	defer ctx.lock.Unlock()
+
+	disk, ok := ctx.volumes[name]
+	if !ok {
+		ctx.Log(WARNING, "volume %s not exist", name)
+		result <- api.NewResultBase(name, true, "not exist")
+		return
+	}
+
+	if disk.containers() > 0 {
+		ctx.Log(ERROR, "cannot remove a in use volume %s", name)
+		result <- api.NewResultBase(name, false, "in use")
+		return
+	}
+
+	ctx.Log(INFO, "remove disk %s", name)
+	delete(ctx.volumes, name)
+	disk.remove(result)
 }
