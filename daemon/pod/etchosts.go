@@ -1,4 +1,4 @@
-package daemon
+package pod
 
 import (
 	"bytes"
@@ -51,13 +51,26 @@ func generateDefaultHosts() ([]byte, error) {
 	return content.Bytes(), nil
 }
 
+func HostsCreator(pod string) *utils.Initializer {
+	return utils.NewInitializer(func() {
+		prepareHosts(pod)
+	})
+}
+
+func HostsPath(pod string) (hostsDir, hostsPath string) {
+	hostsDir = path.Join(utils.HYPER_ROOT, "hosts", pod)
+	hostsPath = path.Join(hostsDir, defaultHostsFilename)
+
+	return
+}
+
 // prepareHosts creates hosts file for given pod
 func prepareHosts(podID string) (string, error) {
-	var hostsDir = path.Join(utils.HYPER_ROOT, "hosts", podID)
-	var hostsPath = path.Join(hostsDir, defaultHostsFilename)
 	var err error
 
-	if err = os.MkdirAll(hostsDir, 0755); err != nil && !os.IsExist(err) {
+	hostsDir, hostsPath := HostsPath(podID)
+
+	if err = os.MkdirAll(hostsDir, 0755); err != nil {
 		return "", err
 	}
 

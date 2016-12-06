@@ -5,7 +5,7 @@ language: go
 
 matrix:
   include:
-    - go: 1.6
+    - go: 1.7
 
 before_install:
   - sudo apt-get update -qq
@@ -15,7 +15,7 @@ before_install:
   - wget https://git.fedorahosted.org/cgit/lvm2.git/snapshot/lvm2-2_02_131.tar.xz
   - tar xf lvm2-2_02_131.tar.xz
   - cd lvm2-2_02_131
-  - ./configure && make device-mapper && sudo make install
+  - ./configure > /dev/null && make device-mapper > /dev/null && sudo make install > /dev/null
 
 # override the default `install`, otherwise default `install` will export ${TRAVIS_BUILD_DIR}/Godeps/_workspace as GOPATH
 # see https://docs.travis-ci.com/user/languages/go#Dependency-Management

@@ -5,50 +5,59 @@ import (
 	"syscall"
 
 	"github.com/golang/glog"
-	"github.com/hyperhq/runv/hypervisor/types"
 )
 
 func (daemon *Daemon) KillContainer(name string, sig int64) error {
-	p, idx, ok := daemon.PodList.GetByContainerIdOrName(name)
+	p, id, ok := daemon.PodList.GetByContainerIdOrName(name)
 	if !ok {
 		return fmt.Errorf("can not find container %s", name)
 	}
 
-	container := p.PodStatus.Containers[idx].Id
-	glog.V(1).Infof("found container %s to kill, signal %d", container, sig)
-
-	if p.PodStatus.Status != types.S_POD_RUNNING || p.VM == nil {
-		return fmt.Errorf("container %s is stopped\n", container)
+	glog.V(1).Infof("found container %s to kill, signal %d", name, sig)
+	if p.IsContainerRunning(id) {
+		return p.KillContainer(id, sig)
 	}
 
-	return p.VM.KillContainer(container, syscall.Signal(sig))
+	glog.V(1).Infof("container %s not in alive status, ignore kill", name)
+	return nil
 }
 
 func (daemon *Daemon) KillPodContainers(podName, container string, sig int64) error {
-	p, ok := daemon.PodList.GetByName(podName)
+	var err error
+
+	p, ok := daemon.PodList.Get(podName)
 	if !ok {
-		return fmt.Errorf("can not find pod %s", podName)
+		err = fmt.Errorf("can not find pod %s", podName)
+		glog.Error(err)
+		return err
 	}
 
-	var err error = nil
-	all := (container == "")
-	shot := false
-	for i := range p.PodStatus.Containers {
-		if all || p.PodStatus.Containers[i].Id == container {
-			glog.V(1).Infof("send signal %d to container %s", sig, container)
-			if p.PodStatus.Status != types.S_POD_RUNNING || p.VM == nil {
-				return fmt.Errorf("container %s is stopped\n", container)
-			}
+	containers := []string{}
+	if container != "" {
+		cid, ok := p.ContainerName2Id(container)
+		if !ok {
+			err = fmt.Errorf("can not get container %s in pod %s", container, podName)
+			glog.Error(err)
+			return err
+		}
+		containers = append(containers, cid)
+	} else {
+		if syscall.Signal(sig) == syscall.SIGKILL {
+			p.ForceQuit()
+			glog.Infof("force kill sandbox for pod %s", podName)
+			return nil
+		}
+		containers = p.ContainerIds()
+	}
 
-			e := p.VM.KillContainer(p.PodStatus.Containers[i].Id, syscall.Signal(sig))
+	for _, cid := range containers {
+		if p.IsContainerRunning(cid) {
+			e := p.KillContainer(cid, sig)
 			if e != nil {
+				glog.Error(e)
 				err = e
 			}
-			shot = true
 		}
-	}
-	if !shot {
-		return fmt.Errorf("can not find container %s", container)
 	}
 	return err
 }

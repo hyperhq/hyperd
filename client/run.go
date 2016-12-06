@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -12,19 +13,17 @@ import (
 	"time"
 
 	"github.com/docker/docker/pkg/namesgenerator"
-	"github.com/hyperhq/hyperd/utils"
-	"github.com/hyperhq/runv/hypervisor/pod"
-	"github.com/hyperhq/runv/lib/term"
-
 	gflag "github.com/jessevdk/go-flags"
-	"net/http"
+
+	apitype "github.com/hyperhq/hyperd/types"
+	"github.com/hyperhq/hyperd/utils"
+	"github.com/hyperhq/runv/lib/term"
 )
 
 // hyperctl run [OPTIONS] image [COMMAND] [ARGS...]
 func (cli *HyperClient) HyperCmdRun(args ...string) (err error) {
 	var opts struct {
 		PodFile       string   `short:"p" long:"podfile" value-name:"\"\"" description:"Create and Run a pod based on the pod file"`
-		K8s           string   `short:"k" long:"kubernetes" value-name:"\"\"" description:"Create and Run a pod based on the kubernetes pod file"`
 		Yaml          bool     `short:"y" long:"yaml" default:"false" default-mask:"-" description:"Create a pod based on Yaml file"`
 		Name          string   `long:"name" value-name:"\"\"" description:"Assign a name to the container"`
 		Attach        bool     `short:"a" long:"attach" default:"false" default-mask:"-" description:"(from podfile) Attach the stdin, stdout and stderr to the container"`
@@ -64,9 +63,6 @@ func (cli *HyperClient) HyperCmdRun(args ...string) (err error) {
 	if opts.PodFile != "" {
 		attach = opts.Attach
 		podJson, err = cli.JsonFromFile(opts.PodFile, opts.Yaml, false)
-	} else if opts.K8s != "" {
-		attach = opts.Attach
-		podJson, err = cli.JsonFromFile(opts.K8s, opts.Yaml, true)
 	} else {
 		if len(args) == 0 {
 			return fmt.Errorf("%s: \"run\" requires a minimum of 1 argument, please provide the image.", os.Args[0])
@@ -83,23 +79,14 @@ func (cli *HyperClient) HyperCmdRun(args ...string) (err error) {
 	t1 := time.Now()
 
 	var (
-		spec  pod.UserPod
-		code  int
-		async = true
-		tty   = false
+		spec apitype.UserPod
+		code int
+		tty  = false
 	)
-	json.Unmarshal([]byte(podJson), &spec)
-
-	vmId, err = cli.client.CreateVm(spec.Resource.Vcpu, spec.Resource.Memory, async)
+	err = json.Unmarshal([]byte(podJson), &spec)
 	if err != nil {
-		return
+		return err
 	}
-
-	defer func() {
-		if err != nil {
-			cli.client.RmVm(vmId)
-		}
-	}()
 
 	podId, code, err = cli.client.CreatePod(&spec)
 	if err != nil {
@@ -128,7 +115,7 @@ func (cli *HyperClient) HyperCmdRun(args ...string) (err error) {
 	}
 
 	if attach {
-		if opts.PodFile == "" && opts.K8s == "" {
+		if opts.PodFile == "" {
 			tty = opts.Tty
 		} else {
 			tty = spec.Tty || spec.Containers[0].Tty
@@ -178,22 +165,6 @@ func (cli *HyperClient) JsonFromFile(filename string, yaml, k8s bool) (string, e
 		}
 	}
 
-	if k8s {
-		var kpod pod.KPod
-
-		if err := json.Unmarshal(jsonbody, &kpod); err != nil {
-			return "", err
-		}
-		userpod, err := kpod.Convert()
-		if err != nil {
-			return "", err
-		}
-		jsonbody, err = json.Marshal(*userpod)
-		if err != nil {
-			return "", err
-		}
-	}
-
 	return string(jsonbody), nil
 }
 
@@ -204,12 +175,12 @@ func (cli *HyperClient) JsonFromCmdline(cmdArgs, cmdEnvs, cmdPortmaps []string, 
 		name       = cmdName
 		image      = cmdArgs[0]
 		command    = []string{}
-		env        = []pod.UserEnvironmentVar{}
-		ports      = []pod.UserContainerPort{}
+		env        = []*apitype.EnvironmentVar{}
+		ports      = []*apitype.UserContainerPort{}
 		logOpts    = make(map[string]string)
 		labels     = make(map[string]string)
-		volumesRef = []pod.UserVolumeReference{}
-		volumes    = []pod.UserVolume{}
+		volumesRef = []*apitype.UserVolumeReference{}
+		volumes    = []*apitype.UserVolume{}
 	)
 	if len(cmdArgs) > 1 {
 		command = cmdArgs[1:]
@@ -225,7 +196,7 @@ func (cli *HyperClient) JsonFromCmdline(cmdArgs, cmdEnvs, cmdPortmaps []string, 
 	}
 	for _, v := range cmdEnvs {
 		if eqlIndex := strings.Index(v, "="); eqlIndex > 0 {
-			env = append(env, pod.UserEnvironmentVar{
+			env = append(env, &apitype.EnvironmentVar{
 				Env:   v[:eqlIndex],
 				Value: v[eqlIndex+1:],
 			})
@@ -246,7 +217,7 @@ func (cli *HyperClient) JsonFromCmdline(cmdArgs, cmdEnvs, cmdPortmaps []string, 
 		if err != nil {
 			return "", err
 		}
-		ports = append(ports, *p)
+		ports = append(ports, p)
 	}
 
 	for _, v := range cmdLabels {
@@ -263,8 +234,8 @@ func (cli *HyperClient) JsonFromCmdline(cmdArgs, cmdEnvs, cmdPortmaps []string, 
 		if err != nil {
 			return "", err
 		}
-		volumes = append(volumes, *vol)
-		volumesRef = append(volumesRef, *volRef)
+		volumes = append(volumes, vol)
+		volumesRef = append(volumesRef, volRef)
 	}
 
 	entrypoints := make([]string, 0, 1)
@@ -272,7 +243,7 @@ func (cli *HyperClient) JsonFromCmdline(cmdArgs, cmdEnvs, cmdPortmaps []string, 
 		entrypoints = append(entrypoints, entrypoint)
 	}
 
-	containerList := []pod.UserContainer{{
+	containerList := []*apitype.UserContainer{{
 		Name:          name,
 		Image:         image,
 		Command:       command,
@@ -281,29 +252,29 @@ func (cli *HyperClient) JsonFromCmdline(cmdArgs, cmdEnvs, cmdPortmaps []string, 
 		Ports:         ports,
 		Envs:          env,
 		Volumes:       volumesRef,
-		Files:         []pod.UserFileReference{},
+		Files:         []*apitype.UserFileReference{},
 		RestartPolicy: cmdRestartPolicy,
+		Tty:           tty,
 	}}
 
-	userPod := &pod.UserPod{
-		Name:       name,
+	userPod := &apitype.UserPod{
+		Id:         name,
 		Containers: containerList,
 		Labels:     labels,
-		Resource:   pod.UserResource{Vcpu: cpu, Memory: memory},
-		Files:      []pod.UserFile{},
+		Resource:   &apitype.UserResource{Vcpu: int32(cpu), Memory: int32(memory)},
+		Files:      []*apitype.UserFile{},
 		Volumes:    volumes,
-		LogConfig: pod.PodLogConfig{
+		Log: &apitype.PodLogConfig{
 			Type:   cmdLogDriver,
 			Config: logOpts,
 		},
-		Tty: tty,
 	}
 
 	jsonString, _ := json.Marshal(userPod)
 	return string(jsonString), nil
 }
 
-func parseVolume(volStr string) (*pod.UserVolume, *pod.UserVolumeReference, error) {
+func parseVolume(volStr string) (*apitype.UserVolume, *apitype.UserVolumeReference, error) {
 
 	var (
 		srcName   string
@@ -354,14 +325,14 @@ func parseVolume(volStr string) (*pod.UserVolume, *pod.UserVolumeReference, erro
 		}
 	}
 
-	vol := pod.UserVolume{
+	vol := apitype.UserVolume{
 		// Avoid name collision
 		Name:   volName + utils.RandStr(5, "number"),
 		Source: srcName,
-		Driver: volDriver,
+		Format: volDriver,
 	}
 
-	volRef := pod.UserVolumeReference{
+	volRef := apitype.UserVolumeReference{
 		Volume:   vol.Name,
 		Path:     destPath,
 		ReadOnly: readOnly,
@@ -370,10 +341,10 @@ func parseVolume(volStr string) (*pod.UserVolume, *pod.UserVolumeReference, erro
 	return &vol, &volRef, nil
 }
 
-func parsePortMapping(portmap string) (*pod.UserContainerPort, error) {
+func parsePortMapping(portmap string) (*apitype.UserContainerPort, error) {
 
 	var (
-		port  = pod.UserContainerPort{}
+		port  = apitype.UserContainerPort{}
 		proto string
 		hPort string
 		cPort string
@@ -397,11 +368,13 @@ func parsePortMapping(portmap string) (*pod.UserContainerPort, error) {
 	}
 
 	port.Protocol = proto
-	port.HostPort, err = strconv.Atoi(hPort)
+	hp, err := strconv.Atoi(hPort)
+	port.HostPort = int32(hp)
 	if err != nil {
 		return nil, fmt.Errorf("flag needs host port and container port: --publish: %v", err)
 	}
-	port.ContainerPort, err = strconv.Atoi(cPort)
+	cp, err := strconv.Atoi(cPort)
+	port.ContainerPort = int32(cp)
 	if err != nil {
 		return nil, fmt.Errorf("flag needs host port and container port: --publish: %v", err)
 	}

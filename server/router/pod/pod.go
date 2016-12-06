@@ -30,11 +30,9 @@ func NewRouter(b Backend) router.Router {
 		local.NewPostRoute("/pod/kill", r.postPodKill),
 		local.NewPostRoute("/pod/pause", r.postPodPause),
 		local.NewPostRoute("/pod/unpause", r.postPodUnpause),
-		local.NewPostRoute("/vm/create", r.postVmCreate),
 		// PUT
 		// DELETE
 		local.NewDeleteRoute("/pod", r.deletePod),
-		local.NewDeleteRoute("/vm", r.deleteVm),
 	}
 
 	return r

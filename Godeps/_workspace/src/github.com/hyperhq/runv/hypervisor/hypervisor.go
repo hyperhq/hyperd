@@ -4,8 +4,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/hyperhq/runv/hypervisor/network"
 	"github.com/hyperhq/runv/hypervisor/types"
-
-	"sync"
 )
 
 func (ctx *VmContext) startSocks() {
@@ -31,26 +29,16 @@ func (ctx *VmContext) loop() {
 	}
 }
 
-func VmLoop(vmId string, hub chan VmEvent, client chan *types.VmResponse, boot *BootConfig) {
-	context, err := InitContext(vmId, hub, client, nil, boot)
-	if err != nil {
-		client <- &types.VmResponse{
-			VmId:  vmId,
-			Code:  types.E_BAD_REQUEST,
-			Cause: err.Error(),
-		}
-		return
-	}
+func (ctx *VmContext) Launch() {
 
 	//launch routines
-	context.startSocks()
-	context.DCtx.Launch(context)
+	ctx.startSocks()
+	ctx.DCtx.Launch(ctx)
 
-	context.loop()
+	ctx.loop()
 }
 
-func VmAssociate(vmId string, hub chan VmEvent, client chan *types.VmResponse,
-	wg *sync.WaitGroup, pack []byte) {
+func VmAssociate(vmId string, hub chan VmEvent, client chan *types.VmResponse, pack []byte) {
 
 	if glog.V(1) {
 		glog.Infof("VM %s trying to reload with serialized data: %s", vmId, string(pack))
@@ -75,7 +63,7 @@ func VmAssociate(vmId string, hub chan VmEvent, client chan *types.VmResponse,
 		return
 	}
 
-	context, err := pinfo.vmContext(hub, client, wg)
+	context, err := pinfo.vmContext(hub, client)
 	if err != nil {
 		client <- &types.VmResponse{
 			VmId:  vmId,
@@ -100,10 +88,10 @@ func VmAssociate(vmId string, hub chan VmEvent, client chan *types.VmResponse,
 
 	context.Become(stateRunning, StateRunning)
 
-	for _, c := range context.vmSpec.Containers {
-		context.ptys.ptyConnect(true, c.Process.Terminal, c.Process.Stdio, c.Process.Stderr, nil)
-		context.ptys.startStdin(c.Process.Stdio, c.Process.Terminal)
-	}
+	//for _, c := range context.vmSpec.Containers {
+	//	context.ptys.ptyConnect(true, c.Process.Terminal, c.Process.Stdio, c.Process.Stderr, nil)
+	//	context.ptys.startStdin(c.Process.Stdio, c.Process.Terminal)
+	//}
 
 	go context.loop()
 }

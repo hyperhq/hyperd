@@ -294,39 +294,6 @@ func (c *HyperClient) GetImageList() ([]*types.ImageInfo, error) {
 	return imageList.ImageList, nil
 }
 
-// CreateVM creates a new VM
-func (c *HyperClient) CreateVM(cpu, memory int32) (string, error) {
-	req := types.VMCreateRequest{
-		Cpu:    cpu,
-		Memory: memory,
-	}
-	vm, err := c.client.VMCreate(
-		c.ctx,
-		&req,
-	)
-	if err != nil {
-		return "", err
-	}
-
-	return vm.VmID, nil
-}
-
-// RemoveVM removes a vm by id
-func (c *HyperClient) RemoveVM(vmID string) (*types.VMRemoveResponse, error) {
-	req := types.VMRemoveRequest{
-		VmID: vmID,
-	}
-	resp, err := c.client.VMRemove(
-		c.ctx,
-		&req,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return resp, nil
-}
-
 // CreatePod creates a pod
 func (c *HyperClient) CreatePod(spec *types.UserPod) (string, error) {
 	req := types.PodCreateRequest{

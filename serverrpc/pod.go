@@ -14,14 +14,14 @@ import (
 func (s *ServerRPC) PodCreate(ctx context.Context, req *types.PodCreateRequest) (*types.PodCreateResponse, error) {
 	glog.V(3).Infof("PodCreate with request %s", req.String())
 
-	pod, err := s.daemon.CreatePod(req.PodID, req.PodSpec)
+	p, err := s.daemon.CreatePod(req.PodID, req.PodSpec)
 	if err != nil {
 		glog.Errorf("CreatePod failed: %v", err)
 		return nil, err
 	}
 
 	return &types.PodCreateResponse{
-		PodID: pod.Id,
+		PodID: p.Id(),
 	}, nil
 }
 
@@ -37,7 +37,7 @@ func (s *ServerRPC) PodStart(stream types.PublicAPI_PodStartServer) error {
 	glog.V(3).Infof("PodStart with request %s", req.String())
 
 	if !req.Attach {
-		_, _, err := s.daemon.StartPod(nil, nil, req.PodID, req.VmID, req.Attach)
+		_, _, err := s.daemon.StartPod(nil, nil, req.PodID, req.Attach)
 		if err != nil {
 			glog.Errorf("StartPod failed: %v", err)
 			return err
@@ -82,7 +82,7 @@ func (s *ServerRPC) PodStart(stream types.PublicAPI_PodStartServer) error {
 		}
 	}()
 
-	if _, _, err := s.daemon.StartPod(ir, ow, req.PodID, req.VmID, req.Attach); err != nil {
+	if _, _, err := s.daemon.StartPod(ir, ow, req.PodID, req.Attach); err != nil {
 		glog.Errorf("StartPod failed: %v", err)
 		return err
 	}
@@ -98,7 +98,7 @@ func (s *ServerRPC) PodRemove(ctx context.Context, req *types.PodRemoveRequest) 
 		return nil, fmt.Errorf("PodID is required for PodRemove")
 	}
 
-	code, cause, err := s.daemon.CleanPod(req.PodID)
+	code, cause, err := s.daemon.RemovePod(req.PodID)
 	if err != nil {
 		glog.Errorf("CleanPod %s failed: %v", req.PodID, err)
 		return nil, err

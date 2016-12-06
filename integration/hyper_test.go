@@ -122,28 +122,6 @@ func (s *TestSuite) TestGetPodInfo(c *C) {
 	c.Logf("Got PodInfo %v", info)
 }
 
-func (s *TestSuite) TestGetVMCreateRemove(c *C) {
-	vm, err := s.client.CreateVM(1, 64)
-	c.Assert(err, IsNil)
-
-	var found = false
-	vmList, err := s.client.GetVMList()
-	c.Assert(err, IsNil)
-	c.Logf("Got VMList %v", vmList)
-	for _, v := range vmList {
-		if v.VmID == vm {
-			found = true
-		}
-	}
-	if !found {
-		c.Errorf("Can't find vm %s", vm)
-	}
-
-	resp, err := s.client.RemoveVM(vm)
-	c.Assert(err, IsNil)
-	c.Logf("RemoveVM resp %s", resp.String())
-}
-
 func (s *TestSuite) TestCreateAndStartPod(c *C) {
 	err := s.client.PullImage("busybox", "latest", nil)
 	c.Assert(err, IsNil)
@@ -305,6 +283,8 @@ func (s *TestSuite) TestAddListDeleteService(c *C) {
 		},
 	}
 
+	c.Log("begin ===> create pod")
+
 	pod, err := s.client.CreatePod(&spec)
 	c.Assert(err, IsNil)
 
@@ -313,6 +293,8 @@ func (s *TestSuite) TestAddListDeleteService(c *C) {
 		err = s.client.RemovePod(pod)
 		c.Assert(err, IsNil)
 	}()
+
+	c.Log("    2 ===> create pod")
 
 	err = s.client.StartPod(pod, "", false)
 	c.Assert(err, IsNil)
@@ -331,9 +313,11 @@ func (s *TestSuite) TestAddListDeleteService(c *C) {
 		},
 	}
 
+	c.Log("    3 ===> update service")
 	err = s.client.UpdateService(pod, updateService)
 	c.Assert(err, IsNil)
 
+	c.Log("    4 ===> list service")
 	svcList, err := s.client.ListService(pod)
 	c.Assert(err, IsNil)
 	c.Assert(len(svcList), Equals, 1)
@@ -353,16 +337,21 @@ func (s *TestSuite) TestAddListDeleteService(c *C) {
 		},
 	}
 
+	c.Log("    5 ===> add service")
 	err = s.client.AddService(pod, addService)
 	c.Assert(err, IsNil)
+	c.Log("    6 ===> list service")
 	svcList, err = s.client.ListService(pod)
 	c.Assert(err, IsNil)
 	c.Assert(len(svcList), Equals, 2)
 
+	c.Log("    7 ===> delete service")
 	err = s.client.DeleteService(pod, addService)
 	c.Assert(err, IsNil)
+	c.Log("    8 ===> list service")
 	svcList, err = s.client.ListService(pod)
 	c.Assert(len(svcList), Equals, 1)
+	c.Log("last  ===> done")
 }
 
 func (s *TestSuite) TestStartAndStopPod(c *C) {
@@ -391,10 +380,11 @@ func (s *TestSuite) TestStartAndStopPod(c *C) {
 
 	podInfo, err = s.client.GetPodInfo(pod)
 	c.Assert(err, IsNil)
-	c.Assert(podInfo.Status.Phase, Equals, "Failed")
 
 	err = s.client.RemovePod(pod)
 	c.Assert(err, IsNil)
+
+	c.Assert(podInfo.Status.Phase, Equals, "Failed")
 }
 
 func (s *TestSuite) TestSetPodLabels(c *C) {

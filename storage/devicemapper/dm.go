@@ -62,14 +62,14 @@ func CreateNewDevice(containerId, devPrefix, rootPath string) error {
 	return nil
 }
 
-func InjectFile(src io.Reader, containerId, devPrefix, target, rootPath string, perm, uid, gid int) error {
+func InjectFile(src io.Reader, containerId, devPrefix, target, basePath string, perm, uid, gid int) error {
 	if containerId == "" {
 		return fmt.Errorf("Please make sure the arguments are not NULL!\n")
 	}
 	permDir := perm | 0111
 	// Define the basic directory, need to get them via the 'info' command
 	var (
-		mntPath = fmt.Sprintf("%s/mnt/", rootPath)
+		mntPath = fmt.Sprintf("%s/mnt/", basePath)
 		devName = fmt.Sprintf("%s-%s", devPrefix, containerId)
 	)
 
@@ -220,7 +220,7 @@ func CreatePool(dm *DeviceMapper) error {
 	return nil
 }
 
-func CreateVolume(poolName, volName, dev_id string, size int, restore bool) error {
+func CreateVolume(poolName, volName, dev_id, mkfs string, size int, restore bool) error {
 	glog.Infof("/dev/mapper/%s", volName)
 	if _, err := os.Stat("/dev/mapper/" + volName); err == nil {
 		return nil
@@ -239,7 +239,7 @@ func CreateVolume(poolName, volName, dev_id string, size int, restore bool) erro
 	}
 
 	if restore == false {
-		parms = fmt.Sprintf("mkfs.ext4 \"/dev/mapper/%s\"", volName)
+		parms = fmt.Sprintf("%s \"/dev/mapper/%s\"", mkfs, volName)
 		if res, err := exec.Command("/bin/sh", "-c", parms).CombinedOutput(); err != nil {
 			glog.Error(string(res))
 			return fmt.Errorf(string(res))
@@ -249,6 +249,19 @@ func CreateVolume(poolName, volName, dev_id string, size int, restore bool) erro
 }
 
 func UnmapVolume(deviceFullPath string) error {
+	f, err := os.Stat(deviceFullPath)
+	if err != nil && os.IsNotExist(err) {
+		glog.Warningf("device to be umounted (%s) does not exist", deviceFullPath)
+		return nil
+	} else if err != nil {
+		glog.Errorf("file %s could not be unmapped: %v", deviceFullPath, err)
+		return err
+	} else if f.Mode() != os.ModeDevice {
+		err := fmt.Errorf("only device could be unmapped, %s is %v", deviceFullPath, f.Mode())
+		glog.Error(err)
+		return err
+	}
+
 	args := fmt.Sprintf("dmsetup remove -f %s", deviceFullPath)
 	cmd := exec.Command("/bin/sh", "-c", args)
 	if output, err := cmd.CombinedOutput(); err != nil {

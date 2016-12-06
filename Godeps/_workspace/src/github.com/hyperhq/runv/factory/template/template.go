@@ -8,7 +8,7 @@ import (
 	"github.com/hyperhq/runv/factory/base"
 	"github.com/hyperhq/runv/factory/direct"
 	"github.com/hyperhq/runv/hypervisor"
-	"github.com/hyperhq/runv/hypervisor/pod"
+	"github.com/hyperhq/runv/lib/utils"
 	"github.com/hyperhq/runv/template"
 )
 
@@ -20,7 +20,7 @@ func New(templateRoot string, cpu, mem int, kernel, initrd string) base.Factory 
 	var vmName string
 
 	for {
-		vmName = fmt.Sprintf("template-vm-%s", pod.RandStr(10, "alpha"))
+		vmName = fmt.Sprintf("template-vm-%s", utils.RandStr(10, "alpha"))
 		if _, err := os.Stat(templateRoot + "/" + vmName); os.IsNotExist(err) {
 			break
 		}

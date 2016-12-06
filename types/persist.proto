@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package types;
+
+import "github.com/hyperhq/runv/api/descriptions.proto";
+import "types.proto";
+
+message PersistPodLayout {
+    string id = 1;
+
+    string globalSpec = 11;
+
+    repeated string containers = 21;
+    repeated string volumes = 22;
+    repeated string interfaces = 23;
+}
+
+message PersistPodMeta {
+    string id = 1;
+    repeated UserService services = 11;
+    map<string, string> labels = 12;
+    int64 createdAt = 21;
+}
+
+message SandboxPersistInfo {
+    string id = 1;
+    bytes PersistInfo = 2;
+}
+
+message PersistContainer {
+    string id = 1;
+    string pod =2;
+    UserContainer spec = 11;
+    api.ContainerDescription descript =12;
+}
+
+message PersistVolume {
+    string name = 1;
+    string pod = 2;
+    UserVolume spec = 11;
+    api.VolumeDescription descript = 12;
+}
+
+message PersistInterface {
+    string id = 1;
+    string pod = 2;
+    UserInterface spec = 11;
+    api.InterfaceDescription descript = 12;
+}

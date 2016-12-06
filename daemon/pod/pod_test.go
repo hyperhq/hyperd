@@ -1,4 +1,4 @@
-package daemon
+package pod
 
 import (
 	"encoding/json"
@@ -75,7 +75,7 @@ func TestDNSInsertRegular(t *testing.T) {
 
 	for tag, input := range inputs {
 		var spec pod.UserPod
-		p := &Pod{
+		p := &LegacyPod{
 			Spec: nil,
 		}
 		if input != "" {

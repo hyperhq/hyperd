@@ -24,5 +24,5 @@ function cleanup {
 trap cleanup EXIT
 
 hack/build-protoc-gen-gogo.sh
-protoc -I${PROTO_ROOT} --gogo_out=plugins=grpc:${PROTO_ROOT} ${PROTO_ROOT}/types.proto
+protoc -I${PROTO_ROOT} -I${HYPER_ROOT}/Godeps/_workspace/src --gogo_out=plugins=grpc:${PROTO_ROOT} ${PROTO_ROOT}/types.proto ${PROTO_ROOT}/persist.proto
 echo "Generated types from proto updated."

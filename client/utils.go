@@ -8,8 +8,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	apitype "github.com/hyperhq/hyperd/types"
 	"github.com/hyperhq/hyperd/utils"
-	"github.com/hyperhq/runv/hypervisor/pod"
 	"github.com/hyperhq/runv/lib/term"
 
 	"github.com/docker/docker/pkg/jsonmessage"
@@ -97,7 +97,7 @@ func (cli *HyperClient) GetTag() string {
 }
 
 func (cli *HyperClient) ConvertYamlToJson(yamlBody []byte) ([]byte, error) {
-	var userPod pod.UserPod
+	var userPod apitype.UserPod
 	if err := yaml.Unmarshal(yamlBody, &userPod); err != nil {
 		return []byte(""), err
 	}

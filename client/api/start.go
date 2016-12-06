@@ -12,7 +12,6 @@ import (
 func (cli *Client) StartPod(podId, vmId string, attach, tty bool, stdin io.ReadCloser, stdout, stderr io.Writer) (string, error) {
 	v := url.Values{}
 	v.Set("podId", podId)
-	v.Set("vmId", vmId)
 
 	if !attach {
 		return cli.startPodWithoutTty(&v)

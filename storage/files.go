@@ -10,12 +10,12 @@ import (
 	"syscall"
 )
 
-func FsInjectFile(src io.Reader, containerId, target, rootDir string, perm, uid, gid int) error {
+func FsInjectFile(src io.Reader, containerId, target, baseDir string, perm, uid, gid int) error {
 	if containerId == "" {
 		return fmt.Errorf("Please make sure the arguments are not NULL!\n")
 	}
 
-	targetFile := path.Join(rootDir, containerId, "rootfs", target)
+	targetFile := path.Join(baseDir, containerId, "rootfs", target)
 
 	return WriteFile(src, targetFile, perm, uid, gid)
 

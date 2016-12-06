@@ -1,4 +1,4 @@
-# INTRODUCE
+# INTRODUCTION
 
 This module include the key functions on processing the POD JSON data file
 

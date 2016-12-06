@@ -10,7 +10,6 @@ import (
 	"github.com/docker/docker/pkg/ioutils"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/golang/glog"
-	"github.com/hyperhq/runv/hypervisor/types"
 )
 
 // ContainerLogsConfig holds configs for logging operations. Exists
@@ -32,27 +31,31 @@ type ContainerLogsConfig struct {
 
 func (daemon *Daemon) GetContainerLogs(container string, config *ContainerLogsConfig) (err error) {
 	var (
-		pod       *Pod
-		cidx      int
 		tailLines int
 	)
 
-	pod, cidx, err = daemon.GetPodByContainerIdOrName(container)
-	if err != nil {
-		return err
-	}
-
-	err = pod.getLogger(daemon)
-	if err != nil {
-		return err
-	}
-
-	logReader, ok := pod.PodStatus.Containers[cidx].Logs.Driver.(logger.LogReader)
+	p, id, ok := daemon.PodList.GetByContainerIdOrName(container)
 	if !ok {
-		return fmt.Errorf("logger not support read")
+		err = fmt.Errorf("cannot find container %s", container)
+		glog.Error(err)
+		return err
 	}
 
-	follow := config.Follow && (pod.PodStatus.Status == types.S_POD_RUNNING)
+	l := p.ContainerLogger(id)
+	if l == nil {
+		err = fmt.Errorf("cannot get logger for container %s", container)
+		glog.Error(err)
+		return err
+	}
+
+	logReader, ok := l.(logger.LogReader)
+	if !ok {
+		err = fmt.Errorf("container %s: logger not support read", container)
+		glog.Error(err)
+		return err
+	}
+
+	follow := config.Follow && p.IsContainerAlive(id)
 	tailLines, err = strconv.Atoi(config.Tail)
 	if err != nil {
 		tailLines = -1
@@ -72,7 +75,7 @@ func (daemon *Daemon) GetContainerLogs(container string, config *ContainerLogsCo
 
 	var outStream io.Writer = wf
 	errStream := outStream
-	if !pod.Spec.Containers[cidx].Tty {
+	if !p.ContainerHasTty(id) {
 		errStream = stdcopy.NewStdWriter(outStream, stdcopy.Stderr)
 		outStream = stdcopy.NewStdWriter(outStream, stdcopy.Stdout)
 	}

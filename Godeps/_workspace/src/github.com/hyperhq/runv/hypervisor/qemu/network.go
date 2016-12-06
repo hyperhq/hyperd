@@ -3,8 +3,8 @@ package qemu
 import (
 	"os"
 
+	"github.com/hyperhq/runv/api"
 	"github.com/hyperhq/runv/hypervisor/network"
-	"github.com/hyperhq/runv/hypervisor/pod"
 )
 
 func (qd *QemuDriver) BuildinNetwork() bool {
@@ -15,17 +15,14 @@ func (qd *QemuDriver) InitNetwork(bIface, bIP string, disableIptables bool) erro
 	return nil
 }
 
-func (qc *QemuContext) ConfigureNetwork(vmId, requestedIP string,
-	maps []pod.UserContainerPort, config pod.UserInterface) (*network.Settings, error) {
+func (qc *QemuContext) ConfigureNetwork(vmId, requestedIP string, config *api.InterfaceDescription) (*network.Settings, error) {
 	return nil, nil
 }
 
-func (qc *QemuContext) AllocateNetwork(vmId, requestedIP string,
-	maps []pod.UserContainerPort) (*network.Settings, error) {
+func (qc *QemuContext) AllocateNetwork(vmId, requestedIP string) (*network.Settings, error) {
 	return nil, nil
 }
 
-func (qc *QemuContext) ReleaseNetwork(vmId, releasedIP string, maps []pod.UserContainerPort,
-	file *os.File) error {
+func (qc *QemuContext) ReleaseNetwork(vmId, releasedIP string, file *os.File) error {
 	return nil
 }

@@ -205,7 +205,7 @@ func (qc *QemuContext) Pause(ctx *hypervisor.VmContext, pause bool, result chan<
 	}
 }
 
-func (qc *QemuContext) AddDisk(ctx *hypervisor.VmContext, sourceType string, blockInfo *hypervisor.BlockDescriptor) {
+func (qc *QemuContext) AddDisk(ctx *hypervisor.VmContext, sourceType string, blockInfo *hypervisor.DiskDescriptor, result chan<- hypervisor.VmEvent) {
 	name := blockInfo.Name
 	filename := blockInfo.Filename
 	format := blockInfo.Format
@@ -231,21 +231,21 @@ func (qc *QemuContext) AddDisk(ctx *hypervisor.VmContext, sourceType string, blo
 		}
 	}
 
-	newDiskAddSession(ctx, qc, name, sourceType, filename, format, id)
+	newDiskAddSession(ctx, qc, name, sourceType, filename, format, id, result)
 }
 
-func (qc *QemuContext) RemoveDisk(ctx *hypervisor.VmContext, blockInfo *hypervisor.BlockDescriptor, callback hypervisor.VmEvent) {
+func (qc *QemuContext) RemoveDisk(ctx *hypervisor.VmContext, blockInfo *hypervisor.DiskDescriptor, callback hypervisor.VmEvent, result chan<- hypervisor.VmEvent) {
 	id := blockInfo.ScsiId
 
-	newDiskDelSession(ctx, qc, id, callback)
+	newDiskDelSession(ctx, qc, id, callback, result)
 }
 
 func (qc *QemuContext) AddNic(ctx *hypervisor.VmContext, host *hypervisor.HostNicInfo, guest *hypervisor.GuestNicInfo, result chan<- hypervisor.VmEvent) {
-	newNetworkAddSession(ctx, qc, host.Fd, guest.Device, host.Mac, guest.Index, guest.Busaddr, result)
+	newNetworkAddSession(ctx, qc, host.Id, host.Fd, guest.Device, host.Mac, guest.Index, guest.Busaddr, result)
 }
 
-func (qc *QemuContext) RemoveNic(ctx *hypervisor.VmContext, n *hypervisor.InterfaceCreated, callback hypervisor.VmEvent) {
-	newNetworkDelSession(ctx, qc, n.DeviceName, callback)
+func (qc *QemuContext) RemoveNic(ctx *hypervisor.VmContext, n *hypervisor.InterfaceCreated, callback hypervisor.VmEvent, result chan<- hypervisor.VmEvent) {
+	newNetworkDelSession(ctx, qc, n.DeviceName, callback, result)
 }
 
 func (qc *QemuContext) SetCpus(ctx *hypervisor.VmContext, cpus int, result chan<- error) {

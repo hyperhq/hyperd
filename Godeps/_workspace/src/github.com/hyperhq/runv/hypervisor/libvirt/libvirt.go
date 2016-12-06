@@ -722,7 +722,7 @@ type disk struct {
 	Iotune  iotune      `xml:"iotune,omitempty"`
 }
 
-func diskXml(blockInfo *hypervisor.BlockDescriptor, secretUUID string) (string, error) {
+func diskXml(blockInfo *hypervisor.DiskDescriptor, secretUUID string) (string, error) {
 	filename := blockInfo.Filename
 	format := blockInfo.Format
 	id := blockInfo.ScsiId
@@ -806,7 +806,7 @@ func diskXml(blockInfo *hypervisor.BlockDescriptor, secretUUID string) (string, 
 	return string(data), nil
 }
 
-func (lc *LibvirtContext) diskSecretUUID(blockInfo *hypervisor.BlockDescriptor) (res string, err error) {
+func (lc *LibvirtContext) diskSecretUUID(blockInfo *hypervisor.DiskDescriptor) (res string, err error) {
 	var sec libvirtgo.VirSecret
 
 	filename := blockInfo.Filename
@@ -851,13 +851,13 @@ func scsiId2Addr(id int) (int, int, error) {
 	return id / 256, id % 256, nil
 }
 
-func (lc *LibvirtContext) AddDisk(ctx *hypervisor.VmContext, sourceType string, blockInfo *hypervisor.BlockDescriptor) {
+func (lc *LibvirtContext) AddDisk(ctx *hypervisor.VmContext, sourceType string, blockInfo *hypervisor.DiskDescriptor, result chan<- hypervisor.VmEvent) {
 	name := blockInfo.Name
 	id := blockInfo.ScsiId
 
 	if lc.domain == nil {
 		glog.Error("Cannot find domain")
-		ctx.Hub <- &hypervisor.DeviceFailed{
+		result <- &hypervisor.DeviceFailed{
 			Session: nil,
 		}
 		return
@@ -866,7 +866,7 @@ func (lc *LibvirtContext) AddDisk(ctx *hypervisor.VmContext, sourceType string, 
 	secretUUID, err := lc.diskSecretUUID(blockInfo)
 	if err != nil {
 		glog.Error("generate disk-get-secret failed, ", err.Error())
-		ctx.Hub <- &hypervisor.DeviceFailed{
+		result <- &hypervisor.DeviceFailed{
 			Session: nil,
 		}
 		return
@@ -875,7 +875,7 @@ func (lc *LibvirtContext) AddDisk(ctx *hypervisor.VmContext, sourceType string, 
 	diskXml, err := diskXml(blockInfo, secretUUID)
 	if err != nil {
 		glog.Error("generate attach-disk-xml failed, ", err.Error())
-		ctx.Hub <- &hypervisor.DeviceFailed{
+		result <- &hypervisor.DeviceFailed{
 			Session: nil,
 		}
 		return
@@ -885,13 +885,13 @@ func (lc *LibvirtContext) AddDisk(ctx *hypervisor.VmContext, sourceType string, 
 	err = lc.domain.AttachDeviceFlags(diskXml, libvirtgo.VIR_DOMAIN_DEVICE_MODIFY_LIVE)
 	if err != nil {
 		glog.Error("attach disk device failed, ", err.Error())
-		ctx.Hub <- &hypervisor.DeviceFailed{
+		result <- &hypervisor.DeviceFailed{
 			Session: nil,
 		}
 		return
 	}
 	target, unit, err := scsiId2Addr(id)
-	ctx.Hub <- &hypervisor.BlockdevInsertedEvent{
+	result <- &hypervisor.BlockdevInsertedEvent{
 		Name:       name,
 		SourceType: sourceType,
 		DeviceName: scsiId2Name(id),
@@ -900,10 +900,10 @@ func (lc *LibvirtContext) AddDisk(ctx *hypervisor.VmContext, sourceType string, 
 	}
 }
 
-func (lc *LibvirtContext) RemoveDisk(ctx *hypervisor.VmContext, blockInfo *hypervisor.BlockDescriptor, callback hypervisor.VmEvent) {
+func (lc *LibvirtContext) RemoveDisk(ctx *hypervisor.VmContext, blockInfo *hypervisor.DiskDescriptor, callback hypervisor.VmEvent, result chan<- hypervisor.VmEvent) {
 	if lc.domain == nil {
 		glog.Error("Cannot find domain")
-		ctx.Hub <- &hypervisor.DeviceFailed{
+		result <- &hypervisor.DeviceFailed{
 			Session: nil,
 		}
 		return
@@ -912,7 +912,7 @@ func (lc *LibvirtContext) RemoveDisk(ctx *hypervisor.VmContext, blockInfo *hyper
 	secretUUID, err := lc.diskSecretUUID(blockInfo)
 	if err != nil {
 		glog.Error("generate disk-get-secret failed, ", err.Error())
-		ctx.Hub <- &hypervisor.DeviceFailed{
+		result <- &hypervisor.DeviceFailed{
 			Session: nil,
 		}
 		return
@@ -921,7 +921,7 @@ func (lc *LibvirtContext) RemoveDisk(ctx *hypervisor.VmContext, blockInfo *hyper
 	diskXml, err := diskXml(blockInfo, secretUUID)
 	if err != nil {
 		glog.Error("generate detach-disk-xml failed, ", err.Error())
-		ctx.Hub <- &hypervisor.DeviceFailed{
+		result <- &hypervisor.DeviceFailed{
 			Session: callback,
 		}
 		return
@@ -929,12 +929,12 @@ func (lc *LibvirtContext) RemoveDisk(ctx *hypervisor.VmContext, blockInfo *hyper
 	err = lc.domain.DetachDeviceFlags(diskXml, libvirtgo.VIR_DOMAIN_DEVICE_MODIFY_LIVE)
 	if err != nil {
 		glog.Error("detach disk device failed, ", err.Error())
-		ctx.Hub <- &hypervisor.DeviceFailed{
+		result <- &hypervisor.DeviceFailed{
 			Session: callback,
 		}
 		return
 	}
-	ctx.Hub <- callback
+	result <- callback
 }
 
 type nicmac struct {
@@ -1047,16 +1047,17 @@ func (lc *LibvirtContext) AddNic(ctx *hypervisor.VmContext, host *hypervisor.Hos
 	}
 
 	result <- &hypervisor.NetDevInsertedEvent{
+		Id:         host.Id,
 		Index:      guest.Index,
 		DeviceName: guest.Device,
 		Address:    guest.Busaddr,
 	}
 }
 
-func (lc *LibvirtContext) RemoveNic(ctx *hypervisor.VmContext, n *hypervisor.InterfaceCreated, callback hypervisor.VmEvent) {
+func (lc *LibvirtContext) RemoveNic(ctx *hypervisor.VmContext, n *hypervisor.InterfaceCreated, callback hypervisor.VmEvent, result chan<- hypervisor.VmEvent) {
 	if lc.domain == nil {
 		glog.Error("Cannot find domain")
-		ctx.Hub <- &hypervisor.DeviceFailed{
+		result <- &hypervisor.DeviceFailed{
 			Session: nil,
 		}
 		return
@@ -1065,7 +1066,7 @@ func (lc *LibvirtContext) RemoveNic(ctx *hypervisor.VmContext, n *hypervisor.Int
 	nicXml, err := nicXml(n.Bridge, n.HostDevice, n.MacAddr, n.PCIAddr, ctx.Boot)
 	if err != nil {
 		glog.Error("generate detach-nic-xml failed, ", err.Error())
-		ctx.Hub <- &hypervisor.DeviceFailed{
+		result <- &hypervisor.DeviceFailed{
 			Session: callback,
 		}
 		return
@@ -1074,12 +1075,12 @@ func (lc *LibvirtContext) RemoveNic(ctx *hypervisor.VmContext, n *hypervisor.Int
 	err = lc.domain.DetachDeviceFlags(nicXml, libvirtgo.VIR_DOMAIN_DEVICE_MODIFY_LIVE)
 	if err != nil {
 		glog.Error("detach nic failed, ", err.Error())
-		ctx.Hub <- &hypervisor.DeviceFailed{
+		result <- &hypervisor.DeviceFailed{
 			Session: callback,
 		}
 		return
 	}
-	ctx.Hub <- callback
+	result <- callback
 }
 
 func (lc *LibvirtContext) SetCpus(ctx *hypervisor.VmContext, cpus int, result chan<- error) {
