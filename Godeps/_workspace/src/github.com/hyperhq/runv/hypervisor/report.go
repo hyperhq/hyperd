@@ -32,32 +32,6 @@ func (ctx *VmContext) reportVmShutdown() {
 	}
 }
 
-func (ctx *VmContext) reportPodRunning(msg string, data interface{}) {
-	ctx.client <- &types.VmResponse{
-		VmId:  ctx.Id,
-		Code:  types.E_POD_RUNNING,
-		Cause: msg,
-		Data:  data,
-	}
-}
-
-func (ctx *VmContext) reportPodStopped() {
-	ctx.client <- &types.VmResponse{
-		VmId:  ctx.Id,
-		Code:  types.E_POD_STOPPED,
-		Cause: "All device detached successful",
-	}
-}
-
-func (ctx *VmContext) reportPodFinished(result *PodFinished) {
-	ctx.client <- &types.VmResponse{
-		VmId:  ctx.Id,
-		Code:  types.E_POD_FINISHED,
-		Cause: "POD run finished",
-		Data:  result.result,
-	}
-}
-
 func (ctx *VmContext) reportProcessFinished(code int, result *types.ProcessFinished) {
 	ctx.client <- &types.VmResponse{
 		VmId:  ctx.Id,
@@ -73,24 +47,6 @@ func (ctx *VmContext) reportSuccess(msg string, data interface{}) {
 		Code:  types.E_OK,
 		Cause: msg,
 		Data:  data,
-	}
-}
-
-func (ctx *VmContext) reportBusy(msg string) {
-	ctx.client <- &types.VmResponse{
-		VmId:  ctx.Id,
-		Code:  types.E_BUSY,
-		Cause: msg,
-	}
-}
-
-// reportBadRequest send report to daemon, notify about that:
-//   1. anything wrong in the request, such as json format, slice length, etc.
-func (ctx *VmContext) reportBadRequest(cause string) {
-	ctx.client <- &types.VmResponse{
-		VmId:  ctx.Id,
-		Code:  types.E_BAD_REQUEST,
-		Cause: cause,
 	}
 }
 

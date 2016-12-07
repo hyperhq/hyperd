@@ -66,8 +66,8 @@ type VmContext struct {
 
 	logPrefix string
 
-	lock *sync.Mutex //protect update of context
-	wg   *sync.WaitGroup
+	lock   sync.Mutex //protect update of context
+	idLock sync.Mutex
 }
 
 type stateHandler func(ctx *VmContext, event VmEvent)
@@ -130,7 +130,6 @@ func InitContext(id string, hub chan VmEvent, client chan *types.VmResponse, dc 
 		networks:        NewNetworkContext(),
 		vmExec:          make(map[string]*hyperstartapi.ExecCommand),
 		logPrefix:       fmt.Sprintf("SB[%s] ", id),
-		lock:            &sync.Mutex{},
 	}
 	ctx.networks.sandbox = ctx
 
@@ -153,36 +152,19 @@ func (ctx *VmContext) unsetTimeout() {
 	}
 }
 
-func (ctx *VmContext) reset() {
-	ctx.lock.Lock()
-
-	ctx.ptys.closePendingTtys()
-
-	ctx.pciAddr = PciAddrFrom
-	ctx.scsiId = 0
-	//do not reset attach id here, let it increase
-
-	ctx.containers = make(map[string]*ContainerContext)
-	ctx.volumes = make(map[string]*DiskContext)
-	ctx.networks = NewNetworkContext()
-	ctx.networks.sandbox = ctx
-
-	ctx.lock.Unlock()
-}
-
 func (ctx *VmContext) nextScsiId() int {
-	ctx.lock.Lock()
+	ctx.idLock.Lock()
 	id := ctx.scsiId
 	ctx.scsiId++
-	ctx.lock.Unlock()
+	ctx.idLock.Unlock()
 	return id
 }
 
 func (ctx *VmContext) nextPciAddr() int {
-	ctx.lock.Lock()
+	ctx.idLock.Lock()
 	addr := ctx.pciAddr
 	ctx.pciAddr++
-	ctx.lock.Unlock()
+	ctx.idLock.Unlock()
 	return addr
 }
 

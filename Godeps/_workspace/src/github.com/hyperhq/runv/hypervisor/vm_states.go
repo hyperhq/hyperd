@@ -16,7 +16,6 @@ const (
 	StatePreparing   = "PREPARING"
 	StateStarting    = "STARTING"
 	StateRunning     = "RUNNING"
-	StatePodStopping = "STOPPING"
 	StateCleaning    = "CLEANING"
 	StateTerminating = "TERMINATING"
 	StateDestroying  = "DESTROYING"
@@ -209,8 +208,7 @@ func (ctx *VmContext) handleGenericOperation(goe *GenericOperation) {
 // state machine
 func unexpectedEventHandler(ctx *VmContext, ev VmEvent, state string) {
 	switch ev.Event() {
-	case COMMAND_STOP_POD,
-		COMMAND_SHUTDOWN,
+	case COMMAND_SHUTDOWN,
 		COMMAND_RELEASE,
 		COMMAND_PAUSEVM:
 		ctx.reportUnexpectedRequest(ev, state)
@@ -236,8 +234,6 @@ func stateRunning(ctx *VmContext, ev VmEvent) {
 		ctx.Log(INFO, "pod is running, got release command, let VM fly")
 		ctx.Become(nil, StateNone)
 		ctx.reportSuccess("", nil)
-	case COMMAND_STOP_POD: // REFACTOR: deprecated, will ignore this command
-		ctx.Log(INFO, "REFACTOR: ignore COMMAND_STOP_POD")
 	case COMMAND_ACK:
 		ack := ev.(*CommandAck)
 		ctx.Log(DEBUG, "[running] got hyperstart ack to %d", ack.reply.Code)
@@ -251,8 +247,6 @@ func stateRunning(ctx *VmContext, ev VmEvent) {
 	case EVENT_INIT_CONNECTED:
 		ctx.Log(INFO, "hyperstart is ready to accept vm commands")
 		ctx.reportVmRun()
-	case EVENT_POD_FINISH: // REFACTOR: can i ignore it? OK, will ignore it
-		ctx.Log(INFO, "REFACTOR: ignore EVENT_POD_FINISH")
 	case EVENT_VM_EXIT, ERROR_VM_START_FAILED:
 		ctx.Log(INFO, "VM has exit, or not started at all (%d)", ev.Event())
 		ctx.reportVmShutdown()
