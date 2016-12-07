@@ -5,7 +5,9 @@ import (
 	"os"
 	"strings"
 	"text/tabwriter"
+	"time"
 
+	humanize "github.com/dustin/go-humanize"
 	gflag "github.com/jessevdk/go-flags"
 )
 
@@ -75,15 +77,22 @@ func (cli *HyperClient) HyperCmdList(args ...string) error {
 	}
 
 	if item == "pod" {
-		fmt.Fprintln(w, "POD ID\tPOD Name\tVM name\tStatus")
+		fmt.Fprintln(w, "POD ID\tPOD Name\tVM name\tStatus\tCreated")
 		for _, p := range podResponse {
 			fields := strings.Split(p, ":")
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", fields[0], fields[1], fields[2], fields[3])
+
+			info, err := cli.client.GetPodInfo(fields[0])
+			if err != nil {
+				return fmt.Errorf("Error while getting %s info: %s", fields[0], err)
+			}
+			uptime := humanize.Time(time.Unix(info.CreatedAt, 0))
+
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", fields[0], fields[1], fields[2], fields[3], uptime)
 		}
 	}
 
 	if item == "container" {
-		fmt.Fprintln(w, "Container ID\tName\tPOD ID\tStatus")
+		fmt.Fprintln(w, "Container ID\tName\tPOD ID\tStatus\tCreated")
 		for _, c := range containerResponse {
 			fields := strings.Split(c, ":")
 			name := fields[1]
@@ -92,7 +101,14 @@ func (cli *HyperClient) HyperCmdList(args ...string) error {
 					name = name[1:]
 				}
 			}
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", fields[0], name, fields[2], fields[3])
+
+			info, err := cli.client.GetContainerInfo(fields[0])
+			if err != nil {
+				return fmt.Errorf("Error while getting %s info: %s", fields[0], err)
+			}
+			uptime := humanize.Time(time.Unix(info.CreatedAt, 0))
+
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", fields[0], name, fields[2], fields[3], uptime)
 		}
 	}
 	w.Flush()
