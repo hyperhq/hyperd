@@ -104,6 +104,7 @@ func (v *Volume) add() error {
 // insert() should only called by add(), and not expose to outside
 // the class.
 func (v *Volume) insert() error {
+	v.Log(DEBUG, "insert volume to sandbox")
 	r := v.p.sandbox.AddVolume(v.descript)
 	if !r.IsSuccess() {
 		err := fmt.Errorf("failed to insert: %s", r.Message())
@@ -157,6 +158,7 @@ func (v *Volume) mount() error {
 		err error
 	)
 
+	v.Log(DEBUG, "mount volume")
 	sharedDir := v.p.sandboxShareDir()
 	v.descript, err = ProbeExistingVolume(v.spec, sharedDir)
 	if err != nil {
