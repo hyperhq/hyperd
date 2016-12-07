@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/url"
 
 	"github.com/hyperhq/hyperd/engine"
@@ -36,7 +35,6 @@ func (cli *Client) GetPodInfo(podName string) (*types.PodInfo, error) {
 	v.Set("podName", podName)
 	body, _, err := readBody(cli.call("GET", "/pod/info?"+v.Encode(), nil, nil))
 	if err != nil {
-		fmt.Printf("Error: %s\n", err)
 		return nil, err
 	}
 	var jsonData types.PodInfo
@@ -53,7 +51,6 @@ func (cli *Client) GetContainerInfo(container string) (*types.ContainerInfo, err
 	v.Set("container", container)
 	body, _, err := readBody(cli.call("GET", "/container/info?"+v.Encode(), nil, nil))
 	if err != nil {
-		fmt.Printf("Error: %s\n", err)
 		return nil, err
 	}
 	var jsonData types.ContainerInfo
