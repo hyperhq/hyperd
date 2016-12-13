@@ -22,68 +22,24 @@ import (
 
 // hyperctl run [OPTIONS] image [COMMAND] [ARGS...]
 func (cli *HyperClient) HyperCmdRun(args ...string) (err error) {
-	var opts struct {
-		PodFile       string   `short:"p" long:"podfile" value-name:"\"\"" description:"Create and Run a pod based on the pod file"`
-		Yaml          bool     `short:"y" long:"yaml" default:"false" default-mask:"-" description:"Create a pod based on Yaml file"`
-		Name          string   `long:"name" value-name:"\"\"" description:"Assign a name to the container"`
-		Attach        bool     `short:"a" long:"attach" default:"false" default-mask:"-" description:"(from podfile) Attach the stdin, stdout and stderr to the container"`
-		Detach        bool     `short:"d" long:"detach" default:"false" default-mask:"-" description:"(from cmdline) Not Attach the stdin, stdout and stderr to the container"`
-		Workdir       string   `long:"workdir" value-name:"\"\"" default-mask:"-" description:"Working directory inside the container"`
-		Tty           bool     `short:"t" long:"tty" default:"false" default-mask:"-" description:"the run command in tty, such as bash shell"`
-		Cpu           int      `long:"cpu" default:"1" value-name:"1" default-mask:"-" description:"CPU number for the VM"`
-		Memory        int      `long:"memory" default:"128" value-name:"128" default-mask:"-" description:"Memory size (MB) for the VM"`
-		Env           []string `long:"env" value-name:"[]" default-mask:"-" description:"Set environment variables"`
-		EntryPoint    string   `long:"entrypoint" value-name:"\"\"" default-mask:"-" description:"Overwrite the default ENTRYPOINT of the image"`
-		RestartPolicy string   `long:"restart" default:"never" value-name:"\"\"" default-mask:"-" description:"Restart policy to apply when a container exits (never, onFailure, always)"`
-		LogDriver     string   `long:"log-driver" value-name:"\"\"" description:"Logging driver for Pod"`
-		LogOpts       []string `long:"log-opt" description:"Log driver options"`
-		Remove        bool     `long:"rm" default:"false" default-mask:"-" description:"Automatically remove the pod when it exits"`
-		Portmap       []string `long:"publish" value-name:"[]" default-mask:"-" description:"Publish a container's port to the host, format: --publish [tcp/udp:]hostPort:containerPort"`
-		Labels        []string `long:"label" value-name:"[]" default-mask:"-" description:"Add labels for Pod, format: --label key=value"`
-		Volumes       []string `short:"v" long:"volume" value-name:"[]" default-mask:"-" description:"Mount host file/directory as a data file/volume, format: -v|--volume=[[hostDir:]containerDir[:options]]"`
-	}
+	copt, err := cli.ParseCreateOptions("run", args...)
 
 	var (
-		podId   string
-		vmId    string
-		podJson string
-		attach  bool = false
+		podId  string
+		vmId   string
+		attach bool = false
+		spec   apitype.UserPod
+		code   int
+		tty    = false
 	)
-	var parser = gflag.NewParser(&opts, gflag.Default|gflag.IgnoreUnknown)
-	parser.Usage = "run [OPTIONS] IMAGE [COMMAND] [ARG...]\n\nCreate a pod, and launch a new VM to run the pod"
-	args, err = parser.ParseArgs(args)
-	if err != nil {
-		if !strings.Contains(err.Error(), "Usage") {
-			return err
-		} else {
-			return nil
-		}
-	}
 
-	if opts.PodFile != "" {
-		attach = opts.Attach
-		podJson, err = cli.JsonFromFile(opts.PodFile, opts.Yaml, false)
-	} else {
-		if len(args) == 0 {
-			return fmt.Errorf("%s: \"run\" requires a minimum of 1 argument, please provide the image.", os.Args[0])
-		}
-		attach = !opts.Detach
-		podJson, err = cli.JsonFromCmdline(args, opts.Env, opts.Portmap, opts.LogDriver, opts.LogOpts,
-			opts.Name, opts.Workdir, opts.RestartPolicy, opts.Cpu, opts.Memory, opts.Tty, opts.Labels, opts.EntryPoint, opts.Volumes)
-	}
-
-	if err != nil {
-		return err
+	if copt.IsContainer {
+		return fmt.Errorf("%s: \"run\" command only support run as a pod.", os.Args[0])
 	}
 
 	t1 := time.Now()
 
-	var (
-		spec apitype.UserPod
-		code int
-		tty  = false
-	)
-	err = json.Unmarshal([]byte(podJson), &spec)
+	err = json.Unmarshal([]byte(copt.JsonBytes), &spec)
 	if err != nil {
 		return err
 	}
@@ -105,7 +61,7 @@ func (cli *HyperClient) HyperCmdRun(args ...string) (err error) {
 		fmt.Printf("POD id is %s\n", podId)
 	}
 
-	if opts.Remove {
+	if copt.Remove {
 		defer func() {
 			rmerr := cli.client.RmPod(podId)
 			if rmerr != nil {
@@ -115,12 +71,7 @@ func (cli *HyperClient) HyperCmdRun(args ...string) (err error) {
 	}
 
 	if attach {
-		if opts.PodFile == "" {
-			tty = opts.Tty
-		} else {
-			tty = spec.Tty || spec.Containers[0].Tty
-		}
-
+		tty = spec.Tty || spec.Containers[0].Tty
 		if tty {
 			p, err := cli.client.GetPodInfo(podId)
 			if err == nil {
@@ -148,7 +99,88 @@ func (cli *HyperClient) HyperCmdRun(args ...string) (err error) {
 	return nil
 }
 
-func (cli *HyperClient) JsonFromFile(filename string, yaml, k8s bool) (string, error) {
+type CreateOptions struct {
+	JsonBytes   []byte
+	IsContainer bool //true for container, false for Pod
+	PodId       string
+	Attach      bool
+	Remove      bool
+}
+
+func (cli *HyperClient) ParseCreateOptions(cmd string, args ...string) (*CreateOptions, error) {
+	var opts struct {
+		PodFile       string   `short:"p" long:"podfile" value-name:"\"\"" description:"Create and Run a pod based on the pod file"`
+		Container     bool     `short:"c" long:"container" default:"false" default-mast:"-" description:"Create container inside a pod"`
+		Yaml          bool     `short:"y" long:"yaml" default:"false" default-mask:"-" description:"Create a pod based on Yaml file"`
+		Name          string   `long:"name" value-name:"\"\"" description:"Assign a name to the container"`
+		Attach        bool     `short:"a" long:"attach" default:"false" default-mask:"-" description:"(from podfile) Attach the stdin, stdout and stderr to the container"`
+		Detach        bool     `short:"d" long:"detach" default:"false" default-mask:"-" description:"(from cmdline) Not Attach the stdin, stdout and stderr to the container"`
+		Workdir       string   `long:"workdir" value-name:"\"\"" default-mask:"-" description:"Working directory inside the container"`
+		Tty           bool     `short:"t" long:"tty" default:"false" default-mask:"-" description:"the run command in tty, such as bash shell"`
+		Cpu           int      `long:"cpu" default:"1" value-name:"1" default-mask:"-" description:"CPU number for the VM"`
+		Memory        int      `long:"memory" default:"128" value-name:"128" default-mask:"-" description:"Memory size (MB) for the VM"`
+		Env           []string `long:"env" value-name:"[]" default-mask:"-" description:"Set environment variables"`
+		EntryPoint    string   `long:"entrypoint" value-name:"\"\"" default-mask:"-" description:"Overwrite the default ENTRYPOINT of the image"`
+		RestartPolicy string   `long:"restart" default:"never" value-name:"\"\"" default-mask:"-" description:"Restart policy to apply when a container exits (never, onFailure, always)"`
+		LogDriver     string   `long:"log-driver" value-name:"\"\"" description:"Logging driver for Pod"`
+		LogOpts       []string `long:"log-opt" description:"Log driver options"`
+		Remove        bool     `long:"rm" default:"false" default-mask:"-" description:"Automatically remove the pod when it exits"`
+		Portmap       []string `long:"publish" value-name:"[]" default-mask:"-" description:"Publish a container's port to the host, format: --publish [tcp/udp:]hostPort:containerPort"`
+		Labels        []string `long:"label" value-name:"[]" default-mask:"-" description:"Add labels for Pod, format: --label key=value"`
+		Volumes       []string `short:"v" long:"volume" value-name:"[]" default-mask:"-" description:"Mount host file/directory as a data file/volume, format: -v|--volume=[[hostDir:]containerDir[:options]]"`
+	}
+
+	var (
+		PodId    string
+		specJson string
+		attach   bool = false
+		err      error
+	)
+	var parser = gflag.NewParser(&opts, gflag.Default|gflag.IgnoreUnknown)
+	parser.Usage = fmt.Sprintf("%s [OPTIONS] IMAGE [COMMAND] [ARG...]\n\nCreate a pod, and launch a new VM to run the pod", cmd)
+	args, err = parser.ParseArgs(args)
+	if err != nil {
+		if !strings.Contains(err.Error(), "Usage") {
+			return nil, err
+		} else {
+			return nil, nil
+		}
+	}
+
+	if opts.Container {
+		if len(args) == 0 {
+			return nil, fmt.Errorf("%s: \"%s\" requires the pod id as first argument.", os.Args[0], cmd)
+		}
+		PodId = args[0]
+		args = args[1:]
+	}
+
+	if opts.PodFile != "" {
+		attach = opts.Attach
+		specJson, err = cli.JsonFromFile(opts.PodFile, opts.Container, opts.Yaml, false)
+	} else {
+		if len(args) == 0 {
+			return nil, fmt.Errorf("%s: \"%s\" requires a minimum of 1 argument, please provide the image.", os.Args[0], cmd)
+		}
+		attach = !opts.Detach
+		specJson, err = cli.JsonFromCmdline(opts.Container, args, opts.Env, opts.Portmap, opts.LogDriver, opts.LogOpts,
+			opts.Name, opts.Workdir, opts.RestartPolicy, opts.Cpu, opts.Memory, opts.Tty, opts.Labels, opts.EntryPoint, opts.Volumes)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &CreateOptions{
+		JsonBytes:   []byte(specJson),
+		IsContainer: opts.Container,
+		PodId:       PodId,
+		Attach:      attach,
+		Remove:      opts.Remove,
+	}, nil
+}
+
+func (cli *HyperClient) JsonFromFile(filename string, container, yaml, k8s bool) (string, error) {
 	if _, err := os.Stat(filename); err != nil {
 		return "", err
 	}
@@ -159,7 +191,7 @@ func (cli *HyperClient) JsonFromFile(filename string, yaml, k8s bool) (string, e
 	}
 
 	if yaml == true {
-		jsonbody, err = cli.ConvertYamlToJson(jsonbody)
+		jsonbody, err = cli.ConvertYamlToJson(jsonbody, container)
 		if err != nil {
 			return "", err
 		}
@@ -168,7 +200,7 @@ func (cli *HyperClient) JsonFromFile(filename string, yaml, k8s bool) (string, e
 	return string(jsonbody), nil
 }
 
-func (cli *HyperClient) JsonFromCmdline(cmdArgs, cmdEnvs, cmdPortmaps []string, cmdLogDriver string, cmdLogOpts []string,
+func (cli *HyperClient) JsonFromCmdline(container bool, cmdArgs, cmdEnvs, cmdPortmaps []string, cmdLogDriver string, cmdLogOpts []string,
 	cmdName, cmdWorkdir, cmdRestartPolicy string, cpu, memory int, tty bool, cmdLabels []string, entrypoint string, cmdVols []string) (string, error) {
 
 	var (
@@ -180,7 +212,6 @@ func (cli *HyperClient) JsonFromCmdline(cmdArgs, cmdEnvs, cmdPortmaps []string, 
 		logOpts    = make(map[string]string)
 		labels     = make(map[string]string)
 		volumesRef = []*apitype.UserVolumeReference{}
-		volumes    = []*apitype.UserVolume{}
 	)
 	if len(cmdArgs) > 1 {
 		command = cmdArgs[1:]
@@ -234,7 +265,7 @@ func (cli *HyperClient) JsonFromCmdline(cmdArgs, cmdEnvs, cmdPortmaps []string, 
 		if err != nil {
 			return "", err
 		}
-		volumes = append(volumes, vol)
+		volRef.Detail = vol
 		volumesRef = append(volumesRef, volRef)
 	}
 
@@ -243,7 +274,7 @@ func (cli *HyperClient) JsonFromCmdline(cmdArgs, cmdEnvs, cmdPortmaps []string, 
 		entrypoints = append(entrypoints, entrypoint)
 	}
 
-	containerList := []*apitype.UserContainer{{
+	c := &apitype.UserContainer{
 		Name:          name,
 		Image:         image,
 		Command:       command,
@@ -255,22 +286,24 @@ func (cli *HyperClient) JsonFromCmdline(cmdArgs, cmdEnvs, cmdPortmaps []string, 
 		Files:         []*apitype.UserFileReference{},
 		RestartPolicy: cmdRestartPolicy,
 		Tty:           tty,
-	}}
-
-	userPod := &apitype.UserPod{
-		Id:         name,
-		Containers: containerList,
-		Labels:     labels,
-		Resource:   &apitype.UserResource{Vcpu: int32(cpu), Memory: int32(memory)},
-		Files:      []*apitype.UserFile{},
-		Volumes:    volumes,
-		Log: &apitype.PodLogConfig{
-			Type:   cmdLogDriver,
-			Config: logOpts,
-		},
 	}
 
-	jsonString, _ := json.Marshal(userPod)
+	var body interface{} = c
+	if !container {
+		userPod := &apitype.UserPod{
+			Id:         name,
+			Containers: []*apitype.UserContainer{c},
+			Labels:     labels,
+			Resource:   &apitype.UserResource{Vcpu: int32(cpu), Memory: int32(memory)},
+			Log: &apitype.PodLogConfig{
+				Type:   cmdLogDriver,
+				Config: logOpts,
+			},
+		}
+		body = userPod
+	}
+
+	jsonString, _ := json.Marshal(body)
 	return string(jsonString), nil
 }
 

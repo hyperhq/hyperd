@@ -25,7 +25,7 @@ func (cli *HyperClient) HyperCmdRm(args ...string) error {
 		return fmt.Errorf("\"rm\" requires a minimum of 1 argument, please provide POD ID.\n")
 	}
 	for _, id := range args {
-		if opts.Container{
+		if opts.Container {
 			err := cli.client.RemoveContainer(id)
 			if err == nil {
 				fmt.Fprintf(cli.out, "container %s is successfully deleted!\n", id)

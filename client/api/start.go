@@ -60,3 +60,16 @@ func (cli *Client) startPodWithoutTty(v *url.Values) (string, error) {
 	}
 	return remoteInfo.Get("ID"), nil
 }
+
+func (cli *Client) StartContainer(podId, container string) error {
+	v := url.Values{}
+	v.Set("podId", podId)
+	v.Set("container", container)
+
+	_, _, err := readBody(cli.call("POST", "/container/start?"+v.Encode(), nil, nil))
+	if err != nil {
+		return err
+	}
+	return nil
+
+}

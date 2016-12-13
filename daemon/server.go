@@ -99,13 +99,14 @@ func (daemon *Daemon) CmdCreateContainer(podId string, containerArgs []byte) (st
 	return daemon.CreateContainerInPod(podId, &c)
 }
 
-func (daemon *Daemon) CmdStartContainer(podId, containerId string) error {
+func (daemon *Daemon) CmdStartContainer(podId, containerId string) (*engine.Env, error) {
 	err := daemon.StartContainer(containerId)
 	if err != nil {
 		glog.Errorf("fail to start container %s in pod %s: %v", containerId, podId, err)
-		return err
+		return nil, err
 	}
-	return nil
+	v := &engine.Env{}
+	return v, nil
 }
 
 func (daemon *Daemon) CmdKillContainer(name string, sig int64) (*engine.Env, error) {

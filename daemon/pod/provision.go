@@ -175,7 +175,7 @@ func (p *XPod) ContainerStart(cid string) error {
 		return nil
 	}
 
-	if !p.IsAlive() || c.IsStopped() {
+	if !p.IsAlive() || !c.IsStopped() {
 		err = fmt.Errorf("not ready for start p: %v, c: %v", p.status, c.CurrentState())
 		c.Log(ERROR, err)
 		return err
