@@ -261,7 +261,7 @@ func UnmapVolume(deviceFullPath string) error {
 	} else if err != nil {
 		glog.Errorf("file %s could not be unmapped: %v", deviceFullPath, err)
 		return err
-	} else if f.Mode() != os.ModeDevice {
+	} else if (f.Mode() & os.ModeDevice) == 0 {
 		err := fmt.Errorf("only device could be unmapped, %s is %v", deviceFullPath, f.Mode())
 		glog.Error(err)
 		return err
