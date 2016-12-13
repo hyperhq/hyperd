@@ -25,12 +25,11 @@ func (cli *HyperClient) HyperCmdRun(args ...string) (err error) {
 	copt, err := cli.ParseCreateOptions("run", args...)
 
 	var (
-		podId  string
-		vmId   string
-		attach bool = false
-		spec   apitype.UserPod
-		code   int
-		tty    = false
+		podId string
+		vmId  string
+		spec  apitype.UserPod
+		code  int
+		tty   = false
 	)
 
 	if copt.IsContainer {
@@ -57,7 +56,7 @@ func (cli *HyperClient) HyperCmdRun(args ...string) (err error) {
 			return
 		}
 	}
-	if !attach {
+	if !copt.Attach {
 		fmt.Printf("POD id is %s\n", podId)
 	}
 
@@ -70,7 +69,7 @@ func (cli *HyperClient) HyperCmdRun(args ...string) (err error) {
 		}()
 	}
 
-	if attach {
+	if copt.Attach {
 		tty = spec.Tty || spec.Containers[0].Tty
 		if tty {
 			p, err := cli.client.GetPodInfo(podId)
@@ -87,12 +86,12 @@ func (cli *HyperClient) HyperCmdRun(args ...string) (err error) {
 
 	}
 
-	_, err = cli.client.StartPod(podId, vmId, attach, tty, cli.in, cli.out, cli.err)
+	_, err = cli.client.StartPod(podId, vmId, copt.Attach, tty, cli.in, cli.out, cli.err)
 	if err != nil {
 		return
 	}
 
-	if !attach {
+	if !copt.Attach {
 		t2 := time.Now()
 		fmt.Printf("Time to run a POD is %d ms\n", (t2.UnixNano()-t1.UnixNano())/1000000)
 	}
@@ -136,7 +135,7 @@ func (cli *HyperClient) ParseCreateOptions(cmd string, args ...string) (*CreateO
 		attach   bool = false
 		err      error
 	)
-	var parser = gflag.NewParser(&opts, gflag.Default|gflag.IgnoreUnknown)
+	var parser = gflag.NewParser(&opts, gflag.Default|gflag.IgnoreUnknown|gflag.PassAfterNonOption)
 	parser.Usage = fmt.Sprintf("%s [OPTIONS] IMAGE [COMMAND] [ARG...]\n\nCreate a pod, and launch a new VM to run the pod", cmd)
 	args, err = parser.ParseArgs(args)
 	if err != nil {
