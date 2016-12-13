@@ -19,10 +19,6 @@ type VmKilledEvent struct {
 	Success bool
 }
 
-type PodFinished struct {
-	result []uint32
-}
-
 type VmTimeout struct{}
 
 type InitFailedEvent struct {
@@ -63,31 +59,6 @@ type WindowSizeCommand struct {
 	Size        *WindowSize
 }
 
-type ContainerCreatedEvent struct {
-	Index  int
-	Id     string
-	Rootfs string
-	Image  string // if fstype is `dir`, this should be a path relative to share_dir
-	// which described the mounted aufs or overlayfs dir.
-	Fstype     string
-	Workdir    string
-	Entrypoint []string
-	Cmd        []string
-	Envs       map[string]string
-}
-
-type ContainerUnmounted struct {
-	Index   int
-	Success bool
-}
-
-type VolumeReadyEvent struct {
-	Name     string //volumen name in spec
-	Filepath string //block dev absolute path, or dir path relative to share dir
-	Fstype   string //"xfs", "ext4" etc. for block dev, or "dir" for dir path
-	Format   string //"raw" (or "qcow2") for volume, no meaning for dir path
-}
-
 type VolumeInfo struct {
 	Name         string //volumen name in spec
 	Filepath     string //block dev absolute path, or dir path relative to share dir
@@ -109,8 +80,6 @@ type BlockdevInsertedEvent struct {
 	ScsiAddr   string // pass scsi addr to hyperstart
 }
 
-type DevSkipEvent struct{}
-
 type InterfaceCreated struct {
 	Id         string //user specified in (ref api.InterfaceDescription: a user identifier of interface, user may use this to specify a nic, normally you can use IPAddr as an Id, however, in some driver (probably vbox?), user may not specify the IPAddr.)
 	Index      int
@@ -123,11 +92,6 @@ type InterfaceCreated struct {
 	IpAddr     string
 	NetMask    string
 	RouteTable []*RouteRule
-}
-
-type InterfaceReleased struct {
-	Index   int
-	Success bool
 }
 
 type RouteRule struct {
@@ -198,16 +162,10 @@ func (qe *VmStartFailEvent) Event() int      { return ERROR_VM_START_FAILED }
 func (qe *VmExit) Event() int                { return EVENT_VM_EXIT }
 func (qe *VmKilledEvent) Event() int         { return EVENT_VM_KILL }
 func (qe *VmTimeout) Event() int             { return EVENT_VM_TIMEOUT }
-func (qe *PodFinished) Event() int           { return EVENT_POD_FINISH }
 func (qe *InitConnectedEvent) Event() int    { return EVENT_INIT_CONNECTED }
-func (qe *ContainerCreatedEvent) Event() int { return EVENT_CONTAINER_ADD }
-func (qe *ContainerUnmounted) Event() int    { return EVENT_CONTAINER_DELETE }
 func (qe *VolumeUnmounted) Event() int       { return EVENT_BLOCK_EJECTED }
-func (qe *VolumeReadyEvent) Event() int      { return EVENT_VOLUME_ADD }
 func (qe *BlockdevInsertedEvent) Event() int { return EVENT_BLOCK_INSERTED }
-func (qe *DevSkipEvent) Event() int          { return EVENT_DEV_SKIP }
 func (qe *InterfaceCreated) Event() int      { return EVENT_INTERFACE_ADD }
-func (qe *InterfaceReleased) Event() int     { return EVENT_INTERFACE_DELETE }
 func (qe *NetDevInsertedEvent) Event() int   { return EVENT_INTERFACE_INSERTED }
 func (qe *NetDevRemovedEvent) Event() int    { return EVENT_INTERFACE_EJECTED }
 func (qe *GetPodStatsCommand) Event() int    { return COMMAND_GET_POD_STATS }

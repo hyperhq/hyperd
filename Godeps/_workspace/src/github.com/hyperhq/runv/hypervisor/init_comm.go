@@ -273,29 +273,6 @@ func waitCmdToInit(ctx *VmContext, init *net.UnixConn) {
 			} else {
 				glog.Error("got ack but no command in queue")
 			}
-		} else if cmd.Code == hyperstartapi.INIT_FINISHPOD {
-			num := len(cmd.retMsg) / 4
-			results := make([]uint32, num)
-			for i := 0; i < num; i++ {
-				results[i] = binary.BigEndian.Uint32(cmd.retMsg[i*4 : i*4+4])
-			}
-
-			for _, c := range cmds {
-				if c.Code == hyperstartapi.INIT_DESTROYPOD {
-					glog.Info("got pod finish message after having send destroy message")
-					looping = false
-					ctx.Hub <- &CommandAck{
-						reply: c,
-					}
-					break
-				}
-			}
-
-			glog.V(1).Infof("Pod finished, returned %d values", num)
-
-			ctx.Hub <- &PodFinished{
-				result: results,
-			}
 		} else {
 			if cmd.Code == hyperstartapi.INIT_NEXT {
 				glog.V(1).Infof("get command NEXT")
@@ -369,7 +346,7 @@ func waitInitAck(ctx *VmContext, init *net.UnixConn) {
 			ctx.Hub <- &Interrupted{Reason: "init socket failed " + err.Error()}
 			return
 		} else if res.Code == hyperstartapi.INIT_ACK || res.Code == hyperstartapi.INIT_NEXT ||
-			res.Code == hyperstartapi.INIT_ERROR || res.Code == hyperstartapi.INIT_FINISHPOD {
+			res.Code == hyperstartapi.INIT_ERROR {
 			ctx.vm <- &hyperstartCmd{Code: res.Code, retMsg: res.Message}
 		}
 	}

@@ -151,8 +151,11 @@ func (dms *DevMapperStorage) CleanupContainer(id, sharedDir string) error {
 	return dm.UnmapVolume(devFullName)
 }
 
-func (dms *DevMapperStorage) InjectFile(src io.Reader, containerId, target, baseDir string, perm, uid, gid int) error {
-	return dm.InjectFile(src, containerId, dms.DevPrefix, target, baseDir, perm, uid, gid)
+func (dms *DevMapperStorage) InjectFile(src io.Reader, mountId, target, baseDir string, perm, uid, gid int) error {
+	if err := dm.CreateNewDevice(mountId, dms.DevPrefix, dms.RootPath()); err != nil {
+		return err
+	}
+	return dm.InjectFile(src, mountId, dms.DevPrefix, target, baseDir, perm, uid, gid)
 }
 
 func (dms *DevMapperStorage) getPersistedId(podId, volName string) (int, error) {

@@ -15,6 +15,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/hyperhq/hyperd/storage"
+	"path/filepath"
 )
 
 type jsonMetadata struct {
@@ -51,6 +52,10 @@ func CreateNewDevice(containerId, devPrefix, rootPath string) error {
 	deviceSize := dat.Size
 	// Activate the device for that device ID
 	devName := fmt.Sprintf("%s-%s", devPrefix, containerId)
+	if _, err := os.Stat(filepath.Join("/dev/mapper", devName)); err == nil {
+		glog.V(1).Infof("already exist dev %s", devName)
+		return nil
+	}
 	poolName := fmt.Sprintf("/dev/mapper/%s-pool", devPrefix)
 	createDeviceCmd := fmt.Sprintf("dmsetup create %s --table \"0 %d thin %s %d\"", devName, deviceSize/512, poolName, deviceId)
 	createDeviceCommand := exec.Command("/bin/sh", "-c", createDeviceCmd)

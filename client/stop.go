@@ -46,7 +46,7 @@ func (cli *HyperClient) HyperCmdStop(args ...string) error {
 				fmt.Fprintf(cli.err, "fail to stop pod %s: %v", args[i], err)
 				continue
 			}
-			if code != types.E_POD_STOPPED && code != types.E_VM_SHUTDOWN {
+			if code != types.E_VM_SHUTDOWN {
 				fmt.Fprintf(cli.err, "Error code is %d, cause is %s", code, cause)
 				continue
 			}
