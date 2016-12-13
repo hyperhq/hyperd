@@ -21,6 +21,10 @@ func (s *ServerRPC) ContainerCreate(ctx context.Context, req *types.ContainerCre
 	}, nil
 }
 
+func (s *ServerRPC) ContainerStart(ctx context.Context, req *types.ContainerStartRequest) (*types.ContainerStartResponse, error) {
+	return nil, nil
+}
+
 // ContainerStop implements POST /container/stop
 func (s *ServerRPC) ContainerStop(c context.Context, req *types.ContainerStopRequest) (*types.ContainerStopResponse, error) {
 	glog.V(3).Infof("ContainerStop with request %v", req.String())
@@ -45,4 +49,8 @@ func (s *ServerRPC) ContainerRename(c context.Context, req *types.ContainerRenam
 	}
 
 	return &types.ContainerRenameResponse{}, nil
+}
+
+func (s *ServerRPC) ContainerRemove(ctx context.Context, req *types.ContainerRemoveRequest) (*types.ContainerRemoveResponse, error) {
+	return nil, nil
 }
