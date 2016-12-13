@@ -78,13 +78,13 @@ func (daemon *Daemon) CreateContainerInPod(podId string, spec *apitypes.UserCont
 	return p.ContainerCreate(spec)
 }
 
-func (daemon *Daemon) StartContainer(podId, containerId string) error {
-	p, ok := daemon.PodList.Get(podId)
-	if !ok {
-		return fmt.Errorf("The pod(%s) can not be found", podId)
-	}
+func (daemon *Daemon) StartContainer(containerId string) error {
 
-	return p.ContainerStart(containerId)
+	p, cid, ok := daemon.PodList.GetByContainerIdOrName(containerId)
+	if !ok {
+		return fmt.Errorf("The container (%s) can not be found", containerId)
+	}
+	return p.ContainerStart(cid)
 }
 
 func (daemon *Daemon) CmdCreateContainer(podId string, containerArgs []byte) (string, error) {
@@ -100,7 +100,7 @@ func (daemon *Daemon) CmdCreateContainer(podId string, containerArgs []byte) (st
 }
 
 func (daemon *Daemon) CmdStartContainer(podId, containerId string) error {
-	err := daemon.StartContainer(podId, containerId)
+	err := daemon.StartContainer(containerId)
 	if err != nil {
 		glog.Errorf("fail to start container %s in pod %s: %v", containerId, podId, err)
 		return err

@@ -22,7 +22,13 @@ func (s *ServerRPC) ContainerCreate(ctx context.Context, req *types.ContainerCre
 }
 
 func (s *ServerRPC) ContainerStart(ctx context.Context, req *types.ContainerStartRequest) (*types.ContainerStartResponse, error) {
-	return nil, nil
+	glog.V(3).Info("ContainerStart with request %s", req.String())
+	err := s.daemon.StartContainer(req.ContainerId)
+	if err != nil {
+		glog.Errorf("ContainerStart failed: %v", err)
+		return nil, err
+	}
+	return &types.ContainerStartResponse{}, nil
 }
 
 // ContainerStop implements POST /container/stop
@@ -52,5 +58,11 @@ func (s *ServerRPC) ContainerRename(c context.Context, req *types.ContainerRenam
 }
 
 func (s *ServerRPC) ContainerRemove(ctx context.Context, req *types.ContainerRemoveRequest) (*types.ContainerRemoveResponse, error) {
-	return nil, nil
+	glog.V(3).Info("ContainerRemove with request %s", req.String())
+	err := s.daemon.RemoveContainer(req.ContainerId)
+	if err != nil {
+		glog.Errorf("ContainerRemove failed: %v", err)
+		return nil, err
+	}
+	return &types.ContainerRemoveResponse{}, nil
 }
