@@ -47,6 +47,7 @@ type ContainerStatus struct {
 	Killed     bool
 
 	sync.RWMutex
+	stateChanged *sync.Cond
 }
 
 // A Container is run inside a Pod. It could be created as a member of a pod,
@@ -63,12 +64,14 @@ type Container struct {
 }
 
 func newContainerStatus() *ContainerStatus {
-	return &ContainerStatus{
+	cs := &ContainerStatus{
 		State:      S_CONTAINER_NONE,
 		CreatedAt:  epocZero,
 		StartedAt:  epocZero,
 		FinishedAt: epocZero,
 	}
+	cs.stateChanged = sync.NewCond(cs.RWMutex.RLocker())
+	return cs
 }
 
 func newContainer(p *XPod, spec *apitypes.UserContainer, create bool) (*Container, error) {
@@ -351,6 +354,9 @@ func (c *Container) StatusString() string {
 
 func (c *Container) GetExitCode() (uint8, error) {
 	c.status.RLock()
+	for c.status.State != S_CONTAINER_CREATED {
+		c.status.stateChanged.Wait()
+	}
 	code := uint8(c.status.ExitCode)
 	if c.status.Killed {
 		code = uint8(137)
@@ -1086,6 +1092,7 @@ func (cs *ContainerStatus) Create() error {
 	}
 
 	cs.State = S_CONTAINER_CREATING
+	cs.stateChanged.Broadcast()
 
 	return nil
 }
@@ -1099,6 +1106,7 @@ func (cs *ContainerStatus) Created(t time.Time) error {
 
 	cs.State = S_CONTAINER_CREATED
 	cs.CreatedAt = t
+	cs.stateChanged.Broadcast()
 
 	return nil
 }
@@ -1113,6 +1121,7 @@ func (cs *ContainerStatus) Start() error {
 
 	cs.Killed = false
 	cs.State = S_CONTAINER_RUNNING
+	cs.stateChanged.Broadcast()
 
 	return nil
 }
@@ -1142,6 +1151,7 @@ func (cs *ContainerStatus) Stop() error {
 		return fmt.Errorf("only RUNNING container could be stopped, current: %d", cs.State)
 	}
 	cs.State = S_CONTAINER_STOPPING
+	cs.stateChanged.Broadcast()
 	return nil
 }
 
@@ -1154,6 +1164,7 @@ func (cs *ContainerStatus) Stopped(t time.Time, exitCode int) bool {
 		result = true
 	}
 	cs.State = S_CONTAINER_CREATED
+	cs.stateChanged.Broadcast()
 	cs.Unlock()
 	return result
 }
