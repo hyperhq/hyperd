@@ -31,3 +31,14 @@ func (cli *Client) RmPod(id string) error {
 	}
 	return nil
 }
+
+func (cli *Client) RemoveContainer(container string) error {
+	v := url.Values{}
+	v.Set("container", container)
+
+	_, _, err := readBody(cli.call("POST", "/container/remove?"+v.Encode(), nil, nil))
+	if err != nil {
+		return err
+	}
+	return nil
+}

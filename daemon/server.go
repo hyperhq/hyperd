@@ -128,6 +128,16 @@ func (daemon *Daemon) CmdStopContainer(name string) (*engine.Env, error) {
 	return v, nil
 }
 
+func (daemon *Daemon) CmdRemoveContainer(name string) (*engine.Env, error) {
+	err := daemon.RemoveContainer(name)
+	if err != nil {
+		glog.Errorf("failed to remove container %s: %v", name, err)
+		return nil, err
+	}
+	v := &engine.Env{}
+	return v, nil
+}
+
 func (daemon *Daemon) CmdExitCode(containerId, execId string) (int, error) {
 	return daemon.ExitCode(containerId, execId)
 }

@@ -31,6 +31,7 @@ type APIInterface interface {
 	StartPod(podId, vmId string, attach, tty bool, stdin io.ReadCloser, stdout, stderr io.Writer) (string, error)
 	StopPod(podId, stopVm string) (int, string, error)
 	RmPod(id string) error
+        RemoveContainer(container string) error
 	PausePod(podId string) error
 	UnpausePod(podId string) error
 	KillPod(pod string, sig int) error
