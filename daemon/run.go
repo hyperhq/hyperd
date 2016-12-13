@@ -63,7 +63,7 @@ func (daemon *Daemon) StartPod(stdin io.ReadCloser, stdout io.WriteCloser, podId
 		}
 	}
 
-	glog.Infof("pod:%s, vm:%s", podId)
+	glog.Infof("Starting pod %q in vm: %q", podId, p.SandboxName())
 
 	err := p.Start()
 	if err != nil {
