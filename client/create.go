@@ -10,11 +10,11 @@ import (
 
 func (cli *HyperClient) HyperCmdCreate(args ...string) error {
 	copt, err := cli.ParseCreateOptions("create", args...)
-	if err != nil {
+	if copt == nil {
 		return err
 	}
-	if copt.Remove || copt.Attach {
-		return fmt.Errorf("\"create\" does not support attach and rm parameter")
+	if copt.Remove {
+		return fmt.Errorf("\"create\" does not support rm parameter")
 	}
 
 	if copt.IsContainer && copt.PodId == "" {

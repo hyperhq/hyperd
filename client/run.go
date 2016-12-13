@@ -23,6 +23,9 @@ import (
 // hyperctl run [OPTIONS] image [COMMAND] [ARGS...]
 func (cli *HyperClient) HyperCmdRun(args ...string) (err error) {
 	copt, err := cli.ParseCreateOptions("run", args...)
+	if copt == nil {
+		return err
+	}
 
 	var (
 		podId string
@@ -136,7 +139,7 @@ func (cli *HyperClient) ParseCreateOptions(cmd string, args ...string) (*CreateO
 		err      error
 	)
 	var parser = gflag.NewParser(&opts, gflag.Default|gflag.IgnoreUnknown|gflag.PassAfterNonOption)
-	parser.Usage = fmt.Sprintf("%s [OPTIONS] IMAGE [COMMAND] [ARG...]\n\nCreate a pod, and launch a new VM to run the pod", cmd)
+	parser.Usage = fmt.Sprintf("%s [OPTIONS] [POD_ID] IMAGE [COMMAND] [ARG...]\n\nCreate a pod, and launch a new VM to run the pod", cmd)
 	args, err = parser.ParseArgs(args)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {

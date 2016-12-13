@@ -137,9 +137,8 @@ func (c *containerRouter) postContainerStart(ctx context.Context, w http.Respons
 		return err
 	}
 
-	pod := r.Form.Get("podId")
 	cname := r.Form.Get("container")
-	env, err := c.backend.CmdStartContainer(pod, cname)
+	env, err := c.backend.CmdStartContainer(cname)
 	if err != nil {
 		return err
 	}

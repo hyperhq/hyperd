@@ -13,7 +13,7 @@ type Backend interface {
 	CmdGetContainerLogs(name string, c *daemon.ContainerLogsConfig) error
 	CmdExitCode(container, tag string) (int, error)
 	CmdCreateContainer(podId string, containerArgs []byte) (string, error)
-	CmdStartContainer(podId, containerId string) (*engine.Env, error)
+	CmdStartContainer(containerId string) (*engine.Env, error)
 	CmdKillContainer(name string, sig int64) (*engine.Env, error)
 	CmdStopContainer(name string) (*engine.Env, error)
 	CmdRemoveContainer(name string) (*engine.Env, error)

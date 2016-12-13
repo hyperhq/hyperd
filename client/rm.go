@@ -30,14 +30,14 @@ func (cli *HyperClient) HyperCmdRm(args ...string) error {
 			if err == nil {
 				fmt.Fprintf(cli.out, "container %s is successfully deleted!\n", id)
 			} else {
-				fmt.Fprintf(cli.err, "%v\n", err)
+				fmt.Fprintf(cli.err, "container %s delete failed: %v\n", id, err)
 			}
 		} else {
 			err := cli.client.RmPod(id)
 			if err == nil {
 				fmt.Fprintf(cli.out, "Pod(%s) is successfully deleted!\n", id)
 			} else {
-				fmt.Fprintf(cli.err, "%v\n", err)
+				fmt.Fprintf(cli.err, "Pod(%s) delete failed: %v\n", id, err)
 			}
 		}
 	}

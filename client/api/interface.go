@@ -20,7 +20,7 @@ type APIInterface interface {
 
 	List(item, pod, vm string, aux bool) (*engine.Env, error)
 	CreateContainer(podID string, spec interface{}) (string, int, error)
-	StartContainer(podId, container string) error
+	StartContainer(container string) error
 	GetContainerInfo(container string) (*types.ContainerInfo, error)
 	GetContainerByPod(podId string) (string, error)
 	GetExitCode(container, tag string) error

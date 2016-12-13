@@ -2184,7 +2184,7 @@ type PublicAPIClient interface {
 	ContainerLogs(ctx context.Context, in *ContainerLogsRequest, opts ...grpc.CallOption) (PublicAPI_ContainerLogsClient, error)
 	// ContainerCreate creates a container in specified pod
 	ContainerCreate(ctx context.Context, in *ContainerCreateRequest, opts ...grpc.CallOption) (*ContainerCreateResponse, error)
-	// ContainerStart start a container in a specified pod
+	// ContainerStart starts a container in a specified pod
 	ContainerStart(ctx context.Context, in *ContainerStartRequest, opts ...grpc.CallOption) (*ContainerStartResponse, error)
 	// ContainerRename renames a container
 	ContainerRename(ctx context.Context, in *ContainerRenameRequest, opts ...grpc.CallOption) (*ContainerRenameResponse, error)
@@ -2720,7 +2720,7 @@ type PublicAPIServer interface {
 	ContainerLogs(*ContainerLogsRequest, PublicAPI_ContainerLogsServer) error
 	// ContainerCreate creates a container in specified pod
 	ContainerCreate(context.Context, *ContainerCreateRequest) (*ContainerCreateResponse, error)
-	// ContainerStart start a container in a specified pod
+	// ContainerStart starts a container in a specified pod
 	ContainerStart(context.Context, *ContainerStartRequest) (*ContainerStartResponse, error)
 	// ContainerRename renames a container
 	ContainerRename(context.Context, *ContainerRenameRequest) (*ContainerRenameResponse, error)

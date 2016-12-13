@@ -801,7 +801,7 @@ service PublicAPI {
     rpc ContainerLogs(ContainerLogsRequest) returns (stream ContainerLogsResponse) {}
     // ContainerCreate creates a container in specified pod
     rpc ContainerCreate(ContainerCreateRequest) returns (ContainerCreateResponse) {}
-    // ContainerStart start a container in a specified pod
+    // ContainerStart starts a container in a specified pod
     rpc ContainerStart(ContainerStartRequest) returns (ContainerStartResponse) {}
     // ContainerRename renames a container
     rpc ContainerRename(ContainerRenameRequest) returns (ContainerRenameResponse) {}
