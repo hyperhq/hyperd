@@ -65,9 +65,9 @@ func (ctx *VmContext) updateInterface(id string, result chan<- error) {
 	}
 }
 
-func (ctx *VmContext) setWindowSize(containerId, execId string, size *WindowSize) {
+func (ctx *VmContext) setWindowSize4242(containerId, execId string, size *WindowSize) {
 	var session uint64
-	if execId != "" {
+	if execId != "init" {
 		exec, ok := ctx.vmExec[execId]
 		if !ok {
 			glog.Errorf("cannot find exec %s", execId)
@@ -95,11 +95,28 @@ func (ctx *VmContext) setWindowSize(containerId, execId string, size *WindowSize
 		glog.Error("the session is not a tty, doesn't support resize.")
 		return
 	}
+	cmd := map[string]interface{}{
+		"seq":    session,
+		"row":    size.Row,
+		"column": size.Column,
+	}
 
+	ctx.vm <- &hyperstartCmd{
+		Code:    hyperstartapi.INIT_WINSIZE,
+		Message: cmd,
+	}
+}
+
+func (ctx *VmContext) setWindowSize(containerId, execId string, size *WindowSize) {
+	if ctx.vmHyperstartAPIVersion <= 4242 {
+		ctx.setWindowSize4242(containerId, execId, size)
+		return
+	}
 	cmd := hyperstartapi.WindowSizeMessage{
-		Seq:    session,
-		Row:    size.Row,
-		Column: size.Column,
+		Container: containerId,
+		Process:   execId,
+		Row:       size.Row,
+		Column:    size.Column,
 	}
 
 	ctx.vm <- &hyperstartCmd{
@@ -118,6 +135,12 @@ func (ctx *VmContext) execCmd(execId string, cmd *hyperstartapi.ExecCommand, tty
 	cmd.Process.Stdio = ctx.ptys.nextAttachId()
 	if !cmd.Process.Terminal {
 		cmd.Process.Stderr = ctx.ptys.nextAttachId()
+	}
+	ctx.lock.Lock()
+	defer ctx.lock.Unlock()
+	if _, existed := ctx.vmExec[execId]; existed || execId == "init" {
+		result <- fmt.Errorf("process id conflicts, the process of the id %s already exists", execId)
+		return
 	}
 	ctx.vmExec[execId] = cmd
 	ctx.ptys.ptyConnect(false, cmd.Process.Terminal, cmd.Process.Stdio, cmd.Process.Stderr, tty)
@@ -153,7 +176,7 @@ func (ctx *VmContext) attachCmd(cmd *AttachCommand, result chan<- error) {
 
 	ctx.attachTty2Container(c.process, cmd)
 	if cmd.Size != nil {
-		ctx.setWindowSize(cmd.Container, "", cmd.Size)
+		ctx.setWindowSize(cmd.Container, "init", cmd.Size)
 	}
 
 	result <- nil
