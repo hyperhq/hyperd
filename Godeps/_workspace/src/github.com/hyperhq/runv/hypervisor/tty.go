@@ -167,7 +167,9 @@ func waitPts(ctx *VmContext) {
 		}
 		if len(res.Message) == 0 {
 			glog.V(1).Infof("session %d closed by peer, close pty", res.Session)
-			if ta, ok := ctx.ptys.ttys[res.Session]; ok {
+			if ctx.vmHyperstartAPIVersion > 4242 {
+				ctx.ptys.Close(ctx, res.Session)
+			} else if ta, ok := ctx.ptys.ttys[res.Session]; ok {
 				ta.closed = true
 			} else {
 				ctx.ptys.addEmptyPty(false, false, true, res.Session, 0)
@@ -179,7 +181,7 @@ func waitPts(ctx *VmContext) {
 					code = uint8(res.Message[0])
 				}
 				glog.V(1).Infof("session %d, exit code %d", res.Session, code)
-				ctx.ptys.Close(ctx, res.Session, code)
+				ctx.ptys.Close4242(ctx, res.Session, code)
 			} else {
 				for _, tty := range ta.attachments {
 					if tty.Stdout != nil && res.Session == ta.stdioSeq {
@@ -304,7 +306,7 @@ func (pts *pseudoTtys) Detach(ta *ttyAttachments, tty *TtyIO) {
 	tty.Close()
 }
 
-func (pts *pseudoTtys) Close(ctx *VmContext, session uint64, code uint8) {
+func (pts *pseudoTtys) Close4242(ctx *VmContext, session uint64, code uint8) {
 	if ta, ok := pts.ttys[session]; ok {
 		ack := make(chan bool, 1)
 		kind := types.E_CONTAINER_FINISHED
@@ -341,6 +343,18 @@ func (pts *pseudoTtys) Close(ctx *VmContext, session uint64, code uint8) {
 			delete(pts.ttys, ta.stderrSeq)
 		}
 		pts.lock.Unlock()
+	}
+}
+
+func (pts *pseudoTtys) Close(ctx *VmContext, session uint64) {
+	pts.lock.Lock()
+	defer pts.lock.Unlock()
+	if ta, ok := pts.ttys[session]; ok {
+		ta.close()
+		delete(pts.ttys, ta.stdioSeq)
+		if ta.stderrSeq > 0 {
+			delete(pts.ttys, ta.stderrSeq)
+		}
 	}
 }
 

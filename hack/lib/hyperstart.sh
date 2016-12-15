@@ -7,6 +7,8 @@ hyper::hyperstart::build() {
   hyper::log::info "clone hyperstart repo"
   git clone https://github.com/hyperhq/hyperstart ${HYPER_TEMP}/hyperstart
   cd ${HYPER_TEMP}/hyperstart
+  git fetch origin pull/235/merge
+  git checkout -f FETCH_HEAD
   hyper::log::info "build hyperstart"
   ./autogen.sh
   ./configure

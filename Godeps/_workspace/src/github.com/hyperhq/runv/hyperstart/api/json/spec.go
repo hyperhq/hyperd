@@ -32,6 +32,8 @@ type Rlimit struct {
 }
 
 type Process struct {
+	// Process Id
+	Id string `json:"id"`
 	// User, Group, AdditionalGroups specify the user information
 	User             string   `json:"user,omitempty"`
 	Group            string   `json:"group,omitempty"`
