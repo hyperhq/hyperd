@@ -143,11 +143,13 @@ func (p *XPod) doContainerCreate(c *apitypes.UserContainer) (string, error) {
 	nvs := make([]string, 0, len(vols))
 	for _, vol := range vols {
 		if _, ok := p.volumes[vol.Name]; ok {
+			pc.Log(TRACE, "volume %s has already been included, don't need to be inserted again", vol.Name)
 			continue
 		}
 		p.volumes[vol.Name] = newVolume(p, vol)
 		nvs = append(nvs, vol.Name)
 	}
+	pc.Log(TRACE, "volumes to be added: %v", nvs)
 
 	future := utils.NewFutureSet()
 	for _, vol := range nvs {
