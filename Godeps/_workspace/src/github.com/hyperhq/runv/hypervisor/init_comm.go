@@ -298,6 +298,24 @@ func waitCmdToInit(ctx *VmContext, init *net.UnixConn) {
 					cmd.result <- fmt.Errorf("marshal command %d failed", cmd.Code)
 					continue
 				}
+				if ctx.vmHyperstartAPIVersion <= 4242 {
+					var msgMap map[string]interface{}
+					var msgErr error
+					if cmd.Code == hyperstartapi.INIT_EXECCMD || cmd.Code == hyperstartapi.INIT_NEWCONTAINER {
+						if msgErr = json.Unmarshal(message, &msgMap); msgErr == nil {
+							if p, ok := msgMap["process"].(map[string]interface{}); ok {
+								delete(p, "id")
+							}
+						}
+					}
+					if msgErr == nil && len(msgMap) != 0 {
+						message, msgErr = json.Marshal(msgMap)
+					}
+					if msgErr != nil {
+						cmd.result <- fmt.Errorf("handle 4242 command %d failed", cmd.Code)
+						continue
+					}
+				}
 
 				msg := &hyperstartapi.DecodedMessage{
 					Code:    cmd.Code,
@@ -348,6 +366,13 @@ func waitInitAck(ctx *VmContext, init *net.UnixConn) {
 		} else if res.Code == hyperstartapi.INIT_ACK || res.Code == hyperstartapi.INIT_NEXT ||
 			res.Code == hyperstartapi.INIT_ERROR {
 			ctx.vm <- &hyperstartCmd{Code: res.Code, retMsg: res.Message}
+		} else if res.Code == hyperstartapi.INIT_PROCESSASYNCEVENT {
+			var pae hyperstartapi.ProcessAsyncEvent
+			if err := json.Unmarshal(res.Message, &pae); err != nil {
+				glog.V(1).Info("read invalid ProcessAsyncEvent")
+			} else {
+				ctx.handleProcessAsyncEvent(&pae)
+			}
 		}
 	}
 }

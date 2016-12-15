@@ -106,6 +106,7 @@ func (cc *ContainerContext) configProcess() {
 		envs = append(envs, hyperstartapi.EnvironmentVar{Env: e, Value: v})
 	}
 	cc.process = &hyperstartapi.Process{
+		Id:       "init",
 		Terminal: c.Tty,
 		Stdio:    cc.sandbox.ptys.nextAttachId(),
 		Stderr:   0,
