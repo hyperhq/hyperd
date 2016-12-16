@@ -480,7 +480,7 @@ func (p *XPod) Attach(cid string, stdin io.ReadCloser, stdout io.WriteCloser, rs
 		return err
 	}
 
-	return c.attach(stdin, stdout, nil, rsp)
+	return c.attach(stdin, stdout, rsp)
 }
 
 func (p *XPod) TtyResize(cid, execId string, h, w int) error {

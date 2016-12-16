@@ -23,10 +23,11 @@ import (
 	"github.com/hyperhq/hyperd/utils"
 	runv "github.com/hyperhq/runv/api"
 	"github.com/hyperhq/runv/hypervisor"
-	runvtypes "github.com/hyperhq/runv/hypervisor/types"
+	"github.com/hyperhq/runv/lib/term"
 )
 
 var epocZero = time.Time{}
+var DetachKeys = "ctrl-p,ctrl-q"
 
 type ContainerState int32
 
@@ -58,6 +59,7 @@ type Container struct {
 	spec     *apitypes.UserContainer
 	descript *runv.ContainerDescription
 	status   *ContainerStatus
+	streams  *StreamConfig
 
 	logger    LogStatus
 	logPrefix string
@@ -76,9 +78,10 @@ func newContainerStatus() *ContainerStatus {
 
 func newContainer(p *XPod, spec *apitypes.UserContainer, create bool) (*Container, error) {
 	c := &Container{
-		p:      p,
-		spec:   spec,
-		status: newContainerStatus(),
+		p:       p,
+		spec:    spec,
+		status:  newContainerStatus(),
+		streams: NewStreamConfig(),
 	}
 	c.updateLogPrefix()
 	if err := c.init(create); err != nil {
@@ -258,33 +261,26 @@ func (c *Container) Remove() error {
 
 // Container operations:
 
-func (c *Container) attach(stdin io.ReadCloser, stdout io.WriteCloser, winsize *hypervisor.WindowSize, rsp chan<- error) error {
+func (c *Container) attach(stdin io.ReadCloser, stdout io.Writer, rsp chan<- error) error {
 	if c.p.sandbox == nil || c.descript == nil {
 		err := fmt.Errorf("container not ready for attach")
 		c.Log(ERROR, err)
 		return err
 	}
 
-	tty := &hypervisor.TtyIO{
-		Stdin:    stdin,
-		Stdout:   stdout,
-		Callback: make(chan *runvtypes.VmResponse, 1),
-	}
-
+	var stderr io.Writer
 	if stdout != nil {
 		if !c.hasTty() {
-			tty.Stderr = stdcopy.NewStdWriter(stdout, stdcopy.Stderr)
-			tty.Stdout = stdcopy.NewStdWriter(stdout, stdcopy.Stdout)
+			stderr = stdcopy.NewStdWriter(stdout, stdcopy.Stderr)
+			stdout = stdcopy.NewStdWriter(stdout, stdcopy.Stdout)
 		}
 	}
+	detachKeys, _ := term.ToBytes(DetachKeys)
 
-	if rsp != nil {
-		go func() {
-			rsp <- tty.WaitForFinish()
-		}()
-	}
-
-	return c.p.sandbox.Attach(tty, c.Id(), winsize)
+	go func() {
+		rsp <- c.AttachStreams(c.streams, true, true, c.hasTty(), stdin, stdout, stderr, detachKeys)
+	}()
+	return nil
 }
 
 // Container status
@@ -888,6 +884,14 @@ func (c *Container) addToSandbox() error {
 		return err
 	}
 
+	c.streams.NewInputPipes()
+	tty := &hypervisor.TtyIO{
+		Stdin:  c.streams.Stdin(),
+		Stdout: c.streams.Stdout(),
+		Stderr: c.streams.Stderr(),
+	}
+	c.p.sandbox.Attach(tty, c.Id(), nil)
+
 	c.status.Created(time.Now())
 	return nil
 }
@@ -973,16 +977,19 @@ func (c *Container) waitFinish(timeout int) {
 	result := c.p.sandbox.WaitProcess(true, []string{c.Id()}, timeout)
 	if result == nil {
 		c.Log(INFO, "wait container failed")
+		c.streams.CloseStreams()
 		firstStop = c.status.UnexpectedStopped()
 	} else {
 		r, ok := <-result
 		if !ok {
 			if timeout < 0 {
 				c.Log(INFO, "container unexpected failed, chan broken")
+				c.streams.CloseStreams()
 				firstStop = c.status.UnexpectedStopped()
 			}
 		} else {
 			c.Log(INFO, "container exited with code %v (at %v)", r.Code, r.FinishedAt)
+			c.streams.CloseStreams()
 			firstStop = c.status.Stopped(r.FinishedAt, r.Code)
 		}
 	}
@@ -1185,4 +1192,157 @@ func (cs *ContainerStatus) IsStopped() bool {
 	defer cs.RUnlock()
 
 	return cs.State == S_CONTAINER_CREATED
+}
+
+// AttachStreams connects streams to a TTY.
+// Used by exec too. Should this move somewhere else?
+func (c *Container) AttachStreams(streamConfig *StreamConfig, openStdin, stdinOnce, tty bool, stdin io.ReadCloser, stdout io.Writer, stderr io.Writer, keys []byte) error {
+	var (
+		cStdout, cStderr io.ReadCloser
+		cStdin           io.WriteCloser
+		wg               sync.WaitGroup
+		errors           = make(chan error, 3)
+	)
+
+	if stdin != nil && openStdin {
+		cStdin = streamConfig.StdinPipe()
+		wg.Add(1)
+	}
+
+	if stdout != nil {
+		cStdout = streamConfig.StdoutPipe()
+		wg.Add(1)
+	}
+
+	if stderr != nil {
+		cStderr = streamConfig.StderrPipe()
+		wg.Add(1)
+	}
+
+	// Connect stdin of container to the http conn.
+	go func() {
+		if stdin == nil || !openStdin {
+			return
+		}
+		c.Log(DEBUG, "attach: stdin: begin")
+
+		var err error
+		if tty {
+			_, err = copyEscapable(cStdin, stdin, keys)
+		} else {
+			_, err = io.Copy(cStdin, stdin)
+		}
+		if err == io.ErrClosedPipe {
+			err = nil
+		}
+		if err != nil {
+			c.Log(ERROR, "attach: stdin: %s", err)
+			errors <- err
+		}
+		if stdinOnce && !tty {
+			cStdin.Close()
+		} else {
+			// No matter what, when stdin is closed (io.Copy unblock), close stdout and stderr
+			if cStdout != nil {
+				cStdout.Close()
+			}
+			if cStderr != nil {
+				cStderr.Close()
+			}
+		}
+		c.Log(DEBUG, "attach: stdin: end")
+		wg.Done()
+	}()
+
+	attachStream := func(name string, stream io.Writer, streamPipe io.ReadCloser) {
+		if stream == nil {
+			return
+		}
+
+		c.Log(DEBUG, "attach: %s: begin", name)
+		_, err := io.Copy(stream, streamPipe)
+		if err == io.ErrClosedPipe {
+			err = nil
+		}
+		if err != nil {
+			c.Log(ERROR, "attach: %s: %v", name, err)
+			errors <- err
+		}
+		// Make sure stdin gets closed
+		if stdin != nil {
+			stdin.Close()
+		}
+		streamPipe.Close()
+		c.Log(DEBUG, "attach: %s: end", name)
+		wg.Done()
+	}
+
+	go attachStream("stdout", stdout, cStdout)
+	go attachStream("stderr", stderr, cStderr)
+
+	wg.Wait()
+	close(errors)
+	for err := range errors {
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+var DetachError error = fmt.Errorf("DetachError")
+
+// Code c/c from io.Copy() modified to handle escape sequence
+func copyEscapable(dst io.Writer, src io.ReadCloser, keys []byte) (written int64, err error) {
+	if len(keys) == 0 {
+		// Default keys : ctrl-p ctrl-q
+		keys = []byte{16, 17}
+	}
+	buf := make([]byte, 32*1024)
+	for {
+		nr, er := src.Read(buf)
+		if nr > 0 {
+			// ---- Docker addition
+			preservBuf := []byte{}
+			for i, key := range keys {
+				preservBuf = append(preservBuf, buf[0:nr]...)
+				if nr != 1 || buf[0] != key {
+					break
+				}
+				if i == len(keys)-1 {
+					src.Close()
+					return 0, DetachError
+				}
+				nr, er = src.Read(buf)
+			}
+			var nw int
+			var ew error
+			if len(preservBuf) > 0 {
+				nw, ew = dst.Write(preservBuf)
+				nr = len(preservBuf)
+			} else {
+				// ---- End of docker
+				nw, ew = dst.Write(buf[0:nr])
+			}
+			if nw > 0 {
+				written += int64(nw)
+			}
+			if ew != nil {
+				err = ew
+				break
+			}
+			if nr != nw {
+				err = io.ErrShortWrite
+				break
+			}
+		}
+		if er == io.EOF {
+			break
+		}
+		if er != nil {
+			err = er
+			break
+		}
+	}
+	return written, err
 }
