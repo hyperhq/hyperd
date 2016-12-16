@@ -941,19 +941,16 @@ func (c *Container) initLogger() {
 }
 
 func (c *Container) startLogging() {
-	var err error
-
 	c.initLogger()
 
 	if c.logger.Driver == nil {
 		return
 	}
 
-	var stdout, stderr io.Reader
+	stdout, stdoutStub := io.Pipe()
+	stderr, stderrStub := io.Pipe()
+	go c.AttachStreams(c.streams, false, false, c.hasTty(), nil, stdoutStub, stderrStub, nil)
 
-	if stdout, stderr, err = c.p.sandbox.GetLogOutput(c.Id(), nil); err != nil {
-		return
-	}
 	c.logger.Copier = logger.NewCopier(c.Id(), map[string]io.Reader{"stdout": stdout, "stderr": stderr}, c.logger.Driver)
 	c.logger.Copier.Run()
 
