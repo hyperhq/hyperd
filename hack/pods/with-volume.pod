@@ -3,7 +3,7 @@
 	"containers" : [{
 	    "name": "c1",
 	    "image": "busybox",
-            "command": ["/bin/sh", "-c", "grep -q 'hello, world' /mnt/with-volume-test-1 && df | grep -q '/var/log' && echo 'container 1 OK' ; sleep 1"],
+            "command": ["/bin/sh", "-c", "grep -q 'hello, world' /mnt/with-volume-test-1 && df | grep -q '/var/log' && echo 'container 1 OK' ; sleep 5"],
             "volumes": [{
                 "volume": "log",
                 "path": "/var/log",
