@@ -288,6 +288,14 @@ func waitCmdToInit(ctx *VmContext, init *net.UnixConn) {
 					got = 0
 				}
 			} else {
+				if ctx.vmHyperstartAPIVersion == 0 && (cmd.Code == hyperstartapi.INIT_EXECCMD || cmd.Code == hyperstartapi.INIT_NEWCONTAINER) {
+					// delay version-awared command
+					glog.V(1).Infof("delay version-awared command :%d", cmd.Code)
+					time.AfterFunc(2*time.Millisecond, func() {
+						ctx.vm <- cmd
+					})
+					continue
+				}
 				var message []byte
 				if message1, ok := cmd.Message.([]byte); ok {
 					message = message1
@@ -360,6 +368,10 @@ func waitCmdToInit(ctx *VmContext, init *net.UnixConn) {
 func waitInitAck(ctx *VmContext, init *net.UnixConn) {
 	for {
 		res, err := ReadVmMessage(init)
+		if err == nil {
+			glog.V(1).Infof("ReadVmMessage code: %d", res.Code)
+			glog.V(1).Infof("ReadVmMessage msg: %s", string(res.Message))
+		}
 		if err != nil {
 			ctx.Hub <- &Interrupted{Reason: "init socket failed " + err.Error()}
 			return
@@ -368,6 +380,7 @@ func waitInitAck(ctx *VmContext, init *net.UnixConn) {
 			ctx.vm <- &hyperstartCmd{Code: res.Code, retMsg: res.Message}
 		} else if res.Code == hyperstartapi.INIT_PROCESSASYNCEVENT {
 			var pae hyperstartapi.ProcessAsyncEvent
+			glog.V(1).Info("ProcessAsyncEvent")
 			if err := json.Unmarshal(res.Message, &pae); err != nil {
 				glog.V(1).Info("read invalid ProcessAsyncEvent")
 			} else {
