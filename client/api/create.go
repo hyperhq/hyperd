@@ -48,7 +48,7 @@ func (cli *Client) CreatePod(spec interface{}) (string, int, error) {
 
 func (cli *Client) CreateContainer(podID string, spec interface{}) (string, int, error) {
 	v := url.Values{}
-	v.Set("podID", podID)
+	v.Set("podId", podID)
 	body, statusCode, err := readBody(cli.call("POST", "/container/create?"+v.Encode(), spec, nil))
 	if err != nil {
 		return "", statusCode, err

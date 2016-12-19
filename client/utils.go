@@ -96,12 +96,24 @@ func (cli *HyperClient) GetTag() string {
 	return utils.RandStr(8, "alphanum")
 }
 
-func (cli *HyperClient) ConvertYamlToJson(yamlBody []byte) ([]byte, error) {
-	var userPod apitype.UserPod
-	if err := yaml.Unmarshal(yamlBody, &userPod); err != nil {
-		return []byte(""), err
+func (cli *HyperClient) ConvertYamlToJson(yamlBody []byte, container bool) ([]byte, error) {
+	var (
+		body interface{}
+	)
+	if container {
+		var userContainer apitype.UserContainer
+		if err := yaml.Unmarshal(yamlBody, &userContainer); err != nil {
+			return []byte(""), err
+		}
+		body = &userContainer
+	} else {
+		var userPod apitype.UserPod
+		if err := yaml.Unmarshal(yamlBody, &userPod); err != nil {
+			return []byte(""), err
+		}
+		body = &userPod
 	}
-	jsonBody, err := json.Marshal(&userPod)
+	jsonBody, err := json.Marshal(body)
 	if err != nil {
 		return []byte(""), err
 	}

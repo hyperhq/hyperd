@@ -19,12 +19,15 @@ type APIInterface interface {
 	WinResize(id, tag string, height, width int) error
 
 	List(item, pod, vm string, aux bool) (*engine.Env, error)
+	CreateContainer(podID string, spec interface{}) (string, int, error)
+	StartContainer(container string) error
 	GetContainerInfo(container string) (*types.ContainerInfo, error)
 	GetContainerByPod(podId string) (string, error)
 	GetExitCode(container, tag string) error
 	ContainerLogs(container, since string, timestamp, follow, stdout, stderr bool, tail string) (io.ReadCloser, string, error)
 	KillContainer(container string, sig int) error
 	StopContainer(container string) error
+	RemoveContainer(container string) error
 
 	GetPodInfo(podName string) (*types.PodInfo, error)
 	CreatePod(spec interface{}) (string, int, error)

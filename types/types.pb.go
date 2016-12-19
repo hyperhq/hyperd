@@ -92,8 +92,12 @@ It has these top-level messages:
 	AttachMessage
 	ContainerCreateRequest
 	ContainerCreateResponse
+	ContainerStartRequest
+	ContainerStartResponse
 	ContainerRenameRequest
 	ContainerRenameResponse
+	ContainerRemoveRequest
+	ContainerRemoveResponse
 	AuthConfig
 	ImagePullRequest
 	ImagePullResponse
@@ -1619,6 +1623,22 @@ func (m *ContainerCreateResponse) Reset()         { *m = ContainerCreateResponse
 func (m *ContainerCreateResponse) String() string { return proto.CompactTextString(m) }
 func (*ContainerCreateResponse) ProtoMessage()    {}
 
+type ContainerStartRequest struct {
+	// ID of the container to start.
+	ContainerId string `protobuf:"bytes,1,opt,name=container_id,proto3" json:"container_id,omitempty"`
+}
+
+func (m *ContainerStartRequest) Reset()         { *m = ContainerStartRequest{} }
+func (m *ContainerStartRequest) String() string { return proto.CompactTextString(m) }
+func (*ContainerStartRequest) ProtoMessage()    {}
+
+type ContainerStartResponse struct {
+}
+
+func (m *ContainerStartResponse) Reset()         { *m = ContainerStartResponse{} }
+func (m *ContainerStartResponse) String() string { return proto.CompactTextString(m) }
+func (*ContainerStartResponse) ProtoMessage()    {}
+
 type ContainerRenameRequest struct {
 	OldContainerName string `protobuf:"bytes,1,opt,name=oldContainerName,proto3" json:"oldContainerName,omitempty"`
 	NewContainerName string `protobuf:"bytes,2,opt,name=newContainerName,proto3" json:"newContainerName,omitempty"`
@@ -1634,6 +1654,21 @@ type ContainerRenameResponse struct {
 func (m *ContainerRenameResponse) Reset()         { *m = ContainerRenameResponse{} }
 func (m *ContainerRenameResponse) String() string { return proto.CompactTextString(m) }
 func (*ContainerRenameResponse) ProtoMessage()    {}
+
+type ContainerRemoveRequest struct {
+	ContainerId string `protobuf:"bytes,1,opt,name=container_id,proto3" json:"container_id,omitempty"`
+}
+
+func (m *ContainerRemoveRequest) Reset()         { *m = ContainerRemoveRequest{} }
+func (m *ContainerRemoveRequest) String() string { return proto.CompactTextString(m) }
+func (*ContainerRemoveRequest) ProtoMessage()    {}
+
+type ContainerRemoveResponse struct {
+}
+
+func (m *ContainerRemoveResponse) Reset()         { *m = ContainerRemoveResponse{} }
+func (m *ContainerRemoveResponse) String() string { return proto.CompactTextString(m) }
+func (*ContainerRemoveResponse) ProtoMessage()    {}
 
 type AuthConfig struct {
 	Username      string `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
@@ -2065,8 +2100,12 @@ func init() {
 	proto.RegisterType((*AttachMessage)(nil), "types.AttachMessage")
 	proto.RegisterType((*ContainerCreateRequest)(nil), "types.ContainerCreateRequest")
 	proto.RegisterType((*ContainerCreateResponse)(nil), "types.ContainerCreateResponse")
+	proto.RegisterType((*ContainerStartRequest)(nil), "types.ContainerStartRequest")
+	proto.RegisterType((*ContainerStartResponse)(nil), "types.ContainerStartResponse")
 	proto.RegisterType((*ContainerRenameRequest)(nil), "types.ContainerRenameRequest")
 	proto.RegisterType((*ContainerRenameResponse)(nil), "types.ContainerRenameResponse")
+	proto.RegisterType((*ContainerRemoveRequest)(nil), "types.ContainerRemoveRequest")
+	proto.RegisterType((*ContainerRemoveResponse)(nil), "types.ContainerRemoveResponse")
 	proto.RegisterType((*AuthConfig)(nil), "types.AuthConfig")
 	proto.RegisterType((*ImagePullRequest)(nil), "types.ImagePullRequest")
 	proto.RegisterType((*ImagePullResponse)(nil), "types.ImagePullResponse")
@@ -2145,6 +2184,8 @@ type PublicAPIClient interface {
 	ContainerLogs(ctx context.Context, in *ContainerLogsRequest, opts ...grpc.CallOption) (PublicAPI_ContainerLogsClient, error)
 	// ContainerCreate creates a container in specified pod
 	ContainerCreate(ctx context.Context, in *ContainerCreateRequest, opts ...grpc.CallOption) (*ContainerCreateResponse, error)
+	// ContainerStart starts a container in a specified pod
+	ContainerStart(ctx context.Context, in *ContainerStartRequest, opts ...grpc.CallOption) (*ContainerStartResponse, error)
 	// ContainerRename renames a container
 	ContainerRename(ctx context.Context, in *ContainerRenameRequest, opts ...grpc.CallOption) (*ContainerRenameResponse, error)
 	// TODO: ContainerCommit commits the changes of the specified container
@@ -2152,6 +2193,8 @@ type PublicAPIClient interface {
 	// TODO: ContainerLabels updates labels of the specified container
 	// ContainerStop stops the specified container
 	ContainerStop(ctx context.Context, in *ContainerStopRequest, opts ...grpc.CallOption) (*ContainerStopResponse, error)
+	// ContainerRemove removes a container from a specified pod
+	ContainerRemove(ctx context.Context, in *ContainerRemoveRequest, opts ...grpc.CallOption) (*ContainerRemoveResponse, error)
 	// ExecCreate creates exec in specified container
 	ExecCreate(ctx context.Context, in *ExecCreateRequest, opts ...grpc.CallOption) (*ExecCreateResponse, error)
 	// ExecStart starts exec
@@ -2388,6 +2431,15 @@ func (c *publicAPIClient) ContainerCreate(ctx context.Context, in *ContainerCrea
 	return out, nil
 }
 
+func (c *publicAPIClient) ContainerStart(ctx context.Context, in *ContainerStartRequest, opts ...grpc.CallOption) (*ContainerStartResponse, error) {
+	out := new(ContainerStartResponse)
+	err := grpc.Invoke(ctx, "/types.PublicAPI/ContainerStart", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *publicAPIClient) ContainerRename(ctx context.Context, in *ContainerRenameRequest, opts ...grpc.CallOption) (*ContainerRenameResponse, error) {
 	out := new(ContainerRenameResponse)
 	err := grpc.Invoke(ctx, "/types.PublicAPI/ContainerRename", in, out, c.cc, opts...)
@@ -2400,6 +2452,15 @@ func (c *publicAPIClient) ContainerRename(ctx context.Context, in *ContainerRena
 func (c *publicAPIClient) ContainerStop(ctx context.Context, in *ContainerStopRequest, opts ...grpc.CallOption) (*ContainerStopResponse, error) {
 	out := new(ContainerStopResponse)
 	err := grpc.Invoke(ctx, "/types.PublicAPI/ContainerStop", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *publicAPIClient) ContainerRemove(ctx context.Context, in *ContainerRemoveRequest, opts ...grpc.CallOption) (*ContainerRemoveResponse, error) {
+	out := new(ContainerRemoveResponse)
+	err := grpc.Invoke(ctx, "/types.PublicAPI/ContainerRemove", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2659,6 +2720,8 @@ type PublicAPIServer interface {
 	ContainerLogs(*ContainerLogsRequest, PublicAPI_ContainerLogsServer) error
 	// ContainerCreate creates a container in specified pod
 	ContainerCreate(context.Context, *ContainerCreateRequest) (*ContainerCreateResponse, error)
+	// ContainerStart starts a container in a specified pod
+	ContainerStart(context.Context, *ContainerStartRequest) (*ContainerStartResponse, error)
 	// ContainerRename renames a container
 	ContainerRename(context.Context, *ContainerRenameRequest) (*ContainerRenameResponse, error)
 	// TODO: ContainerCommit commits the changes of the specified container
@@ -2666,6 +2729,8 @@ type PublicAPIServer interface {
 	// TODO: ContainerLabels updates labels of the specified container
 	// ContainerStop stops the specified container
 	ContainerStop(context.Context, *ContainerStopRequest) (*ContainerStopResponse, error)
+	// ContainerRemove removes a container from a specified pod
+	ContainerRemove(context.Context, *ContainerRemoveRequest) (*ContainerRemoveResponse, error)
 	// ExecCreate creates exec in specified container
 	ExecCreate(context.Context, *ExecCreateRequest) (*ExecCreateResponse, error)
 	// ExecStart starts exec
@@ -2927,6 +2992,18 @@ func _PublicAPI_ContainerCreate_Handler(srv interface{}, ctx context.Context, de
 	return out, nil
 }
 
+func _PublicAPI_ContainerStart_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
+	in := new(ContainerStartRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	out, err := srv.(PublicAPIServer).ContainerStart(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func _PublicAPI_ContainerRename_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
 	in := new(ContainerRenameRequest)
 	if err := dec(in); err != nil {
@@ -2945,6 +3022,18 @@ func _PublicAPI_ContainerStop_Handler(srv interface{}, ctx context.Context, dec 
 		return nil, err
 	}
 	out, err := srv.(PublicAPIServer).ContainerStop(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func _PublicAPI_ContainerRemove_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
+	in := new(ContainerRemoveRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	out, err := srv.(PublicAPIServer).ContainerRemove(ctx, in)
 	if err != nil {
 		return nil, err
 	}
@@ -3230,12 +3319,20 @@ var _PublicAPI_serviceDesc = grpc.ServiceDesc{
 			Handler:    _PublicAPI_ContainerCreate_Handler,
 		},
 		{
+			MethodName: "ContainerStart",
+			Handler:    _PublicAPI_ContainerStart_Handler,
+		},
+		{
 			MethodName: "ContainerRename",
 			Handler:    _PublicAPI_ContainerRename_Handler,
 		},
 		{
 			MethodName: "ContainerStop",
 			Handler:    _PublicAPI_ContainerStop_Handler,
+		},
+		{
+			MethodName: "ContainerRemove",
+			Handler:    _PublicAPI_ContainerRemove_Handler,
 		},
 		{
 			MethodName: "ExecCreate",

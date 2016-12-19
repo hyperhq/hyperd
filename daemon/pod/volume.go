@@ -14,7 +14,7 @@ type VolumeState int32
 
 const (
 	S_VOLUME_CREATED VolumeState = iota
-	S_VOLUME_IMSERTING
+	S_VOLUME_INSERTING
 	S_VOLUME_INSERTED
 	S_VOLUME_ERROR
 )
@@ -65,9 +65,9 @@ func (v *Volume) Info() *apitypes.PodVolume {
 // add() try to mount the volume and add it to the sandbox
 func (v *Volume) add() error {
 	changed, err := v.transit(
-		S_VOLUME_IMSERTING,
+		S_VOLUME_INSERTING,
 		map[VolumeState]bool{S_VOLUME_CREATED: true},                            // from created to inserting
-		map[VolumeState]bool{S_VOLUME_IMSERTING: true, S_VOLUME_INSERTED: true}, //ignore if inserting or inserted already
+		map[VolumeState]bool{S_VOLUME_INSERTING: true, S_VOLUME_INSERTED: true}, //ignore if inserting or inserted already
 	)
 	if !changed { // already logged in v.transit method
 		return err
@@ -177,15 +177,20 @@ func (v *Volume) umount() error {
 }
 
 func (v *Volume) subscribeInsert(wg *utils.WaitGroupWithFail) error {
+	v.Log(TRACE, "subcribe volume insert")
 	v.Lock()
 	defer v.Unlock()
 	if v.status == S_VOLUME_INSERTED {
+		v.Log(DEBUG, "the subscribed volume has been inserted, need nothing.")
 		return nil
 	} else if v.status == S_VOLUME_ERROR {
-		return fmt.Errorf("volume %s is in ERROR state", v.spec.Name)
+		err := fmt.Errorf("volume %s is in ERROR state", v.spec.Name)
+		v.Log(ERROR, err)
+		return err
 	}
 	wg.Add(1)
 	v.insertSubscribers = append(v.insertSubscribers, wg)
+	v.Log(DEBUG, "subscribe the volume")
 	return nil
 }
 
@@ -199,7 +204,7 @@ func (v *Volume) transit(to VolumeState, from, ignore map[VolumeState]bool) (cha
 func (v *Volume) setInserted() {
 	v.Lock()
 	//only from inserting to inserted
-	v.unlockedTransit(S_VOLUME_INSERTED, map[VolumeState]bool{S_VOLUME_IMSERTING: true}, map[VolumeState]bool{})
+	v.unlockedTransit(S_VOLUME_INSERTED, map[VolumeState]bool{S_VOLUME_INSERTING: true}, map[VolumeState]bool{})
 	if v.insertSubscribers != nil {
 		for _, wg := range v.insertSubscribers {
 			wg.Done()
@@ -211,7 +216,7 @@ func (v *Volume) setInserted() {
 
 func (v *Volume) setInsertFail(err error) {
 	v.Lock()
-	v.unlockedTransit(S_VOLUME_ERROR, map[VolumeState]bool{S_VOLUME_IMSERTING: true}, map[VolumeState]bool{})
+	v.unlockedTransit(S_VOLUME_ERROR, map[VolumeState]bool{S_VOLUME_INSERTING: true}, map[VolumeState]bool{})
 	if v.insertSubscribers != nil {
 		for _, wg := range v.insertSubscribers {
 			wg.Fail(err)

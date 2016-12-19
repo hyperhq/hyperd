@@ -277,6 +277,7 @@ func (p *XPod) RemoveContainer(id string) error {
 		return err
 	}
 	p.factory.registry.ReleaseContainer(id, c.SpecName())
+	delete(p.containers, id)
 
 	removedVols := make([]string, 0, len(cvols))
 	for _, cv := range cvols {

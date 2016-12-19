@@ -9,11 +9,10 @@ import (
 
 func (cli *HyperClient) HyperCmdStart(args ...string) error {
 	var opts struct {
-		Cpu int `short:"c" long:"cpu" default:"1" value-name:"1" description:"CPU number for the VM"`
-		Mem int `short:"m" long:"memory" default:"128" value-name:"128" description:"Memory size (MB) for the VM"`
+		Container bool `short:"c" long:"container" default:"false" default-mask:"-" description:"start container"`
 	}
-	var parser = gflag.NewParser(&opts, gflag.Default)
-	parser.Usage = "start [-c 1 -m 128]| POD_ID \n\nLaunch a 'pending' pod"
+	var parser = gflag.NewParser(&opts, gflag.Default|gflag.IgnoreUnknown)
+	parser.Usage = "start [OPTIONS] POD_ID|CONTAINER_ID\n\nLaunch a created pod or container"
 	args, err := parser.ParseArgs(args)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {
@@ -26,17 +25,21 @@ func (cli *HyperClient) HyperCmdStart(args ...string) error {
 		return fmt.Errorf("\"start\" requires a minimum of 1 argument, please provide POD ID.\n")
 	}
 	var (
-		podId = args[0]
-		vmId  string
+		id = args[0]
 	)
-	if len(args) >= 2 {
-		vmId = args[1]
-	}
 
-	_, err = cli.client.StartPod(podId, vmId, false, false, nil, nil, nil)
-	if err != nil {
-		return err
+	if !opts.Container {
+		_, err = cli.client.StartPod(id, "", false, false, nil, nil, nil)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(cli.out, "Successfully started the Pod(%s)\n", id)
+	} else {
+		err = cli.client.StartContainer(id)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(cli.out, "Successfully started container %s\n", id)
 	}
-	fmt.Fprintf(cli.out, "Successfully started the Pod(%s)\n", podId)
 	return nil
 }

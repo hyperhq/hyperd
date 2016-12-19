@@ -601,12 +601,25 @@ message ContainerCreateResponse {
   string containerID = 1;
 }
 
+message ContainerStartRequest {
+  // ID of the container to start.
+  string container_id = 1;
+}
+
+message ContainerStartResponse {}
+
 message ContainerRenameRequest {
   string oldContainerName = 1;
   string newContainerName = 2;
 }
 
 message ContainerRenameResponse {}
+
+message ContainerRemoveRequest {
+  string container_id = 1;
+}
+
+message ContainerRemoveResponse {}
 
 message AuthConfig {
   string username = 1;
@@ -788,6 +801,8 @@ service PublicAPI {
     rpc ContainerLogs(ContainerLogsRequest) returns (stream ContainerLogsResponse) {}
     // ContainerCreate creates a container in specified pod
     rpc ContainerCreate(ContainerCreateRequest) returns (ContainerCreateResponse) {}
+    // ContainerStart starts a container in a specified pod
+    rpc ContainerStart(ContainerStartRequest) returns (ContainerStartResponse) {}
     // ContainerRename renames a container
     rpc ContainerRename(ContainerRenameRequest) returns (ContainerRenameResponse) {}
     // TODO: ContainerCommit commits the changes of the specified container
@@ -795,6 +810,8 @@ service PublicAPI {
     // TODO: ContainerLabels updates labels of the specified container
     // ContainerStop stops the specified container
     rpc ContainerStop(ContainerStopRequest) returns (ContainerStopResponse) {}
+    // ContainerRemove removes a container from a specified pod
+    rpc ContainerRemove(ContainerRemoveRequest) returns (ContainerRemoveResponse) {}
     // ExecCreate creates exec in specified container
     rpc ExecCreate(ExecCreateRequest) returns (ExecCreateResponse) {}
     // ExecStart starts exec

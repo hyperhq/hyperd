@@ -78,13 +78,13 @@ func (daemon *Daemon) CreateContainerInPod(podId string, spec *apitypes.UserCont
 	return p.ContainerCreate(spec)
 }
 
-func (daemon *Daemon) StartContainer(podId, containerId string) error {
-	p, ok := daemon.PodList.Get(podId)
-	if !ok {
-		return fmt.Errorf("The pod(%s) can not be found", podId)
-	}
+func (daemon *Daemon) StartContainer(containerId string) error {
 
-	return p.ContainerStart(containerId)
+	p, cid, ok := daemon.PodList.GetByContainerIdOrName(containerId)
+	if !ok {
+		return fmt.Errorf("The container (%s) can not be found", containerId)
+	}
+	return p.ContainerStart(cid)
 }
 
 func (daemon *Daemon) CmdCreateContainer(podId string, containerArgs []byte) (string, error) {
@@ -99,13 +99,14 @@ func (daemon *Daemon) CmdCreateContainer(podId string, containerArgs []byte) (st
 	return daemon.CreateContainerInPod(podId, &c)
 }
 
-func (daemon *Daemon) CmdStartContainer(podId, containerId string) error {
-	err := daemon.StartContainer(podId, containerId)
+func (daemon *Daemon) CmdStartContainer(containerId string) (*engine.Env, error) {
+	err := daemon.StartContainer(containerId)
 	if err != nil {
-		glog.Errorf("fail to start container %s in pod %s: %v", containerId, podId, err)
-		return err
+		glog.Errorf("fail to start container %s: %v", containerId, err)
+		return nil, err
 	}
-	return nil
+	v := &engine.Env{}
+	return v, nil
 }
 
 func (daemon *Daemon) CmdKillContainer(name string, sig int64) (*engine.Env, error) {
@@ -122,6 +123,16 @@ func (daemon *Daemon) CmdStopContainer(name string) (*engine.Env, error) {
 	err := daemon.StopContainer(name, 5)
 	if err != nil {
 		glog.Errorf("fail to stop container %s: %v", name, err)
+		return nil, err
+	}
+	v := &engine.Env{}
+	return v, nil
+}
+
+func (daemon *Daemon) CmdRemoveContainer(name string) (*engine.Env, error) {
+	err := daemon.RemoveContainer(name)
+	if err != nil {
+		glog.Errorf("failed to remove container %s: %v", name, err)
 		return nil, err
 	}
 	v := &engine.Env{}
