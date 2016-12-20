@@ -237,13 +237,13 @@ func (p *XPod) createSandbox(spec *apitypes.UserPod) error {
 		},
 	}
 
+	p.sandbox = sandbox
 	p.status = S_POD_STARTING
 
 	go p.waitVMInit()
 	go p.waitVMStop()
 	sandbox.InitSandbox(config)
 
-	p.sandbox = sandbox
 	return nil
 }
 
