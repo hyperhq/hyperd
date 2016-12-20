@@ -33,6 +33,7 @@ func (cli *HyperClient) HyperCmdRun(args ...string) (err error) {
 		spec  apitype.UserPod
 		code  int
 		tty   = false
+		res   chan error
 	)
 
 	if copt.IsContainer {
@@ -72,32 +73,44 @@ func (cli *HyperClient) HyperCmdRun(args ...string) (err error) {
 		}()
 	}
 
-	if copt.Attach {
+	if copt.Attach && len(spec.Containers) > 0 {
+		res = make(chan error, 1)
 		tty = spec.Tty || spec.Containers[0].Tty
+		p, err := cli.client.GetPodInfo(podId)
+		if err != nil {
+			fmt.Fprintf(cli.err, "failed to get pod info: %v", err)
+			return err
+		}
 		if tty {
-			p, err := cli.client.GetPodInfo(podId)
-			if err == nil {
-				cli.monitorTtySize(p.Spec.Containers[0].ContainerID, "")
-			}
-
+			cli.monitorTtySize(p.Spec.Containers[0].ContainerID, "")
 			oldState, err := term.SetRawTerminal(cli.inFd)
 			if err != nil {
 				return err
 			}
 			defer term.RestoreTerminal(cli.inFd, oldState)
 		}
+		cname := spec.Containers[0].Name
 
+		go func() {
+			res <- cli.client.Attach(cname, tty, cli.in, cli.out, cli.err)
+		}()
 	}
 
-	_, err = cli.client.StartPod(podId, vmId, copt.Attach, tty, cli.in, cli.out, cli.err)
+	_, err = cli.client.StartPod(podId, vmId, false, tty, nil, nil, nil)
 	if err != nil {
-		return
+		return err
 	}
 
 	if !copt.Attach {
 		t2 := time.Now()
 		fmt.Printf("Time to run a POD is %d ms\n", (t2.UnixNano()-t1.UnixNano())/1000000)
 	}
+
+	if res != nil {
+		err = <-res
+		return cli.client.GetExitCode(spec.Containers[0].Name, "")
+	}
+
 	return nil
 }
 
