@@ -86,7 +86,8 @@ It has these top-level messages:
 	ExecCreateResponse
 	ExecStartRequest
 	ExecStartResponse
-	PodStartMessage
+	PodStartRequest
+	PodStartResponse
 	WaitRequest
 	WaitResponse
 	AttachMessage
@@ -1561,16 +1562,20 @@ func (m *ExecStartResponse) Reset()         { *m = ExecStartResponse{} }
 func (m *ExecStartResponse) String() string { return proto.CompactTextString(m) }
 func (*ExecStartResponse) ProtoMessage()    {}
 
-type PodStartMessage struct {
-	PodID  string `protobuf:"bytes,1,opt,name=podID,proto3" json:"podID,omitempty"`
-	VmID   string `protobuf:"bytes,2,opt,name=vmID,proto3" json:"vmID,omitempty"`
-	Attach bool   `protobuf:"varint,3,opt,name=attach,proto3" json:"attach,omitempty"`
-	Data   []byte `protobuf:"bytes,4,opt,name=data,proto3" json:"data,omitempty"`
+type PodStartRequest struct {
+	PodID string `protobuf:"bytes,1,opt,name=podID,proto3" json:"podID,omitempty"`
 }
 
-func (m *PodStartMessage) Reset()         { *m = PodStartMessage{} }
-func (m *PodStartMessage) String() string { return proto.CompactTextString(m) }
-func (*PodStartMessage) ProtoMessage()    {}
+func (m *PodStartRequest) Reset()         { *m = PodStartRequest{} }
+func (m *PodStartRequest) String() string { return proto.CompactTextString(m) }
+func (*PodStartRequest) ProtoMessage()    {}
+
+type PodStartResponse struct {
+}
+
+func (m *PodStartResponse) Reset()         { *m = PodStartResponse{} }
+func (m *PodStartResponse) String() string { return proto.CompactTextString(m) }
+func (*PodStartResponse) ProtoMessage()    {}
 
 type WaitRequest struct {
 	Container string `protobuf:"bytes,1,opt,name=container,proto3" json:"container,omitempty"`
@@ -2094,7 +2099,8 @@ func init() {
 	proto.RegisterType((*ExecCreateResponse)(nil), "types.ExecCreateResponse")
 	proto.RegisterType((*ExecStartRequest)(nil), "types.ExecStartRequest")
 	proto.RegisterType((*ExecStartResponse)(nil), "types.ExecStartResponse")
-	proto.RegisterType((*PodStartMessage)(nil), "types.PodStartMessage")
+	proto.RegisterType((*PodStartRequest)(nil), "types.PodStartRequest")
+	proto.RegisterType((*PodStartResponse)(nil), "types.PodStartResponse")
 	proto.RegisterType((*WaitRequest)(nil), "types.WaitRequest")
 	proto.RegisterType((*WaitResponse)(nil), "types.WaitResponse")
 	proto.RegisterType((*AttachMessage)(nil), "types.AttachMessage")
@@ -2159,7 +2165,7 @@ type PublicAPIClient interface {
 	// PodRemove deletes a pod by podID
 	PodRemove(ctx context.Context, in *PodRemoveRequest, opts ...grpc.CallOption) (*PodRemoveResponse, error)
 	// PodStart starts a pod
-	PodStart(ctx context.Context, opts ...grpc.CallOption) (PublicAPI_PodStartClient, error)
+	PodStart(ctx context.Context, in *PodStartRequest, opts ...grpc.CallOption) (*PodStartResponse, error)
 	// PodStop stops a pod
 	PodStop(ctx context.Context, in *PodStopRequest, opts ...grpc.CallOption) (*PodStopResponse, error)
 	// PodSignal sends a singal to all containers of specified pod
@@ -2269,35 +2275,13 @@ func (c *publicAPIClient) PodRemove(ctx context.Context, in *PodRemoveRequest, o
 	return out, nil
 }
 
-func (c *publicAPIClient) PodStart(ctx context.Context, opts ...grpc.CallOption) (PublicAPI_PodStartClient, error) {
-	stream, err := grpc.NewClientStream(ctx, &_PublicAPI_serviceDesc.Streams[0], c.cc, "/types.PublicAPI/PodStart", opts...)
+func (c *publicAPIClient) PodStart(ctx context.Context, in *PodStartRequest, opts ...grpc.CallOption) (*PodStartResponse, error) {
+	out := new(PodStartResponse)
+	err := grpc.Invoke(ctx, "/types.PublicAPI/PodStart", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &publicAPIPodStartClient{stream}
-	return x, nil
-}
-
-type PublicAPI_PodStartClient interface {
-	Send(*PodStartMessage) error
-	Recv() (*PodStartMessage, error)
-	grpc.ClientStream
-}
-
-type publicAPIPodStartClient struct {
-	grpc.ClientStream
-}
-
-func (x *publicAPIPodStartClient) Send(m *PodStartMessage) error {
-	return x.ClientStream.SendMsg(m)
-}
-
-func (x *publicAPIPodStartClient) Recv() (*PodStartMessage, error) {
-	m := new(PodStartMessage)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
+	return out, nil
 }
 
 func (c *publicAPIClient) PodStop(ctx context.Context, in *PodStopRequest, opts ...grpc.CallOption) (*PodStopResponse, error) {
@@ -2391,7 +2375,7 @@ func (c *publicAPIClient) PodStats(ctx context.Context, in *PodStatsRequest, opt
 }
 
 func (c *publicAPIClient) ContainerLogs(ctx context.Context, in *ContainerLogsRequest, opts ...grpc.CallOption) (PublicAPI_ContainerLogsClient, error) {
-	stream, err := grpc.NewClientStream(ctx, &_PublicAPI_serviceDesc.Streams[1], c.cc, "/types.PublicAPI/ContainerLogs", opts...)
+	stream, err := grpc.NewClientStream(ctx, &_PublicAPI_serviceDesc.Streams[0], c.cc, "/types.PublicAPI/ContainerLogs", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2477,7 +2461,7 @@ func (c *publicAPIClient) ExecCreate(ctx context.Context, in *ExecCreateRequest,
 }
 
 func (c *publicAPIClient) ExecStart(ctx context.Context, opts ...grpc.CallOption) (PublicAPI_ExecStartClient, error) {
-	stream, err := grpc.NewClientStream(ctx, &_PublicAPI_serviceDesc.Streams[2], c.cc, "/types.PublicAPI/ExecStart", opts...)
+	stream, err := grpc.NewClientStream(ctx, &_PublicAPI_serviceDesc.Streams[1], c.cc, "/types.PublicAPI/ExecStart", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2508,7 +2492,7 @@ func (x *publicAPIExecStartClient) Recv() (*ExecStartResponse, error) {
 }
 
 func (c *publicAPIClient) Attach(ctx context.Context, opts ...grpc.CallOption) (PublicAPI_AttachClient, error) {
-	stream, err := grpc.NewClientStream(ctx, &_PublicAPI_serviceDesc.Streams[3], c.cc, "/types.PublicAPI/Attach", opts...)
+	stream, err := grpc.NewClientStream(ctx, &_PublicAPI_serviceDesc.Streams[2], c.cc, "/types.PublicAPI/Attach", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2584,7 +2568,7 @@ func (c *publicAPIClient) ServiceUpdate(ctx context.Context, in *ServiceUpdateRe
 }
 
 func (c *publicAPIClient) ImagePull(ctx context.Context, in *ImagePullRequest, opts ...grpc.CallOption) (PublicAPI_ImagePullClient, error) {
-	stream, err := grpc.NewClientStream(ctx, &_PublicAPI_serviceDesc.Streams[4], c.cc, "/types.PublicAPI/ImagePull", opts...)
+	stream, err := grpc.NewClientStream(ctx, &_PublicAPI_serviceDesc.Streams[3], c.cc, "/types.PublicAPI/ImagePull", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2616,7 +2600,7 @@ func (x *publicAPIImagePullClient) Recv() (*ImagePullResponse, error) {
 }
 
 func (c *publicAPIClient) ImagePush(ctx context.Context, in *ImagePushRequest, opts ...grpc.CallOption) (PublicAPI_ImagePushClient, error) {
-	stream, err := grpc.NewClientStream(ctx, &_PublicAPI_serviceDesc.Streams[5], c.cc, "/types.PublicAPI/ImagePush", opts...)
+	stream, err := grpc.NewClientStream(ctx, &_PublicAPI_serviceDesc.Streams[4], c.cc, "/types.PublicAPI/ImagePush", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2695,7 +2679,7 @@ type PublicAPIServer interface {
 	// PodRemove deletes a pod by podID
 	PodRemove(context.Context, *PodRemoveRequest) (*PodRemoveResponse, error)
 	// PodStart starts a pod
-	PodStart(PublicAPI_PodStartServer) error
+	PodStart(context.Context, *PodStartRequest) (*PodStartResponse, error)
 	// PodStop stops a pod
 	PodStop(context.Context, *PodStopRequest) (*PodStopResponse, error)
 	// PodSignal sends a singal to all containers of specified pod
@@ -2813,30 +2797,16 @@ func _PublicAPI_PodRemove_Handler(srv interface{}, ctx context.Context, dec func
 	return out, nil
 }
 
-func _PublicAPI_PodStart_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(PublicAPIServer).PodStart(&publicAPIPodStartServer{stream})
-}
-
-type PublicAPI_PodStartServer interface {
-	Send(*PodStartMessage) error
-	Recv() (*PodStartMessage, error)
-	grpc.ServerStream
-}
-
-type publicAPIPodStartServer struct {
-	grpc.ServerStream
-}
-
-func (x *publicAPIPodStartServer) Send(m *PodStartMessage) error {
-	return x.ServerStream.SendMsg(m)
-}
-
-func (x *publicAPIPodStartServer) Recv() (*PodStartMessage, error) {
-	m := new(PodStartMessage)
-	if err := x.ServerStream.RecvMsg(m); err != nil {
+func _PublicAPI_PodStart_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
+	in := new(PodStartRequest)
+	if err := dec(in); err != nil {
 		return nil, err
 	}
-	return m, nil
+	out, err := srv.(PublicAPIServer).PodStart(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func _PublicAPI_PodStop_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
@@ -3275,6 +3245,10 @@ var _PublicAPI_serviceDesc = grpc.ServiceDesc{
 			Handler:    _PublicAPI_PodRemove_Handler,
 		},
 		{
+			MethodName: "PodStart",
+			Handler:    _PublicAPI_PodStart_Handler,
+		},
+		{
 			MethodName: "PodStop",
 			Handler:    _PublicAPI_PodStop_Handler,
 		},
@@ -3376,12 +3350,6 @@ var _PublicAPI_serviceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams: []grpc.StreamDesc{
-		{
-			StreamName:    "PodStart",
-			Handler:       _PublicAPI_PodStart_Handler,
-			ServerStreams: true,
-			ClientStreams: true,
-		},
 		{
 			StreamName:    "ContainerLogs",
 			Handler:       _PublicAPI_ContainerLogs_Handler,

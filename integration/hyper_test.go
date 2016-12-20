@@ -98,7 +98,7 @@ func (s *TestSuite) TestPostAttach(c *C) {
 	c.Logf("Pod created: %s", pod)
 	defer s.client.RemovePod(pod)
 
-	err = s.client.StartPod(pod, "", false)
+	err = s.client.StartPod(pod)
 	c.Assert(err, IsNil)
 
 	podInfo, err := s.client.GetPodInfo(pod)
@@ -154,7 +154,7 @@ func (s *TestSuite) TestCreateAndStartPod(c *C) {
 		c.Errorf("Can't found pod %s", pod)
 	}
 
-	err = s.client.StartPod(pod, "", false)
+	err = s.client.StartPod(pod)
 	c.Assert(err, IsNil)
 
 	podInfo, err := s.client.GetPodInfo(pod)
@@ -296,7 +296,7 @@ func (s *TestSuite) TestAddListDeleteService(c *C) {
 
 	c.Log("    2 ===> create pod")
 
-	err = s.client.StartPod(pod, "", false)
+	err = s.client.StartPod(pod)
 	c.Assert(err, IsNil)
 
 	updateService := []*types.UserService{
@@ -368,7 +368,7 @@ func (s *TestSuite) TestStartAndStopPod(c *C) {
 	c.Assert(err, IsNil)
 	c.Logf("Pod created: %s", pod)
 
-	err = s.client.StartPod(pod, "", false)
+	err = s.client.StartPod(pod)
 	c.Assert(err, IsNil)
 
 	podInfo, err := s.client.GetPodInfo(pod)
@@ -429,7 +429,7 @@ func (s *TestSuite) TestPauseAndUnpausePod(c *C) {
 	c.Assert(err, IsNil)
 	c.Logf("Pod created: %s", pod)
 
-	err = s.client.StartPod(pod, "", false)
+	err = s.client.StartPod(pod)
 	c.Assert(err, IsNil)
 
 	podInfo, err := s.client.GetPodInfo(pod)
@@ -479,7 +479,7 @@ func (s *TestSuite) TestGetPodStats(c *C) {
 		c.Assert(err, IsNil)
 	}()
 
-	err = s.client.StartPod(podID, "", false)
+	err = s.client.StartPod(podID)
 	c.Assert(err, IsNil)
 
 	stats, err := s.client.GetPodStats(podID)

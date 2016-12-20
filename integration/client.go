@@ -453,36 +453,13 @@ func (c *HyperClient) ContainerExecStart(containerId, execId string, stdin io.Re
 }
 
 // StartPod starts a pod by podID
-func (c *HyperClient) StartPod(podID, vmID string, attach bool) error {
-	stream, err := c.client.PodStart(context.Background())
+func (c *HyperClient) StartPod(podID string) error {
+	req := &types.PodStartRequest{
+		PodID: podID,
+	}
+
+	_, err := c.client.PodStart(c.ctx, req)
 	if err != nil {
-		return err
-	}
-
-	req := types.PodStartMessage{
-		PodID:  podID,
-		VmID:   vmID,
-		Attach: attach,
-	}
-	if err := stream.Send(&req); err != nil {
-		return err
-	}
-
-	if attach {
-		if _, err := stream.Recv(); err != nil {
-			return err
-		}
-
-		return nil
-	}
-
-	cmd := types.PodStartMessage{
-		Data: []byte("ls\n"),
-	}
-	if err := stream.Send(&cmd); err != nil {
-		return err
-	}
-	if _, err := stream.Recv(); err != nil {
 		return err
 	}
 

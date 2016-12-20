@@ -2,7 +2,6 @@ package serverrpc
 
 import (
 	"fmt"
-	"io"
 
 	"github.com/golang/glog"
 	"github.com/hyperhq/hyperd/types"
@@ -26,68 +25,17 @@ func (s *ServerRPC) PodCreate(ctx context.Context, req *types.PodCreateRequest) 
 }
 
 // PodStart starts a pod by podID
-func (s *ServerRPC) PodStart(stream types.PublicAPI_PodStartServer) error {
-	req, err := stream.Recv()
-	if err == io.EOF {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
+func (s *ServerRPC) PodStart(ctx context.Context, req *types.PodStartRequest) (*types.PodStartResponse, error) {
 	glog.V(3).Infof("PodStart with request %s", req.String())
 
-	if !req.Attach {
-		_, _, err := s.daemon.StartPod(nil, nil, req.PodID, req.Attach)
-		if err != nil {
-			glog.Errorf("StartPod failed: %v", err)
-			return err
-		}
+	err := s.daemon.StartPod(req.PodID)
 
-		// Send an empty message to client, so client could wait for start complete
-		if err := stream.Send(&types.PodStartMessage{}); err != nil {
-			return err
-		}
-
-		return nil
-	}
-
-	ir, iw := io.Pipe()
-	or, ow := io.Pipe()
-
-	go func() {
-		for {
-			cmd, err := stream.Recv()
-			if err != nil {
-				return
-			}
-
-			if _, err := iw.Write(cmd.Data); err != nil {
-				return
-			}
-		}
-
-	}()
-
-	go func() {
-		for {
-			res := make([]byte, 512)
-			n, err := or.Read(res)
-			if err != nil {
-				return
-			}
-
-			if err := stream.Send(&types.PodStartMessage{Data: res[:n]}); err != nil {
-				return
-			}
-		}
-	}()
-
-	if _, _, err := s.daemon.StartPod(ir, ow, req.PodID, req.Attach); err != nil {
+	if err != nil {
 		glog.Errorf("StartPod failed: %v", err)
-		return err
+		return nil, err
 	}
 
-	return nil
+	return &types.PodStartResponse{}, nil
 }
 
 // PodRemove removes a pod by podID
