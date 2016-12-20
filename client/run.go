@@ -29,7 +29,6 @@ func (cli *HyperClient) HyperCmdRun(args ...string) (err error) {
 
 	var (
 		podId string
-		vmId  string
 		spec  apitype.UserPod
 		code  int
 		tty   = false
@@ -96,7 +95,7 @@ func (cli *HyperClient) HyperCmdRun(args ...string) (err error) {
 		}()
 	}
 
-	_, err = cli.client.StartPod(podId, vmId, false, tty, nil, nil, nil)
+	err = cli.client.StartPod(podId)
 	if err != nil {
 		return err
 	}
