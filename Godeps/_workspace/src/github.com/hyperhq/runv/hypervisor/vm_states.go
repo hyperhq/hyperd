@@ -91,10 +91,6 @@ func (ctx *VmContext) setWindowSize4242(containerId, execId string, size *Window
 		return
 	}
 
-	if !ctx.ptys.isTty(session) {
-		glog.Error("the session is not a tty, doesn't support resize.")
-		return
-	}
 	cmd := map[string]interface{}{
 		"seq":    session,
 		"row":    size.Row,
@@ -143,7 +139,7 @@ func (ctx *VmContext) execCmd(execId string, cmd *hyperstartapi.ExecCommand, tty
 		return
 	}
 	ctx.vmExec[execId] = cmd
-	ctx.ptys.ptyConnect(false, cmd.Process.Terminal, cmd.Process.Stdio, cmd.Process.Stderr, tty)
+	ctx.ptys.StdioConnect(cmd.Process.Stdio, cmd.Process.Stderr, tty)
 	ctx.vm <- &hyperstartCmd{
 		Code:    hyperstartapi.INIT_EXECCMD,
 		Message: cmd,
@@ -184,7 +180,7 @@ func (ctx *VmContext) attachCmd(cmd *AttachCommand, result chan<- error) {
 
 func (ctx *VmContext) attachTty2Container(process *hyperstartapi.Process, cmd *AttachCommand) {
 	session := process.Stdio
-	ctx.ptys.ptyConnect(true, process.Terminal, session, process.Stderr, cmd.Streams)
+	ctx.ptys.StdioConnect(session, process.Stderr, cmd.Streams)
 	glog.V(1).Infof("Connecting tty for %s on session %d", cmd.Container, session)
 }
 
@@ -262,7 +258,7 @@ func stateRunning(ctx *VmContext, ev VmEvent) {
 		ctx.Log(DEBUG, "[running] got hyperstart ack to %d", ack.reply.Code)
 		switch ack.reply.Code {
 		case hyperstartapi.INIT_STARTPOD:
-			ctx.Log(INFO, "pod start success ", string(ack.msg))
+			ctx.Log(INFO, "pod start success: %s", string(ack.msg))
 			ctx.reportSuccess("Start POD success", []byte{})
 			//TODO: the payload is the persist info, will deal with this later
 		default:

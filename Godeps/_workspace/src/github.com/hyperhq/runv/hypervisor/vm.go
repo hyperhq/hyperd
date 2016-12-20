@@ -558,11 +558,11 @@ func (vm *Vm) AddProcess(container, execId string, terminal bool, args []string,
 	}
 
 	vm.GenericOperation("StartStdin", func(ctx *VmContext, result chan<- error) {
-		ctx.ptys.startStdin(execCmd.Process.Stdio, true)
+		ctx.ptys.startStdin(execCmd.Process.Stdio)
 		result <- nil
 	}, StateRunning)
 
-	return tty.WaitForFinish()
+	return nil
 }
 
 func (vm *Vm) AddVolume(vol *api.VolumeDescription) api.Result {
@@ -654,9 +654,8 @@ func (vm *Vm) StartContainer(id string) error {
 	}
 	vm.ctx.Log(DEBUG, "container %s started, setup stdin if needed", id)
 	vm.GenericOperation("StartNewContainerStdin", func(ctx *VmContext, result chan<- error) {
-		// start stdin. TODO: find the correct idx if parallel multi INIT_NEWCONTAINER
 		if cc, ok := ctx.containers[id]; ok {
-			ctx.ptys.startStdin(cc.process.Stdio, cc.process.Terminal)
+			ctx.ptys.startStdin(cc.process.Stdio)
 		}
 		result <- nil
 	}, StateInit, StateRunning)
