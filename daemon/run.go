@@ -2,7 +2,6 @@ package daemon
 
 import (
 	"fmt"
-	"io"
 
 	"github.com/golang/glog"
 
@@ -43,24 +42,10 @@ func (daemon *Daemon) CreatePod(podId string, podSpec *apitypes.UserPod) (*pod.X
 	return p, nil
 }
 
-//TODO: remove the tty stream in StartPod API, now we could support attach after created
-func (daemon *Daemon) StartPod(stdin io.ReadCloser, stdout io.WriteCloser, podId string, attach bool) (int, string, error) {
+func (daemon *Daemon) StartPod(podId string) error {
 	p, ok := daemon.PodList.Get(podId)
 	if !ok {
-		return -1, "", fmt.Errorf("The pod(%s) can not be found, please create it first", podId)
-	}
-
-	var waitTty chan error
-
-	if attach {
-		glog.V(1).Info("Run pod with tty attached")
-
-		ids := p.ContainerIdsOf(apitypes.UserContainer_REGULAR)
-		for _, id := range ids {
-			waitTty = make(chan error, 1)
-			p.Attach(id, stdin, stdout, waitTty)
-			break
-		}
+		return fmt.Errorf("The pod(%s) can not be found, please create it first", podId)
 	}
 
 	glog.Infof("Starting pod %q in vm: %q", podId, p.SandboxName())
@@ -68,14 +53,10 @@ func (daemon *Daemon) StartPod(stdin io.ReadCloser, stdout io.WriteCloser, podId
 	err := p.Start()
 	if err != nil {
 		glog.Infof("failed to  start pod %s: %v", p.Id(), err)
-		return -1, err.Error(), err
+		return err
 	}
 
-	if waitTty != nil {
-		<-waitTty
-	}
-
-	return 0, "", err
+	return err
 }
 
 func (daemon *Daemon) WaitContainer(cid string, second int) (int, error) {

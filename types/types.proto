@@ -570,12 +570,11 @@ message ExecStartResponse{
     bytes stdout = 1;
 }
 
-message PodStartMessage {
-  string podID  = 1;
-  string vmID   = 2;
-  bool   attach = 3;
-  bytes  data   = 4;
+message PodStartRequest {
+  string podID = 1;
 }
+
+message PodStartResponse {}
 
 message WaitRequest{
     string container = 1;
@@ -770,7 +769,7 @@ service PublicAPI {
     // PodRemove deletes a pod by podID
     rpc PodRemove(PodRemoveRequest) returns (PodRemoveResponse) {}
     // PodStart starts a pod
-    rpc PodStart(stream PodStartMessage) returns (stream PodStartMessage) {}
+    rpc PodStart(PodStartRequest) returns (PodStartResponse) {}
     // PodStop stops a pod
     rpc PodStop(PodStopRequest) returns (PodStopResponse) {}
     // PodSignal sends a singal to all containers of specified pod

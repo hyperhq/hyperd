@@ -238,17 +238,13 @@ func (daemon *Daemon) CmdSetPodLabels(podId string, override bool, labels map[st
 	return v, nil
 }
 
-func (daemon *Daemon) CmdStartPod(stdin io.ReadCloser, stdout io.WriteCloser, podId, vmId string, attach bool) (*engine.Env, error) {
-	code, cause, err := daemon.StartPod(stdin, stdout, podId, attach)
+func (daemon *Daemon) CmdStartPod(podId string) (*engine.Env, error) {
+	err := daemon.StartPod(podId)
 	if err != nil {
 		return nil, err
 	}
 
 	v := &engine.Env{}
-	v.Set("ID", vmId)
-	v.SetInt("Code", code)
-	v.Set("Cause", cause)
-
 	return v, nil
 }
 
