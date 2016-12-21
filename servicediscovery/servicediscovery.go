@@ -14,7 +14,6 @@ import (
 	apitypes "github.com/hyperhq/hyperd/types"
 	"github.com/hyperhq/hyperd/utils"
 	"github.com/hyperhq/runv/hypervisor"
-	"github.com/hyperhq/runv/hypervisor/types"
 	"github.com/hyperhq/runv/lib/linuxsignal"
 )
 
@@ -79,16 +78,12 @@ func SetupLoopbackAddress(vm *hypervisor.Vm, container, ip, operation string) er
 		return err
 	}
 
-	tty := &hypervisor.TtyIO{
-		Callback: make(chan *types.VmResponse, 1),
-	}
-
 	result := vm.WaitProcess(false, []string{execId}, 60)
 	if result == nil {
 		return fmt.Errorf("can not wait %s, id: %s", command, execId)
 	}
 
-	if err := vm.Exec(container, execId, string(execcmd), false, tty); err != nil {
+	if err := vm.Exec(container, execId, string(execcmd), false, &hypervisor.TtyIO{}); err != nil {
 		return err
 	}
 

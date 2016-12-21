@@ -10,7 +10,6 @@ import (
 	"github.com/hyperhq/hypercontainer-utils/hlog"
 	"github.com/hyperhq/hyperd/utils"
 	"github.com/hyperhq/runv/hypervisor"
-	"github.com/hyperhq/runv/hypervisor/types"
 )
 
 type Exec struct {
@@ -63,6 +62,16 @@ func (p *XPod) CreateExec(containerId, cmds string, terminal bool) (string, erro
 	return execId, nil
 }
 
+type waitClose struct {
+	io.ReadCloser
+	wait chan bool
+}
+
+func (wc *waitClose) Close() error {
+	close(wc.wait)
+	return wc.ReadCloser.Close()
+}
+
 func (p *XPod) StartExec(stdin io.ReadCloser, stdout io.WriteCloser, containerId, execId string) error {
 	p.statusLock.RLock()
 	es, ok := p.execs[execId]
@@ -74,10 +83,10 @@ func (p *XPod) StartExec(stdin io.ReadCloser, stdout io.WriteCloser, containerId
 		return err
 	}
 
+	wReader := &waitClose{ReadCloser: stdin, wait: make(chan bool)}
 	tty := &hypervisor.TtyIO{
-		Stdin:    stdin,
-		Stdout:   stdout,
-		Callback: make(chan *types.VmResponse, 1),
+		Stdin:  wReader,
+		Stdout: stdout,
 	}
 
 	if !es.Terminal && stdout != nil {
@@ -119,7 +128,9 @@ func (p *XPod) StartExec(stdin io.ReadCloser, stdout io.WriteCloser, containerId
 		}
 	}(es)
 
-	return p.sandbox.Exec(es.Container, es.Id, es.Cmds, es.Terminal, tty)
+	err := p.sandbox.Exec(es.Container, es.Id, es.Cmds, es.Terminal, tty)
+	<-wReader.wait
+	return err
 }
 
 func (p *XPod) GetExecExitCode(containerId, execId string) (uint8, error) {

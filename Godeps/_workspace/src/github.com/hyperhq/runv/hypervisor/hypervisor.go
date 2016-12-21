@@ -10,7 +10,7 @@ func (ctx *VmContext) startSocks() {
 	go waitInitReady(ctx)
 	go waitPts(ctx)
 	if glog.V(1) {
-		go waitConsoleOutput(ctx)
+		go watchVmConsole(ctx)
 	}
 }
 
@@ -83,7 +83,7 @@ func VmAssociate(vmId string, hub chan VmEvent, client chan *types.VmResponse, p
 	go waitPts(context)
 	go connectToInit(context)
 	if glog.V(1) {
-		go waitConsoleOutput(context)
+		go watchVmConsole(context)
 	}
 
 	context.Become(stateRunning, StateRunning)

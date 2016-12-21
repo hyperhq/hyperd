@@ -222,7 +222,6 @@ func (ctx *VmContext) handleProcessAsyncEvent(pae *hyperstartapi.ProcessAsyncEve
 func (ctx *VmContext) Close() {
 	ctx.lock.Lock()
 	defer ctx.lock.Unlock()
-	ctx.ptys.closePendingTtys()
 	ctx.unsetTimeout()
 	ctx.networks.close()
 	ctx.DCtx.Close()
