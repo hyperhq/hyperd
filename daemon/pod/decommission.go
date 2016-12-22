@@ -479,7 +479,6 @@ func (p *XPod) stopContainers(cList []string, cMap map[string]bool, graceful int
 		return err, nil
 	}
 
-	timeout := utils.Timeout(graceful)
 	errMap := map[string]error{}
 
 	for len(cMap) > 0 {
@@ -488,7 +487,7 @@ func (p *XPod) stopContainers(cList []string, cMap map[string]bool, graceful int
 			if !ok {
 				err := fmt.Errorf("chan broken while waiting containers: %#v", cMap)
 				p.Log(WARNING, err)
-				break //break the select
+				return err, errMap
 			}
 			p.Log(DEBUG, "container %s stopped (%v)", ex.Id, ex.Code)
 			if _, exist := errMap[ex.Id]; exist { //if it exited, ignore the exceptions
@@ -501,10 +500,6 @@ func (p *XPod) stopContainers(cList []string, cMap map[string]bool, graceful int
 				errMap[ex.id] = ex.err
 				delete(cMap, ex.id)
 			}
-		case <-timeout:
-			err := fmt.Errorf("timeout while waiting containers: %#v of [%v]", cMap, cList)
-			p.Log(ERROR, err)
-			return err, errMap
 		}
 	}
 
