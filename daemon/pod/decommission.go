@@ -369,42 +369,30 @@ func (p *XPod) doStopPod(graceful int) error {
 		return err
 	}
 
-	var errChan = make(chan error, 1)
-
 	p.Log(INFO, "going to stop pod")
-	go func(sb *hypervisor.Vm) {
-		//lock all resource action of the pod, but don't block list/read query
-		p.resourceLock.Lock()
-		defer p.resourceLock.Unlock()
 
-		//whatever the result of stop container, go on shutdown vm
-		p.stopAllContainers(graceful)
+	//lock all resource action of the pod, but don't block list/read query
+	p.resourceLock.Lock()
+	defer p.resourceLock.Unlock()
 
-		p.Log(INFO, "all container killed (or failed), now shutdown sandbox")
-		result := sb.Shutdown()
-		if result.IsSuccess() {
-			p.Log(INFO, "pod is stopped")
-			errChan <- nil
-			return
-		}
-
-		err := fmt.Errorf("failed to shuting down: %s", result.Message())
-		p.Log(ERROR, err)
-		errChan <- err
-	}(p.sandbox)
-
-	select {
-	case err = <-errChan:
-		if err != nil {
-			p.Log(WARNING, "force quit sandbox due to %v", err)
-			p.ForceQuit()
-		}
-	case <-utils.Timeout(graceful):
-		p.Log(WARNING, "force quit sandbox due to timeout")
+	//whatever the result of stop container, go on shutdown vm
+	err = p.stopAllContainers(graceful)
+	if err != nil {
+		p.Log(INFO, "stop container failed, force quit sandbox")
 		p.ForceQuit()
+		return nil
 	}
 
-	return nil
+	p.Log(INFO, "stop container success, shutdown sandbox")
+	result := p.sandbox.Shutdown()
+	if result.IsSuccess() {
+		p.Log(INFO, "pod is stopped")
+		return nil
+	}
+
+	err = fmt.Errorf("failed to shuting down: %s", result.Message())
+	p.Log(ERROR, err)
+	return err
 }
 
 func (p *XPod) stopAllContainers(graceful int) error {
