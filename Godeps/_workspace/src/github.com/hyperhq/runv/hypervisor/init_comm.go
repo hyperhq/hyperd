@@ -61,7 +61,6 @@ func ReadVmMessage(conn *net.UnixConn) (*hyperstartapi.DecodedMessage, error) {
 		if want > 512 {
 			want = 512
 		}
-		glog.V(1).Infof("trying to read %d bytes", want)
 		nr, err := conn.Read(buf[:want])
 		if err != nil {
 			glog.Error("read init data failed")
@@ -71,11 +70,8 @@ func ReadVmMessage(conn *net.UnixConn) (*hyperstartapi.DecodedMessage, error) {
 		res = append(res, buf[:nr]...)
 		read = read + nr
 
-		glog.V(1).Infof("read %d/%d [length = %d]", read, needRead, length)
-
 		if length == 0 && read >= 8 {
 			length = int(binary.BigEndian.Uint32(res[4:8]))
-			glog.V(1).Infof("data length is %d", length)
 			if length > 8 {
 				needRead = length
 			}
@@ -230,10 +226,8 @@ func waitCmdToInit(ctx *VmContext, init *net.UnixConn) {
 			}
 		} else {
 			if cmd.Code == hyperstartapi.INIT_NEXT {
-				glog.V(1).Infof("get command NEXT")
-
 				got += int(binary.BigEndian.Uint32(cmd.retMsg[0:4]))
-				glog.V(1).Infof("send %d, receive %d", index, got)
+				glog.V(1).Infof("get command NEXT: send %d, receive %d", index, got)
 				timeout = false
 				if index == got {
 					/* received the sent out message */
@@ -297,7 +291,7 @@ func waitCmdToInit(ctx *VmContext, init *net.UnixConn) {
 				}
 
 				wrote, _ := init.Write(data[:end])
-				glog.V(1).Infof("write %d to init, payload: '%s'.", wrote, data[:end])
+				glog.V(1).Infof("write %d to hyperstart.", wrote)
 				index += wrote
 			}
 
@@ -324,8 +318,7 @@ func waitInitAck(ctx *VmContext, init *net.UnixConn) {
 	for {
 		res, err := ReadVmMessage(init)
 		if err == nil {
-			glog.V(1).Infof("ReadVmMessage code: %d", res.Code)
-			glog.V(1).Infof("ReadVmMessage msg: %s", string(res.Message))
+			glog.V(3).Infof("ReadVmMessage code: %d, len: %d", res.Code, len(res.Message))
 		}
 		if err != nil {
 			ctx.Hub <- &Interrupted{Reason: "init socket failed " + err.Error()}
@@ -335,7 +328,7 @@ func waitInitAck(ctx *VmContext, init *net.UnixConn) {
 			ctx.vm <- &hyperstartCmd{Code: res.Code, retMsg: res.Message}
 		} else if res.Code == hyperstartapi.INIT_PROCESSASYNCEVENT {
 			var pae hyperstartapi.ProcessAsyncEvent
-			glog.V(1).Info("ProcessAsyncEvent")
+			glog.V(3).Info("ProcessAsyncEvent: %s", string(res.Message))
 			if err := json.Unmarshal(res.Message, &pae); err != nil {
 				glog.V(1).Info("read invalid ProcessAsyncEvent")
 			} else {

@@ -29,10 +29,6 @@ type InitConnectedEvent struct {
 	conn *net.UnixConn
 }
 
-type GetPodStatsCommand struct {
-	Id string
-}
-
 type OnlineCpuMemCommand struct{}
 
 type ShutdownCommand struct {
@@ -168,7 +164,6 @@ func (qe *BlockdevInsertedEvent) Event() int { return EVENT_BLOCK_INSERTED }
 func (qe *InterfaceCreated) Event() int      { return EVENT_INTERFACE_ADD }
 func (qe *NetDevInsertedEvent) Event() int   { return EVENT_INTERFACE_INSERTED }
 func (qe *NetDevRemovedEvent) Event() int    { return EVENT_INTERFACE_EJECTED }
-func (qe *GetPodStatsCommand) Event() int    { return COMMAND_GET_POD_STATS }
 func (qe *OnlineCpuMemCommand) Event() int   { return COMMAND_ONLINECPUMEM }
 func (qe *AttachCommand) Event() int         { return COMMAND_ATTACH }
 func (qe *WindowSizeCommand) Event() int     { return COMMAND_WINDOWSIZE }

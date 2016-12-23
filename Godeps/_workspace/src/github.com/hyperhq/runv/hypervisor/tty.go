@@ -57,7 +57,6 @@ func readTtyMessage(conn *net.UnixConn) (*hyperstartapi.TtyMessage, error) {
 		if want > 512 {
 			want = 512
 		}
-		glog.V(1).Infof("tty: trying to read %d bytes", want)
 		nr, err := conn.Read(buf[:want])
 		if err != nil {
 			glog.Error("read tty data failed")
@@ -67,11 +66,8 @@ func readTtyMessage(conn *net.UnixConn) (*hyperstartapi.TtyMessage, error) {
 		res = append(res, buf[:nr]...)
 		read = read + nr
 
-		glog.V(1).Infof("tty: read %d/%d [length = %d]", read, needRead, length)
-
 		if length == 0 && read >= 12 {
 			length = int(binary.BigEndian.Uint32(res[8:12]))
-			glog.V(1).Infof("data length is %d", length)
 			if length > 12 {
 				needRead = length
 			}
@@ -91,8 +87,6 @@ func waitTtyMessage(ctx *VmContext, conn *net.UnixConn) {
 			glog.V(1).Info("tty chan closed, quit sent goroutine")
 			break
 		}
-
-		glog.V(3).Infof("trying to write to session %d", msg.Session)
 
 		if _, ok := ctx.ptys.ttys[msg.Session]; ok {
 			_, err := conn.Write(msg.ToBuffer())
@@ -126,6 +120,7 @@ func waitPts(ctx *VmContext) {
 			close(ctx.ptys.channel)
 			return
 		}
+		glog.V(1).Infof("tty: read %d bytes for stream %d", len(res.Message), res.Session)
 		if len(res.Message) == 0 {
 			glog.V(1).Infof("session %d closed by peer, close pty", res.Session)
 			if ctx.vmHyperstartAPIVersion > 4242 {
@@ -281,14 +276,13 @@ func (pts *pseudoTtys) startStdin(session uint64) {
 							Session: session,
 							Message: make([]byte, 0),
 						}
-						// don't detach, we need the last output of the container
 					} else if ta, ok := pts.ttys[session]; ok {
 						pts.Remove(ta.stdioSeq)
 					}
 					return
 				}
 
-				glog.V(3).Infof("trying to input char: %d and %d chars", buf[0], nr)
+				glog.V(3).Infof("trying to input %d chars to stream %d", nr, session)
 
 				mbuf := make([]byte, nr)
 				copy(mbuf, buf[:nr])
@@ -310,5 +304,5 @@ func (vm *Vm) Attach(tty *TtyIO, container string, size *WindowSize) error {
 
 	return vm.GenericOperation("Attach", func(ctx *VmContext, result chan<- error) {
 		ctx.attachCmd(cmd, result)
-	}, StateInit, StateStarting, StateRunning)
+	}, StateRunning)
 }

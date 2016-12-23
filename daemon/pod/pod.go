@@ -280,9 +280,9 @@ func (p *XPod) ContainerInfo(cid string) (*apitypes.ContainerInfo, error) {
 
 }
 
-func (p *XPod) Stats() *runvtypes.VmResponse {
+func (p *XPod) Stats() *runvtypes.PodStats {
 	//use channel, don't block in statusLock
-	ch := make(chan *runvtypes.VmResponse, 1)
+	ch := make(chan *runvtypes.PodStats, 1)
 
 	p.statusLock.Lock()
 	if p.sandbox == nil {
