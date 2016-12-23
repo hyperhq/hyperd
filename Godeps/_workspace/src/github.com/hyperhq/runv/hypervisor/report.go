@@ -70,22 +70,3 @@ func (ctx *VmContext) reportVmFault(cause string) {
 		Cause: cause,
 	}
 }
-
-func (ctx *VmContext) reportPodStats(ev VmEvent) {
-	response := types.VmResponse{
-		VmId:  ctx.Id,
-		Code:  types.E_POD_STATS,
-		Cause: "",
-		Reply: ev,
-		Data:  nil,
-	}
-
-	stats, err := ctx.DCtx.Stats(ctx)
-	if err != nil {
-		response.Cause = "Get pod stats failed"
-	} else {
-		response.Data = stats
-	}
-
-	ctx.client <- &response
-}

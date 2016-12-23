@@ -36,12 +36,11 @@ func (daemon *Daemon) GetPodStats(podId string) (interface{}, error) {
 		return nil, fmt.Errorf("Can not get pod stats for non-running pod (%s)", podId)
 	}
 
-	response := p.Stats()
-	if response == nil || response.Data == nil {
-		return nil, fmt.Errorf("Stats for pod %s is nil", podId)
+	if stats := p.Stats(); stats != nil {
+		return stats, nil
 	}
 
-	return response.Data, nil
+	return nil, fmt.Errorf("Stats for pod %s is nil", podId)
 }
 
 func (daemon *Daemon) GetContainerInfo(name string) (*types.ContainerInfo, error) {
