@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/hyperhq/hypercontainer-utils/hlog"
-	"github.com/hyperhq/hyperd/servicediscovery"
 	apitypes "github.com/hyperhq/hyperd/types"
 	"github.com/hyperhq/hyperd/utils"
 	runv "github.com/hyperhq/runv/api"
@@ -205,9 +204,6 @@ func (p *XPod) Start() error {
 	}
 
 	if p.status == S_POD_RUNNING {
-		if err := p.setupServiceInf(); err != nil {
-			return err
-		}
 		if err := p.startAll(); err != nil {
 			return err
 		}
@@ -334,10 +330,6 @@ func (p *XPod) releaseNames(containers []*apitypes.UserContainer) {
 // This function will do resource op and update the spec. and won't
 // access sandbox.
 func (p *XPod) initResources(spec *apitypes.UserPod, allowCreate bool) error {
-	if sc := p.ParseServiceDiscovery(spec); sc != nil {
-		spec.Containers = append([]*apitypes.UserContainer{sc}, spec.Containers...)
-	}
-
 	for _, cspec := range spec.Containers {
 		c, err := newContainer(p, cspec, allowCreate)
 		if err != nil {
@@ -368,7 +360,7 @@ func (p *XPod) initResources(spec *apitypes.UserPod, allowCreate bool) error {
 	return nil
 }
 
-// prepareResources() will allocate IP, generate service discovery config file etc.
+// prepareResources() will allocate IP.
 // This apply for creating and restart a stopped pod.
 func (p *XPod) prepareResources() error {
 	var (
@@ -376,15 +368,6 @@ func (p *XPod) prepareResources() error {
 	)
 	//generate /etc/hosts
 	p.factory.hosts.Do()
-
-	// gernerate service discovery config
-	if len(p.services) > 0 {
-		if err = servicediscovery.PrepareServices(p.services, p.Id()); err != nil {
-			p.Log(ERROR, "PrepareServices failed %v", err)
-			return err
-		}
-		p.globalSpec.Type = "service-discovery"
-	}
 
 	defer func() {
 		if err != nil {
@@ -448,31 +431,6 @@ func (p *XPod) startAll() error {
 	if err := future.Wait(ProvisionTimeout); err != nil {
 		p.Log(ERROR, "error during start all containers: %v", err)
 		return err
-	}
-	return nil
-}
-
-// only necessary for startup with service
-func (p *XPod) setupServiceInf() error {
-	if len(p.services) == 0 || p.sandbox == nil {
-		return nil
-	}
-	var existing = make(map[string]bool)
-	for _, srv := range p.services {
-		if existing[srv.ServiceIP] {
-			continue
-		}
-		p.Log(DEBUG, "init service ip %s", srv.ServiceIP)
-		existing[srv.ServiceIP] = true
-		desc := &runv.InterfaceDescription{
-			Id: srv.ServiceIP,
-			Lo: true,
-			Ip: srv.ServiceIP,
-		}
-		if err := p.sandbox.AddNic(desc); err != nil {
-			p.Log(ERROR, "failed to inf for init service %#v: %v", srv, err)
-			return err
-		}
 	}
 	return nil
 }
