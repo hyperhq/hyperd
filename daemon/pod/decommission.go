@@ -369,42 +369,30 @@ func (p *XPod) doStopPod(graceful int) error {
 		return err
 	}
 
-	var errChan = make(chan error, 1)
-
 	p.Log(INFO, "going to stop pod")
-	go func(sb *hypervisor.Vm) {
-		//lock all resource action of the pod, but don't block list/read query
-		p.resourceLock.Lock()
-		defer p.resourceLock.Unlock()
 
-		//whatever the result of stop container, go on shutdown vm
-		p.stopAllContainers(graceful)
+	//lock all resource action of the pod, but don't block list/read query
+	p.resourceLock.Lock()
+	defer p.resourceLock.Unlock()
 
-		p.Log(INFO, "all container killed (or failed), now shutdown sandbox")
-		result := sb.Shutdown()
-		if result.IsSuccess() {
-			p.Log(INFO, "pod is stopped")
-			errChan <- nil
-			return
-		}
-
-		err := fmt.Errorf("failed to shuting down: %s", result.Message())
-		p.Log(ERROR, err)
-		errChan <- err
-	}(p.sandbox)
-
-	select {
-	case err = <-errChan:
-		if err != nil {
-			p.Log(WARNING, "force quit sandbox due to %v", err)
-			p.ForceQuit()
-		}
-	case <-utils.Timeout(graceful):
-		p.Log(WARNING, "force quit sandbox due to timeout")
+	//whatever the result of stop container, go on shutdown vm
+	err = p.stopAllContainers(graceful)
+	if err != nil {
+		p.Log(INFO, "stop container failed, force quit sandbox")
 		p.ForceQuit()
+		return nil
 	}
 
-	return nil
+	p.Log(INFO, "stop container success, shutdown sandbox")
+	result := p.sandbox.Shutdown()
+	if result.IsSuccess() {
+		p.Log(INFO, "pod is stopped")
+		return nil
+	}
+
+	err = fmt.Errorf("failed to shuting down: %s", result.Message())
+	p.Log(ERROR, err)
+	return err
 }
 
 func (p *XPod) stopAllContainers(graceful int) error {
@@ -479,7 +467,6 @@ func (p *XPod) stopContainers(cList []string, cMap map[string]bool, graceful int
 		return err, nil
 	}
 
-	timeout := utils.Timeout(graceful)
 	errMap := map[string]error{}
 
 	for len(cMap) > 0 {
@@ -488,7 +475,7 @@ func (p *XPod) stopContainers(cList []string, cMap map[string]bool, graceful int
 			if !ok {
 				err := fmt.Errorf("chan broken while waiting containers: %#v", cMap)
 				p.Log(WARNING, err)
-				break //break the select
+				return err, errMap
 			}
 			p.Log(DEBUG, "container %s stopped (%v)", ex.Id, ex.Code)
 			if _, exist := errMap[ex.Id]; exist { //if it exited, ignore the exceptions
@@ -501,10 +488,6 @@ func (p *XPod) stopContainers(cList []string, cMap map[string]bool, graceful int
 				errMap[ex.id] = ex.err
 				delete(cMap, ex.id)
 			}
-		case <-timeout:
-			err := fmt.Errorf("timeout while waiting containers: %#v of [%v]", cMap, cList)
-			p.Log(ERROR, err)
-			return err, errMap
 		}
 	}
 
