@@ -385,13 +385,13 @@ func (c *Container) init(allowCreate bool) error {
 		loaded = true
 	}
 
-	if cjson == nil && !allowCreate {
-		err = fmt.Errorf("could not load container")
-		c.Log(ERROR, err)
-		return err
-	}
-
 	if cjson == nil {
+		if !allowCreate {
+			err = fmt.Errorf("could not load container")
+			c.Log(ERROR, err)
+			return err
+		}
+
 		cjson, err = c.createByEngine()
 		if err != nil {
 			c.Log(ERROR, err)
@@ -406,10 +406,6 @@ func (c *Container) init(allowCreate bool) error {
 		c.Log(ERROR, err)
 		return err
 	}
-	desc.Volumes = c.parseVolumes(cjson)
-	desc.Initialize = !loaded
-
-	c.descript = desc
 
 	if !loaded {
 		if err = c.createVolumes(); err != nil {
@@ -421,8 +417,13 @@ func (c *Container) init(allowCreate bool) error {
 		c.configEtcHosts()
 
 		c.configDNS()
-		c.injectFiles()
+		c.injectFiles(desc.MountId)
 	}
+
+	desc.Volumes = c.parseVolumes(cjson)
+	desc.Initialize = !loaded
+
+	c.descript = desc
 
 	return nil
 }
@@ -770,7 +771,7 @@ func (c *Container) configDNS() {
 	})
 }
 
-func (c *Container) injectFiles() error {
+func (c *Container) injectFiles(mountId string) error {
 	if len(c.spec.Files) == 0 {
 		return nil
 	}
@@ -811,7 +812,7 @@ func (c *Container) injectFiles() error {
 		default:
 		}
 
-		err := c.p.factory.sd.InjectFile(src, c.descript.MountId, targetPath, sharedDir,
+		err := c.p.factory.sd.InjectFile(src, mountId, targetPath, sharedDir,
 			utils.PermInt(f.Perm), utils.UidInt(f.User), utils.UidInt(f.Group))
 		if err != nil {
 			c.Log(ERROR, "got error when inject files: %v", err)
