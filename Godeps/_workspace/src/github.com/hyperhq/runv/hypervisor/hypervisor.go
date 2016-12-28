@@ -1,6 +1,8 @@
 package hypervisor
 
 import (
+	"fmt"
+
 	"github.com/golang/glog"
 	"github.com/hyperhq/runv/hypervisor/network"
 	"github.com/hyperhq/runv/hypervisor/types"
@@ -38,7 +40,7 @@ func (ctx *VmContext) Launch() {
 	ctx.loop()
 }
 
-func VmAssociate(vmId string, hub chan VmEvent, client chan *types.VmResponse, pack []byte) {
+func VmAssociate(vmId string, hub chan VmEvent, client chan *types.VmResponse, pack []byte) (*VmContext, error) {
 
 	if glog.V(1) {
 		glog.Infof("VM %s trying to reload with serialized data: %s", vmId, string(pack))
@@ -46,36 +48,16 @@ func VmAssociate(vmId string, hub chan VmEvent, client chan *types.VmResponse, p
 
 	pinfo, err := vmDeserialize(pack)
 	if err != nil {
-		client <- &types.VmResponse{
-			VmId:  vmId,
-			Code:  types.E_BAD_REQUEST,
-			Cause: err.Error(),
-		}
-		return
+		return nil, err
 	}
 
 	if pinfo.Id != vmId {
-		client <- &types.VmResponse{
-			VmId:  vmId,
-			Code:  types.E_BAD_REQUEST,
-			Cause: "VM ID mismatch",
-		}
-		return
+		return nil, fmt.Errorf("VM ID mismatch, %v vs %v", vmId, pinfo.Id)
 	}
 
 	context, err := pinfo.vmContext(hub, client)
 	if err != nil {
-		client <- &types.VmResponse{
-			VmId:  vmId,
-			Code:  types.E_BAD_REQUEST,
-			Cause: err.Error(),
-		}
-		return
-	}
-
-	client <- &types.VmResponse{
-		VmId: vmId,
-		Code: types.E_OK,
+		return nil, err
 	}
 
 	context.DCtx.Associate(context)
@@ -94,6 +76,7 @@ func VmAssociate(vmId string, hub chan VmEvent, client chan *types.VmResponse, p
 	//}
 
 	go context.loop()
+	return context, nil
 }
 
 func InitNetwork(bIface, bIP string, disableIptables bool) error {

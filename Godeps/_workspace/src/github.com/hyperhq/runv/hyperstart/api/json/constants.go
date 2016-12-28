@@ -28,4 +28,8 @@ const (
 	INIT_SETUPROUTE
 	INIT_REMOVECONTAINER
 	INIT_PROCESSASYNCEVENT
+	INIT_SIGNALPROCESS
 )
+
+// "hyperstart" is the special container ID for adding processes.
+const HYPERSTART_EXEC_CONTAINER = "hyperstart"

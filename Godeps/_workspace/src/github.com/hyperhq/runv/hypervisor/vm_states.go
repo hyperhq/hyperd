@@ -142,11 +142,27 @@ func (ctx *VmContext) execCmd(execId string, cmd *hyperstartapi.ExecCommand, tty
 	}
 }
 
-func (ctx *VmContext) killCmd(container string, signal syscall.Signal, result chan<- error) {
+func (ctx *VmContext) signalProcess(container, process string, signal syscall.Signal, result chan<- error) {
+	if ctx.vmHyperstartAPIVersion <= 4242 {
+		if process == "init" {
+			ctx.vm <- &hyperstartCmd{
+				Code: hyperstartapi.INIT_KILLCONTAINER,
+				Message: hyperstartapi.KillCommand{
+					Container: container,
+					Signal:    signal,
+				},
+				result: result,
+			}
+		} else {
+			result <- fmt.Errorf("only the init process of the container can be signaled")
+		}
+		return
+	}
 	ctx.vm <- &hyperstartCmd{
-		Code: hyperstartapi.INIT_KILLCONTAINER,
-		Message: hyperstartapi.KillCommand{
+		Code: hyperstartapi.INIT_SIGNALPROCESS,
+		Message: hyperstartapi.SignalCommand{
 			Container: container,
+			Process:   process,
 			Signal:    signal,
 		},
 		result: result,

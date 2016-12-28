@@ -15,6 +15,12 @@ type KillCommand struct {
 	Signal    syscall.Signal `json:"signal"`
 }
 
+type SignalCommand struct {
+	Container string         `json:"container"`
+	Process   string         `json:"process"`
+	Signal    syscall.Signal `json:"signal"`
+}
+
 type ExecCommand struct {
 	Container string  `json:"container,omitempty"`
 	Process   Process `json:"process"`

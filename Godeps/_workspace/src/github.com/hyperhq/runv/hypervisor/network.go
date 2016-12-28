@@ -70,13 +70,13 @@ func (nc *NetworkContext) freeSlot(slot int) {
 	if inf, ok := nc.eth[slot]; !ok {
 		nc.sandbox.Log(WARNING, "Freeing an unoccupied eth slot %d", slot)
 		return
-	} else {
+	} else if inf != nil {
 		if _, ok := nc.idMap[inf.Id]; ok {
 			delete(nc.idMap, inf.Id)
 		}
-		nc.sandbox.Log(DEBUG, "Free slot %d of eth", slot)
-		delete(nc.eth, slot)
 	}
+	nc.sandbox.Log(DEBUG, "Free slot %d of eth", slot)
+	delete(nc.eth, slot)
 }
 
 func (nc *NetworkContext) addInterface(inf *api.InterfaceDescription, result chan api.Result) {
