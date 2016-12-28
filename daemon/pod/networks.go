@@ -34,8 +34,9 @@ func (inf *Interface) Log(level hlog.LogLevel, args ...interface{}) {
 }
 
 func (inf *Interface) prepare() error {
-
-	defer inf.Log(DEBUG, "prepare inf info: %#v", inf.descript)
+	defer func() {
+		inf.Log(DEBUG, "prepare inf info: %#v", inf.descript)
+	}()
 
 	if inf.spec.Ip == "" && inf.spec.Bridge != "" {
 		err := fmt.Errorf("if configured a bridge, must specify the IP address")
