@@ -354,7 +354,7 @@ func (p *XPod) initResources(spec *apitypes.UserPod, allowCreate bool) error {
 		p.interfaces[nspec.Ifname] = inf
 	}
 
-	p.services = spec.Services
+	p.services = newServices(p, spec.Services)
 	p.portMappings = spec.Portmappings
 
 	return nil
@@ -411,6 +411,10 @@ func (p *XPod) addResourcesToSandbox() error {
 
 	for ic, c := range p.containers {
 		future.Add(ic, c.addToSandbox)
+	}
+
+	if p.services.size() != 0 {
+		future.Add("serivce", p.services.apply)
 	}
 
 	if err := future.Wait(ProvisionTimeout); err != nil {

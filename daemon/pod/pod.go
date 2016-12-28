@@ -57,7 +57,7 @@ type XPod struct {
 	containers   map[string]*Container
 	volumes      map[string]*Volume
 	interfaces   map[string]*Interface
-	services     []*apitypes.UserService
+	services     *Services
 	portMappings []*apitypes.PortMapping
 	labels       map[string]string
 	resourceLock *sync.Mutex
@@ -371,10 +371,6 @@ func (p *XPod) updatePodInfo() error {
 	}
 
 	return nil
-}
-
-func (p *XPod) HasServiceContainer() bool {
-	return p.globalSpec.Type == "service-discovery" || len(p.services) > 0
 }
 
 func (p *XPod) ContainerLogger(id string) logger.Logger {
