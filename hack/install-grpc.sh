@@ -4,8 +4,8 @@ OS=`uname`
 
 if [ "x$OS" == "xDarwin" ] ; then
     cd /tmp
-    curl -sSL https://github.com/google/protobuf/releases/download/v3.0.0/protoc-3.0.0-osx-x86_64.zip -o protoc-3.0.0-osx-x86_64.zip
-    unzip protoc-3.0.0-osx-x86_64.zip
+    curl -sSL https://github.com/google/protobuf/releases/download/v3.1.0/protoc-3.1.0-osx-x86_64.zip -o protoc-3.1.0-osx-x86_64.zip
+    unzip protoc-3.1.0-osx-x86_64.zip
     sudo mv bin/protoc /usr/local/bin/protoc
 else
     which yum>/dev/null
@@ -18,9 +18,9 @@ else
 
     # Install protoc
     cd /tmp
-    curl -sSL https://github.com/google/protobuf/releases/download/v3.0.0-beta-3/protoc-3.0.0-beta-3-linux-x86_64.zip -o protoc-3.0.0-beta-3-linux-x86_64.zip
-    unzip protoc-3.0.0-beta-3-linux-x86_64.zip
-    sudo mv protoc /usr/bin/protoc
+    curl -sSL https://github.com/google/protobuf/releases/download/v3.1.0/protoc-3.1.0-linux-x86_64.zip -o protoc-3.1.0-linux-x86_64.zip
+    unzip protoc-3.1.0-linux-x86_64.zip
+    sudo mv bin/protoc /usr/bin/protoc
 fi
 
 echo "protoc installed success."
