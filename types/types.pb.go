@@ -1137,6 +1137,7 @@ type UserContainer struct {
 	Type          UserContainer_ContainerType `protobuf:"varint,16,opt,name=type,proto3,enum=types.UserContainer_ContainerType" json:"type,omitempty"`
 	StopSignal    string                      `protobuf:"bytes,17,opt,name=StopSignal,proto3" json:"StopSignal,omitempty"`
 	Ulimits       []*Ulimit                   `protobuf:"bytes,18,rep,name=ulimits" json:"ulimits,omitempty"`
+	LogPath       string                      `protobuf:"bytes,19,opt,name=logPath,proto3" json:"logPath,omitempty"`
 }
 
 func (m *UserContainer) Reset()         { *m = UserContainer{} }
