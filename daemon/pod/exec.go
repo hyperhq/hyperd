@@ -1,6 +1,7 @@
 package pod
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"time"
@@ -15,7 +16,7 @@ import (
 type Exec struct {
 	Id        string
 	Container string
-	Cmds      string
+	Cmds      []string
 	Terminal  bool
 	ExitCode  uint8
 
@@ -44,6 +45,10 @@ func (p *XPod) CreateExec(containerId, cmds string, terminal bool) (string, erro
 		p.Log(ERROR, err)
 		return "", err
 	}
+	var command []string
+	if err := json.Unmarshal([]byte(cmds), &command); err != nil {
+		return "", err
+	}
 
 	execId := fmt.Sprintf("exec-%s", utils.RandStr(10, "alpha"))
 
@@ -51,7 +56,7 @@ func (p *XPod) CreateExec(containerId, cmds string, terminal bool) (string, erro
 	p.execs[execId] = &Exec{
 		Container: containerId,
 		Id:        execId,
-		Cmds:      cmds,
+		Cmds:      command,
 		Terminal:  terminal,
 		ExitCode:  255,
 		logPrefix: fmt.Sprintf("Pod[%s] Con[%s] Exec[%s] ", p.Id(), containerId[:12], execId),
@@ -73,6 +78,13 @@ func (wc *waitClose) Close() error {
 }
 
 func (p *XPod) StartExec(stdin io.ReadCloser, stdout io.WriteCloser, containerId, execId string) error {
+	c, ok := p.containers[containerId]
+	if !ok {
+		err := fmt.Errorf("no container %s available for exec %s", containerId, execId)
+		p.Log(ERROR, err)
+		return err
+	}
+
 	p.statusLock.RLock()
 	es, ok := p.execs[execId]
 	p.statusLock.RUnlock()
@@ -128,7 +140,12 @@ func (p *XPod) StartExec(stdin io.ReadCloser, stdout io.WriteCloser, containerId
 		}
 	}(es)
 
-	err := p.sandbox.Exec(es.Container, es.Id, es.Cmds, es.Terminal, tty)
+	var envs []string
+	for e, v := range c.descript.Envs {
+		envs = append(envs, fmt.Sprintf("%s=%s", e, v))
+	}
+
+	err := p.sandbox.AddProcess(es.Container, es.Id, es.Terminal, es.Cmds, envs, c.descript.Workdir, tty)
 	<-wReader.wait
 	return err
 }
