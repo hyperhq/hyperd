@@ -409,9 +409,18 @@ func (p *XPod) addResourcesToSandbox() error {
 	p.Log(INFO, "adding resource to sandbox")
 	future := utils.NewFutureSet()
 
-	for ik, inf := range p.interfaces {
-		future.Add(ik, inf.add)
-	}
+	future.Add("addInterface", func() error {
+		for _, inf := range p.interfaces {
+			if err := inf.add(); err != nil {
+				return err
+			}
+		}
+		err := p.sandbox.AddRoute()
+		if err != nil {
+			p.Log(ERROR, "fail to add Route: %v", err)
+		}
+		return err
+	})
 
 	for iv, vol := range p.volumes {
 		future.Add(iv, vol.add)
