@@ -57,6 +57,14 @@ func (pod *UserPod) Validate() error {
 			return errors.New("Files name does not unique")
 		}
 	}
+
+	uniq, sset := keySet(pod.Services)
+	if !uniq {
+		if len(sset) > 0 {
+			return errors.New("Services IP:Port@Protocol combination does not unique")
+		}
+	}
+
 	var permReg = regexp.MustCompile("0[0-7]{3}")
 	for idx, container := range pod.Containers {
 
@@ -138,6 +146,9 @@ func (vol UserVolume) key() string          { return vol.Name }
 func (vol UserVolumeReference) key() string { return vol.Volume }
 func (f UserFile) key() string              { return f.Name }
 func (env EnvironmentVar) key() string      { return env.Env }
+func (srv UserService) key() string {
+	return fmt.Sprintf("%s:%s@%s", srv.ServiceIP, srv.ServicePort, strings.ToLower(srv.Protocol))
+}
 
 func InterfaceSlice(slice interface{}) ([]interface{}, error) {
 	s := reflect.ValueOf(slice)
