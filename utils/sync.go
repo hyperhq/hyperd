@@ -118,7 +118,7 @@ func (fs *FutureSet) Wait(timeout time.Duration) error {
 		}
 	}
 	if len(errs) > 0 {
-		return fmt.Errorf("finished with errors: %#v", errs)
+		return fmt.Errorf("finished with errors: %v", errs)
 	}
 
 	return nil
