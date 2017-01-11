@@ -254,9 +254,6 @@ func (s *TestSuite) TestPullImage(c *C) {
 }
 
 func (s *TestSuite) TestAddListDeleteService(c *C) {
-	err := s.client.PullImage("haproxy", "1.4", nil)
-	c.Assert(err, IsNil)
-
 	spec := types.UserPod{
 		Containers: []*types.UserContainer{
 			{

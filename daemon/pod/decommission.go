@@ -71,7 +71,6 @@ func (p *XPod) Remove(force bool) error {
 	p.status = S_POD_NONE
 	p.statusLock.Unlock()
 
-	os.RemoveAll(path.Join(utils.HYPER_ROOT, "services", p.Id()))
 	os.RemoveAll(path.Join(utils.HYPER_ROOT, "hosts", p.Id()))
 
 	//TODO get created volumes and remove them

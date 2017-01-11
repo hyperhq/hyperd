@@ -58,6 +58,7 @@ type LogStatus struct {
 func NewPodFactory(vmFactory factory.Factory, registry *PodList, db *daemondb.DaemonDB, sd PodStorage, eng ContainerEngine, logCfg *GlobalLogConfig) *PodFactory {
 	return &PodFactory{
 		sd:        sd,
+		db:        db,
 		registry:  registry,
 		engine:    eng,
 		vmFactory: vmFactory,

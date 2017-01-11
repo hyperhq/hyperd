@@ -182,7 +182,7 @@ func loadGloabalSpec(db *daemondb.DaemonDB, id string) (*types.UserPod, error) {
 func (p *XPod) savePodMeta() error {
 	meta := &types.PersistPodMeta{
 		Id:       p.Id(),
-		Services: p.services,
+		Services: p.services.get(),
 		Labels:   p.labels,
 	}
 	if p.info != nil {
@@ -202,7 +202,7 @@ func (p *XPod) loadPodMeta() error {
 		p.info.CreatedAt = meta.CreatedAt
 	}
 	p.labels = meta.Labels
-	p.services = meta.Services
+	p.services = newServices(p, meta.Services)
 	return nil
 }
 
