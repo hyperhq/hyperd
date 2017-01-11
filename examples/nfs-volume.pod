@@ -1,0 +1,20 @@
+{
+  "resource": {
+    "vcpu": 1,
+    "memory": 1024
+  },
+  "containers": [{
+      "image": "ubuntu",
+      "volumes": [{
+	"volume": "sharevolume",
+	"path": "/export",
+	"readOnly": false
+      }]
+  }],
+  "volumes": [{
+    "name": "sharevolume",
+    "source": "192.168.80.72:/export",
+    "format": "nas",
+    "fstype": "nfs"
+  }]
+}
