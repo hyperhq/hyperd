@@ -91,7 +91,7 @@ func (pod *UserPod) Validate() error {
 		}
 
 		for _, v := range container.Volumes {
-			if _, ok := vset[v.Volume]; !ok {
+			if _, ok := vset[v.Volume]; !ok && v.Detail == nil {
 				return fmt.Errorf("in container %d, volume %s does not exist in volume list.", idx, v.Volume)
 			}
 		}
