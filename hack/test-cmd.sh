@@ -86,6 +86,9 @@ EOF
 ) | sudo tee /etc/libvirt/qemu.conf
     sudo /etc/init.d/libvirt-bin restart
     [ ! -x /etc/init.d/virtlogd ] || sudo /etc/init.d/virtlogd restart
+    mount|grep cgroup || sudo mount -t tmpfs none /sys/fs/cgroup
+    [ -d /sys/fs/cgroup/cpu,cpuacct ] || sudo mkdir -p /sys/fs/cgroup/cpu,cpuacct
+    mount|grep cpuacct || sudo mount -t cgroup -o cpu,cpuacct none /sys/fs/cgroup/cpu,cpuacct || true
 }
 
 hyper::util::trap_add cleanup EXIT SIGINT
