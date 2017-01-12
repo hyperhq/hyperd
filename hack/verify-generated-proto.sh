@@ -3,6 +3,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+export GO15VENDOREXPERIMENT=1
+
 HYPER_ROOT=$(dirname "${BASH_SOURCE}")/..
 PROTO_ROOT=${HYPER_ROOT}/types
 _tmp="${HYPER_ROOT}/_tmp"

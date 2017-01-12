@@ -1,7 +1,7 @@
 {
 	"ImportPath": "github.com/hyperhq/hyperd",
-	"GoVersion": "go1.5",
-	"GodepVersion": "v74",
+	"GoVersion": "go1.7",
+	"GodepVersion": "v75",
 	"Packages": [
 		".",
 		"github.com/hyperhq/hyperd/cmds/protoc-gen-gogo",
@@ -131,6 +131,16 @@
 			"ImportPath": "github.com/boltdb/bolt",
 			"Comment": "v1.1.0",
 			"Rev": "ee716d1410cb44d1a6b7e59a96a2b2bec23366a9"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/Godeps/_workspace/src/github.com/ugorji/go/codec",
+			"Comment": "v2.2.0",
+			"Rev": "e4561dd8cfb1163fb51afceca9c78aa89398e731"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/Godeps/_workspace/src/golang.org/x/net/context",
+			"Comment": "v2.2.0",
+			"Rev": "e4561dd8cfb1163fb51afceca9c78aa89398e731"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/client",
@@ -1567,10 +1577,6 @@
 		{
 			"ImportPath": "github.com/tinylib/msgp/msgp",
 			"Rev": "75ee40d2601edf122ef667e2a07d600d4c44490c"
-		},
-		{
-			"ImportPath": "github.com/ugorji/go/codec",
-			"Rev": "5abd4e96a45c386928ed2ca2a7ef63e2533e18ec"
 		},
 		{
 			"ImportPath": "github.com/vaughan0/go-ini",

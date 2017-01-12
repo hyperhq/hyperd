@@ -6,7 +6,7 @@ set -o pipefail
 find_files() {
   find . -not \( \
       \( \
-        -wholename '*/Godeps/*' \
+        -wholename '*/vendor/*' \
       \) -prune \
     \) -name '*.go'
 }

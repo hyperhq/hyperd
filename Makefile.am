@@ -1,4 +1,4 @@
-export GOPATH:=$(abs_top_srcdir)/Godeps/_workspace:$(GOPATH)
+export GO15VENDOREXPERIMENT=1
 if WITH_XEN
 XEN_BUILD_TAG=with_xen
 else
