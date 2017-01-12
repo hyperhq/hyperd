@@ -11,7 +11,6 @@ import (
 
 func (cli *HyperClient) HyperCmdList(args ...string) error {
 	var opts struct {
-		Aux bool   `short:"x" long:"aux" default:"false" description:"show the auxiliary containers"`
 		Pod string `short:"p" long:"pod" value-name:"\"\"" description:"only list the specified pod"`
 		VM  string `short:"m" long:"vm" value-name:"\"\"" description:"only list resources on the specified vm"`
 	}
@@ -37,7 +36,7 @@ func (cli *HyperClient) HyperCmdList(args ...string) error {
 		return fmt.Errorf("Error, the %s can not support %s list!", os.Args[0], item)
 	}
 
-	remoteInfo, err := cli.client.List(item, opts.Pod, opts.VM, opts.Aux)
+	remoteInfo, err := cli.client.List(item, opts.Pod, opts.VM)
 	if err != nil {
 		return err
 	}

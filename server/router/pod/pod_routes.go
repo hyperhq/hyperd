@@ -42,13 +42,12 @@ func (p *podRouter) getList(ctx context.Context, w http.ResponseWriter, r *http.
 	}
 
 	item := r.Form.Get("item")
-	auxiliary := httputils.BoolValue(r, "auxiliary")
 	pod := r.Form.Get("pod")
 	vm := r.Form.Get("vm")
 
-	glog.V(1).Infof("List type is %s, specified pod: [%s], specified vm: [%s], list auxiliary pod: %v", item, pod, vm, auxiliary)
+	glog.V(1).Infof("List type is %s, specified pod: [%s], specified vm: [%s]", item, pod, vm)
 
-	env, err := p.backend.CmdList(item, pod, vm, auxiliary)
+	env, err := p.backend.CmdList(item, pod, vm)
 	if err != nil {
 		return err
 	}

@@ -43,25 +43,18 @@ func (daemon *Daemon) snapshotPodList(podId, vmId string) []*pod.XPod {
 	return pl
 }
 
-func (daemon *Daemon) ListContainers(podId, vmId string, auxiliary bool) ([]*apitypes.ContainerListResult, error) {
+func (daemon *Daemon) ListContainers(podId, vmId string) ([]*apitypes.ContainerListResult, error) {
 	var (
-		cids   []string
 		result = []*apitypes.ContainerListResult{}
 	)
 	pl := daemon.snapshotPodList(podId, vmId)
 	for _, p := range pl {
-		if auxiliary {
-			cids = p.ContainerIds()
-		} else {
-			cids = p.ContainerIdsOf(apitypes.UserContainer_REGULAR)
-		}
-		for _, cid := range cids {
+		for _, cid := range p.ContainerIds() {
 			status := p.ContainerBriefStatus(cid)
 			if status != nil {
 				result = append(result, status)
 			}
 		}
-
 	}
 	return result, nil
 }
@@ -89,7 +82,7 @@ func (daemon *Daemon) ListVMs(podId, vmId string) ([]*apitypes.VMListResult, err
 	return result, nil
 }
 
-func (daemon *Daemon) List(item, podId, vmId string, auxiliary bool) (map[string][]string, error) {
+func (daemon *Daemon) List(item, podId, vmId string) (map[string][]string, error) {
 	var (
 		pl = []*pod.XPod{}
 
@@ -98,7 +91,7 @@ func (daemon *Daemon) List(item, podId, vmId string, auxiliary bool) (map[string
 		podJsonResponse       = []string{}
 		containerJsonResponse = []string{}
 	)
-	hlog.Log(hlog.INFO, "got list request for %s (pod: %s, vm: %s, include aux container: %v)", item, podId, vmId, auxiliary)
+	hlog.Log(hlog.INFO, "got list request for %s (pod: %s, vm: %s)", item, podId, vmId)
 	if item != "pod" && item != "container" && item != "vm" {
 		return list, fmt.Errorf("Can not support %s list!", item)
 	}
@@ -120,13 +113,7 @@ func (daemon *Daemon) List(item, podId, vmId string, auxiliary bool) (map[string
 		case "pod":
 			podJsonResponse = append(podJsonResponse, p.StatusString())
 		case "container":
-			var cids []string
-			if auxiliary {
-				cids = p.ContainerIds()
-			} else {
-				cids = p.ContainerIdsOf(apitypes.UserContainer_REGULAR)
-			}
-			for _, cid := range cids {
+			for _, cid := range p.ContainerIds() {
 				status := p.ContainerStatusString(cid)
 				if status != "" {
 					containerJsonResponse = append(containerJsonResponse, status)

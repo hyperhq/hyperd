@@ -236,9 +236,7 @@ func (c *Container) start() error {
 		return err
 	}
 
-	if c.spec.Type == apitypes.UserContainer_REGULAR {
-		c.startLogging()
-	}
+	c.startLogging()
 
 	go c.waitFinish(-1)
 

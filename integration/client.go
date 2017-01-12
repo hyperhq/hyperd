@@ -75,10 +75,8 @@ func (c *HyperClient) GetVMList() ([]*types.VMListResult, error) {
 }
 
 // GetContainerList gets a list of containers
-func (c *HyperClient) GetContainerList(auxiliary bool) ([]*types.ContainerListResult, error) {
-	req := types.ContainerListRequest{
-		Auxiliary: auxiliary,
-	}
+func (c *HyperClient) GetContainerList() ([]*types.ContainerListResult, error) {
+	req := types.ContainerListRequest{}
 	containerList, err := c.client.ContainerList(
 		c.ctx,
 		&req,
