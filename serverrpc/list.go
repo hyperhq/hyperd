@@ -10,7 +10,7 @@ import (
 func (s *ServerRPC) ContainerList(ctx context.Context, req *types.ContainerListRequest) (*types.ContainerListResponse, error) {
 	glog.V(3).Infof("ContainerList with request %s", req.String())
 
-	containerList, err := s.daemon.ListContainers(req.PodID, req.VmID, req.Auxiliary)
+	containerList, err := s.daemon.ListContainers(req.PodID, req.VmID)
 	if err != nil {
 		glog.Errorf("ContainerList error: %v", err)
 		return nil, err

@@ -44,12 +44,9 @@ func (cli *Client) GetContainerByPod(podId string) (string, error) {
 	return "", fmt.Errorf("Container not found")
 }
 
-func (cli *Client) List(item, pod, vm string, aux bool) (*engine.Env, error) {
+func (cli *Client) List(item, pod, vm string) (*engine.Env, error) {
 	v := url.Values{}
 	v.Set("item", item)
-	if aux {
-		v.Set("auxiliary", "yes")
-	}
 	if pod != "" {
 		v.Set("pod", pod)
 	}

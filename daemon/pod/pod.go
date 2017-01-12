@@ -423,16 +423,6 @@ func (p *XPod) ContainerNames() []string {
 	return result
 }
 
-func (p *XPod) ContainerIdsOf(ctype apitypes.UserContainer_ContainerType) []string {
-	result := make([]string, 0, len(p.containers))
-	for cid, c := range p.containers {
-		if c.spec.Type == ctype {
-			result = append(result, cid)
-		}
-	}
-	return result
-}
-
 func (p *XPod) ContainerName2Id(name string) (string, bool) {
 	if name == "" {
 		return "", false

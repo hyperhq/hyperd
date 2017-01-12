@@ -205,8 +205,8 @@ func (daemon *Daemon) CmdGetContainerInfo(name string) (interface{}, error) {
 	return daemon.GetContainerInfo(name)
 }
 
-func (daemon *Daemon) CmdList(item, podId, vmId string, auxiliary bool) (*engine.Env, error) {
-	list, err := daemon.List(item, podId, vmId, auxiliary)
+func (daemon *Daemon) CmdList(item, podId, vmId string) (*engine.Env, error) {
+	list, err := daemon.List(item, podId, vmId)
 	if err != nil {
 		return nil, err
 	}

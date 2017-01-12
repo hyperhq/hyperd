@@ -42,7 +42,7 @@ func (s *TestSuite) TestGetVMList(c *C) {
 }
 
 func (s *TestSuite) TestGetContainerList(c *C) {
-	containerList, err := s.client.GetContainerList(true)
+	containerList, err := s.client.GetContainerList()
 	c.Assert(err, IsNil)
 	c.Logf("Got ContainerList %v", containerList)
 }
@@ -54,7 +54,7 @@ func (s *TestSuite) TestGetImageList(c *C) {
 }
 
 func (s *TestSuite) TestGetContainerInfo(c *C) {
-	containerList, err := s.client.GetContainerList(true)
+	containerList, err := s.client.GetContainerList()
 	c.Assert(err, IsNil)
 	c.Logf("Got ContainerList %v", containerList)
 
@@ -68,7 +68,7 @@ func (s *TestSuite) TestGetContainerInfo(c *C) {
 }
 
 func (s *TestSuite) TestGetContainerLogs(c *C) {
-	containerList, err := s.client.GetContainerList(true)
+	containerList, err := s.client.GetContainerList()
 	c.Assert(err, IsNil)
 	c.Logf("Got ContainerList %v", containerList)
 

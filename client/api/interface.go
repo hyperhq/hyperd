@@ -18,7 +18,7 @@ type APIInterface interface {
 
 	WinResize(id, tag string, height, width int) error
 
-	List(item, pod, vm string, aux bool) (*engine.Env, error)
+	List(item, pod, vm string) (*engine.Env, error)
 	CreateContainer(podID string, spec interface{}) (string, int, error)
 	StartContainer(container string) error
 	GetContainerInfo(container string) (*types.ContainerInfo, error)

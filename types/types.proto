@@ -280,7 +280,6 @@ message PodListResponse {
 message ContainerListRequest {
   string podID    = 1;
   string vmID     = 2;
-  bool auxiliary  = 3;
 }
 
 message ContainerListResult {
@@ -400,11 +399,6 @@ message UserContainer {
   UserUser user                         = 13;
   map<string, string> labels            = 14;
   string id                             = 15;
-  enum ContainerType {
-    REGULAR = 0;
-    SERVICE = 99;
-  }
-  ContainerType type                    = 16;
   string StopSignal                     = 17;
   repeated Ulimit ulimits               = 18;
   string logPath                        = 19;
