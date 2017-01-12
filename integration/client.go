@@ -712,3 +712,17 @@ func (c *HyperClient) Ping() (*types.PingResponse, error) {
 
 	return resp, nil
 }
+
+// ContainerSignal sends a signal to specified container of specified pod
+func (c *HyperClient) ContainerSignal(podID, containerID string, signal int64) error {
+	_, err := c.client.ContainerSignal(c.ctx, &types.ContainerSignalRequest{
+		PodID:       podID,
+		ContainerID: containerID,
+		Signal:      signal,
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

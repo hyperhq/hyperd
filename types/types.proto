@@ -759,6 +759,14 @@ message PingResponse {
   string hyperdStats = 1;
 }
 
+message ContainerSignalRequest {
+    string podID       = 1;
+    string containerID = 2;
+    int64  signal      = 3;
+}
+
+message ContainerSignalResponse{}
+
 // PublicAPI defines the public APIs which are handled over TCP sockets.
 service PublicAPI {
     // PodList gets a list of pods
@@ -773,7 +781,7 @@ service PublicAPI {
     rpc PodStart(PodStartRequest) returns (PodStartResponse) {}
     // PodStop stops a pod
     rpc PodStop(PodStopRequest) returns (PodStopResponse) {}
-    // PodSignal sends a singal to all containers of specified pod
+    // PodSignal sends a signal to all containers of specified pod
     rpc PodSignal(PodSignalRequest) returns (PodSignalResponse) {}
     // PodPause pauses a pod
     rpc PodPause(PodPauseRequest) returns (PodPauseResponse) {}
@@ -806,7 +814,8 @@ service PublicAPI {
     // ContainerRename renames a container
     rpc ContainerRename(ContainerRenameRequest) returns (ContainerRenameResponse) {}
     // TODO: ContainerCommit commits the changes of the specified container
-    // TODO: ContainerSignal sends a singla to specified container
+    // ContainerSignal sends a signal to specified container
+    rpc ContainerSignal(ContainerSignalRequest) returns (ContainerSignalResponse) {}
     // TODO: ContainerLabels updates labels of the specified container
     // ContainerStop stops the specified container
     rpc ContainerStop(ContainerStopRequest) returns (ContainerStopResponse) {}

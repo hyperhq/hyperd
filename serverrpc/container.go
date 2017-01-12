@@ -66,3 +66,16 @@ func (s *ServerRPC) ContainerRemove(ctx context.Context, req *types.ContainerRem
 	}
 	return &types.ContainerRemoveResponse{}, nil
 }
+
+// ContainerSignal sends a singal to specified container of specified pod
+func (s *ServerRPC) ContainerSignal(ctx context.Context, req *types.ContainerSignalRequest) (*types.ContainerSignalResponse, error) {
+	glog.V(3).Infof("ContainerSignal with request %s", req.String())
+
+	err := s.daemon.KillPodContainers(req.PodID, req.ContainerID, req.Signal)
+	if err != nil {
+		glog.Errorf("Kill Container %s of Pod %s with signal %d failed: %v", req.ContainerID, req.PodID, req.Signal, err)
+		return nil, err
+	}
+
+	return &types.ContainerSignalResponse{}, nil
+}
