@@ -85,6 +85,7 @@ clear_emulator_capabilities = 0
 EOF
 ) | sudo tee /etc/libvirt/qemu.conf
     sudo /etc/init.d/libvirt-bin restart
+    [ ! -x /etc/init.d/virtlogd ] || sudo /etc/init.d/virtlogd restart
 }
 
 hyper::util::trap_add cleanup EXIT SIGINT
