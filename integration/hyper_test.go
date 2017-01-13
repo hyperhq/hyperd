@@ -1,8 +1,10 @@
 package integration
 
 import (
+	"io"
 	"testing"
 
+	"github.com/hyperhq/hyperd/lib/promise"
 	"github.com/hyperhq/hyperd/types"
 	. "gopkg.in/check.v1"
 )
@@ -528,4 +530,65 @@ func (s *TestSuite) TestSendContainerSignal(c *C) {
 	containerInfo, err = s.client.GetContainerInfo(container)
 	c.Assert(err, IsNil)
 	c.Assert(containerInfo.Status.Phase, Equals, "failed")
+}
+
+func (s *TestSuite) TestSendExecSignal(c *C) {
+	sigKill := int64(9)
+	cName := "test-exec-signal"
+	spec := types.UserPod{
+		Id: "busybox",
+		Containers: []*types.UserContainer{
+			{
+				Name:  cName,
+				Image: "busybox",
+			},
+		},
+	}
+	podID, err := s.client.CreatePod(&spec)
+	c.Assert(err, IsNil)
+
+	defer func() {
+		err = s.client.RemovePod(podID)
+		c.Assert(err, IsNil)
+	}()
+
+	err = s.client.StartPod(podID)
+	c.Assert(err, IsNil)
+
+	execId, err := s.client.ContainerExecCreate(cName, []string{"sh", "-c", "top"}, false)
+	c.Assert(err, IsNil)
+
+	outReader, outWriter := io.Pipe()
+	errC := promise.Go(func() error {
+		return s.client.ContainerExecStart(cName, execId, nil, outWriter, nil, false)
+	})
+
+	// make sure process has been started.
+	readC := make(chan struct{})
+	go func() {
+		buf := make([]byte, 32)
+		for {
+			n, err := outReader.Read(buf)
+			if err == nil && n > 0 {
+				readC <- struct{}{}
+				break
+			} else if err != nil && err != io.EOF {
+				errC <- err
+				break
+			}
+		}
+	}()
+
+	select {
+	case err = <-errC:
+		c.Assert(err, IsNil)
+	case <-readC:
+	}
+
+	err = s.client.ContainerExecSignal(cName, execId, sigKill)
+	c.Assert(err, IsNil)
+
+	exitCode, err := s.client.Wait(cName, execId, false)
+	c.Assert(err, IsNil)
+	c.Assert(exitCode, Equals, int32(0))
 }
