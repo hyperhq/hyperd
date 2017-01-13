@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"syscall"
 	"time"
 
 	"github.com/docker/docker/pkg/stdcopy"
@@ -171,6 +172,25 @@ func (p *XPod) GetExecExitCode(containerId, execId string) (uint8, error) {
 	}
 	es.Log(INFO, "got exec exit code: %d", es.ExitCode)
 	return es.ExitCode, nil
+}
+
+func (p *XPod) KillExec(execId string, sig int64) error {
+	p.statusLock.RLock()
+	es, ok := p.execs[execId]
+	p.statusLock.RUnlock()
+
+	if !ok {
+		err := fmt.Errorf("no exec %s exists for pod %s", execId, p.Id)
+		p.Log(ERROR, err)
+		return err
+	}
+
+	return p.protectedSandboxOperation(
+		func(sb *hypervisor.Vm) error {
+			return sb.SignalProcess(es.Container, es.Id, syscall.Signal(sig))
+		},
+		time.Second*5,
+		fmt.Sprintf("Kill process %s with %d", es.Id, sig))
 }
 
 func (p *XPod) DeleteExec(containerId, execId string) {

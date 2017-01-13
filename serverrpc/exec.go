@@ -102,3 +102,16 @@ func (s *ServerRPC) Wait(c context.Context, req *types.WaitRequest) (*types.Wait
 		ExitCode: int32(code),
 	}, nil
 }
+
+// ExecSignal sends a singal to specified exec of specified container
+func (s *ServerRPC) ExecSignal(ctx context.Context, req *types.ExecSignalRequest) (*types.ExecSignalResponse, error) {
+	glog.V(3).Infof("ExecSignal with request %v", req.String())
+
+	err := s.daemon.KillExec(req.ContainerID, req.ExecID, req.Signal)
+	if err != nil {
+		glog.Errorf("Kill Process %s of container %s with signal %d failed: %v", req.ExecID, req.ContainerID, req.Signal, err)
+		return nil, err
+	}
+
+	return &types.ExecSignalResponse{}, nil
+}

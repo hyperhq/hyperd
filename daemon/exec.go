@@ -46,3 +46,15 @@ func (daemon *Daemon) StartExec(stdin io.ReadCloser, stdout io.WriteCloser, cont
 	glog.V(1).Infof("Start Exec for container %s", containerId)
 	return p.StartExec(stdin, stdout, id, execId)
 }
+
+func (daemon *Daemon) KillExec(containerId string, execId string, signal int64) error {
+	p, _, ok := daemon.PodList.GetByContainerIdOrName(containerId)
+	if !ok {
+		err := fmt.Errorf("cannot find container %s", containerId)
+		glog.Error(err)
+		return err
+	}
+
+	glog.V(1).Infof("Kill Exec for container %s", containerId)
+	return p.KillExec(execId, signal)
+}
