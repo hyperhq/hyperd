@@ -469,6 +469,10 @@ func (c *Container) createByEngine() (*dockertypes.ContainerJSON, error) {
 		config.Entrypoint = strslice.New(c.spec.Entrypoint...)
 	}
 
+	if c.spec.Workdir != "" {
+		config.WorkingDir = c.spec.Workdir
+	}
+
 	if len(c.spec.Envs) != 0 {
 		envs := []string{}
 		for _, env := range c.spec.Envs {
