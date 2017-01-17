@@ -8,6 +8,7 @@ import (
 
 	"github.com/hyperhq/runv/api"
 	hyperstartapi "github.com/hyperhq/runv/hyperstart/api/json"
+	"github.com/hyperhq/runv/hyperstart/libhyperstart"
 	"github.com/hyperhq/runv/hypervisor/types"
 )
 
@@ -34,7 +35,6 @@ type VmContext struct {
 	// Communication Context
 	Hub    chan VmEvent
 	client chan *types.VmResponse
-	vm     chan *hyperstartCmd
 
 	DCtx DriverContext
 
@@ -49,7 +49,7 @@ type VmContext struct {
 
 	//	InterfaceCount int
 
-	ptys *pseudoTtys
+	hyperstart libhyperstart.Hyperstart
 
 	// Specification
 	volumes    map[string]*DiskContext
@@ -80,8 +80,6 @@ func NewVmSpec() *hyperstartapi.Pod {
 
 func InitContext(id string, hub chan VmEvent, client chan *types.VmResponse, dc DriverContext, boot *BootConfig) (*VmContext, error) {
 	var (
-		vmChannel = make(chan *hyperstartCmd, 128)
-
 		//dir and sockets:
 		homeDir         = BaseDir + "/" + id + "/"
 		hyperSockName   = homeDir + HyperSockName
@@ -115,8 +113,6 @@ func InitContext(id string, hub chan VmEvent, client chan *types.VmResponse, dc 
 		Hub:             hub,
 		client:          client,
 		DCtx:            dc,
-		vm:              vmChannel,
-		ptys:            newPts(),
 		HomeDir:         homeDir,
 		HyperSockName:   hyperSockName,
 		TtySockName:     ttySockName,
@@ -220,12 +216,13 @@ func (ctx *VmContext) handleProcessAsyncEvent(pae *hyperstartapi.ProcessAsyncEve
 }
 
 func (ctx *VmContext) Close() {
+	ctx.Log(INFO, "VmContext Close()")
 	ctx.lock.Lock()
 	defer ctx.lock.Unlock()
 	ctx.unsetTimeout()
 	ctx.networks.close()
 	ctx.DCtx.Close()
-	close(ctx.vm)
+	ctx.hyperstart.Close()
 	close(ctx.client)
 	os.Remove(ctx.ShareDir)
 	ctx.handler = nil

@@ -2,19 +2,13 @@ package hypervisor
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/golang/glog"
+	"github.com/hyperhq/runv/hyperstart/libhyperstart"
 	"github.com/hyperhq/runv/hypervisor/network"
 	"github.com/hyperhq/runv/hypervisor/types"
 )
-
-func (ctx *VmContext) startSocks() {
-	go waitInitReady(ctx)
-	go waitPts(ctx)
-	if glog.V(1) {
-		go watchVmConsole(ctx)
-	}
-}
 
 func (ctx *VmContext) loop() {
 	for ctx.handler != nil {
@@ -31,13 +25,65 @@ func (ctx *VmContext) loop() {
 	}
 }
 
+func (ctx *VmContext) handlePAEs() {
+	ch, err := ctx.hyperstart.ProcessAsyncEvents()
+	if err == nil {
+		for e := range ch {
+			ctx.handleProcessAsyncEvent(&e)
+		}
+	}
+	ctx.hyperstart.Close()
+	ctx.Log(ERROR, "hyperstart stopped")
+	ctx.Hub <- &Interrupted{Reason: "hyperstart stopped"}
+}
+
+func (ctx *VmContext) watchHyperstart(sendReadyEvent bool) {
+	timeout := time.AfterFunc(30*time.Second, func() {
+		if ctx.PauseState == PauseStateUnpaused {
+			ctx.Log(ERROR, "watch hyperstart timeout")
+			ctx.Hub <- &InitFailedEvent{Reason: "watch hyperstart timeout"}
+			ctx.hyperstart.Close()
+		}
+	})
+	for {
+		_, err := ctx.hyperstart.APIVersion()
+		if err != nil {
+			ctx.hyperstart.Close()
+			ctx.Hub <- &InitFailedEvent{Reason: "hyperstart failed: " + err.Error()}
+			break
+		}
+		if !timeout.Stop() {
+			<-timeout.C
+		}
+		if sendReadyEvent {
+			ctx.Hub <- &InitConnectedEvent{}
+			sendReadyEvent = false
+		}
+		time.Sleep(10 * time.Second)
+		timeout.Reset(30 * time.Second)
+	}
+	timeout.Stop()
+}
+
 func (ctx *VmContext) Launch() {
+	go ctx.DCtx.Launch(ctx)
 
 	//launch routines
-	ctx.startSocks()
-	ctx.DCtx.Launch(ctx)
+	if ctx.Boot.BootFromTemplate {
+		glog.Info("boot from template")
+		ctx.PauseState = PauseStatePaused
+		ctx.hyperstart = libhyperstart.NewSerialJsonBasedHyperstart(ctx.HyperSockName, ctx.TtySockName, 1, false)
+		ctx.Hub <- &InitConnectedEvent{}
+	} else {
+		ctx.hyperstart = libhyperstart.NewSerialJsonBasedHyperstart(ctx.HyperSockName, ctx.TtySockName, 1, true)
+		go ctx.watchHyperstart(true)
+	}
+	if glog.V(1) {
+		go watchVmConsole(ctx)
+	}
 
-	ctx.loop()
+	go ctx.loop()
+	go ctx.handlePAEs()
 }
 
 func VmAssociate(vmId string, hub chan VmEvent, client chan *types.VmResponse, pack []byte) (*VmContext, error) {
@@ -60,10 +106,9 @@ func VmAssociate(vmId string, hub chan VmEvent, client chan *types.VmResponse, p
 		return nil, err
 	}
 
+	context.hyperstart = libhyperstart.NewSerialJsonBasedHyperstart(context.HyperSockName, context.TtySockName, pinfo.HwStat.AttachId, false)
 	context.DCtx.Associate(context)
 
-	go waitPts(context)
-	go connectToInit(context)
 	if glog.V(1) {
 		go watchVmConsole(context)
 	}
@@ -75,6 +120,8 @@ func VmAssociate(vmId string, hub chan VmEvent, client chan *types.VmResponse, p
 	//	context.ptys.startStdin(c.Process.Stdio, c.Process.Terminal)
 	//}
 
+	go context.watchHyperstart(false)
+	go context.handlePAEs()
 	go context.loop()
 	return context, nil
 }
