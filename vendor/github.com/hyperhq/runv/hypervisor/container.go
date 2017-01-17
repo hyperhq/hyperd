@@ -1,6 +1,7 @@
 package hypervisor
 
 import (
+	"io"
 	"sync"
 
 	"github.com/hyperhq/runv/api"
@@ -17,6 +18,12 @@ type ContainerContext struct {
 	process   *hyperstartapi.Process
 	fsmap     []*hyperstartapi.FsmapDescriptor
 	vmVolumes []*hyperstartapi.VolumeDescriptor
+
+	// TODO move streamCopy() to hyperd and remove all these tty and pipes
+	tty        *TtyIO
+	stdinPipe  io.WriteCloser
+	stdoutPipe io.ReadCloser
+	stderrPipe io.ReadCloser
 
 	logPrefix string
 }
@@ -108,8 +115,6 @@ func (cc *ContainerContext) configProcess() {
 	cc.process = &hyperstartapi.Process{
 		Id:       "init",
 		Terminal: c.Tty,
-		Stdio:    cc.sandbox.ptys.nextAttachId(),
-		Stderr:   0,
 		Args:     append([]string{c.Path}, c.Args...),
 		Envs:     envs,
 		Workdir:  c.Workdir,
@@ -125,9 +130,4 @@ func (cc *ContainerContext) configProcess() {
 		cc.process.Rlimits[i].Hard = l.Hard
 		cc.process.Rlimits[i].Soft = l.Soft
 	}
-
-	if !c.Tty {
-		cc.process.Stderr = cc.sandbox.ptys.nextAttachId()
-	}
-
 }

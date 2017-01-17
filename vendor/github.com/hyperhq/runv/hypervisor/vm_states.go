@@ -3,11 +3,11 @@ package hypervisor
 import (
 	"errors"
 	"fmt"
-	"syscall"
+	"io"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
-	hyperstartapi "github.com/hyperhq/runv/hyperstart/api/json"
 )
 
 // states
@@ -32,143 +32,27 @@ func (ctx *VmContext) newContainer(id string, result chan<- error) {
 	c, ok := ctx.containers[id]
 	if ok {
 		glog.Infof("start sending INIT_NEWCONTAINER")
-		ctx.vm <- &hyperstartCmd{
-			Code:    hyperstartapi.INIT_NEWCONTAINER,
-			Message: c.VmSpec(),
-			result:  result,
+		var err error
+		c.stdinPipe, c.stdoutPipe, c.stderrPipe, err = ctx.hyperstart.NewContainer(c.VmSpec())
+		if err == nil && c.tty != nil {
+			go streamCopy(c.tty, c.stdinPipe, c.stdoutPipe, c.stderrPipe)
 		}
+		result <- err
 		glog.Infof("sent INIT_NEWCONTAINER")
 	} else {
 		result <- fmt.Errorf("container %s not exist", id)
 	}
 }
 
-func (ctx *VmContext) updateInterface(id string, result chan<- error) {
+func (ctx *VmContext) updateInterface(id string) error {
 	if inf := ctx.networks.getInterface(id); inf == nil {
-		result <- fmt.Errorf("can't find interface whose ID is %s", id)
-		return
+		return fmt.Errorf("can't find interface whose ID is %s", id)
 	} else {
-		ctx.vm <- &hyperstartCmd{
-			Code: hyperstartapi.INIT_SETUPINTERFACE,
-			Message: hyperstartapi.NetworkInf{
-				Device:    inf.DeviceName,
-				IpAddress: inf.IpAddr,
-				NetMask:   inf.NetMask,
-			},
-			result: result,
-		}
+		return ctx.hyperstart.UpdateInterface(inf.DeviceName, inf.IpAddr, inf.NetMask)
 	}
 }
 
-func (ctx *VmContext) setWindowSize4242(containerId, execId string, size *WindowSize) {
-	var session uint64
-	if execId != "init" {
-		exec, ok := ctx.vmExec[execId]
-		if !ok {
-			glog.Errorf("cannot find exec %s", execId)
-			return
-		}
-
-		session = exec.Process.Stdio
-	} else if containerId != "" {
-		ctx.lock.Lock()
-		defer ctx.lock.Unlock()
-
-		c, ok := ctx.containers[containerId]
-		if !ok {
-			glog.Errorf("cannot find container %s", containerId)
-			return
-		}
-
-		session = c.process.Stdio
-	} else {
-		glog.Error("no container or exec is specified")
-		return
-	}
-
-	cmd := map[string]interface{}{
-		"seq":    session,
-		"row":    size.Row,
-		"column": size.Column,
-	}
-
-	ctx.vm <- &hyperstartCmd{
-		Code:    hyperstartapi.INIT_WINSIZE,
-		Message: cmd,
-	}
-}
-
-func (ctx *VmContext) setWindowSize(containerId, execId string, size *WindowSize) {
-	if ctx.vmHyperstartAPIVersion <= 4242 {
-		ctx.setWindowSize4242(containerId, execId, size)
-		return
-	}
-	cmd := hyperstartapi.WindowSizeMessage{
-		Container: containerId,
-		Process:   execId,
-		Row:       size.Row,
-		Column:    size.Column,
-	}
-
-	ctx.vm <- &hyperstartCmd{
-		Code:    hyperstartapi.INIT_WINSIZE,
-		Message: cmd,
-	}
-}
-
-func (ctx *VmContext) onlineCpuMem(cmd *OnlineCpuMemCommand) {
-	ctx.vm <- &hyperstartCmd{
-		Code: hyperstartapi.INIT_ONLINECPUMEM,
-	}
-}
-
-func (ctx *VmContext) execCmd(execId string, cmd *hyperstartapi.ExecCommand, tty *TtyIO, result chan<- error) {
-	cmd.Process.Stdio = ctx.ptys.nextAttachId()
-	if !cmd.Process.Terminal {
-		cmd.Process.Stderr = ctx.ptys.nextAttachId()
-	}
-	ctx.lock.Lock()
-	defer ctx.lock.Unlock()
-	if _, existed := ctx.vmExec[execId]; existed || execId == "init" {
-		result <- fmt.Errorf("process id conflicts, the process of the id %s already exists", execId)
-		return
-	}
-	ctx.vmExec[execId] = cmd
-	ctx.ptys.StdioConnect(cmd.Process.Stdio, cmd.Process.Stderr, tty)
-	ctx.vm <- &hyperstartCmd{
-		Code:    hyperstartapi.INIT_EXECCMD,
-		Message: cmd,
-		result:  result,
-	}
-}
-
-func (ctx *VmContext) signalProcess(container, process string, signal syscall.Signal, result chan<- error) {
-	if ctx.vmHyperstartAPIVersion <= 4242 {
-		if process == "init" {
-			ctx.vm <- &hyperstartCmd{
-				Code: hyperstartapi.INIT_KILLCONTAINER,
-				Message: hyperstartapi.KillCommand{
-					Container: container,
-					Signal:    signal,
-				},
-				result: result,
-			}
-		} else {
-			result <- fmt.Errorf("only the init process of the container can be signaled")
-		}
-		return
-	}
-	ctx.vm <- &hyperstartCmd{
-		Code: hyperstartapi.INIT_SIGNALPROCESS,
-		Message: hyperstartapi.SignalCommand{
-			Container: container,
-			Process:   process,
-			Signal:    signal,
-		},
-		result: result,
-	}
-}
-
+// TODO remove attachCmd and move streamCopy to hyperd
 func (ctx *VmContext) attachCmd(cmd *AttachCommand, result chan<- error) {
 	ctx.lock.Lock()
 	defer ctx.lock.Unlock()
@@ -181,34 +65,111 @@ func (ctx *VmContext) attachCmd(cmd *AttachCommand, result chan<- error) {
 		return
 	}
 
-	ctx.attachTty2Container(c.process, cmd)
-	if cmd.Size != nil {
-		ctx.setWindowSize(cmd.Container, "init", cmd.Size)
+	if c.tty != nil {
+		result <- fmt.Errorf("we can attach only once")
+		return
+	}
+	c.tty = cmd.Streams
+	if c.stdinPipe != nil {
+		go streamCopy(c.tty, c.stdinPipe, c.stdoutPipe, c.stderrPipe)
 	}
 
 	result <- nil
 }
 
-func (ctx *VmContext) attachTty2Container(process *hyperstartapi.Process, cmd *AttachCommand) {
-	session := process.Stdio
-	ctx.ptys.StdioConnect(session, process.Stderr, cmd.Streams)
-	glog.V(1).Infof("Connecting tty for %s on session %d", cmd.Container, session)
+// TODO move this logic to hyperd
+type TtyIO struct {
+	Stdin  io.ReadCloser
+	Stdout io.Writer
+	Stderr io.Writer
+}
+
+func (tty *TtyIO) Close() {
+	glog.V(1).Info("Close tty ")
+
+	if tty.Stdin != nil {
+		tty.Stdin.Close()
+	}
+	cf := func(w io.Writer) {
+		if w == nil {
+			return
+		}
+		if c, ok := w.(io.WriteCloser); ok {
+			c.Close()
+		}
+	}
+	cf(tty.Stdout)
+	cf(tty.Stderr)
+}
+
+// TODO move this logic to hyperd
+func streamCopy(tty *TtyIO, stdinPipe io.WriteCloser, stdoutPipe, stderrPipe io.ReadCloser) {
+	var wg sync.WaitGroup
+	// old way cleanup all(expect stdinPipe) no matter what kinds of fails, TODO: change it
+	var once sync.Once
+	cleanup := func() {
+		tty.Close()
+		// stdinPipe is directly closed in the first go routine
+		stdoutPipe.Close()
+		if stderrPipe != nil {
+			stderrPipe.Close()
+		}
+	}
+	if tty.Stdin != nil {
+		wg.Add(1)
+		go func() {
+			_, err := io.Copy(stdinPipe, tty.Stdin)
+			stdinPipe.Close()
+			if err != nil {
+				// we should not call cleanup when tty.Stdin reaches EOF
+				once.Do(cleanup)
+			}
+			wg.Done()
+		}()
+	}
+	if tty.Stdout != nil {
+		wg.Add(1)
+		go func() {
+			io.Copy(tty.Stdout, stdoutPipe)
+			once.Do(cleanup)
+			wg.Done()
+		}()
+	}
+	if tty.Stderr != nil && stderrPipe != nil {
+		wg.Add(1)
+		go func() {
+			io.Copy(tty.Stderr, stderrPipe)
+			once.Do(cleanup)
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+	once.Do(cleanup)
 }
 
 func (ctx *VmContext) startPod() {
-	ctx.vm <- &hyperstartCmd{
-		Code:    hyperstartapi.INIT_STARTPOD,
-		Message: ctx.networks.sandboxInfo(),
+	err := ctx.hyperstart.StartSandbox(ctx.networks.sandboxInfo())
+	if err == nil {
+		ctx.Log(INFO, "pod start success")
+		ctx.reportSuccess("Start POD success", []byte{})
+	} else {
+		reason := "Start POD failed"
+		ctx.reportVmFault(reason)
+		ctx.Log(ERROR, reason)
 	}
 }
 
-func (ctx *VmContext) shutdownVM(err bool, msg string) {
-	if err {
-		ctx.reportVmFault(msg)
-		glog.Error("Shutting down because of an exception: ", msg)
-	}
+func (ctx *VmContext) shutdownVM() {
 	ctx.setTimeout(10)
-	ctx.vm <- &hyperstartCmd{Code: hyperstartapi.INIT_DESTROYPOD}
+	err := ctx.hyperstart.DestroySandbox()
+	if err == nil {
+		glog.Info("POD destroyed")
+		ctx.poweroffVM(false, "")
+	} else {
+		glog.Warning("Destroy pod failed")
+		ctx.poweroffVM(true, "Destroy pod failed")
+		ctx.Close()
+	}
 }
 
 func (ctx *VmContext) poweroffVM(err bool, msg string) {
@@ -249,29 +210,14 @@ func unexpectedEventHandler(ctx *VmContext, ev VmEvent, state string) {
 
 func stateRunning(ctx *VmContext, ev VmEvent) {
 	switch ev.Event() {
-	case COMMAND_ONLINECPUMEM:
-		ctx.onlineCpuMem(ev.(*OnlineCpuMemCommand))
-	case COMMAND_WINDOWSIZE:
-		cmd := ev.(*WindowSizeCommand)
-		ctx.setWindowSize(cmd.ContainerId, cmd.ExecId, cmd.Size)
 	case COMMAND_SHUTDOWN:
 		ctx.Log(INFO, "got shutdown command, shutting down")
-		ctx.shutdownVM(false, "")
+		go ctx.shutdownVM()
 		ctx.Become(stateTerminating, StateTerminating)
 	case COMMAND_RELEASE:
 		ctx.Log(INFO, "pod is running, got release command, let VM fly")
 		ctx.Become(nil, StateNone)
 		ctx.reportSuccess("", nil)
-	case COMMAND_ACK:
-		ack := ev.(*CommandAck)
-		ctx.Log(DEBUG, "[running] got hyperstart ack to %d", ack.reply.Code)
-		switch ack.reply.Code {
-		case hyperstartapi.INIT_STARTPOD:
-			ctx.Log(INFO, "pod start success: %s", string(ack.msg))
-			ctx.reportSuccess("Start POD success", []byte{})
-			//TODO: the payload is the persist info, will deal with this later
-		default:
-		}
 	case EVENT_INIT_CONNECTED:
 		ctx.Log(INFO, "hyperstart is ready to accept vm commands")
 		ctx.reportVmRun()
@@ -290,17 +236,6 @@ func stateRunning(ctx *VmContext, ev VmEvent) {
 		glog.Info("Connection interrupted, quit...")
 		ctx.poweroffVM(true, "connection to vm broken")
 		ctx.Close()
-	case ERROR_CMD_FAIL:
-		ack := ev.(*CommandError)
-		switch ack.reply.Code {
-		case hyperstartapi.INIT_NEWCONTAINER:
-			//TODO: report fail message to the caller
-		case hyperstartapi.INIT_STARTPOD:
-			reason := "Start POD failed"
-			ctx.reportVmFault(reason)
-			ctx.Log(ERROR, reason)
-		default:
-		}
 	case GENERIC_OPERATION:
 		ctx.handleGenericOperation(ev.(*GenericOperation))
 	default:
@@ -320,20 +255,6 @@ func stateTerminating(ctx *VmContext, ev VmEvent) {
 		ctx.Close()
 	case COMMAND_RELEASE:
 		glog.Info("vm terminating, got release")
-	case COMMAND_ACK:
-		ack := ev.(*CommandAck)
-		glog.V(1).Infof("[Terminating] Got reply to %d: '%s'", ack.reply, string(ack.msg))
-		if ack.reply.Code == hyperstartapi.INIT_DESTROYPOD {
-			glog.Info("POD destroyed ", string(ack.msg))
-			ctx.poweroffVM(false, "")
-		}
-	case ERROR_CMD_FAIL:
-		ack := ev.(*CommandError)
-		if ack.reply.Code == hyperstartapi.INIT_DESTROYPOD {
-			glog.Warning("Destroy pod failed")
-			ctx.poweroffVM(true, "Destroy pod failed")
-			ctx.Close()
-		}
 	case EVENT_VM_TIMEOUT:
 		glog.Warning("VM did not exit in time, try to stop it")
 		ctx.poweroffVM(true, "vm terminating timeout")

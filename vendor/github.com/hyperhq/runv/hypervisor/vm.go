@@ -64,7 +64,7 @@ func (vm *Vm) Launch(b *BootConfig) (err error) {
 
 	}
 
-	go ctx.Launch()
+	ctx.Launch()
 	vm.ctx = ctx
 
 	vm.Hub = vmEvent
@@ -327,53 +327,16 @@ func (vm *Vm) Kill() {
 }
 
 func (vm *Vm) WriteFile(container, target string, data []byte) error {
-	if target == "" {
-		return fmt.Errorf("'write' without file")
-	}
-
-	return vm.GenericOperation("WriteFile", func(ctx *VmContext, result chan<- error) {
-		writeCmd, _ := json.Marshal(hyperstartapi.FileCommand{
-			Container: container,
-			File:      target,
-		})
-		writeCmd = append(writeCmd, data[:]...)
-		ctx.vm <- &hyperstartCmd{
-			Code:    hyperstartapi.INIT_WRITEFILE,
-			Message: writeCmd,
-			result:  result,
-		}
-	}, StateRunning)
+	return vm.ctx.hyperstart.WriteFile(container, target, data)
 }
 
 func (vm *Vm) ReadFile(container, target string) ([]byte, error) {
-	if target == "" {
-		return nil, fmt.Errorf("'read' without file")
-	}
+	return vm.ctx.hyperstart.ReadFile(container, target)
 
-	cmd := hyperstartCmd{
-		Code: hyperstartapi.INIT_READFILE,
-		Message: &hyperstartapi.FileCommand{
-			Container: container,
-			File:      target,
-		},
-	}
-	err := vm.GenericOperation("ReadFile", func(ctx *VmContext, result chan<- error) {
-		cmd.result = result
-		ctx.vm <- &cmd
-	}, StateRunning)
-
-	return cmd.retMsg, err
 }
 
 func (vm *Vm) SignalProcess(container, process string, signal syscall.Signal) error {
-	return vm.GenericOperation("SignalProcess", func(ctx *VmContext, result chan<- error) {
-		if ctx.current != StateRunning {
-			glog.V(1).Infof("container %s is already stopped, in %s", container, ctx.current)
-			result <- fmt.Errorf("container %s is already stopped", container)
-			return
-		}
-		ctx.signalProcess(container, process, signal, result)
-	}, StateRunning, StateTerminating)
+	return vm.ctx.hyperstart.SignalProcess(container, process, signal)
 }
 
 func (vm *Vm) KillContainer(container string, signal syscall.Signal) error {
@@ -381,15 +344,8 @@ func (vm *Vm) KillContainer(container string, signal syscall.Signal) error {
 }
 
 func (vm *Vm) AddRoute() error {
-	return vm.GenericOperation("AddRoute", func(ctx *VmContext, result chan<- error) {
-		routes := ctx.networks.getRoutes()
-
-		ctx.vm <- &hyperstartCmd{
-			Code:    hyperstartapi.INIT_SETUPROUTE,
-			Message: hyperstartapi.Routes{Routes: routes},
-			result:  result,
-		}
-	}, StateRunning)
+	routes := vm.ctx.networks.getRoutes()
+	return vm.ctx.hyperstart.AddRoute(routes)
 }
 
 func (vm *Vm) AddNic(info *api.InterfaceDescription) error {
@@ -407,13 +363,10 @@ func (vm *Vm) AddNic(info *api.InterfaceDescription) error {
 		return fmt.Errorf("allocate device failed")
 	}
 
-	return vm.GenericOperation("InterfaceInserted", func(ctx *VmContext, result chan<- error) {
-		if ctx.LogLevel(TRACE) {
-			glog.Infof("finial vmSpec.Interface is %#v", ctx.networks.getInterface(info.Id))
-		}
-
-		ctx.updateInterface(info.Id, result)
-	}, StateRunning)
+	if vm.ctx.LogLevel(TRACE) {
+		glog.Infof("finial vmSpec.Interface is %#v", vm.ctx.networks.getInterface(info.Id))
+	}
+	return vm.ctx.updateInterface(info.Id)
 }
 
 func (vm *Vm) DeleteNic(id string) error {
@@ -470,17 +423,7 @@ func (vm *Vm) AddMem(totalMem int) error {
 }
 
 func (vm *Vm) OnlineCpuMem() error {
-	onlineCmd := &OnlineCpuMemCommand{}
-
-	Status, err := vm.GetResponseChan()
-	if err != nil {
-		return nil
-	}
-	defer vm.ReleaseResponseChan(Status)
-
-	vm.Hub <- onlineCmd
-
-	return nil
+	return vm.ctx.hyperstart.OnlineCpuMem()
 }
 
 func (vm *Vm) HyperstartExecSync(cmd []string, stdin []byte) (stdout, stderr []byte, err error) {
@@ -549,30 +492,19 @@ func (vm *Vm) AddProcess(container, execId string, terminal bool, args []string,
 		}
 	}
 
-	execCmd := &hyperstartapi.ExecCommand{
-		Container: container,
-		Process: hyperstartapi.Process{
-			Id:       execId,
-			Terminal: terminal,
-			Args:     args,
-			Envs:     envs,
-			Workdir:  workdir,
-		},
-	}
-
-	err := vm.GenericOperation("AddProcess", func(ctx *VmContext, result chan<- error) {
-		ctx.execCmd(execId, execCmd, tty, result)
-	}, StateRunning)
+	stdinPipe, stdoutPipe, stderrPipe, err := vm.ctx.hyperstart.AddProcess(container, &hyperstartapi.Process{
+		Id:       execId,
+		Terminal: terminal,
+		Args:     args,
+		Envs:     envs,
+		Workdir:  workdir,
+	})
 
 	if err != nil {
 		return fmt.Errorf("exec command %v failed: %v", args, err)
 	}
 
-	vm.GenericOperation("StartStdin", func(ctx *VmContext, result chan<- error) {
-		ctx.ptys.startStdin(execCmd.Process.Stdio)
-		result <- nil
-	}, StateRunning)
-
+	go streamCopy(tty, stdinPipe, stdoutPipe, stderrPipe)
 	return nil
 }
 
@@ -663,41 +595,46 @@ func (vm *Vm) StartContainer(id string) error {
 	if err != nil {
 		return fmt.Errorf("Create new container failed: %v", err)
 	}
-	vm.ctx.Log(DEBUG, "container %s started, setup stdin if needed", id)
-	vm.GenericOperation("StartNewContainerStdin", func(ctx *VmContext, result chan<- error) {
-		if cc, ok := ctx.containers[id]; ok {
-			ctx.ptys.startStdin(cc.process.Stdio)
-		}
-		result <- nil
-	}, StateRunning)
 
 	vm.ctx.Log(DEBUG, "container %s start: done.", id)
 	return nil
+}
+
+type WindowSize struct {
+	Row    uint16 `json:"row"`
+	Column uint16 `json:"column"`
 }
 
 func (vm *Vm) Tty(containerId, execId string, row, column int) error {
 	if execId == "" {
 		execId = "init"
 	}
-	var ttySizeCommand = &WindowSizeCommand{
-		ContainerId: containerId,
-		ExecId:      execId,
-		Size:        &WindowSize{Row: uint16(row), Column: uint16(column)},
+	return vm.ctx.hyperstart.TtyWinResize(containerId, execId, uint16(row), uint16(column))
+}
+
+func (vm *Vm) Attach(tty *TtyIO, container string, size *WindowSize) error {
+	cmd := &AttachCommand{
+		Streams:   tty,
+		Size:      size,
+		Container: container,
 	}
 
-	vm.Hub <- ttySizeCommand
-	return nil
+	return vm.GenericOperation("Attach", func(ctx *VmContext, result chan<- error) {
+		ctx.attachCmd(cmd, result)
+	}, StateRunning)
 }
 
 func (vm *Vm) Stats() *types.PodStats {
 	ctx := vm.ctx
 
 	if ctx.current != StateRunning {
+		vm.ctx.Log(WARNING, "could not get stats from non-running pod")
 		return nil
 	}
 
 	stats, err := ctx.DCtx.Stats(ctx)
 	if err != nil {
+		vm.ctx.Log(WARNING, "failed to get stats: %v", err)
 		return nil
 	}
 	return stats
