@@ -920,19 +920,22 @@ func (c *Container) initLogger() {
 	}
 
 	if c.p.factory.logCfg.Type == jsonfilelog.Name {
+		var logdir string
+
 		if c.spec.LogPath != "" {
 			ctx.LogPath = c.spec.LogPath
+			logdir = filepath.Dir(ctx.LogPath)
 		} else {
-			prefix := c.p.factory.logCfg.PathPrefix
+			logdir = c.p.factory.logCfg.PathPrefix
 			if c.p.factory.logCfg.PodIdInPath {
-				prefix = filepath.Join(prefix, c.p.Id())
+				logdir = filepath.Join(logdir, c.p.Id())
 			}
-			if err := os.MkdirAll(prefix, os.FileMode(0755)); err != nil {
-				c.Log(ERROR, "cannot create container log dir %s: %v", prefix, err)
-				return
-			}
+			ctx.LogPath = filepath.Join(logdir, fmt.Sprintf("%s-json.log", c.Id()))
+		}
 
-			ctx.LogPath = filepath.Join(prefix, fmt.Sprintf("%s-json.log", c.Id()))
+		if err := os.MkdirAll(logdir, os.FileMode(0755)); err != nil {
+			c.Log(ERROR, "cannot create container log dir %s: %v", logdir, err)
+			return
 		}
 
 		c.Log(DEBUG, "configure container log to %s", ctx.LogPath)
