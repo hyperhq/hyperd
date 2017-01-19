@@ -330,15 +330,18 @@ func (daemon *Daemon) DestroyAndKeepVm() error {
 }
 
 func (daemon *Daemon) ReleaseAllVms() error {
-	var (
-		err error = nil
-	)
-
-	err = daemon.PodList.Foreach(func(p *pod.XPod) error {
-		return p.Dissociate()
+	var remains = []*pod.XPod{}
+	daemon.PodList.Foreach(func(p *pod.XPod) error {
+		remains = append(remains, p)
+		return nil
 	})
-
-	return err
+	for _, p := range remains {
+		glog.V(1).Infof("try to dissociate %s", p.Id())
+		if err := p.Dissociate(); err != nil {
+			glog.Warningf("fail to dissociate %s: %v", p.Id(), err)
+		}
+	}
+	return nil
 }
 
 func (daemon *Daemon) Shutdown() error {
