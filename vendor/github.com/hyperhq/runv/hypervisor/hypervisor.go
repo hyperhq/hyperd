@@ -23,6 +23,12 @@ func (ctx *VmContext) loop() {
 		glog.V(1).Infof("vm %s: main event loop got message %d(%s)", ctx.Id, ev.Event(), EventString(ev.Event()))
 		ctx.handler(ctx, ev)
 	}
+
+	// Unless the ctx.Hub channel is drained, processes sending operations can
+	// be left hanging waiting for a response. Since the handler is already
+	// gone, we return a fail to all these requests.
+
+	glog.V(1).Infof("vm %s: main event loop exiting", ctx.Id)
 }
 
 func (ctx *VmContext) handlePAEs() {

@@ -11,6 +11,10 @@ func (v *VolumeDescription) IsDir() bool {
 	return v.Format == "vfs"
 }
 
+func (v *VolumeDescription) IsNas() bool {
+	return v.Format == "nas"
+}
+
 func SandboxInfoFromOCF(s *specs.Spec) *SandboxConfig {
 	return &SandboxConfig{
 		Hostname: s.Hostname,
