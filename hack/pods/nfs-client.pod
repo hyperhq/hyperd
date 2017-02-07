@@ -1,0 +1,21 @@
+{
+  "resource": {
+    "vcpu": 1,
+    "memory": 256
+  },
+  "containers": [{
+      "image": "busybox",
+      "command": ["/bin/sh", "-c", "touch /export/foo"],
+      "volumes": [{
+	"volume": "sharevolume",
+	"path": "/export",
+	"readOnly": false
+      }]
+  }],
+  "volumes": [{
+    "name": "sharevolume",
+    "source": "NFSSERVER:/export",
+    "format": "nas",
+    "fstype": "nfs"
+  }]
+}

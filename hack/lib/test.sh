@@ -119,6 +119,23 @@ hyper::test::service() {
     hyper::test::run_attached_pod ${HYPER_ROOT}/hack/pods/service.pod
 }
 
+hyper::test::nfs_volume() {
+  echo "create nfs volume server"
+  server=$(sudo hyperctl run -d hyperhq/nfs-server-tester | sed -ne "s/POD id is \(.*\)/\1/p")
+  ip=$(sudo hyperctl exec $server ip addr |sed -ne "s|.* \(.*\)/24.*|\1|p")
+  sleep 10 # nfs-server-tester takes a bit long to init in hykins
+  echo "create nfs volume client"
+  sed -e "s/NFSSERVER/$ip/" ${HYPER_ROOT}/hack/pods/nfs-client.pod > ${HYPER_TEMP}/nfs-client.pod
+  client=$(sudo hyperctl run -p ${HYPER_TEMP}/nfs-client.pod | sed -ne "s/POD id is \(.*\)/\1/p")
+  echo "check nfs file in nfs volume: /export/foo"
+  sleep 1 # sleep a bit to let client cmd to run
+  res=$(sudo hyperctl exec $server ls /export | grep foo > /dev/null 2>&1; echo $?)
+  echo "clean up nfs client/server"
+  sudo hyperctl rm $server $client
+  echo "check result should be 0, got: $res"
+  test $res -eq 0
+}
+
 hyper::test::command() {
   id=$(sudo hyperctl run -t -d gcr.io/google_containers/etcd:2.0.9 /usr/local/bin/etcd | sed -ne "s/POD id is \(.*\)/\1/p")
   sudo hyperctl rm $id
