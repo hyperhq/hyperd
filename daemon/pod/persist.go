@@ -136,6 +136,10 @@ func (p *XPod) savePod() error {
 		return err
 	}
 
+	if err := p.saveSandbox(); err != nil {
+		return err
+	}
+
 	if err := p.savePodMeta(); err != nil {
 		return err
 	}
@@ -283,6 +287,14 @@ func (p *XPod) loadInterface(id string) error {
 	inf.descript = ix.Descript
 	p.interfaces[inf.descript.Id] = inf
 	return nil
+}
+
+func (p *XPod) saveSandbox() error {
+	var sb types.SandboxPersistInfo
+	if p.sandbox != nil {
+		// TODO: dump sandbox info from runv VM
+	}
+	return saveMessage(p.factory.db, fmt.Sprintf(SB_KEY_FMT, p.Id()), &sb, p, "sandbox info")
 }
 
 func (p *XPod) loadSandbox() error {

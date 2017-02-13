@@ -60,12 +60,13 @@ func CreateXPod(factory *PodFactory, spec *apitypes.UserPod) (*XPod, error) {
 
 	p.initPodInfo()
 
-	//TODO: write the daemon db
-	//daemon.WritePodAndContainers(pod.Id)
-
 	// reserve again in case container is created
 	err = p.reserveNames(spec.Containers)
 	if err != nil {
+		return nil, err
+	}
+
+	if err = p.savePod(); err != nil {
 		return nil, err
 	}
 
@@ -250,7 +251,7 @@ func (p *XPod) reconnectSandbox(sandboxId string, pinfo []byte) error {
 	)
 
 	if sandboxId != "" {
-		sandbox, err = associateSandbox(sandboxId)
+		sandbox, err = associateSandbox(sandboxId, pinfo)
 		if err != nil {
 			p.Log(ERROR, err)
 			sandbox = nil
