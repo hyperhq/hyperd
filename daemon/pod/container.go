@@ -436,7 +436,7 @@ func (c *Container) loadJson() *dockertypes.ContainerJSON {
 		}
 
 		n := strings.TrimLeft(rsp.Name, "/")
-		if c.spec.Name != rsp.Name {
+		if c.spec.Name != n {
 			c.Log(ERROR, "name mismatch of loaded container, loaded is %s", n)
 			c.spec.Id = ""
 			return nil
