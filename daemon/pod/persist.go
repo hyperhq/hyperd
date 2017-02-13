@@ -35,6 +35,10 @@ const (
 	IF_KEY_FMT        = "IF-%s-%s"
 )
 
+func ListAllPods(db *daemondb.DaemonDB) ([][]byte, error) {
+	return db.PrefixListKey([]byte(LAYOUT_KEY_PREFIX), nil)
+}
+
 func LoadAllPods(db *daemondb.DaemonDB) chan *types.PersistPodLayout {
 	kvchan := db.PrefixList2Chan([]byte(LAYOUT_KEY_PREFIX), nil)
 	if kvchan == nil {

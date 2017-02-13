@@ -227,8 +227,8 @@ func (d *DaemonDB) PrefixList2Chan(prefix []byte, keyFilter KeyFilter) chan *KVP
 		for iter.Next() {
 			glog.V(3).Infof("got key from leveldb %s", string(iter.Key()))
 			if keyFilter == nil || keyFilter(iter.Key()) {
-				k := make([]byte, 0, len(iter.Key()))
-				v := make([]byte, 0, len(iter.Value()))
+				k := make([]byte, len(iter.Key()))
+				v := make([]byte, len(iter.Value()))
 				copy(k, iter.Key())
 				copy(v, iter.Value())
 				ch <- &KVPair{k, v}
