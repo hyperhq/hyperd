@@ -180,7 +180,7 @@ func (p *XPod) saveGlobalSpec() error {
 
 func loadGloabalSpec(db *daemondb.DaemonDB, id string) (*types.UserPod, error) {
 	var spec types.UserPod
-	err := loadMessage(db, fmt.Sprintf(LAYOUT_KEY_FMT, id), &spec, nil, fmt.Sprintf("spec for %s", id))
+	err := loadMessage(db, fmt.Sprintf(PS_KEY_FMT, id), &spec, nil, fmt.Sprintf("spec for %s", id))
 	if err != nil {
 		return nil, err
 	}
