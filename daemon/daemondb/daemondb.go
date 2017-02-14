@@ -143,6 +143,10 @@ func (d *DaemonDB) Close() error {
 	return d.db.Close()
 }
 
+func (d *DaemonDB) Delete(key []byte) error {
+	return d.db.Delete(key, nil)
+}
+
 func (d *DaemonDB) Get(key []byte) ([]byte, error) {
 	data, err := d.db.Get(key, nil)
 	if err != nil {

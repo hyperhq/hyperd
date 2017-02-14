@@ -174,6 +174,45 @@ func (p *XPod) savePod() error {
 	return saveMessage(p.factory.db, fmt.Sprintf(LAYOUT_KEY_FMT, p.Id()), pl, p, "pod layout")
 }
 
+func (p *XPod) removeFromDB() (err error) {
+	// remove pod layout entry first.
+	if err = removeMessage(p.factory.db, fmt.Sprintf(LAYOUT_KEY_FMT, p.Id()), p, "pod layout"); err != nil {
+		return err
+	}
+
+	for _, i := range p.interfaces {
+		if err = i.removeFromDB(); err != nil {
+			return err
+		}
+	}
+
+	for _, v := range p.volumes {
+		if err = v.removeFromDB(); err != nil {
+			return err
+		}
+	}
+
+	for _, c := range p.containers {
+		if err = c.removeFromDB(); err != nil {
+			return err
+		}
+	}
+
+	if err = p.removePodMetaFromDB(); err != nil {
+		return err
+	}
+
+	if err = p.removeSandboxFromDB(); err != nil {
+		return err
+	}
+
+	if err = p.removeGlobalSpecFromDB(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (p *XPod) saveGlobalSpec() error {
 	return saveMessage(p.factory.db, fmt.Sprintf(PS_KEY_FMT, p.Id()), p.globalSpec, p, "global spec")
 }
@@ -185,6 +224,10 @@ func loadGloabalSpec(db *daemondb.DaemonDB, id string) (*types.UserPod, error) {
 		return nil, err
 	}
 	return &spec, nil
+}
+
+func (p *XPod) removeGlobalSpecFromDB() error {
+	return removeMessage(p.factory.db, fmt.Sprintf(PS_KEY_FMT, p.Id()), p, "global spec")
 }
 
 func (p *XPod) savePodMeta() error {
@@ -212,6 +255,10 @@ func (p *XPod) loadPodMeta() error {
 	p.labels = meta.Labels
 	p.services = newServices(p, meta.Services)
 	return nil
+}
+
+func (p *XPod) removePodMetaFromDB() error {
+	return removeMessage(p.factory.db, fmt.Sprintf(PM_KEY_FMT, p.Id()), p, "pod meta")
 }
 
 func (c *Container) saveContainer() error {
@@ -244,6 +291,10 @@ func (p *XPod) loadContainer(id string) error {
 	return nil
 }
 
+func (c *Container) removeFromDB() error {
+	return removeMessage(c.p.factory.db, fmt.Sprintf(CX_KEY_FMT, c.Id()), c, "container info")
+}
+
 func (v *Volume) saveVolume() error {
 	vx := &types.PersistVolume{
 		Name:     v.spec.Name,
@@ -265,6 +316,10 @@ func (p *XPod) loadVolume(id string) error {
 	v.status = S_VOLUME_CREATED
 	p.volumes[v.spec.Name] = v
 	return nil
+}
+
+func (v *Volume) removeFromDB() error {
+	return removeMessage(v.p.factory.db, fmt.Sprintf(VX_KEY_FMT, v.p.Id(), v.spec.Name), v, "volume info")
 }
 
 func (inf *Interface) saveInterface() error {
@@ -289,6 +344,10 @@ func (p *XPod) loadInterface(id string) error {
 	return nil
 }
 
+func (inf *Interface) removeFromDB() error {
+	return removeMessage(inf.p.factory.db, fmt.Sprintf(IF_KEY_FMT, inf.p.Id(), inf.descript.Id), inf, "interface info")
+}
+
 func (p *XPod) saveSandbox() error {
 	var sb types.SandboxPersistInfo
 	if p.sandbox != nil {
@@ -299,11 +358,15 @@ func (p *XPod) saveSandbox() error {
 
 func (p *XPod) loadSandbox() error {
 	var sb types.SandboxPersistInfo
-	err := loadMessage(p.factory.db, fmt.Sprintf(SB_KEY_FMT, p.Id()), &sb, p, "load sandbox info")
+	err := loadMessage(p.factory.db, fmt.Sprintf(SB_KEY_FMT, p.Id()), &sb, p, "sandbox info")
 	if err != nil {
 		return err
 	}
 	return p.reconnectSandbox(sb.Id, sb.PersistInfo)
+}
+
+func (p *XPod) removeSandboxFromDB() error {
+	return removeMessage(p.factory.db, fmt.Sprintf(SB_KEY_FMT, p.Id()), p, "sandbox info")
 }
 
 func saveMessage(db *daemondb.DaemonDB, key string, message proto.Message, owner hlog.LogOwner, op string) error {
@@ -332,5 +395,15 @@ func loadMessage(db *daemondb.DaemonDB, key string, message proto.Message, owner
 		hlog.HLog(ERROR, owner, 2, "failed to unpack loaded %s: %v", op, err)
 		return err
 	}
+	return nil
+}
+
+func removeMessage(db *daemondb.DaemonDB, key string, owner hlog.LogOwner, op string) error {
+	err := db.Delete([]byte(key))
+	if err != nil {
+		hlog.HLog(ERROR, owner, 2, "failed to remove %s: %v", op, err)
+		return err
+	}
+	hlog.HLog(DEBUG, owner, 2, "%s removed from db", op)
 	return nil
 }
