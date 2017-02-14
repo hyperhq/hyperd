@@ -213,6 +213,34 @@ func (p *XPod) removeFromDB() (err error) {
 	return nil
 }
 
+func (p *XPod) saveLayout() error {
+	var (
+		containers = make([]string, 0, len(p.containers))
+		volumes    = make([]string, 0, len(p.volumes))
+		interfaces = make([]string, 0, len(p.interfaces))
+	)
+
+	for cid := range p.containers {
+		containers = append(containers, cid)
+	}
+
+	for vid := range p.volumes {
+		volumes = append(volumes, vid)
+	}
+
+	for inf := range p.interfaces {
+		interfaces = append(interfaces, inf)
+	}
+
+	pl := &types.PersistPodLayout{
+		Id:         p.Id(),
+		Containers: containers,
+		Volumes:    volumes,
+		Interfaces: interfaces,
+	}
+	return saveMessage(p.factory.db, fmt.Sprintf(LAYOUT_KEY_FMT, p.Id()), pl, p, "pod layout")
+}
+
 func (p *XPod) saveGlobalSpec() error {
 	return saveMessage(p.factory.db, fmt.Sprintf(PS_KEY_FMT, p.Id()), p.globalSpec, p, "global spec")
 }

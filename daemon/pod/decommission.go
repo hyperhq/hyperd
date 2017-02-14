@@ -297,8 +297,22 @@ func (p *XPod) RemoveContainer(id string) error {
 		}
 	}
 
-	//TODO: remove volumes those created during container creating
-	//TODO: remove containers in daemondb daemon.db.DeleteP2C(p.Id)
+	//remove volumes from daemondb
+	for _, vName := range removedVols {
+		if v, ok := p.volumes[vName]; ok {
+			if err = v.removeFromDB(); err != nil {
+				return err
+			}
+		}
+	}
+	// remove container in daemondb.
+	if err = c.removeFromDB(); err != nil {
+		return err
+	}
+	// update layout to remove container from pod layout.
+	if err = p.saveLayout(); err != nil {
+		return err
+	}
 
 	return nil
 }
