@@ -259,8 +259,9 @@ func (daemon *Daemon) initDefaultLog(c *apitypes.HyperConfig) {
 }
 
 func (daemon *Daemon) GetPodNum() int64 {
-	pods, err := daemon.db.ListPod()
+	pods, err := pod.ListAllPods(daemon.db)
 	if err != nil {
+		glog.Errorf("fail to list pods: %v", err)
 		return 0
 	}
 	return int64(len(pods))

@@ -73,12 +73,14 @@ func (p *XPod) Remove(force bool) error {
 
 	os.RemoveAll(path.Join(utils.HYPER_ROOT, "hosts", p.Id()))
 
-	//TODO get created volumes and remove them
 	for id, c := range p.containers {
 		p.factory.registry.ReleaseContainer(id, c.SpecName())
 		p.factory.engine.ContainerRm(id, &dockertypes.ContainerRmConfig{false, false, false})
 	}
-	//TODO should remove items in daemondb:	daemon.db.DeletePod(p.Id)
+
+	//remove pod(including all containers/volumes/interfaces) in daemondb
+	p.removeFromDB()
+
 	if p.DelayDeleteOn() {
 		p.Log(DEBUG, "should wait periodical clean up")
 		p.factory.registry.Release(p.Id())
@@ -295,8 +297,22 @@ func (p *XPod) RemoveContainer(id string) error {
 		}
 	}
 
-	//TODO: remove volumes those created during container creating
-	//TODO: remove containers in daemondb daemon.db.DeleteP2C(p.Id)
+	//remove volumes from daemondb
+	for _, vName := range removedVols {
+		if v, ok := p.volumes[vName]; ok {
+			if err = v.removeFromDB(); err != nil {
+				return err
+			}
+		}
+	}
+	// remove container in daemondb.
+	if err = c.removeFromDB(); err != nil {
+		return err
+	}
+	// update layout to remove container from pod layout.
+	if err = p.saveLayout(); err != nil {
+		return err
+	}
 
 	return nil
 }

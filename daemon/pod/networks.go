@@ -51,7 +51,7 @@ func (inf *Interface) prepare() error {
 			return err
 		}
 		inf.descript = &runv.InterfaceDescription{
-			Id:     setting.IPAddress,
+			Id:     inf.spec.Ifname,
 			Lo:     false,
 			Bridge: setting.Bridge,
 			Ip:     setting.IPAddress,
