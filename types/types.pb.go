@@ -86,6 +86,8 @@ It has these top-level messages:
 	ExecCreateResponse
 	ExecStartRequest
 	ExecStartResponse
+	ExecSignalRequest
+	ExecSignalResponse
 	PodStartRequest
 	PodStartResponse
 	WaitRequest
@@ -1543,6 +1545,23 @@ func (m *ExecStartResponse) Reset()         { *m = ExecStartResponse{} }
 func (m *ExecStartResponse) String() string { return proto.CompactTextString(m) }
 func (*ExecStartResponse) ProtoMessage()    {}
 
+type ExecSignalRequest struct {
+	ContainerID string `protobuf:"bytes,1,opt,name=containerID,proto3" json:"containerID,omitempty"`
+	ExecID      string `protobuf:"bytes,2,opt,name=execID,proto3" json:"execID,omitempty"`
+	Signal      int64  `protobuf:"varint,3,opt,name=signal,proto3" json:"signal,omitempty"`
+}
+
+func (m *ExecSignalRequest) Reset()         { *m = ExecSignalRequest{} }
+func (m *ExecSignalRequest) String() string { return proto.CompactTextString(m) }
+func (*ExecSignalRequest) ProtoMessage()    {}
+
+type ExecSignalResponse struct {
+}
+
+func (m *ExecSignalResponse) Reset()         { *m = ExecSignalResponse{} }
+func (m *ExecSignalResponse) String() string { return proto.CompactTextString(m) }
+func (*ExecSignalResponse) ProtoMessage()    {}
+
 type PodStartRequest struct {
 	PodID string `protobuf:"bytes,1,opt,name=podID,proto3" json:"podID,omitempty"`
 }
@@ -2097,6 +2116,8 @@ func init() {
 	proto.RegisterType((*ExecCreateResponse)(nil), "types.ExecCreateResponse")
 	proto.RegisterType((*ExecStartRequest)(nil), "types.ExecStartRequest")
 	proto.RegisterType((*ExecStartResponse)(nil), "types.ExecStartResponse")
+	proto.RegisterType((*ExecSignalRequest)(nil), "types.ExecSignalRequest")
+	proto.RegisterType((*ExecSignalResponse)(nil), "types.ExecSignalResponse")
 	proto.RegisterType((*PodStartRequest)(nil), "types.PodStartRequest")
 	proto.RegisterType((*PodStartResponse)(nil), "types.PodStartResponse")
 	proto.RegisterType((*WaitRequest)(nil), "types.WaitRequest")
@@ -2205,6 +2226,8 @@ type PublicAPIClient interface {
 	ExecCreate(ctx context.Context, in *ExecCreateRequest, opts ...grpc.CallOption) (*ExecCreateResponse, error)
 	// ExecStart starts exec
 	ExecStart(ctx context.Context, opts ...grpc.CallOption) (PublicAPI_ExecStartClient, error)
+	// ExecSignal sends a signal to specified exec in specified container
+	ExecSignal(ctx context.Context, in *ExecSignalRequest, opts ...grpc.CallOption) (*ExecSignalResponse, error)
 	// Attach attaches to the specified container
 	Attach(ctx context.Context, opts ...grpc.CallOption) (PublicAPI_AttachClient, error)
 	// Wait gets the exit code of the specified container
@@ -2500,6 +2523,15 @@ func (x *publicAPIExecStartClient) Recv() (*ExecStartResponse, error) {
 	return m, nil
 }
 
+func (c *publicAPIClient) ExecSignal(ctx context.Context, in *ExecSignalRequest, opts ...grpc.CallOption) (*ExecSignalResponse, error) {
+	out := new(ExecSignalResponse)
+	err := grpc.Invoke(ctx, "/types.PublicAPI/ExecSignal", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *publicAPIClient) Attach(ctx context.Context, opts ...grpc.CallOption) (PublicAPI_AttachClient, error) {
 	stream, err := grpc.NewClientStream(ctx, &_PublicAPI_serviceDesc.Streams[2], c.cc, "/types.PublicAPI/Attach", opts...)
 	if err != nil {
@@ -2729,6 +2761,8 @@ type PublicAPIServer interface {
 	ExecCreate(context.Context, *ExecCreateRequest) (*ExecCreateResponse, error)
 	// ExecStart starts exec
 	ExecStart(PublicAPI_ExecStartServer) error
+	// ExecSignal sends a signal to specified exec in specified container
+	ExecSignal(context.Context, *ExecSignalRequest) (*ExecSignalResponse, error)
 	// Attach attaches to the specified container
 	Attach(PublicAPI_AttachServer) error
 	// Wait gets the exit code of the specified container
@@ -3070,6 +3104,18 @@ func (x *publicAPIExecStartServer) Recv() (*ExecStartRequest, error) {
 	return m, nil
 }
 
+func _PublicAPI_ExecSignal_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
+	in := new(ExecSignalRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	out, err := srv.(PublicAPIServer).ExecSignal(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func _PublicAPI_Attach_Handler(srv interface{}, stream grpc.ServerStream) error {
 	return srv.(PublicAPIServer).Attach(&publicAPIAttachServer{stream})
 }
@@ -3337,6 +3383,10 @@ var _PublicAPI_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ExecCreate",
 			Handler:    _PublicAPI_ExecCreate_Handler,
+		},
+		{
+			MethodName: "ExecSignal",
+			Handler:    _PublicAPI_ExecSignal_Handler,
 		},
 		{
 			MethodName: "Wait",

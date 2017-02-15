@@ -565,6 +565,14 @@ message ExecStartResponse{
     bytes stdout = 1;
 }
 
+message ExecSignalRequest{
+    string containerID      = 1;
+    string execID           = 2;
+    int64  signal           = 3;
+}
+
+message ExecSignalResponse{}
+
 message PodStartRequest {
   string podID = 1;
 }
@@ -819,6 +827,8 @@ service PublicAPI {
     rpc ExecCreate(ExecCreateRequest) returns (ExecCreateResponse) {}
     // ExecStart starts exec
     rpc ExecStart(stream ExecStartRequest) returns (stream ExecStartResponse) {}
+    // ExecSignal sends a signal to specified exec in specified container
+    rpc ExecSignal(ExecSignalRequest) returns (ExecSignalResponse) {}
     // Attach attaches to the specified container
     rpc Attach(stream AttachMessage) returns (stream AttachMessage) {}
     // Wait gets the exit code of the specified container

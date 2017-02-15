@@ -351,6 +351,21 @@ func (c *HyperClient) RemovePod(podID string) error {
 	return nil
 }
 
+// ContainerExecSignal sends signal to specified exec of specified container
+func (c *HyperClient) ContainerExecSignal(container, execID string, sig int64) error {
+	req := types.ExecSignalRequest{
+		ContainerID: container,
+		ExecID:      execID,
+		Signal:      sig,
+	}
+	_, err := c.client.ExecSignal(c.ctx, &req)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // ContainerExecCreate creates exec in a container
 func (c *HyperClient) ContainerExecCreate(container string, command []string, tty bool) (string, error) {
 	req := types.ExecCreateRequest{
