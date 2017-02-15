@@ -780,6 +780,15 @@ message ContainerSignalRequest {
 
 message ContainerSignalResponse{}
 
+message TTYResizeRequest{
+    string containerID = 1;
+    string execID      = 2;
+    int32  width       = 3;
+    int32  height      = 4;
+}
+
+message TTYResizeResponse{}
+
 // PublicAPI defines the public APIs which are handled over TCP sockets.
 service PublicAPI {
     // PodList gets a list of pods
@@ -846,7 +855,8 @@ service PublicAPI {
     rpc Attach(stream AttachMessage) returns (stream AttachMessage) {}
     // Wait gets the exit code of the specified container
     rpc Wait(WaitRequest) returns (WaitResponse) {}
-    // TODO: TTYResize resizes the tty of the specified container
+    // TTYResize resizes the tty of the specified container
+    rpc TTYResize(TTYResizeRequest) returns (TTYResizeResponse) {}
     
     // ServiceList gets a list of services
     rpc ServiceList(ServiceListRequest) returns (ServiceListResponse) {}
