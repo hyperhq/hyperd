@@ -19,6 +19,7 @@ func (pod *UserPod) Validate() error {
 		"vdi":   true,
 		"vfs":   true,
 		"rbd":   true,
+		"nas":   true,
 	}
 
 	hostnameLen := len(pod.Hostname)

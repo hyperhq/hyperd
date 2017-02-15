@@ -3,9 +3,10 @@ package hypervisor
 import (
 	"sync"
 
-	"github.com/hyperhq/runv/api"
 	"strconv"
 	"strings"
+
+	"github.com/hyperhq/runv/api"
 )
 
 type DiskDescriptor struct {
@@ -22,6 +23,10 @@ type DiskDescriptor struct {
 
 func (d *DiskDescriptor) IsDir() bool {
 	return d.Format == "vfs"
+}
+
+func (d *DiskDescriptor) IsNas() bool {
+	return d.Format == "nas"
 }
 
 type DiskContext struct {
@@ -48,6 +53,9 @@ func NewDiskContext(ctx *VmContext, vol *api.VolumeDescription) *DiskContext {
 		lock:      &sync.RWMutex{},
 	}
 	if vol.IsDir() {
+		dc.ready = true
+	} else if vol.IsNas() {
+		dc.DeviceName = vol.Source
 		dc.ready = true
 	} else if vol.Format == "rbd" {
 		dc.Options = map[string]string{
@@ -107,7 +115,7 @@ func (dc *DiskContext) remove(result chan<- api.Result) {
 		result = make(chan api.Result, 4)
 	}
 
-	if dc.IsDir() {
+	if dc.IsDir() || dc.IsNas() {
 		result <- api.NewResultBase(dc.Name, true, "no need to unplug")
 		return
 	}

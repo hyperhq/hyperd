@@ -29,7 +29,6 @@ type Vm struct {
 	Mem  int
 	Lazy bool
 
-	Hub     chan VmEvent
 	clients *Fanout
 }
 
@@ -67,7 +66,6 @@ func (vm *Vm) Launch(b *BootConfig) (err error) {
 	ctx.Launch()
 	vm.ctx = ctx
 
-	vm.Hub = vmEvent
 	vm.clients = CreateFanout(Status, 128, false)
 
 	return nil
@@ -90,7 +88,6 @@ func (vm *Vm) AssociateVm(data []byte) error {
 
 	//	go vm.handlePodEvent(mypod)
 	//
-	vm.Hub = PodEvent
 	vm.clients = CreateFanout(Status, 128, false)
 
 	//	mypod.Status = types.S_POD_RUNNING
@@ -106,20 +103,20 @@ func (vm *Vm) AssociateVm(data []byte) error {
 type matchResponse func(response *types.VmResponse) (error, bool)
 
 func (vm *Vm) WaitResponse(match matchResponse, timeout int) chan error {
-	result := make(chan error)
-	go func() {
-		var timeoutChan <-chan time.Time
-		if timeout >= 0 {
-			timeoutChan = time.After(time.Duration(timeout) * time.Second)
-		} else {
-			timeoutChan = make(chan time.Time, 1)
-		}
+	result := make(chan error, 1)
+	var timeoutChan <-chan time.Time
+	if timeout >= 0 {
+		timeoutChan = time.After(time.Duration(timeout) * time.Second)
+	} else {
+		timeoutChan = make(chan time.Time, 1)
+	}
 
-		Status, err := vm.GetResponseChan()
-		if err != nil {
-			result <- err
-			return
-		}
+	Status, err := vm.GetResponseChan()
+	if err != nil {
+		result <- err
+		return result
+	}
+	go func() {
 		defer vm.ReleaseResponseChan(Status)
 
 		for {
@@ -155,7 +152,15 @@ func (vm *Vm) ReleaseVm() error {
 	}, -1)
 
 	releasePodEvent := &ReleaseVMCommand{}
-	vm.Hub <- releasePodEvent
+
+	if vm.ctx == nil {
+		return fmt.Errorf("ReleaseVm(%s) failed: VmContext is nil", vm.Id)
+	}
+
+	if err := vm.ctx.SendVmEvent(releasePodEvent); err != nil {
+		return err
+	}
+
 	return <-result
 }
 
@@ -311,7 +316,14 @@ func (vm *Vm) Shutdown() api.Result {
 		return nil, false
 	}, -1)
 
-	vm.Hub <- &ShutdownCommand{}
+	if vm.ctx == nil {
+		return api.NewResultBase(vm.Id, false, "internal error - context == nil")
+	}
+
+	if err := vm.ctx.SendVmEvent(&ShutdownCommand{}); err != nil {
+		return api.NewResultBase(vm.Id, false, "vm context already exited")
+	}
+
 	if err := <-result; err != nil {
 		return api.NewResultBase(vm.Id, false, err.Error())
 	}
@@ -320,10 +332,7 @@ func (vm *Vm) Shutdown() api.Result {
 
 // TODO: should we provide a method to force kill vm
 func (vm *Vm) Kill() {
-	vm.GenericOperation("KillSandbox", func(ctx *VmContext, result chan<- error) {
-		ctx.poweroffVM(false, "API Kill Sandbox")
-		result <- nil
-	}, StateRunning, StateTerminating)
+	vm.ctx.poweroffVM(false, "vm.Kill()")
 }
 
 func (vm *Vm) WriteFile(container, target string, data []byte) error {
@@ -332,7 +341,6 @@ func (vm *Vm) WriteFile(container, target string, data []byte) error {
 
 func (vm *Vm) ReadFile(container, target string) ([]byte, error) {
 	return vm.ctx.hyperstart.ReadFile(container, target)
-
 }
 
 func (vm *Vm) SignalProcess(container, process string, signal syscall.Signal) error {
@@ -350,7 +358,7 @@ func (vm *Vm) AddRoute() error {
 
 func (vm *Vm) AddNic(info *api.InterfaceDescription) error {
 	client := make(chan api.Result, 1)
-	vm.SendGenericOperation("CreateInterface", func(ctx *VmContext, result chan<- error) {
+	vm.sendGenericOperation("CreateInterface", func(ctx *VmContext, result chan<- error) {
 		go ctx.AddInterface(info, client)
 	}, StateRunning)
 
@@ -371,7 +379,7 @@ func (vm *Vm) AddNic(info *api.InterfaceDescription) error {
 
 func (vm *Vm) DeleteNic(id string) error {
 	client := make(chan api.Result, 1)
-	vm.SendGenericOperation("NetDevRemovedEvent", func(ctx *VmContext, result chan<- error) {
+	vm.sendGenericOperation("NetDevRemovedEvent", func(ctx *VmContext, result chan<- error) {
 		ctx.RemoveInterface(id, client)
 	}, StateRunning)
 
@@ -703,20 +711,37 @@ func (vm *Vm) GetIPAddrs() []string {
 	return ips
 }
 
-func (vm *Vm) SendGenericOperation(name string, op func(ctx *VmContext, result chan<- error), states ...string) <-chan error {
+// sendGenericOperation queues a generic operation onto the VM's context if it
+// is in position to handle it.
+func (vm *Vm) sendGenericOperation(name string, op func(ctx *VmContext, result chan<- error), states ...string) <-chan error {
 	result := make(chan error, 1)
+
+	// Check vm context is available
+	if vm.ctx == nil {
+		result <- fmt.Errorf("sendGenericOperation(%s) failed: VmContext is nil", name)
+		return result
+	}
+
+	// Setup the generic operation
 	goe := &GenericOperation{
 		OpName: name,
 		State:  states,
 		OpFunc: op,
 		Result: result,
 	}
-	vm.Hub <- goe
+
+	// Try and send it - if we fail here, discard the channel and immediately
+	// push the failure state instead (goe isn't sent, so the result channel
+	// isn't used).
+	if err := vm.ctx.SendVmEvent(goe); err != nil {
+		result <- err
+	}
+
 	return result
 }
 
 func (vm *Vm) GenericOperation(name string, op func(ctx *VmContext, result chan<- error), states ...string) error {
-	return <-vm.SendGenericOperation(name, op, states...)
+	return <-vm.sendGenericOperation(name, op, states...)
 }
 
 func errorResponse(cause string) *types.VmResponse {
@@ -754,18 +779,23 @@ func GetVm(vmId string, b *BootConfig, waitStarted, lazy bool) (*Vm, error) {
 	}
 
 	if waitStarted {
+		glog.V(1).Info("waiting for vm to start")
 		if err := <-vm.WaitResponse(func(response *types.VmResponse) (error, bool) {
 			if response.Code == types.E_FAILED {
+				glog.Error("VM start failed")
 				return fmt.Errorf("vm start failed"), true
 			}
 			if response.Code == types.E_VM_RUNNING {
+				glog.V(1).Info("VM started successfully")
 				return nil, true
 			}
+			glog.Error("VM never started")
 			return nil, false
 		}, -1); err != nil {
 			vm.Kill()
 		}
 	}
 
+	glog.V(1).Info("GetVm succeeded (not waiting for startup)")
 	return vm, nil
 }

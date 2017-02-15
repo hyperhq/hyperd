@@ -150,6 +150,8 @@ func qmpReceiver(qmp chan QmpInteraction, wait chan int, decoder *json.Decoder) 
 
 		if msg.MessageType() == QMP_EVENT && msg.(*QmpEvent).Type == QMP_EVENT_SHUTDOWN {
 			glog.V(0).Info("Shutdown, quit QMP receiver")
+			/* After shutdown, send wait notification to close qmp channel */
+			close(wait)
 			return
 		}
 	}
