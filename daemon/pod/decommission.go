@@ -313,6 +313,10 @@ func (p *XPod) RemoveContainer(id string) error {
 	if err = p.saveLayout(); err != nil {
 		return err
 	}
+	// save sandbox change
+	if err = p.saveSandbox(); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -564,6 +568,11 @@ func (p *XPod) cleanup() {
 	if err != nil {
 		// even if error, we set the vm to be stopped
 		p.Log(ERROR, "pod stopping failed, failed to decommit the resources: %v", err)
+	}
+
+	err = p.removeSandboxFromDB()
+	if err != nil {
+		p.Log(ERROR, "pod stopping failed, failed to remove sandbox persist data: %v", err)
 	}
 
 	p.Log(DEBUG, "tag pod as stopped")

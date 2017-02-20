@@ -2,6 +2,7 @@ package pod
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/hyperhq/hypercontainer-utils/hlog"
@@ -84,29 +85,38 @@ func LoadXPod(factory *PodFactory, layout *types.PersistPodLayout) (*XPod, error
 	if err != nil {
 		return nil, err
 	}
+	// prevent using incomplete pod
+	defer func() {
+		if err != nil {
+			p.releaseNames(spec.Containers)
+		}
+	}()
 
 	for _, ix := range layout.Interfaces {
-		if err := p.loadInterface(ix); err != nil {
+		if err = p.loadInterface(ix); err != nil {
 			return nil, err
 		}
 	}
 
 	for _, vid := range layout.Volumes {
-		if err := p.loadVolume(vid); err != nil {
+		if err = p.loadVolume(vid); err != nil {
 			return nil, err
 		}
 	}
 
 	for _, cid := range layout.Containers {
-		if err := p.loadContainer(cid); err != nil {
+		if err = p.loadContainer(cid); err != nil {
 			return nil, err
 		}
 	}
 
 	err = p.loadSandbox()
 	if err != nil {
-		//remove vm from daemonDB
-		return nil, err
+		if !strings.Contains(err.Error(), "leveldb: not found") {
+			p.removeSandboxFromDB()
+			return nil, err
+		}
+		p.status = S_POD_STOPPED
 	}
 
 	err = p.loadPodMeta()
@@ -377,11 +387,28 @@ func (inf *Interface) removeFromDB() error {
 }
 
 func (p *XPod) saveSandbox() error {
-	var sb types.SandboxPersistInfo
-	if p.sandbox != nil {
-		// TODO: dump sandbox info from runv VM
+	var (
+		sb  types.SandboxPersistInfo
+		err error
+	)
+	stop_status := map[PodState]bool{
+		S_POD_NONE:     true,
+		S_POD_STOPPED:  true,
+		S_POD_STOPPING: true,
+		S_POD_ERROR:    true,
 	}
-	return saveMessage(p.factory.db, fmt.Sprintf(SB_KEY_FMT, p.Id()), &sb, p, "sandbox info")
+	p.statusLock.RLock()
+	defer p.statusLock.RUnlock()
+	if !stop_status[p.status] {
+		sb.Id = p.sandbox.Id
+		sb.PersistInfo, err = p.sandbox.Dump()
+		if err != nil {
+			hlog.HLog(ERROR, p, 2, "failed to dump sandbox %s: %v", sb.Id, err)
+			return err
+		}
+		return saveMessage(p.factory.db, fmt.Sprintf(SB_KEY_FMT, p.Id()), &sb, p, "sandbox info")
+	}
+	return nil
 }
 
 func (p *XPod) loadSandbox() error {

@@ -160,6 +160,23 @@ func (p *XPod) doContainerCreate(c *apitypes.UserContainer) (string, error) {
 		p.Log(ERROR, "error during add container resources to sandbox: %v", err)
 		return "", err
 	}
+
+	// serialize all changes to daemonDB
+	for _, vn := range nvs {
+		if err = p.volumes[vn].saveVolume(); err != nil {
+			return "", err
+		}
+	}
+	if err = pc.saveContainer(); err != nil {
+		return "", err
+	}
+	if err = p.saveLayout(); err != nil {
+		return "", err
+	}
+	if err = p.saveSandbox(); err != nil {
+		p.Log(ERROR, "error during save sandbox: %v", err)
+		return "", err
+	}
 	return pc.Id(), nil
 }
 
@@ -183,7 +200,12 @@ func (p *XPod) ContainerStart(cid string) error {
 		return err
 	}
 
-	return c.start()
+	if err = c.start(); err != nil {
+		return err
+	}
+
+	// save Sandbox state for attachID changed.
+	return p.saveSandbox()
 }
 
 // Start() means start a STOPPED pod.
@@ -214,7 +236,7 @@ func (p *XPod) Start() error {
 		return err
 	}
 
-	return nil
+	return p.saveSandbox()
 }
 
 func (p *XPod) createSandbox(spec *apitypes.UserPod) error {
