@@ -300,6 +300,10 @@ func (xd *XenDriver) SupportLazyMode() bool {
 	return false
 }
 
+func (xd *XenDriver) SupportVmSocket() bool {
+	return false
+}
+
 func diskRoutine(add bool, xc *XenContext, ctx *hypervisor.VmContext,
 	name, sourceType, filename, format string, id int, callback hypervisor.VmEvent, result chan<- hypervisor.VmEvent) {
 	backend := LIBXL_DISK_BACKEND_TAP

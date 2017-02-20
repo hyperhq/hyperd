@@ -9,9 +9,15 @@ import (
 	"github.com/hyperhq/runv/hypervisor/libvirt"
 	"github.com/hyperhq/runv/hypervisor/qemu"
 	"github.com/hyperhq/runv/hypervisor/xen"
+	"github.com/hyperhq/runv/lib/vsock"
 )
 
-func Probe(driver string) (hypervisor.HypervisorDriver, error) {
+func Probe(driver string) (hd hypervisor.HypervisorDriver, err error) {
+	defer func() {
+		if hd != nil && hypervisor.VsockCidManager == nil {
+			hypervisor.VsockCidManager = vsock.NewDefaultVsockCidAllocator()
+		}
+	}()
 	switch strings.ToLower(driver) {
 	case "libvirt":
 		ld := libvirt.InitDriver()

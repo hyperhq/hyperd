@@ -23,7 +23,7 @@ type pState struct {
 	stderrPipe io.ReadCloser
 }
 
-type serialBasedHyperstart struct {
+type jsonBasedHyperstart struct {
 	sync.RWMutex
 	vmAPIVersion       uint32
 	closed             bool
@@ -44,8 +44,8 @@ type hyperstartCmd struct {
 	result chan<- error
 }
 
-func NewSerialJsonBasedHyperstart(ctlSock, streamSock string, lastStreamSeq uint64, waitReady bool) Hyperstart {
-	h := &serialBasedHyperstart{
+func NewJsonBasedHyperstart(ctlSock, streamSock string, lastStreamSeq uint64, waitReady bool) Hyperstart {
+	h := &jsonBasedHyperstart{
 		procs:              make(map[pKey]*pState),
 		lastStreamSeq:      lastStreamSeq,
 		streamOuts:         make(map[uint64]streamOut),
@@ -58,19 +58,19 @@ func NewSerialJsonBasedHyperstart(ctlSock, streamSock string, lastStreamSeq uint
 	return h
 }
 
-func (h *serialBasedHyperstart) Close() {
+func (h *jsonBasedHyperstart) Close() {
 	h.Lock()
 	defer h.Unlock()
 	if !h.closed {
-		glog.Info("close serialBasedHyperstart")
+		glog.Info("close jsonBasedHyperstart")
 		for pk := range h.procs {
 			h.processAsyncEvents <- hyperstartapi.ProcessAsyncEvent{Container: pk.c, Process: pk.p, Event: "finished", Status: 255}
 		}
-		h.procs = nil
+		h.procs = make(map[pKey]*pState)
 		for _, out := range h.streamOuts {
 			out.Close()
 		}
-		h.streamOuts = nil
+		h.streamOuts = make(map[uint64]streamOut)
 		close(h.ctlChan)
 		close(h.streamChan)
 		close(h.processAsyncEvents)
@@ -78,11 +78,11 @@ func (h *serialBasedHyperstart) Close() {
 	}
 }
 
-func (h *serialBasedHyperstart) ProcessAsyncEvents() (<-chan hyperstartapi.ProcessAsyncEvent, error) {
+func (h *jsonBasedHyperstart) ProcessAsyncEvents() (<-chan hyperstartapi.ProcessAsyncEvent, error) {
 	return h.processAsyncEvents, nil
 }
 
-func (h *serialBasedHyperstart) LastStreamSeq() uint64 {
+func (h *jsonBasedHyperstart) LastStreamSeq() uint64 {
 	return h.lastStreamSeq
 }
 
@@ -129,9 +129,11 @@ func readVmMessage(conn io.Reader) (*hyperstartapi.DecodedMessage, error) {
 	}, nil
 }
 
-func handleCtlSock(h *serialBasedHyperstart, ctlSock string, waitReady bool) error {
-	conn, err := utils.UnixSocketConnect(ctlSock)
+func handleCtlSock(h *jsonBasedHyperstart, ctlSock string, waitReady bool) error {
+	conn, err := utils.SocketConnect(ctlSock)
 	if err != nil {
+		glog.Error("Cannot connect to ctl socket ", ctlSock, err.Error())
+		h.Close()
 		return err
 	}
 
@@ -162,7 +164,7 @@ func handleCtlSock(h *serialBasedHyperstart, ctlSock string, waitReady bool) err
 	return err
 }
 
-func (h *serialBasedHyperstart) hyperstartCommandWithRetMsg(code uint32, msg interface{}) (retMsg []byte, err error) {
+func (h *jsonBasedHyperstart) hyperstartCommandWithRetMsg(code uint32, msg interface{}) (retMsg []byte, err error) {
 	defer func() {
 		if recover() != nil {
 			err = fmt.Errorf("send ctl channel error, the hyperstart might have closed")
@@ -179,12 +181,12 @@ func (h *serialBasedHyperstart) hyperstartCommandWithRetMsg(code uint32, msg int
 	return vcmd.retMsg, err
 }
 
-func (h *serialBasedHyperstart) hyperstartCommand(code uint32, msg interface{}) error {
+func (h *jsonBasedHyperstart) hyperstartCommand(code uint32, msg interface{}) error {
 	_, err := h.hyperstartCommandWithRetMsg(code, msg)
 	return err
 }
 
-func handleMsgToHyperstart(h *serialBasedHyperstart, conn io.WriteCloser) {
+func handleMsgToHyperstart(h *jsonBasedHyperstart, conn io.WriteCloser) {
 	looping := true
 	cmds := []*hyperstartCmd{}
 
@@ -297,7 +299,7 @@ func handleMsgToHyperstart(h *serialBasedHyperstart, conn io.WriteCloser) {
 	}
 }
 
-func handleMsgFromHyperstart(h *serialBasedHyperstart, conn io.Reader) {
+func handleMsgFromHyperstart(h *jsonBasedHyperstart, conn io.Reader) {
 	for {
 		res, err := readVmMessage(conn)
 		if err == nil {
@@ -355,7 +357,7 @@ func readTtyMessage(conn io.Reader) (*hyperstartapi.TtyMessage, error) {
 	}, nil
 }
 
-func handleStreamToHyperstart(h *serialBasedHyperstart, conn io.WriteCloser) {
+func handleStreamToHyperstart(h *jsonBasedHyperstart, conn io.WriteCloser) {
 	for {
 		msg, ok := <-h.streamChan
 		if !ok {
@@ -372,10 +374,10 @@ func handleStreamToHyperstart(h *serialBasedHyperstart, conn io.WriteCloser) {
 	}
 }
 
-func handleStreamSock(h *serialBasedHyperstart, streamSock string) error {
-	conn, err := utils.UnixSocketConnect(streamSock)
+func handleStreamSock(h *jsonBasedHyperstart, streamSock string) error {
+	conn, err := utils.SocketConnect(streamSock)
 	if err != nil {
-		glog.Error("Cannot connect to stream socket ", err.Error())
+		glog.Error("Cannot connect to stream socket ", streamSock, err.Error())
 		h.Close()
 		return err
 	}
@@ -387,7 +389,7 @@ func handleStreamSock(h *serialBasedHyperstart, streamSock string) error {
 	return nil
 }
 
-func handleStreamFromHyperstart(h *serialBasedHyperstart, conn io.Reader) {
+func handleStreamFromHyperstart(h *jsonBasedHyperstart, conn io.Reader) {
 	for {
 		res, err := readTtyMessage(conn)
 		if err != nil {
@@ -423,7 +425,7 @@ func handleStreamFromHyperstart(h *serialBasedHyperstart, conn io.Reader) {
 	}
 }
 
-func (h *serialBasedHyperstart) sendProcessAsyncEvent(pae hyperstartapi.ProcessAsyncEvent) {
+func (h *jsonBasedHyperstart) sendProcessAsyncEvent(pae hyperstartapi.ProcessAsyncEvent) {
 	h.Lock()
 	defer h.Unlock()
 	pk := pKey{c: pae.Container, p: pae.Process}
@@ -433,7 +435,7 @@ func (h *serialBasedHyperstart) sendProcessAsyncEvent(pae hyperstartapi.ProcessA
 	}
 }
 
-func (h *serialBasedHyperstart) sendProcessAsyncEvent4242(stdioSeq uint64, code uint8) {
+func (h *jsonBasedHyperstart) sendProcessAsyncEvent4242(stdioSeq uint64, code uint8) {
 	h.Lock()
 	defer h.Unlock()
 	for pk, ps := range h.procs {
@@ -444,7 +446,7 @@ func (h *serialBasedHyperstart) sendProcessAsyncEvent4242(stdioSeq uint64, code 
 	}
 }
 
-func (h *serialBasedHyperstart) removeStreamOut(seq uint64) {
+func (h *jsonBasedHyperstart) removeStreamOut(seq uint64) {
 	h.Lock()
 	defer h.Unlock()
 	// simple version: delete(h.streamOuts, seq), but the serial-based hyperstart
@@ -459,7 +461,7 @@ func (h *serialBasedHyperstart) removeStreamOut(seq uint64) {
 
 type streamIn struct {
 	streamSeq uint64
-	h         *serialBasedHyperstart
+	h         *jsonBasedHyperstart
 }
 
 func (s *streamIn) Write(data []byte) (ret int, err error) {
@@ -513,7 +515,7 @@ type streamOut struct {
 	ps *pState // required for removeStreamOut()
 }
 
-func (h *serialBasedHyperstart) APIVersion() (uint32, error) {
+func (h *jsonBasedHyperstart) APIVersion() (uint32, error) {
 	retMsg, err := h.hyperstartCommandWithRetMsg(hyperstartapi.INIT_VERSION, nil)
 	if err != nil {
 		glog.Infof("get hyperstart API version error: %v\n", err)
@@ -526,7 +528,7 @@ func (h *serialBasedHyperstart) APIVersion() (uint32, error) {
 	return binary.BigEndian.Uint32(retMsg[:4]), nil
 }
 
-func (h *serialBasedHyperstart) WriteFile(container, path string, data []byte) error {
+func (h *jsonBasedHyperstart) WriteFile(container, path string, data []byte) error {
 	writeCmd, _ := json.Marshal(hyperstartapi.FileCommand{
 		Container: container,
 		File:      path,
@@ -535,18 +537,18 @@ func (h *serialBasedHyperstart) WriteFile(container, path string, data []byte) e
 	return h.hyperstartCommand(hyperstartapi.INIT_WRITEFILE, writeCmd)
 }
 
-func (h *serialBasedHyperstart) ReadFile(container, path string) ([]byte, error) {
+func (h *jsonBasedHyperstart) ReadFile(container, path string) ([]byte, error) {
 	return h.hyperstartCommandWithRetMsg(hyperstartapi.INIT_READFILE, &hyperstartapi.FileCommand{
 		Container: container,
 		File:      path,
 	})
 }
 
-func (h *serialBasedHyperstart) AddRoute(r []hyperstartapi.Route) error {
+func (h *jsonBasedHyperstart) AddRoute(r []hyperstartapi.Route) error {
 	return h.hyperstartCommand(hyperstartapi.INIT_SETUPROUTE, hyperstartapi.Routes{Routes: r})
 }
 
-func (h *serialBasedHyperstart) UpdateInterface(dev, ip, mask string) error {
+func (h *jsonBasedHyperstart) UpdateInterface(dev, ip, mask string) error {
 	return h.hyperstartCommand(hyperstartapi.INIT_SETUPINTERFACE, hyperstartapi.NetworkInf{
 		Device:    dev,
 		IpAddress: ip,
@@ -554,7 +556,7 @@ func (h *serialBasedHyperstart) UpdateInterface(dev, ip, mask string) error {
 	})
 }
 
-func (h *serialBasedHyperstart) TtyWinResize4242(container, process string, row, col uint16) error {
+func (h *jsonBasedHyperstart) TtyWinResize4242(container, process string, row, col uint16) error {
 	h.RLock()
 	p, ok := h.procs[pKey{c: container, p: process}]
 	h.RUnlock()
@@ -572,7 +574,7 @@ func (h *serialBasedHyperstart) TtyWinResize4242(container, process string, row,
 	return h.hyperstartCommand(hyperstartapi.INIT_WINSIZE, cmd)
 }
 
-func (h *serialBasedHyperstart) TtyWinResize(container, process string, row, col uint16) error {
+func (h *jsonBasedHyperstart) TtyWinResize(container, process string, row, col uint16) error {
 	if h.vmAPIVersion <= 4242 {
 		return h.TtyWinResize4242(container, process, row, col)
 	}
@@ -585,17 +587,17 @@ func (h *serialBasedHyperstart) TtyWinResize(container, process string, row, col
 	return h.hyperstartCommand(hyperstartapi.INIT_WINSIZE, cmd)
 }
 
-func (h *serialBasedHyperstart) OnlineCpuMem() error {
+func (h *jsonBasedHyperstart) OnlineCpuMem() error {
 	return h.hyperstartCommand(hyperstartapi.INIT_ONLINECPUMEM, nil)
 }
 
-func (h *serialBasedHyperstart) allocStreamSeq() uint64 {
+func (h *jsonBasedHyperstart) allocStreamSeq() uint64 {
 	seq := h.lastStreamSeq
 	h.lastStreamSeq++
 	return seq
 }
 
-func (h *serialBasedHyperstart) setupProcessIo(ps *pState, terminal bool) {
+func (h *jsonBasedHyperstart) setupProcessIo(ps *pState, terminal bool) {
 	ps.stdioSeq = h.allocStreamSeq()
 	stdoutPipe, stdout := io.Pipe() // TODO: make StreamOut nonblockable
 	ps.stdoutPipe = stdoutPipe
@@ -609,7 +611,7 @@ func (h *serialBasedHyperstart) setupProcessIo(ps *pState, terminal bool) {
 	ps.stdinPipe = streamIn{streamSeq: ps.stdioSeq, h: h}
 }
 
-func (h *serialBasedHyperstart) removeProcess(container, process string) {
+func (h *jsonBasedHyperstart) removeProcess(container, process string) {
 	h.Lock()
 	defer h.Unlock()
 	pk := pKey{c: container, p: process}
@@ -624,7 +626,7 @@ func (h *serialBasedHyperstart) removeProcess(container, process string) {
 	}
 }
 
-func (h *serialBasedHyperstart) NewContainer(c *hyperstartapi.Container) (io.WriteCloser, io.ReadCloser, io.ReadCloser, error) {
+func (h *jsonBasedHyperstart) NewContainer(c *hyperstartapi.Container) (io.WriteCloser, io.ReadCloser, io.ReadCloser, error) {
 	h.Lock()
 	if _, existed := h.procs[pKey{c: c.Id, p: c.Process.Id}]; existed {
 		h.Unlock()
@@ -645,7 +647,7 @@ func (h *serialBasedHyperstart) NewContainer(c *hyperstartapi.Container) (io.Wri
 	return &ps.stdinPipe, ps.stdoutPipe, ps.stderrPipe, err
 }
 
-func (h *serialBasedHyperstart) AddProcess(container string, p *hyperstartapi.Process) (io.WriteCloser, io.ReadCloser, io.ReadCloser, error) {
+func (h *jsonBasedHyperstart) AddProcess(container string, p *hyperstartapi.Process) (io.WriteCloser, io.ReadCloser, io.ReadCloser, error) {
 	h.Lock()
 	if _, existed := h.procs[pKey{c: container, p: p.Id}]; existed {
 		h.Unlock()
@@ -669,7 +671,7 @@ func (h *serialBasedHyperstart) AddProcess(container string, p *hyperstartapi.Pr
 	return &ps.stdinPipe, ps.stdoutPipe, ps.stderrPipe, err
 }
 
-func (h *serialBasedHyperstart) SignalProcess(container, process string, signal syscall.Signal) error {
+func (h *jsonBasedHyperstart) SignalProcess(container, process string, signal syscall.Signal) error {
 	if h.vmAPIVersion <= 4242 {
 		if process == "init" {
 			return h.hyperstartCommand(hyperstartapi.INIT_KILLCONTAINER, hyperstartapi.KillCommand{
@@ -686,10 +688,10 @@ func (h *serialBasedHyperstart) SignalProcess(container, process string, signal 
 	})
 }
 
-func (h *serialBasedHyperstart) StartSandbox(pod *hyperstartapi.Pod) error {
+func (h *jsonBasedHyperstart) StartSandbox(pod *hyperstartapi.Pod) error {
 	return h.hyperstartCommand(hyperstartapi.INIT_STARTPOD, pod)
 }
 
-func (h *serialBasedHyperstart) DestroySandbox() error {
+func (h *jsonBasedHyperstart) DestroySandbox() error {
 	return h.hyperstartCommand(hyperstartapi.INIT_DESTROYPOD, nil)
 }

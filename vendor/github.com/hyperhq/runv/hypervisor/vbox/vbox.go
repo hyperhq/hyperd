@@ -179,10 +179,10 @@ func (vc *VBoxContext) Dump() (map[string]interface{}, error) {
 	}, nil
 }
 
-func (vc *VBoxContext) Pause(ctx *hypervisor.VmContext, pause bool, result chan<- error) {
+func (vc *VBoxContext) Pause(ctx *hypervisor.VmContext, pause bool) error {
 	err := fmt.Errorf("doesn't support pause for vbox right now")
 	glog.Warning(err)
-	result <- err
+	return err
 }
 
 func (vc *VBoxContext) Shutdown(ctx *hypervisor.VmContext) {
@@ -386,16 +386,16 @@ func (vc *VBoxContext) RemoveNic(ctx *hypervisor.VmContext, n *hypervisor.Interf
 	}()
 }
 
-func (vc *VBoxContext) SetCpus(ctx *hypervisor.VmContext, cpus int, result chan<- error) {
-	result <- fmt.Errorf("SetCpus is unsupported on virtualbox driver")
+func (vc *VBoxContext) SetCpus(ctx *hypervisor.VmContext, cpus int) error {
+	return fmt.Errorf("SetCpus is unsupported on virtualbox driver")
 }
 
-func (vc *VBoxContext) AddMem(ctx *hypervisor.VmContext, slot, size int, result chan<- error) {
-	result <- fmt.Errorf("AddMem is unsupported on virtualbox driver")
+func (vc *VBoxContext) AddMem(ctx *hypervisor.VmContext, slot, size int) error {
+	return fmt.Errorf("AddMem is unsupported on virtualbox driver")
 }
 
-func (vc *VBoxContext) Save(ctx *hypervisor.VmContext, path string, result chan<- error) {
-	result <- fmt.Errorf("Save is unsupported on virtualbox driver")
+func (vc *VBoxContext) Save(ctx *hypervisor.VmContext, path string) error {
+	return fmt.Errorf("Save is unsupported on virtualbox driver")
 }
 
 // Prepare the conditions for the vm startup
@@ -441,6 +441,10 @@ func (vc *VBoxContext) detachDisk(disk string, port int) error {
 
 func (vc *VBoxDriver) SupportLazyMode() bool {
 	return true
+}
+
+func (vc *VBoxDriver) SupportVmSocket() bool {
+	return false
 }
 
 func scsiId2Name(id int) string {
