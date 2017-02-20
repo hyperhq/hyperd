@@ -34,7 +34,7 @@ func startSandbox(f factory.Factory, cpu, mem int, kernel, initrd string) (vm *h
 			Kernel: kernel,
 			Initrd: initrd,
 		}
-		vm, err = hypervisor.GetVm("", config, false, hypervisor.HDriver.SupportLazyMode())
+		vm, err = hypervisor.GetVm("", config, false)
 	}
 	if err != nil {
 		hlog.Log(ERROR, "failed to create a sandbox (cpu=%d, mem=%d kernel=%s initrd=%d): %v", cpu, mem, kernel, initrd, err)
@@ -44,8 +44,7 @@ func startSandbox(f factory.Factory, cpu, mem int, kernel, initrd string) (vm *h
 }
 
 func associateSandbox(id string, vmData []byte) (vm *hypervisor.Vm, err error) {
-	vm = hypervisor.NewVm(id, 0, 0, false)
-	err = vm.AssociateVm(vmData)
+	vm, err = hypervisor.AssociateVm(id, vmData)
 	if err != nil {
 		return nil, err
 	}

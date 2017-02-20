@@ -893,7 +893,10 @@ func (c *Container) addToSandbox() error {
 		Stdout: c.streams.Stdout(),
 		Stderr: c.streams.Stderr(),
 	}
-	c.p.sandbox.Attach(tty, c.Id(), nil)
+	if err := c.p.sandbox.Attach(tty, c.Id()); err != nil {
+		c.Log(ERROR, err)
+		return err
+	}
 
 	c.status.Created(time.Now())
 	return nil

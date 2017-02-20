@@ -24,6 +24,7 @@ type HyperConfig struct {
 	Bridge          string
 	BridgeIP        string
 	DisableIptables bool
+	EnableVsock     bool
 	DefaultLog      string
 	DefaultLogOpt   map[string]string
 
