@@ -43,14 +43,6 @@ func startSandbox(f factory.Factory, cpu, mem int, kernel, initrd string) (vm *h
 	return vm, err
 }
 
-func associateSandbox(id string, vmData []byte) (vm *hypervisor.Vm, err error) {
-	vm, err = hypervisor.AssociateVm(id, vmData)
-	if err != nil {
-		return nil, err
-	}
-	return vm, nil
-}
-
 func dissociateSandbox(sandbox *hypervisor.Vm, retry int) error {
 	if sandbox == nil {
 		return nil

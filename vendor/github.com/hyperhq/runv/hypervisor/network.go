@@ -13,6 +13,7 @@ import (
 const (
 	MAX_NIC = int(^uint(0) >> 1) // Eth is network card, while lo is alias, what's the maximum for each? same?
 	// let upper level logic care about the restriction. here is just an upbond.
+	DEFAULT_LO_DEVICE_NAME = "lo"
 )
 
 type NetworkContext struct {
@@ -89,7 +90,7 @@ func (nc *NetworkContext) addInterface(inf *api.InterfaceDescription, result cha
 		}
 		i := &InterfaceCreated{
 			Id:         inf.Id,
-			DeviceName: "lo",
+			DeviceName: DEFAULT_LO_DEVICE_NAME,
 			IpAddr:     inf.Ip,
 			NetMask:    "255.255.255.255",
 		}

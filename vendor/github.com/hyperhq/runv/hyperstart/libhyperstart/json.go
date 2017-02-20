@@ -598,12 +598,16 @@ func (h *jsonBasedHyperstart) allocStreamSeq() uint64 {
 }
 
 func (h *jsonBasedHyperstart) setupProcessIo(ps *pState, terminal bool) {
-	ps.stdioSeq = h.allocStreamSeq()
+	if ps.stdioSeq == 0 {
+		ps.stdioSeq = h.allocStreamSeq()
+	}
 	stdoutPipe, stdout := io.Pipe() // TODO: make StreamOut nonblockable
 	ps.stdoutPipe = stdoutPipe
 	h.streamOuts[ps.stdioSeq] = streamOut{WriteCloser: stdout, ps: ps}
 	if !terminal {
-		ps.stderrSeq = h.allocStreamSeq()
+		if ps.stderrSeq == 0 {
+			ps.stderrSeq = h.allocStreamSeq()
+		}
 		stderrPipe, stderr := io.Pipe()
 		ps.stderrPipe = stderrPipe
 		h.streamOuts[ps.stderrSeq] = streamOut{WriteCloser: stderr, ps: ps}
@@ -639,12 +643,35 @@ func (h *jsonBasedHyperstart) NewContainer(c *hyperstartapi.Container) (io.Write
 
 	c.Process.Stdio = ps.stdioSeq
 	c.Process.Stderr = ps.stderrSeq
+
 	err := h.hyperstartCommand(hyperstartapi.INIT_NEWCONTAINER, c)
 	if err != nil {
 		h.removeProcess(c.Id, c.Process.Id)
 		return nil, nil, nil, err
 	}
 	return &ps.stdinPipe, ps.stdoutPipe, ps.stderrPipe, err
+}
+
+func (h *jsonBasedHyperstart) RestoreContainer(c *hyperstartapi.Container) (io.WriteCloser, io.ReadCloser, io.ReadCloser, error) {
+	h.Lock()
+	defer h.Unlock()
+	if _, existed := h.procs[pKey{c: c.Id, p: c.Process.Id}]; existed {
+		return nil, nil, nil, fmt.Errorf("process id conflicts, the process of the id %s already exists", c.Process.Id)
+	}
+	// Send SIGCONT signal to init to test whether it's alive.
+	err := h.SignalProcess(c.Id, "init", syscall.SIGCONT)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("container not exist or already stopped")
+	}
+	// restore procs/streamOuts map
+	ps := &pState{
+		stdioSeq:  c.Process.Stdio,
+		stderrSeq: c.Process.Stderr,
+	}
+	h.setupProcessIo(ps, c.Process.Terminal)
+	h.procs[pKey{c: c.Id, p: c.Process.Id}] = ps
+
+	return &ps.stdinPipe, ps.stdoutPipe, ps.stderrPipe, nil
 }
 
 func (h *jsonBasedHyperstart) AddProcess(container string, p *hyperstartapi.Process) (io.WriteCloser, io.ReadCloser, io.ReadCloser, error) {

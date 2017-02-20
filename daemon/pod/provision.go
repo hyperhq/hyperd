@@ -251,7 +251,7 @@ func (p *XPod) reconnectSandbox(sandboxId string, pinfo []byte) error {
 	)
 
 	if sandboxId != "" {
-		sandbox, err = associateSandbox(sandboxId, pinfo)
+		sandbox, err = hypervisor.AssociateVm(sandboxId, pinfo)
 		if err != nil {
 			p.Log(ERROR, err)
 			sandbox = nil
