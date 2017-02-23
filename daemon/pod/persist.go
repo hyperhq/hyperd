@@ -119,6 +119,13 @@ func LoadXPod(factory *PodFactory, layout *types.PersistPodLayout) (*XPod, error
 		p.status = S_POD_STOPPED
 	}
 
+	// if sandbox is running, set all volume INSERTED
+	if p.status == S_POD_RUNNING {
+		for _, v := range p.volumes {
+			v.status = S_VOLUME_INSERTED
+		}
+	}
+
 	err = p.loadPodMeta()
 	if err != nil {
 		return nil, err
