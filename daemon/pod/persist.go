@@ -124,10 +124,12 @@ func LoadXPod(factory *PodFactory, layout *types.PersistPodLayout) (*XPod, error
 		return nil, err
 	}
 
-	//resume logging
+	//associate containers
 	if p.status == S_POD_RUNNING {
 		for _, c := range p.containers {
-			c.startLogging()
+			if err = c.associateToSandbox(); err != nil {
+				return nil, err
+			}
 		}
 	}
 

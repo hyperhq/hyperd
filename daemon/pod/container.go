@@ -902,6 +902,39 @@ func (c *Container) addToSandbox() error {
 	return nil
 }
 
+func (c *Container) associateToSandbox() error {
+	c.Log(DEBUG, "try to associate container %s to sandbox", c.Id())
+	alive, err := c.p.sandbox.AssociateContainer(c.Id())
+	if err != nil {
+		return err
+	}
+	// FIXME missing container status history here.
+	if alive {
+		c.status.State = S_CONTAINER_RUNNING
+		c.status.StartedAt = time.Now()
+	} else {
+		c.status.State = S_CONTAINER_CREATED
+		c.status.CreatedAt = time.Now()
+	}
+
+	c.streams.NewInputPipes()
+	tty := &hypervisor.TtyIO{
+		Stdin:  c.streams.Stdin(),
+		Stdout: c.streams.Stdout(),
+		Stderr: c.streams.Stderr(),
+	}
+	err = c.p.sandbox.Attach(tty, c.Id())
+	if err != nil {
+		return err
+	}
+
+	go c.waitFinish(-1)
+
+	c.startLogging()
+
+	return nil
+}
+
 func (c *Container) initLogger() {
 	if c.logger.Driver != nil {
 		return
