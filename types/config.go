@@ -63,6 +63,7 @@ func NewHyperConfig(config string) *HyperConfig {
 	driver, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "Hypervisor")
 	c.Driver = strings.ToLower(driver)
 	c.DisableIptables = cfg.MustBool(goconfig.DEFAULT_SECTION, "DisableIptables", false)
+	c.EnableVsock = cfg.MustBool(goconfig.DEFAULT_SECTION, "EnableVsock", false)
 	c.DefaultLog, _ = cfg.GetValue(goconfig.DEFAULT_SECTION, "Logger")
 	c.DefaultLogOpt, _ = cfg.GetSection("Log")
 	c.VmFactoryPolicy, _ = cfg.GetValue(goconfig.DEFAULT_SECTION, "VmFactoryPolicy")
