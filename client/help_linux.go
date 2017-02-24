@@ -26,6 +26,7 @@ Command:
   rm                     Remove one or more pods
   rmi                    Remove one or more images
   run                    Create a pod, and launch a new pod
+  save                   Save one or more images to a tar archive (streamed to STDOUT by default)
   start                  Launch a 'pending' pod
   stop                   Stop a running pod, it will become 'pending'
 
