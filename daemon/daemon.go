@@ -289,7 +289,7 @@ func (daemon *Daemon) WritePodAndContainers(podId string) error {
 		containers = append(containers, c)
 	}
 
-	return daemon.db.UpdateP2C(podId, containers)
+	return daemon.db.LagecyUpdateP2C(podId, containers)
 }
 
 func (daemon *Daemon) GetVmByPodId(podId string) (string, error) {
