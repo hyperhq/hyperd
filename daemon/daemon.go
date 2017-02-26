@@ -41,6 +41,14 @@ type Daemon struct {
 }
 
 func (daemon *Daemon) Restore() error {
+	//try to migrate lagecy data first
+	err := pod.MigrateLagecyPersistentData(daemon.db, func() *pod.PodFactory {
+		return pod.NewPodFactory(daemon.Factory, daemon.PodList, daemon.db, daemon.Storage, daemon.Daemon, daemon.DefaultLog)
+	})
+	if err != nil {
+		return err
+	}
+
 	if daemon.GetPodNum() == 0 {
 		return nil
 	}
