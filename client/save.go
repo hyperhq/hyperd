@@ -7,12 +7,15 @@ import (
 	"os"
 	"strings"
 
+	runconfigopts "github.com/docker/docker/runconfig/opts"
 	gflag "github.com/jessevdk/go-flags"
 )
 
 func (cli *HyperClient) HyperCmdSave(args ...string) error {
 	var opts struct {
-		Output string `short:"o" long:"output" value-name:"\"\"" description:"Write to a file, instead of STDOUT"`
+		Output string   `short:"o" long:"output" value-name:"\"\"" description:"Write to a file, instead of STDOUT"`
+		Format string   `short:"f" long:"format" value-name:"\"\"" description:"Specify the format of the output tar archive"`
+		Refs   []string `short:"r" long:"references" value-name:"\"\"" description:"References to use when saving an OCI image layout tar archive"`
 	}
 
 	output := cli.out
@@ -42,7 +45,7 @@ func (cli *HyperClient) HyperCmdSave(args ...string) error {
 
 	images := args
 
-	responseBody, err := cli.client.Save(images)
+	responseBody, err := cli.client.Save(images, opts.Format, runconfigopts.ConvertKVStringsToMap(opts.Refs))
 	if err != nil {
 		fmt.Fprintf(cli.err, err.Error()+"\n")
 		return err
