@@ -217,7 +217,16 @@ func (s *router) getImagesSave(ctx context.Context, w http.ResponseWriter, r *ht
 		names = r.Form["names"]
 	}
 
-	if err := s.daemon.ExportImage(names, output); err != nil {
+	format := r.FormValue("format")
+	refs := map[string]string{}
+	refsJSON := r.FormValue("refs")
+	if refsJSON != "" {
+		if err := json.NewDecoder(strings.NewReader(refsJSON)).Decode(&refs); err != nil {
+			return err
+		}
+	}
+
+	if err := s.daemon.ExportImage(names, format, refs, output); err != nil {
 		if !output.Flushed() {
 			return err
 		}
