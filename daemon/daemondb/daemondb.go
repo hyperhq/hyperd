@@ -27,38 +27,38 @@ func NewDaemonDB(db_file string) (*DaemonDB, error) {
 }
 
 // Composition Process
-func (d *DaemonDB) DeleteVMByPod(id string) error {
-	v, err := d.GetP2V(id)
+func (d *DaemonDB) LagecyDeleteVMByPod(id string) error {
+	v, err := d.LagecyGetP2V(id)
 	if err != nil {
 		return err
 	}
-	d.DeleteP2V(id)
-	if err := d.DeleteVM(v); err != nil {
+	d.LagecyDeleteP2V(id)
+	if err := d.LagecyDeleteVM(v); err != nil {
 		return err
 	}
 	return nil
 }
 
 // Pods podId and args
-func (d *DaemonDB) GetPod(id string) ([]byte, error) {
+func (d *DaemonDB) LagecyGetPod(id string) ([]byte, error) {
 	return d.Get(keyPod(id))
 }
 
-func (d *DaemonDB) UpdatePod(id string, data []byte) error {
+func (d *DaemonDB) LagecyUpdatePod(id string, data []byte) error {
 	return d.Update(keyPod(id), data)
 }
 
-func (d *DaemonDB) DeletePod(id string) error {
+func (d *DaemonDB) LagecyDeletePod(id string) error {
 	return d.db.Delete(keyPod(id), nil)
 }
 
-func (d *DaemonDB) ListPod() ([][]byte, error) {
+func (d *DaemonDB) LagecyListPod() ([][]byte, error) {
 	return d.PrefixListKey(prefixPod(), func(key []byte) bool {
 		return !strings.HasPrefix(string(key), POD_CONTAINER_PREFIX)
 	})
 }
 
-func (d *DaemonDB) GetAllPods() chan *KVPair {
+func (d *DaemonDB) LagecyGetAllPods() chan *KVPair {
 	return d.PrefixList2Chan(prefixPod(), func(key []byte) bool {
 		return !strings.HasPrefix(string(key), POD_CONTAINER_PREFIX)
 	})
@@ -86,7 +86,7 @@ func (d *DaemonDB) DeletePodVolumes(podId string) error {
 }
 
 // POD to Containers (string to string list)
-func (d *DaemonDB) GetP2C(id string) ([]string, error) {
+func (d *DaemonDB) LagecyGetP2C(id string) ([]string, error) {
 	glog.V(3).Info("try get container list for pod ", id)
 	cl, err := d.Get(keyP2C(id))
 	if err != nil || len(cl) == 0 {
@@ -95,34 +95,34 @@ func (d *DaemonDB) GetP2C(id string) ([]string, error) {
 	return strings.Split(string(cl), ":"), nil
 }
 
-func (d *DaemonDB) UpdateP2C(id string, containers []string) error {
+func (d *DaemonDB) LagecyUpdateP2C(id string, containers []string) error {
 	glog.V(3).Infof("try set container list for pod %s: %v", id, containers)
 	return d.Update(keyP2C(id), []byte(strings.Join(containers, ":")))
 }
 
-func (d *DaemonDB) DeleteP2C(id string) error {
+func (d *DaemonDB) LagecyDeleteP2C(id string) error {
 	return d.db.Delete(keyP2C(id), nil)
 }
 
 // POD to VM (string to string)
-func (d *DaemonDB) GetP2V(id string) (string, error) {
+func (d *DaemonDB) LagecyGetP2V(id string) (string, error) {
 	return d.GetString(keyP2V(id))
 }
 
-func (d *DaemonDB) UpdateP2V(id, vm string) error {
+func (d *DaemonDB) LagecyUpdateP2V(id, vm string) error {
 	return d.Update(keyP2V(id), []byte(vm))
 }
 
-func (d *DaemonDB) DeleteP2V(id string) error {
+func (d *DaemonDB) LagecyDeleteP2V(id string) error {
 	return d.db.Delete(keyP2V(id), nil)
 }
 
-func (d *DaemonDB) DeleteAllP2V() error {
+func (d *DaemonDB) LagecyDeleteAllP2V() error {
 	return d.PrefixDelete(prefixP2V())
 }
 
 // VM DATA (string to data)
-func (d *DaemonDB) GetVM(id string) ([]byte, error) {
+func (d *DaemonDB) LagecyGetVM(id string) ([]byte, error) {
 	data, err := d.db.Get(keyVMData(id), nil)
 	if err != nil {
 		return []byte(""), err
@@ -130,11 +130,11 @@ func (d *DaemonDB) GetVM(id string) ([]byte, error) {
 	return data, nil
 }
 
-func (d *DaemonDB) UpdateVM(id string, data []byte) error {
+func (d *DaemonDB) LagecyUpdateVM(id string, data []byte) error {
 	return d.Update(keyVMData(id), data)
 }
 
-func (d *DaemonDB) DeleteVM(id string) error {
+func (d *DaemonDB) LagecyDeleteVM(id string) error {
 	return d.db.Delete(keyVMData(id), nil)
 }
 
