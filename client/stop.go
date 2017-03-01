@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/hyperhq/runv/hypervisor/types"
-
 	gflag "github.com/jessevdk/go-flags"
 )
 

@@ -170,10 +170,17 @@ func (v *Volume) mount() error {
 }
 
 func (v *Volume) umount() error {
+	var err error
 	if v.descript != nil {
-		return UmountExistingVolume(v.descript.Fstype, v.descript.Source, v.p.sandboxShareDir())
+		err = UmountExistingVolume(v.descript.Fstype, v.descript.Source, v.p.sandboxShareDir())
 	}
-	return nil
+	v.Lock()
+	v.status = S_VOLUME_CREATED
+	if err != nil {
+		v.status = S_VOLUME_ERROR
+	}
+	v.Unlock()
+	return err
 }
 
 func (v *Volume) subscribeInsert(wg *utils.WaitGroupWithFail) error {

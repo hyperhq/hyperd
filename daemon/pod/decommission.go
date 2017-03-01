@@ -607,6 +607,8 @@ func (p *XPod) decommissionResources() (err error) {
 		}
 	}
 
+	p.sandbox = nil
+
 	cleanupHosts(p.Id())
 	// then it could be start again.
 	p.factory.hosts = HostsCreator(p.Id())
