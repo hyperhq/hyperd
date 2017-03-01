@@ -200,3 +200,29 @@ func (s *router) getImagesJSON(ctx context.Context, w http.ResponseWriter, r *ht
 
 	return env.WriteJSON(w, http.StatusOK)
 }
+
+func (s *router) getImagesSave(ctx context.Context, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+	if err := httputils.ParseForm(r); err != nil {
+		return err
+	}
+
+	w.Header().Set("Content-Type", "application/x-tar")
+
+	output := ioutils.NewWriteFlusher(w)
+	defer output.Close()
+	var names []string
+	if name, ok := vars["name"]; ok {
+		names = []string{name}
+	} else {
+		names = r.Form["names"]
+	}
+
+	if err := s.daemon.ExportImage(names, output); err != nil {
+		if !output.Flushed() {
+			return err
+		}
+		sf := streamformatter.NewJSONStreamFormatter()
+		output.Write(sf.FormatError(err))
+	}
+	return nil
+}

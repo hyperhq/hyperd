@@ -89,7 +89,10 @@ func (r *router) initRoutes() {
 	r.routes = []dkrouter.Route{
 		// OPTIONS
 		// GET
+		// /images/json in docker
 		NewGetRoute("/images/get", r.getImagesJSON),
+		// /images/get in docker
+		NewGetRoute("/images/save", r.getImagesSave),
 		// POST
 		NewPostRoute("/image/create", r.postImagesCreate),
 		NewPostRoute("/image/load", r.postImagesLoad),
