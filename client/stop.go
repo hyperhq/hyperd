@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/hyperhq/runv/hypervisor/types"
-
 	gflag "github.com/jessevdk/go-flags"
 )
 
@@ -40,7 +38,7 @@ func (cli *HyperClient) HyperCmdStop(args ...string) error {
 				fmt.Fprintf(cli.err, "fail to stop pod %s: %v", args[i], err)
 				continue
 			}
-			if code != types.E_VM_SHUTDOWN {
+			if code != 0 {
 				fmt.Fprintf(cli.err, "Error code is %d, cause is %s", code, cause)
 				continue
 			}
