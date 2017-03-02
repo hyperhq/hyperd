@@ -16,9 +16,11 @@ import (
 	"github.com/docker/docker/pkg/chrootarchive"
 	"github.com/docker/docker/pkg/symlink"
 	"github.com/docker/docker/reference"
+	digest "github.com/opencontainers/go-digest"
+	ociv1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-func (l *tarexporter) Load(inTar io.ReadCloser, outStream io.Writer) error {
+func (l *tarexporter) Load(inTar io.ReadCloser, name string, refs map[string]string, outStream io.Writer) error {
 	tmpDir, err := ioutil.TempDir("", "docker-import-")
 	if err != nil {
 		return err
@@ -28,6 +30,18 @@ func (l *tarexporter) Load(inTar io.ReadCloser, outStream io.Writer) error {
 	if err := chrootarchive.Untar(inTar, tmpDir, nil); err != nil {
 		return err
 	}
+
+	// check and try to load an OCI image layout
+	ociLayoutPath, err := safePath(tmpDir, "oci-layout")
+	if err != nil {
+		return err
+	}
+	ociLayoutFile, err := os.Open(ociLayoutPath)
+	if err == nil {
+		ociLayoutFile.Close()
+		return l.ociLoad(tmpDir, name, refs, outStream)
+	}
+
 	// read manifest, if no file then load in legacy mode
 	manifestPath, err := safePath(tmpDir, manifestFileName)
 	if err != nil {
@@ -47,7 +61,11 @@ func (l *tarexporter) Load(inTar io.ReadCloser, outStream io.Writer) error {
 		return err
 	}
 
-	for _, m := range manifest {
+	return l.loadHelper(tmpDir, manifest, outStream)
+}
+
+func (l *tarexporter) loadHelper(tmpDir string, manifests []manifestItem, outStream io.Writer) error {
+	for _, m := range manifests {
 		configPath, err := safePath(tmpDir, m.Config)
 		if err != nil {
 			return err
@@ -105,7 +123,6 @@ func (l *tarexporter) Load(inTar io.ReadCloser, outStream io.Writer) error {
 			}
 			l.setLoadedTag(ref, imgID, outStream)
 		}
-
 	}
 
 	return nil
@@ -137,6 +154,84 @@ func (l *tarexporter) setLoadedTag(ref reference.NamedTagged, imgID image.ID, ou
 		return err
 	}
 	return nil
+}
+
+func (l *tarexporter) ociLoad(tmpDir, name string, refs map[string]string, outStream io.Writer) error {
+	if name != "" && len(refs) != 0 {
+		return fmt.Errorf("cannot load with either name and refs")
+	}
+
+	if name == "" && len(refs) == 0 {
+		return fmt.Errorf("no OCI image name mapping provided")
+	}
+
+	var manifests []manifestItem
+	indexJSON, err := os.Open(filepath.Join(tmpDir, "index.json"))
+	if err != nil {
+		return err
+	}
+	defer indexJSON.Close()
+	index := ociv1.ImageIndex{}
+	if err := json.NewDecoder(indexJSON).Decode(&index); err != nil {
+		return err
+	}
+	for _, md := range index.Manifests {
+		if md.MediaType != ociv1.MediaTypeImageManifest {
+			continue
+		}
+		d := digest.Digest(md.Digest)
+		manifestPath := filepath.Join(tmpDir, "blobs", d.Algorithm().String(), d.Hex())
+		f, err := os.Open(manifestPath)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		man := ociv1.Manifest{}
+		if err := json.NewDecoder(f).Decode(&man); err != nil {
+			return err
+		}
+		layers := make([]string, len(man.Layers))
+		for i, l := range man.Layers {
+			layerDigest := digest.Digest(l.Digest)
+			layers[i] = filepath.Join("blobs", layerDigest.Algorithm().String(), layerDigest.Hex())
+		}
+		tag := ""
+		refName, ok := md.Annotations["org.opencontainers.ref.name"]
+		if !ok {
+			return fmt.Errorf("no ref name annotation")
+		}
+		if name != "" {
+			named, err := reference.ParseNamed(name)
+			if err != nil {
+				return err
+			}
+			withTag, err := reference.WithTag(named, refName)
+			if err != nil {
+				return err
+			}
+			tag = withTag.String()
+		} else {
+			_, rs, err := getRefs(refs)
+			if err != nil {
+				return err
+			}
+			r, ok := rs[refName]
+			if !ok {
+				return fmt.Errorf("no naming provided for %q", refName)
+			}
+			tag = r.String()
+		}
+		configDigest := digest.Digest(man.Config.Digest)
+		manifests = append(manifests, manifestItem{
+			Config:   filepath.Join("blobs", configDigest.Algorithm().String(), configDigest.Hex()),
+			RepoTags: []string{tag},
+			Layers:   layers,
+			// TODO(runcom): foreign srcs?
+			// See https://github.com/docker/docker/pull/22866/files#r96125181
+		})
+	}
+
+	return l.loadHelper(tmpDir, manifests, outStream)
 }
 
 func (l *tarexporter) legacyLoad(tmpDir string, outStream io.Writer) error {
