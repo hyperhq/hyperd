@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -17,6 +18,7 @@ import (
 	"github.com/hyperhq/hyperd/storage"
 	"github.com/hyperhq/hyperd/storage/aufs"
 	dm "github.com/hyperhq/hyperd/storage/devicemapper"
+	"github.com/hyperhq/hyperd/storage/graphdriver/rawblock"
 	"github.com/hyperhq/hyperd/storage/overlay"
 	"github.com/hyperhq/hyperd/storage/vbox"
 	apitypes "github.com/hyperhq/hyperd/types"
@@ -42,6 +44,7 @@ var StorageDrivers map[string]func(*dockertypes.Info, *daemondb.DaemonDB) (Stora
 	"devicemapper": DMFactory,
 	"aufs":         AufsFactory,
 	"overlay":      OverlayFsFactory,
+	"rawblock":     RawBlockFactory,
 	"vbox":         VBoxStorageFactory,
 }
 
@@ -397,6 +400,74 @@ func (o *OverlayFsStorage) CreateVolume(podId string, spec *apitypes.UserVolume)
 }
 
 func (o *OverlayFsStorage) RemoveVolume(podId string, record []byte) error {
+	return nil
+}
+
+type RawBlockStorage struct {
+	rootPath string
+}
+
+func RawBlockFactory(_ *dockertypes.Info, _ *daemondb.DaemonDB) (Storage, error) {
+	driver := &RawBlockStorage{
+		rootPath: filepath.Join(utils.HYPER_ROOT, "rawblock"),
+	}
+	return driver, nil
+}
+
+func (s *RawBlockStorage) Type() string {
+	return "rawblock"
+}
+
+func (s *RawBlockStorage) RootPath() string {
+	return s.rootPath
+}
+
+func (s *RawBlockStorage) Init() error {
+	if err := os.MkdirAll(filepath.Join(s.RootPath(), "volumes"), 0700); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (*RawBlockStorage) CleanUp() error { return nil }
+
+func (s *RawBlockStorage) PrepareContainer(containerId, sharedDir string) (*runv.VolumeDescription, error) {
+	devFullName := filepath.Join(s.RootPath(), "blocks", containerId)
+
+	vol := &runv.VolumeDescription{
+		Name:   devFullName,
+		Source: devFullName,
+		Fstype: "xfs",
+		Format: "raw",
+	}
+
+	return vol, nil
+}
+
+func (s *RawBlockStorage) CleanupContainer(id, sharedDir string) error {
+	return nil
+}
+
+func (s *RawBlockStorage) InjectFile(src io.Reader, mountId, target, baseDir string, perm, uid, gid int) error {
+	if err := rawblock.GetImage(filepath.Join(s.RootPath(), "blocks"), baseDir, mountId, "xfs", "", uid, gid); err != nil {
+		return err
+	}
+	defer rawblock.PutImage(baseDir, mountId)
+	return storage.FsInjectFile(src, mountId, target, baseDir, perm, uid, gid)
+}
+
+func (s *RawBlockStorage) CreateVolume(podId string, spec *apitypes.UserVolume) error {
+	block := filepath.Join(s.RootPath(), "volumes", fmt.Sprintf("%s-%s", podId, spec.Name))
+	if err := rawblock.CreateBlock(block, "xfs", "", uint64(storage.DEFAULT_DM_VOL_SIZE)); err != nil {
+		return err
+	}
+	spec.Source = block
+	spec.Fstype = "xfs"
+	spec.Format = "raw"
+	return nil
+}
+
+func (s *RawBlockStorage) RemoveVolume(podId string, record []byte) error {
 	return nil
 }
 
