@@ -40,7 +40,7 @@ type APIInterface interface {
 
 	Build(name string, hasBody bool, body io.Reader) (io.ReadCloser, string, error)
 	Commit(container, repo, author, message string, changes []string, pause bool) (string, error)
-	Load(body io.Reader) (io.ReadCloser, string, error)
+	Load(body io.Reader, name string, refs map[string]string) (io.ReadCloser, string, error)
 	Save(imageIDs []string, format string, refs map[string]string) (io.ReadCloser, error)
 	GetImages(all, quiet bool) (*engine.Env, error)
 	RemoveImage(image string, noprune, force bool) (*engine.Env, error)
