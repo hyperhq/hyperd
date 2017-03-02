@@ -12,9 +12,9 @@ before_install:
   - sudo apt-get install -y autoconf automake pkg-config libdevmapper-dev libsqlite3-dev libvirt-dev qemu libvirt-bin aufs-tools -qq
   - cd `mktemp -d`
   - mkdir -p ${GOPATH}/src/github.com/hyperhq
-  - wget https://git.fedorahosted.org/cgit/lvm2.git/snapshot/lvm2-2_02_131.tar.xz
-  - tar xf lvm2-2_02_131.tar.xz
-  - cd lvm2-2_02_131
+  - wget ftp://sources.redhat.com/pub/lvm2/LVM2.2.02.131.tgz
+  - tar xf LVM2.2.02.131.tgz
+  - cd LVM2.2.02.131
   - ./configure > /dev/null && make device-mapper > /dev/null && sudo make install > /dev/null
 
 # override the default `install`, otherwise default `install` will export ${TRAVIS_BUILD_DIR}/Godeps/_workspace as GOPATH
