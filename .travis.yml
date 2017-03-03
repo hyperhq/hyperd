@@ -9,10 +9,10 @@ go:
 env:
   - HYPER_EXEC_DRIVER=qemu    HYPER_STORAGE_DRIVER=aufs
   - HYPER_EXEC_DRIVER=qemu    HYPER_STORAGE_DRIVER=rawblock
-  - HYPER_EXEC_DRIVER=qemu    HYPER_STORAGE_DRIVER=dm
+  - HYPER_EXEC_DRIVER=qemu    HYPER_STORAGE_DRIVER=devicemapper
   - HYPER_EXEC_DRIVER=libvirt HYPER_STORAGE_DRIVER=aufs
   - HYPER_EXEC_DRIVER=libvirt HYPER_STORAGE_DRIVER=rawblock
-  - HYPER_EXEC_DRIVER=libvirt HYPER_STORAGE_DRIVER=dm
+  - HYPER_EXEC_DRIVER=libvirt HYPER_STORAGE_DRIVER=devicemapper
 
 before_install:
   - sudo apt-get update -qq
