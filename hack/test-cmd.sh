@@ -181,9 +181,10 @@ __EOF__
   stop_hyperd
 }
 
-# devicemapper storage driver takes too much time to init
 hyper_storage_drivers=(
+  "rawblock"
   "aufs"
+  "dm"
 )
 
 hyper_exec_drivers=(
@@ -191,6 +192,17 @@ hyper_exec_drivers=(
   "qemu"
   "libvirt"
 )
+
+# set hyper_exec_drivers if HYPER_EXEC_DRIVER was set
+if [ -n ${HYPER_EXEC_DRIVER+x} ]; then
+	hyper_exec_drivers=("$HYPER_EXEC_DRIVER")
+fi
+
+# set hyper_storage_drivers if HYPER_STORAGE_DRIVER was set
+if [ -n ${HYPER_STORAGE_DRIVER+x} ]; then
+	hyper_storage_drivers=("$HYPER_STORAGE_DRIVER")
+fi
+
 for sdriver in "${hyper_storage_drivers[@]}"; do
   for edriver in "${hyper_exec_drivers[@]}"; do
     runTests "${edriver}" "${sdriver}"
