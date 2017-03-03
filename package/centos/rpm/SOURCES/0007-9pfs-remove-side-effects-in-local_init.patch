@@ -1,0 +1,73 @@
+From 64784f3c6db2ca2492763d1a2419fa34291e14a6 Mon Sep 17 00:00:00 2001
+From: Greg Kurz <groug@kaod.org>
+Date: Sun, 26 Feb 2017 23:41:48 +0100
+Subject: [PATCH 07/34] 9pfs: remove side-effects in local_init()
+
+If this function fails, it should not modify *ctx.
+
+Signed-off-by: Greg Kurz <groug@kaod.org>
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+---
+ hw/9pfs/virtio-9p-local.c | 37 +++++++++++++++++++------------------
+ 1 file changed, 19 insertions(+), 18 deletions(-)
+
+diff --git a/hw/9pfs/virtio-9p-local.c b/hw/9pfs/virtio-9p-local.c
+index f1f2e25..bbad576 100644
+--- a/hw/9pfs/virtio-9p-local.c
++++ b/hw/9pfs/virtio-9p-local.c
+@@ -1168,9 +1168,25 @@ static int local_ioc_getversion(FsContext *ctx, V9fsPath *path,
+ 
+ static int local_init(FsContext *ctx)
+ {
+-    int err = 0;
+     struct statfs stbuf;
+ 
++#ifdef FS_IOC_GETVERSION
++    /*
++     * use ioc_getversion only if the ioctl is definied
++     */
++    if (statfs(ctx->fs_root, &stbuf) < 0) {
++        return -1;
++    }
++    switch (stbuf.f_type) {
++    case EXT2_SUPER_MAGIC:
++    case BTRFS_SUPER_MAGIC:
++    case REISERFS_SUPER_MAGIC:
++    case XFS_SUPER_MAGIC:
++        ctx->exops.get_st_gen = local_ioc_getversion;
++        break;
++    }
++#endif
++
+     if (ctx->export_flags & V9FS_SM_PASSTHROUGH) {
+         ctx->xops = passthrough_xattr_ops;
+     } else if (ctx->export_flags & V9FS_SM_MAPPED) {
+@@ -1185,23 +1201,8 @@ static int local_init(FsContext *ctx)
+         ctx->xops = passthrough_xattr_ops;
+     }
+     ctx->export_flags |= V9FS_PATHNAME_FSCONTEXT;
+-#ifdef FS_IOC_GETVERSION
+-    /*
+-     * use ioc_getversion only if the iocl is definied
+-     */
+-    err = statfs(ctx->fs_root, &stbuf);
+-    if (!err) {
+-        switch (stbuf.f_type) {
+-        case EXT2_SUPER_MAGIC:
+-        case BTRFS_SUPER_MAGIC:
+-        case REISERFS_SUPER_MAGIC:
+-        case XFS_SUPER_MAGIC:
+-            ctx->exops.get_st_gen = local_ioc_getversion;
+-            break;
+-        }
+-    }
+-#endif
+-    return err;
++
++    return 0;
+ }
+ 
+ static int local_parse_opts(QemuOpts *opts, struct FsDriverEntry *fse)
+-- 
+2.10.1 (Apple Git-78)
+

@@ -1,0 +1,166 @@
+From 9352c4a2e4d7ca5f9e3d7bacdca3fc23961a7107 Mon Sep 17 00:00:00 2001
+From: Greg Kurz <groug@kaod.org>
+Date: Sun, 26 Feb 2017 23:44:46 +0100
+Subject: [PATCH 30/34] 9pfs: local: symlink: don't follow symlinks
+
+The local_symlink() callback is vulnerable to symlink attacks because it
+calls:
+
+(1) symlink() which follows symbolic links for all path elements but the
+    rightmost one
+(2) open(O_NOFOLLOW) which follows symbolic links for all path elements but
+    the rightmost one
+(3) local_set_xattr()->setxattr() which follows symbolic links for all
+    path elements
+(4) local_set_mapped_file_attr() which calls in turn local_fopen() and
+    mkdir(), both functions following symbolic links for all path
+    elements but the rightmost one
+
+This patch converts local_symlink() to rely on opendir_nofollow() and
+symlinkat() to fix (1), openat(O_NOFOLLOW) to fix (2), as well as
+local_set_xattrat() and local_set_mapped_file_attrat() to fix (3) and
+(4) respectively.
+
+This partly fixes CVE-2016-9602.
+
+Signed-off-by: Greg Kurz <groug@kaod.org>
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+---
+ hw/9pfs/virtio-9p-local.c | 81 +++++++++++++++--------------------------------
+ 1 file changed, 25 insertions(+), 56 deletions(-)
+
+diff --git a/hw/9pfs/virtio-9p-local.c b/hw/9pfs/virtio-9p-local.c
+index 8e61177..c58ff0b 100644
+--- a/hw/9pfs/virtio-9p-local.c
++++ b/hw/9pfs/virtio-9p-local.c
+@@ -975,23 +975,22 @@ static int local_symlink(FsContext *fs_ctx, const char *oldpath,
+                          V9fsPath *dir_path, const char *name, FsCred *credp)
+ {
+     int err = -1;
+-    int serrno = 0;
+-    char *newpath;
+-    V9fsString fullname;
+-    char *buffer = NULL;
++    int dirfd;
+ 
+-    v9fs_string_init(&fullname);
+-    v9fs_string_sprintf(&fullname, "%s/%s", dir_path->data, name);
+-    newpath = fullname.data;
++    dirfd = local_opendir_nofollow(fs_ctx, dir_path->data);
++    if (dirfd == -1) {
++        return -1;
++    }
+ 
+     /* Determine the security model */
+-    if (fs_ctx->export_flags & V9FS_SM_MAPPED) {
++    if (fs_ctx->export_flags & V9FS_SM_MAPPED ||
++        fs_ctx->export_flags & V9FS_SM_MAPPED_FILE) {
+         int fd;
+         ssize_t oldpath_size, write_size;
+-        buffer = rpath(fs_ctx, newpath);
+-        fd = open(buffer, O_CREAT|O_EXCL|O_RDWR|O_NOFOLLOW, SM_LOCAL_MODE_BITS);
++
++        fd = openat_file(dirfd, name, O_CREAT | O_EXCL | O_RDWR,
++                         SM_LOCAL_MODE_BITS);
+         if (fd == -1) {
+-            err = fd;
+             goto out;
+         }
+         /* Write the oldpath (target) to the file. */
+@@ -999,78 +998,48 @@ static int local_symlink(FsContext *fs_ctx, const char *oldpath,
+         do {
+             write_size = write(fd, (void *)oldpath, oldpath_size);
+         } while (write_size == -1 && errno == EINTR);
++        close_preserve_errno(fd);
+ 
+         if (write_size != oldpath_size) {
+-            serrno = errno;
+-            close(fd);
+-            err = -1;
+             goto err_end;
+         }
+-        close(fd);
+         /* Set cleint credentials in symlink's xattr */
+-        credp->fc_mode = credp->fc_mode|S_IFLNK;
+-        err = local_set_xattr(buffer, credp);
+-        if (err == -1) {
+-            serrno = errno;
+-            goto err_end;
+-        }
+-    } else if (fs_ctx->export_flags & V9FS_SM_MAPPED_FILE) {
+-        int fd;
+-        ssize_t oldpath_size, write_size;
+-        buffer = rpath(fs_ctx, newpath);
+-        fd = open(buffer, O_CREAT|O_EXCL|O_RDWR|O_NOFOLLOW, SM_LOCAL_MODE_BITS);
+-        if (fd == -1) {
+-            err = fd;
+-            goto out;
+-        }
+-        /* Write the oldpath (target) to the file. */
+-        oldpath_size = strlen(oldpath);
+-        do {
+-            write_size = write(fd, (void *)oldpath, oldpath_size);
+-        } while (write_size == -1 && errno == EINTR);
++        credp->fc_mode = credp->fc_mode | S_IFLNK;
+ 
+-        if (write_size != oldpath_size) {
+-            serrno = errno;
+-            close(fd);
+-            err = -1;
+-            goto err_end;
++        if (fs_ctx->export_flags & V9FS_SM_MAPPED) {
++            err = local_set_xattrat(dirfd, name, credp);
++        } else {
++            err = local_set_mapped_file_attrat(dirfd, name, credp);
+         }
+-        close(fd);
+-        /* Set cleint credentials in symlink's xattr */
+-        credp->fc_mode = credp->fc_mode|S_IFLNK;
+-        err = local_set_mapped_file_attr(fs_ctx, newpath, credp);
+         if (err == -1) {
+-            serrno = errno;
+             goto err_end;
+         }
+-    } else if ((fs_ctx->export_flags & V9FS_SM_PASSTHROUGH) ||
+-               (fs_ctx->export_flags & V9FS_SM_NONE)) {
+-        buffer = rpath(fs_ctx, newpath);
+-        err = symlink(oldpath, buffer);
++    } else if (fs_ctx->export_flags & V9FS_SM_PASSTHROUGH ||
++               fs_ctx->export_flags & V9FS_SM_NONE) {
++        err = symlinkat(oldpath, dirfd, name);
+         if (err) {
+             goto out;
+         }
+-        err = lchown(buffer, credp->fc_uid, credp->fc_gid);
++        err = fchownat(dirfd, name, credp->fc_uid, credp->fc_gid,
++                       AT_SYMLINK_NOFOLLOW);
+         if (err == -1) {
+             /*
+              * If we fail to change ownership and if we are
+              * using security model none. Ignore the error
+              */
+             if ((fs_ctx->export_flags & V9FS_SEC_MASK) != V9FS_SM_NONE) {
+-                serrno = errno;
+                 goto err_end;
+-            } else
++            } else {
+                 err = 0;
++            }
+         }
+     }
+     goto out;
+ 
+ err_end:
+-    remove(buffer);
+-    errno = serrno;
++    unlinkat_preserve_errno(dirfd, name, 0);
+ out:
+-    g_free(buffer);
+-    v9fs_string_free(&fullname);
++    close_preserve_errno(dirfd);
+     return err;
+ }
+ 
+-- 
+2.10.1 (Apple Git-78)
+

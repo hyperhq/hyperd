@@ -1,0 +1,184 @@
+From 67dc5a880bced0a214508bdcbd68a33eb799059a Mon Sep 17 00:00:00 2001
+From: Lai Jiangshan <jiangshanlai@gmail.com>
+Date: Wed, 30 Mar 2016 12:31:08 +0800
+Subject: [PATCH 5/5] migration: add migration capability to bypass the shared
+ memory
+
+when it is used for hyper private, this capability is ignore,
+and the shared memory (share=on) is always bypassed.
+
+Signed-off-by: Lai Jiangshan <jiangshanlai@gmail.com>
+---
+ exec.c                        |  5 +++++
+ include/exec/cpu-all.h        |  2 ++
+ include/migration/migration.h |  1 +
+ migration/migration.c         | 10 ++++++++++
+ migration/ram.c               | 33 ++++++++++++++++++++++++++-------
+ qapi-schema.json              |  6 +++++-
+ qmp-commands.hx               |  2 ++
+ 7 files changed, 51 insertions(+), 8 deletions(-)
+
+diff --git a/exec.c b/exec.c
+index 756c164..9ab60b3 100644
+--- a/exec.c
++++ b/exec.c
+@@ -1334,6 +1334,11 @@ static RAMBlock *find_ram_block(ram_addr_t addr)
+     return NULL;
+ }
+ 
++bool qemu_ram_is_shared(RAMBlock *rb)
++{
++    return rb->flags & RAM_SHARED;
++}
++
+ /* Called with iothread lock held.  */
+ void qemu_ram_set_idstr(ram_addr_t addr, const char *name, DeviceState *dev)
+ {
+diff --git a/include/exec/cpu-all.h b/include/exec/cpu-all.h
+index ea6a9a6..0b5e438 100644
+--- a/include/exec/cpu-all.h
++++ b/include/exec/cpu-all.h
+@@ -300,6 +300,8 @@ static inline void *ramblock_ptr(RAMBlock *block, ram_addr_t offset)
+     return (char *)block->host + offset;
+ }
+ 
++bool qemu_ram_is_shared(RAMBlock *rb);
++
+ typedef struct RAMList {
+     QemuMutex mutex;
+     /* Protected by the iothread lock.  */
+diff --git a/include/migration/migration.h b/include/migration/migration.h
+index 8334621..c6e1dd3 100644
+--- a/include/migration/migration.h
++++ b/include/migration/migration.h
+@@ -178,6 +178,7 @@ int migrate_compress_level(void);
+ int migrate_compress_threads(void);
+ int migrate_decompress_threads(void);
+ bool migrate_use_events(void);
++bool migrate_bypass_shared_memory(void);
+ 
+ void ram_control_before_iterate(QEMUFile *f, uint64_t flags);
+ void ram_control_after_iterate(QEMUFile *f, uint64_t flags);
+diff --git a/migration/migration.c b/migration/migration.c
+index c4a7d0b..a4eeb3f 100644
+--- a/migration/migration.c
++++ b/migration/migration.c
+@@ -227,6 +227,16 @@ static void migrate_generate_event(int new_state)
+     }
+ }
+ 
++#define HYPER_PRIVATE true
++bool migrate_bypass_shared_memory(void)
++{
++    MigrationState *s;
++
++    s = migrate_get_current();
++
++    return HYPER_PRIVATE || s->enabled_capabilities[MIGRATION_CAPABILITY_BYPASS_SHARED_MEMORY];
++}
++
+ /*
+  * Called on -incoming with a defer: uri.
+  * The migration can be started later after any parameters have been
+diff --git a/migration/ram.c b/migration/ram.c
+index 7f007e6..0781e39 100644
+--- a/migration/ram.c
++++ b/migration/ram.c
+@@ -546,6 +546,28 @@ static void migration_bitmap_sync_init(void)
+     num_dirty_pages_period = 0;
+     xbzrle_cache_miss_prev = 0;
+     iterations_prev = 0;
++    migration_dirty_pages = 0;
++}
++
++static void migration_bitmap_init(unsigned long *bitmap)
++{
++    RAMBlock *block;
++
++    bitmap_clear(bitmap, 0, last_ram_offset() >> TARGET_PAGE_BITS);
++    rcu_read_lock();
++    QLIST_FOREACH_RCU(block, &ram_list.blocks, next) {
++        if (!migrate_bypass_shared_memory() || !qemu_ram_is_shared(block)) {
++            bitmap_set(bitmap, block->offset >> TARGET_PAGE_BITS,
++                       block->used_length >> TARGET_PAGE_BITS);
++
++            /*
++             * Count the total number of pages used by ram blocks not including
++             * any gaps due to alignment or unplugs.
++             */
++	    migration_dirty_pages += block->used_length >> TARGET_PAGE_BITS;
++	}
++    }
++    rcu_read_unlock();
+ }
+ 
+ /* Called with iothread lock held, to protect ram_list.dirty_memory[] */
+@@ -573,7 +595,9 @@ static void migration_bitmap_sync(void)
+     qemu_mutex_lock(&migration_bitmap_mutex);
+     rcu_read_lock();
+     QLIST_FOREACH_RCU(block, &ram_list.blocks, next) {
+-        migration_bitmap_sync_range(block->mr->ram_addr, block->used_length);
++        if (!migrate_bypass_shared_memory() || !qemu_ram_is_shared(block)) {
++            migration_bitmap_sync_range(block->offset, block->used_length);
++        }
+     }
+     rcu_read_unlock();
+     qemu_mutex_unlock(&migration_bitmap_mutex);
+@@ -1147,12 +1171,7 @@ static int ram_save_setup(QEMUFile *f, void *opaque)
+     ram_bitmap_pages = last_ram_offset() >> TARGET_PAGE_BITS;
+     migration_bitmap = bitmap_new(ram_bitmap_pages);
+     bitmap_set(migration_bitmap, 0, ram_bitmap_pages);
+-
+-    /*
+-     * Count the total number of pages used by ram blocks not including any
+-     * gaps due to alignment or unplugs.
+-     */
+-    migration_dirty_pages = ram_bytes_total() >> TARGET_PAGE_BITS;
++    migration_bitmap_init(migration_bitmap);
+ 
+     memory_global_dirty_log_start();
+     migration_bitmap_sync();
+diff --git a/qapi-schema.json b/qapi-schema.json
+index 4342a08..ca34058 100644
+--- a/qapi-schema.json
++++ b/qapi-schema.json
+@@ -529,11 +529,15 @@
+ # @auto-converge: If enabled, QEMU will automatically throttle down the guest
+ #          to speed up convergence of RAM migration. (since 1.6)
+ #
++# @bypass-shared-memory: the shared memory region will be bypassed on migration.
++#          This feature allows the memory region to be reused by new qemu(s)
++#          or be migrated separately. (since 2.6)
++#
+ # Since: 1.2
+ ##
+ { 'enum': 'MigrationCapability',
+   'data': ['xbzrle', 'rdma-pin-all', 'auto-converge', 'zero-blocks',
+-           'compress', 'events'] }
++           'compress', 'events', 'bypass-shared-memory'] }
+ 
+ ##
+ # @MigrationCapabilityStatus
+diff --git a/qmp-commands.hx b/qmp-commands.hx
+index ba630b1..81b3f1c 100644
+--- a/qmp-commands.hx
++++ b/qmp-commands.hx
+@@ -3407,6 +3407,7 @@ Enable/Disable migration capabilities
+ - "auto-converge": throttle down guest to help convergence of migration
+ - "zero-blocks": compress zero blocks during block migration
+ - "events": generate events for each migration state change
++- "bypass-shared-memory": bypass shared memory region
+ 
+ Arguments:
+ 
+@@ -3434,6 +3435,7 @@ Query current migration capabilities
+          - "rdma-pin-all" : RDMA Pin Page state (json-bool)
+          - "auto-converge" : Auto Converge state (json-bool)
+          - "zero-blocks" : Zero Blocks state (json-bool)
++         - "bypass-shared-memory": bypass shared memory state (json-bool)
+ 
+ Arguments:
+ 
+-- 
+2.5.4 (Apple Git-61)
+

@@ -1,0 +1,125 @@
+From 6d791c4bcc6c9c33d21c6dda70aa4f4a47eb59de Mon Sep 17 00:00:00 2001
+From: Greg Kurz <groug@kaod.org>
+Date: Sun, 26 Feb 2017 23:45:02 +0100
+Subject: [PATCH 32/34] 9pfs: local: mkdir: don't follow symlinks
+
+The local_mkdir() callback is vulnerable to symlink attacks because it
+calls:
+
+(1) mkdir() which follows symbolic links for all path elements but the
+    rightmost one
+(2) local_set_xattr()->setxattr() which follows symbolic links for all
+    path elements
+(3) local_set_mapped_file_attr() which calls in turn local_fopen() and
+    mkdir(), both functions following symbolic links for all path
+    elements but the rightmost one
+(4) local_post_create_passthrough() which calls in turn lchown() and
+    chmod(), both functions also following symbolic links
+
+This patch converts local_mkdir() to rely on opendir_nofollow() and
+mkdirat() to fix (1), as well as local_set_xattrat(),
+local_set_mapped_file_attrat() and local_set_cred_passthrough() to
+fix (2), (3) and (4) respectively.
+
+The mapped and mapped-file security modes are supposed to be identical,
+except for the place where credentials and file modes are stored. While
+here, we also make that explicit by sharing the call to mkdirat().
+
+This partly fixes CVE-2016-9602.
+
+Signed-off-by: Greg Kurz <groug@kaod.org>
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+---
+ hw/9pfs/virtio-9p-local.c | 55 +++++++++++++++++------------------------------
+ 1 file changed, 20 insertions(+), 35 deletions(-)
+
+diff --git a/hw/9pfs/virtio-9p-local.c b/hw/9pfs/virtio-9p-local.c
+index 6f648c3..bc2f86f 100644
+--- a/hw/9pfs/virtio-9p-local.c
++++ b/hw/9pfs/virtio-9p-local.c
+@@ -796,62 +796,47 @@ out:
+ static int local_mkdir(FsContext *fs_ctx, V9fsPath *dir_path,
+                        const char *name, FsCred *credp)
+ {
+-    char *path;
+     int err = -1;
+-    int serrno = 0;
+-    V9fsString fullname;
+-    char *buffer = NULL;
++    int dirfd;
+ 
+-    v9fs_string_init(&fullname);
+-    v9fs_string_sprintf(&fullname, "%s/%s", dir_path->data, name);
+-    path = fullname.data;
++    dirfd = local_opendir_nofollow(fs_ctx, dir_path->data);
++    if (dirfd == -1) {
++        return -1;
++    }
+ 
+-    /* Determine the security model */
+-    if (fs_ctx->export_flags & V9FS_SM_MAPPED) {
+-        buffer = rpath(fs_ctx, path);
+-        err = mkdir(buffer, SM_LOCAL_DIR_MODE_BITS);
++    if (fs_ctx->export_flags & V9FS_SM_MAPPED ||
++        fs_ctx->export_flags & V9FS_SM_MAPPED_FILE) {
++        err = mkdirat(dirfd, name, SM_LOCAL_DIR_MODE_BITS);
+         if (err == -1) {
+             goto out;
+         }
+-        credp->fc_mode = credp->fc_mode|S_IFDIR;
+-        err = local_set_xattr(buffer, credp);
+-        if (err == -1) {
+-            serrno = errno;
+-            goto err_end;
+-        }
+-    } else if (fs_ctx->export_flags & V9FS_SM_MAPPED_FILE) {
+-        buffer = rpath(fs_ctx, path);
+-        err = mkdir(buffer, SM_LOCAL_DIR_MODE_BITS);
+-        if (err == -1) {
+-            goto out;
++        credp->fc_mode = credp->fc_mode | S_IFDIR;
++
++        if (fs_ctx->export_flags & V9FS_SM_MAPPED) {
++            err = local_set_xattrat(dirfd, name, credp);
++        } else {
++            err = local_set_mapped_file_attrat(dirfd, name, credp);
+         }
+-        credp->fc_mode = credp->fc_mode|S_IFDIR;
+-        err = local_set_mapped_file_attr(fs_ctx, path, credp);
+         if (err == -1) {
+-            serrno = errno;
+             goto err_end;
+         }
+-    } else if ((fs_ctx->export_flags & V9FS_SM_PASSTHROUGH) ||
+-               (fs_ctx->export_flags & V9FS_SM_NONE)) {
+-        buffer = rpath(fs_ctx, path);
+-        err = mkdir(buffer, credp->fc_mode);
++    } else if (fs_ctx->export_flags & V9FS_SM_PASSTHROUGH ||
++               fs_ctx->export_flags & V9FS_SM_NONE) {
++        err = mkdirat(dirfd, name, credp->fc_mode);
+         if (err == -1) {
+             goto out;
+         }
+-        err = local_post_create_passthrough(fs_ctx, path, credp);
++        err = local_set_cred_passthrough(fs_ctx, dirfd, name, credp);
+         if (err == -1) {
+-            serrno = errno;
+             goto err_end;
+         }
+     }
+     goto out;
+ 
+ err_end:
+-    remove(buffer);
+-    errno = serrno;
++    unlinkat_preserve_errno(dirfd, name, AT_REMOVEDIR);
+ out:
+-    g_free(buffer);
+-    v9fs_string_free(&fullname);
++    close_preserve_errno(dirfd);
+     return err;
+ }
+ 
+-- 
+2.10.1 (Apple Git-78)
+

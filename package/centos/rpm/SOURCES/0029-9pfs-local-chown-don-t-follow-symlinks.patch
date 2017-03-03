@@ -1,0 +1,76 @@
+From 01a1bb03c1576b8b1bc9d13d8b5916575327ee0c Mon Sep 17 00:00:00 2001
+From: Greg Kurz <groug@kaod.org>
+Date: Sun, 26 Feb 2017 23:44:37 +0100
+Subject: [PATCH 29/34] 9pfs: local: chown: don't follow symlinks
+
+The local_chown() callback is vulnerable to symlink attacks because it
+calls:
+
+(1) lchown() which follows symbolic links for all path elements but the
+    rightmost one
+(2) local_set_xattr()->setxattr() which follows symbolic links for all
+    path elements
+(3) local_set_mapped_file_attr() which calls in turn local_fopen() and
+    mkdir(), both functions following symbolic links for all path
+    elements but the rightmost one
+
+This patch converts local_chown() to rely on open_nofollow() and
+fchownat() to fix (1), as well as local_set_xattrat() and
+local_set_mapped_file_attrat() to fix (2) and (3) respectively.
+
+This partly fixes CVE-2016-9602.
+
+Signed-off-by: Greg Kurz <groug@kaod.org>
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+---
+ hw/9pfs/virtio-9p-local.c | 26 +++++++++++++++++---------
+ 1 file changed, 17 insertions(+), 9 deletions(-)
+
+diff --git a/hw/9pfs/virtio-9p-local.c b/hw/9pfs/virtio-9p-local.c
+index 33f92d1..8e61177 100644
+--- a/hw/9pfs/virtio-9p-local.c
++++ b/hw/9pfs/virtio-9p-local.c
+@@ -1157,23 +1157,31 @@ static int local_truncate(FsContext *ctx, V9fsPath *fs_path, off_t size)
+ 
+ static int local_chown(FsContext *fs_ctx, V9fsPath *fs_path, FsCred *credp)
+ {
+-    char *buffer;
++    char *dirpath = g_path_get_dirname(fs_path->data);
++    char *name = g_path_get_basename(fs_path->data);
+     int ret = -1;
+-    char *path = fs_path->data;
++    int dirfd;
++
++    dirfd = local_opendir_nofollow(fs_ctx, dirpath);
++    if (dirfd == -1) {
++        goto out;
++    }
+ 
+     if ((credp->fc_uid == -1 && credp->fc_gid == -1) ||
+         (fs_ctx->export_flags & V9FS_SM_PASSTHROUGH) ||
+         (fs_ctx->export_flags & V9FS_SM_NONE)) {
+-        buffer = rpath(fs_ctx, path);
+-        ret = lchown(buffer, credp->fc_uid, credp->fc_gid);
+-        g_free(buffer);
++        ret = fchownat(dirfd, name, credp->fc_uid, credp->fc_gid,
++                       AT_SYMLINK_NOFOLLOW);
+     } else if (fs_ctx->export_flags & V9FS_SM_MAPPED) {
+-        buffer = rpath(fs_ctx, path);
+-        ret = local_set_xattr(buffer, credp);
+-        g_free(buffer);
++        ret = local_set_xattrat(dirfd, name, credp);
+     } else if (fs_ctx->export_flags & V9FS_SM_MAPPED_FILE) {
+-        return local_set_mapped_file_attr(fs_ctx, path, credp);
++        ret = local_set_mapped_file_attrat(dirfd, name, credp);
+     }
++
++    close_preserve_errno(dirfd);
++out:
++    g_free(name);
++    g_free(dirpath);
+     return ret;
+ }
+ 
+-- 
+2.10.1 (Apple Git-78)
+

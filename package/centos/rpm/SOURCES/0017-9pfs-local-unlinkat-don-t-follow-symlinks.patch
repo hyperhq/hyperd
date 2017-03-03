@@ -1,0 +1,148 @@
+From 33a5cbab04461fdced9870455a2458c04f9c3c4d Mon Sep 17 00:00:00 2001
+From: Greg Kurz <groug@kaod.org>
+Date: Sun, 26 Feb 2017 23:43:00 +0100
+Subject: [PATCH 17/34] 9pfs: local: unlinkat: don't follow symlinks
+
+The local_unlinkat() callback is vulnerable to symlink attacks because it
+calls remove() which follows symbolic links in all path elements but the
+rightmost one.
+
+This patch converts local_unlinkat() to rely on opendir_nofollow() and
+unlinkat() instead.
+
+Most of the code is moved to a separate local_unlinkat_common() helper
+which will be reused in a subsequent patch to fix the same issue in
+local_remove().
+
+This partly fixes CVE-2016-9602.
+
+Signed-off-by: Greg Kurz <groug@kaod.org>
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+---
+ hw/9pfs/virtio-9p-local.c | 99 +++++++++++++++++++++++++++--------------------
+ 1 file changed, 56 insertions(+), 43 deletions(-)
+
+diff --git a/hw/9pfs/virtio-9p-local.c b/hw/9pfs/virtio-9p-local.c
+index c78bbfa..d358460 100644
+--- a/hw/9pfs/virtio-9p-local.c
++++ b/hw/9pfs/virtio-9p-local.c
+@@ -966,6 +966,56 @@ static int local_utimensat(FsContext *s, V9fsPath *fs_path,
+     return ret;
+ }
+ 
++static int local_unlinkat_common(FsContext *ctx, int dirfd, const char *name,
++                                 int flags)
++{
++    int ret = -1;
++
++    if (ctx->export_flags & V9FS_SM_MAPPED_FILE) {
++        int map_dirfd;
++
++        if (flags == AT_REMOVEDIR) {
++            int fd;
++
++            fd = openat(dirfd, name, O_RDONLY | O_DIRECTORY | O_PATH);
++            if (fd == -1) {
++                goto err_out;
++            }
++            /*
++             * If directory remove .virtfs_metadata contained in the
++             * directory
++             */
++            ret = unlinkat(fd, VIRTFS_META_DIR, AT_REMOVEDIR);
++            close_preserve_errno(fd);
++            if (ret < 0 && errno != ENOENT) {
++                /*
++                 * We didn't had the .virtfs_metadata file. May be file created
++                 * in non-mapped mode ?. Ignore ENOENT.
++                 */
++                goto err_out;
++            }
++        }
++        /*
++         * Now remove the name from parent directory
++         * .virtfs_metadata directory.
++         */
++        map_dirfd = openat_dir(dirfd, VIRTFS_META_DIR);
++        ret = unlinkat(map_dirfd, name, 0);
++        close_preserve_errno(map_dirfd);
++        if (ret < 0 && errno != ENOENT) {
++            /*
++             * We didn't had the .virtfs_metadata file. May be file created
++             * in non-mapped mode ?. Ignore ENOENT.
++             */
++            goto err_out;
++        }
++    }
++
++    ret = unlinkat(dirfd, name, flags);
++err_out:
++    return ret;
++}
++
+ static int local_remove(FsContext *ctx, const char *path)
+ {
+     int err;
+@@ -1118,52 +1168,15 @@ static int local_unlinkat(FsContext *ctx, V9fsPath *dir,
+                           const char *name, int flags)
+ {
+     int ret;
+-    V9fsString fullname;
+-    char *buffer;
+-
+-    v9fs_string_init(&fullname);
++    int dirfd;
+ 
+-    v9fs_string_sprintf(&fullname, "%s/%s", dir->data, name);
+-    if (ctx->export_flags & V9FS_SM_MAPPED_FILE) {
+-        if (flags == AT_REMOVEDIR) {
+-            /*
+-             * If directory remove .virtfs_metadata contained in the
+-             * directory
+-             */
+-            buffer = g_strdup_printf("%s/%s/%s", ctx->fs_root,
+-                                     fullname.data, VIRTFS_META_DIR);
+-            ret = remove(buffer);
+-            g_free(buffer);
+-            if (ret < 0 && errno != ENOENT) {
+-                /*
+-                 * We didn't had the .virtfs_metadata file. May be file created
+-                 * in non-mapped mode ?. Ignore ENOENT.
+-                 */
+-                goto err_out;
+-            }
+-        }
+-        /*
+-         * Now remove the name from parent directory
+-         * .virtfs_metadata directory.
+-         */
+-        buffer = local_mapped_attr_path(ctx, fullname.data);
+-        ret = remove(buffer);
+-        g_free(buffer);
+-        if (ret < 0 && errno != ENOENT) {
+-            /*
+-             * We didn't had the .virtfs_metadata file. May be file created
+-             * in non-mapped mode ?. Ignore ENOENT.
+-             */
+-            goto err_out;
+-        }
++    dirfd = local_opendir_nofollow(ctx, dir->data);
++    if (dirfd == -1) {
++        return -1;
+     }
+-    /* Remove the name finally */
+-    buffer = rpath(ctx, fullname.data);
+-    ret = remove(buffer);
+-    g_free(buffer);
+ 
+-err_out:
+-    v9fs_string_free(&fullname);
++    ret = local_unlinkat_common(ctx, dirfd, name, flags);
++    close_preserve_errno(dirfd);
+     return ret;
+ }
+ 
+-- 
+2.10.1 (Apple Git-78)
+

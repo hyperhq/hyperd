@@ -1,0 +1,57 @@
+From 47b016867f35e708be42e90f081627473e13c9cb Mon Sep 17 00:00:00 2001
+From: Greg Kurz <groug@kaod.org>
+Date: Sun, 26 Feb 2017 23:43:17 +0100
+Subject: [PATCH 19/34] 9pfs: local: utimensat: don't follow symlinks
+
+The local_utimensat() callback is vulnerable to symlink attacks because it
+calls qemu_utimens()->utimensat(AT_SYMLINK_NOFOLLOW) which follows symbolic
+links in all path elements but the rightmost one or qemu_utimens()->utimes()
+which follows symbolic links for all path elements.
+
+This patch converts local_utimensat() to rely on opendir_nofollow() and
+utimensat(AT_SYMLINK_NOFOLLOW) directly instead of using qemu_utimens().
+It is hence assumed that the OS supports utimensat(), i.e. has glibc 2.6
+or higher and linux 2.6.22 or higher, which seems reasonable nowadays.
+
+This partly fixes CVE-2016-9602.
+
+Signed-off-by: Greg Kurz <groug@kaod.org>
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+---
+ hw/9pfs/virtio-9p-local.c | 19 +++++++++++++------
+ 1 file changed, 13 insertions(+), 6 deletions(-)
+
+diff --git a/hw/9pfs/virtio-9p-local.c b/hw/9pfs/virtio-9p-local.c
+index cb724b4..5841fbd 100644
+--- a/hw/9pfs/virtio-9p-local.c
++++ b/hw/9pfs/virtio-9p-local.c
+@@ -956,13 +956,20 @@ static int local_chown(FsContext *fs_ctx, V9fsPath *fs_path, FsCred *credp)
+ static int local_utimensat(FsContext *s, V9fsPath *fs_path,
+                            const struct timespec *buf)
+ {
+-    char *buffer;
+-    int ret;
+-    char *path = fs_path->data;
++    char *dirpath = g_path_get_dirname(fs_path->data);
++    char *name = g_path_get_basename(fs_path->data);
++    int dirfd, ret = -1;
+ 
+-    buffer = rpath(s, path);
+-    ret = qemu_utimens(buffer, buf);
+-    g_free(buffer);
++    dirfd = local_opendir_nofollow(s, dirpath);
++    if (dirfd == -1) {
++        goto out;
++    }
++
++    ret = utimensat(dirfd, name, buf, AT_SYMLINK_NOFOLLOW);
++    close_preserve_errno(dirfd);
++out:
++    g_free(dirpath);
++    g_free(name);
+     return ret;
+ }
+ 
+-- 
+2.10.1 (Apple Git-78)
+

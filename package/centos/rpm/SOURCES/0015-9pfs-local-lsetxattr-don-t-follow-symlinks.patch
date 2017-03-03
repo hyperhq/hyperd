@@ -1,0 +1,174 @@
+From ad3807647a3f056ae5785f3dfdd0dcd4cf3d4286 Mon Sep 17 00:00:00 2001
+From: Greg Kurz <groug@kaod.org>
+Date: Sun, 26 Feb 2017 23:42:43 +0100
+Subject: [PATCH 15/34] 9pfs: local: lsetxattr: don't follow symlinks
+
+The local_lsetxattr() callback is vulnerable to symlink attacks because
+it calls lsetxattr() which follows symbolic links in all path elements but
+the rightmost one.
+
+This patch introduces a helper to emulate the non-existing fsetxattrat()
+function: it is implemented with /proc/self/fd which provides a trusted
+path that can be safely passed to lsetxattr().
+
+local_lsetxattr() is converted to use this helper and opendir_nofollow().
+
+This partly fixes CVE-2016-9602.
+
+Signed-off-by: Greg Kurz <groug@kaod.org>
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+---
+ hw/9pfs/virtio-9p-posix-acl.c  | 18 ++++--------------
+ hw/9pfs/virtio-9p-util.h       |  2 ++
+ hw/9pfs/virtio-9p-xattr-user.c |  8 +-------
+ hw/9pfs/virtio-9p-xattr.c      | 39 +++++++++++++++++++++++++++++++++------
+ hw/9pfs/virtio-9p-xattr.h      |  3 +++
+ 5 files changed, 43 insertions(+), 27 deletions(-)
+
+diff --git a/hw/9pfs/virtio-9p-posix-acl.c b/hw/9pfs/virtio-9p-posix-acl.c
+index e65bd62..e64b52d 100644
+--- a/hw/9pfs/virtio-9p-posix-acl.c
++++ b/hw/9pfs/virtio-9p-posix-acl.c
+@@ -51,13 +51,8 @@ static ssize_t mp_pacl_listxattr(FsContext *ctx, const char *path,
+ static int mp_pacl_setxattr(FsContext *ctx, const char *path, const char *name,
+                             void *value, size_t size, int flags)
+ {
+-    char *buffer;
+-    int ret;
+-
+-    buffer = rpath(ctx, path);
+-    ret = lsetxattr(buffer, MAP_ACL_ACCESS, value, size, flags);
+-    g_free(buffer);
+-    return ret;
++    return local_setxattr_nofollow(ctx, path, MAP_ACL_ACCESS, value, size,
++                                   flags);
+ }
+ 
+ static int mp_pacl_removexattr(FsContext *ctx,
+@@ -109,13 +104,8 @@ static ssize_t mp_dacl_listxattr(FsContext *ctx, const char *path,
+ static int mp_dacl_setxattr(FsContext *ctx, const char *path, const char *name,
+                             void *value, size_t size, int flags)
+ {
+-    char *buffer;
+-    int ret;
+-
+-    buffer = rpath(ctx, path);
+-    ret = lsetxattr(buffer, MAP_ACL_DEFAULT, value, size, flags);
+-    g_free(buffer);
+-    return ret;
++    return local_setxattr_nofollow(ctx, path, MAP_ACL_DEFAULT, value, size,
++                                   flags);
+ }
+ 
+ static int mp_dacl_removexattr(FsContext *ctx,
+diff --git a/hw/9pfs/virtio-9p-util.h b/hw/9pfs/virtio-9p-util.h
+index 7d95a8d..dcb476b 100644
+--- a/hw/9pfs/virtio-9p-util.h
++++ b/hw/9pfs/virtio-9p-util.h
+@@ -55,5 +55,7 @@ int relative_openat_nofollow(int dirfd, const char *path, int flags,
+                              mode_t mode);
+ ssize_t fgetxattrat_nofollow(int dirfd, const char *path, const char *name,
+                              void *value, size_t size);
++int fsetxattrat_nofollow(int dirfd, const char *path, const char *name,
++                         void *value, size_t size, int flags);
+ 
+ #endif
+diff --git a/hw/9pfs/virtio-9p-xattr-user.c b/hw/9pfs/virtio-9p-xattr-user.c
+index 316447b..f6a95cf 100644
+--- a/hw/9pfs/virtio-9p-xattr-user.c
++++ b/hw/9pfs/virtio-9p-xattr-user.c
+@@ -68,9 +68,6 @@ static ssize_t mp_user_listxattr(FsContext *ctx, const char *path,
+ static int mp_user_setxattr(FsContext *ctx, const char *path, const char *name,
+                             void *value, size_t size, int flags)
+ {
+-    char *buffer;
+-    int ret;
+-
+     if (strncmp(name, "user.virtfs.", 12) == 0) {
+         /*
+          * Don't allow fetch of user.virtfs namesapce
+@@ -79,10 +76,7 @@ static int mp_user_setxattr(FsContext *ctx, const char *path, const char *name,
+         errno = EACCES;
+         return -1;
+     }
+-    buffer = rpath(ctx, path);
+-    ret = lsetxattr(buffer, name, value, size, flags);
+-    g_free(buffer);
+-    return ret;
++    return local_setxattr_nofollow(ctx, path, name, value, size, flags);
+ }
+ 
+ static int mp_user_removexattr(FsContext *ctx,
+diff --git a/hw/9pfs/virtio-9p-xattr.c b/hw/9pfs/virtio-9p-xattr.c
+index 782bfbb..a1336a5 100644
+--- a/hw/9pfs/virtio-9p-xattr.c
++++ b/hw/9pfs/virtio-9p-xattr.c
+@@ -195,18 +195,45 @@ ssize_t pt_getxattr(FsContext *ctx, const char *path, const char *name,
+     return local_getxattr_nofollow(ctx, path, name, value, size);
+ }
+ 
+-int pt_setxattr(FsContext *ctx, const char *path, const char *name, void *value,
+-                size_t size, int flags)
++int fsetxattrat_nofollow(int dirfd, const char *filename, const char *name,
++                         void *value, size_t size, int flags)
+ {
+-    char *buffer;
++    char *proc_path = g_strdup_printf("/proc/self/fd/%d/%s", dirfd, filename);
+     int ret;
+ 
+-    buffer = rpath(ctx, path);
+-    ret = lsetxattr(buffer, name, value, size, flags);
+-    g_free(buffer);
++    ret = lsetxattr(proc_path, name, value, size, flags);
++    g_free(proc_path);
++    return ret;
++}
++
++ssize_t local_setxattr_nofollow(FsContext *ctx, const char *path,
++                                const char *name, void *value, size_t size,
++                                int flags)
++{
++    char *dirpath = g_path_get_dirname(path);
++    char *filename = g_path_get_basename(path);
++    int dirfd;
++    ssize_t ret = -1;
++
++    dirfd = local_opendir_nofollow(ctx, dirpath);
++    if (dirfd == -1) {
++        goto out;
++    }
++
++    ret = fsetxattrat_nofollow(dirfd, filename, name, value, size, flags);
++    close_preserve_errno(dirfd);
++out:
++    g_free(dirpath);
++    g_free(filename);
+     return ret;
+ }
+ 
++int pt_setxattr(FsContext *ctx, const char *path, const char *name, void *value,
++                size_t size, int flags)
++{
++    return local_setxattr_nofollow(ctx, path, name, value, size, flags);
++}
++
+ int pt_removexattr(FsContext *ctx, const char *path, const char *name)
+ {
+     char *buffer;
+diff --git a/hw/9pfs/virtio-9p-xattr.h b/hw/9pfs/virtio-9p-xattr.h
+index 72bf5fb..fc20456 100644
+--- a/hw/9pfs/virtio-9p-xattr.h
++++ b/hw/9pfs/virtio-9p-xattr.h
+@@ -30,6 +30,9 @@ typedef struct xattr_operations
+ 
+ ssize_t local_getxattr_nofollow(FsContext *ctx, const char *path,
+                                 const char *name, void *value, size_t size);
++ssize_t local_setxattr_nofollow(FsContext *ctx, const char *path,
++                                const char *name, void *value, size_t size,
++                                int flags);
+ 
+ extern XattrOperations mapped_user_xattr;
+ extern XattrOperations passthrough_user_xattr;
+-- 
+2.10.1 (Apple Git-78)
+

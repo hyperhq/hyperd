@@ -1,0 +1,44 @@
+From dccd111bc0f26591024929f21c0dea2c472ea0b3 Mon Sep 17 00:00:00 2001
+From: Greg Kurz <groug@kaod.org>
+Date: Sun, 26 Feb 2017 23:43:25 +0100
+Subject: [PATCH 20/34] 9pfs: local: statfs: don't follow symlinks
+
+The local_statfs() callback is vulnerable to symlink attacks because it
+calls statfs() which follows symbolic links in all path elements.
+
+This patch converts local_statfs() to rely on open_nofollow() and fstatfs()
+instead.
+
+This partly fixes CVE-2016-9602.
+
+Signed-off-by: Greg Kurz <groug@kaod.org>
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+---
+ hw/9pfs/virtio-9p-local.c | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
+
+diff --git a/hw/9pfs/virtio-9p-local.c b/hw/9pfs/virtio-9p-local.c
+index 5841fbd..9a101d5 100644
+--- a/hw/9pfs/virtio-9p-local.c
++++ b/hw/9pfs/virtio-9p-local.c
+@@ -1074,13 +1074,11 @@ static int local_fsync(FsContext *ctx, int fid_type,
+ 
+ static int local_statfs(FsContext *s, V9fsPath *fs_path, struct statfs *stbuf)
+ {
+-    char *buffer;
+-    int ret;
+-    char *path = fs_path->data;
++    int fd, ret;
+ 
+-    buffer = rpath(s, path);
+-    ret = statfs(buffer, stbuf);
+-    g_free(buffer);
++    fd = local_open_nofollow(s, fs_path->data, O_RDONLY, 0);
++    ret = fstatfs(fd, stbuf);
++    close_preserve_errno(fd);
+     return ret;
+ }
+ 
+-- 
+2.10.1 (Apple Git-78)
+

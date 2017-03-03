@@ -1,0 +1,47 @@
+From 6def7d27be106c7c18b1aec1ef0fe84af208c0a3 Mon Sep 17 00:00:00 2001
+From: Greg Kurz <groug@kaod.org>
+Date: Sun, 26 Feb 2017 23:43:32 +0100
+Subject: [PATCH 21/34] 9pfs: local: truncate: don't follow symlinks
+
+The local_truncate() callback is vulnerable to symlink attacks because
+it calls truncate() which follows symbolic links in all path elements.
+
+This patch converts local_truncate() to rely on open_nofollow() and
+ftruncate() instead.
+
+This partly fixes CVE-2016-9602.
+
+Signed-off-by: Greg Kurz <groug@kaod.org>
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+---
+ hw/9pfs/virtio-9p-local.c | 13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
+
+diff --git a/hw/9pfs/virtio-9p-local.c b/hw/9pfs/virtio-9p-local.c
+index 9a101d5..7ff8fb0 100644
+--- a/hw/9pfs/virtio-9p-local.c
++++ b/hw/9pfs/virtio-9p-local.c
+@@ -891,13 +891,14 @@ err_out:
+ 
+ static int local_truncate(FsContext *ctx, V9fsPath *fs_path, off_t size)
+ {
+-    char *buffer;
+-    int ret;
+-    char *path = fs_path->data;
++    int fd, ret;
+ 
+-    buffer = rpath(ctx, path);
+-    ret = truncate(buffer, size);
+-    g_free(buffer);
++    fd = local_open_nofollow(ctx, fs_path->data, O_WRONLY, 0);
++    if (fd == -1) {
++        return -1;
++    }
++    ret = ftruncate(fd, size);
++    close_preserve_errno(fd);
+     return ret;
+ }
+ 
+-- 
+2.10.1 (Apple Git-78)
+

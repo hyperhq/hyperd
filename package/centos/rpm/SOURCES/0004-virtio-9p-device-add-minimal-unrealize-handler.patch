@@ -1,0 +1,60 @@
+From b0ea0761d6d15d93dc2f4dae660a83449a8e885e Mon Sep 17 00:00:00 2001
+From: Greg Kurz <gkurz@linux.vnet.ibm.com>
+Date: Tue, 8 Dec 2015 16:54:57 +0100
+Subject: [PATCH 4/5] virtio-9p-device: add minimal unrealize handler
+
+Since commit 4652f1640e029e1f2433fa77ba6af285 "virtio-9p: add savevm
+handlers", if the user hot-unplugs a quiescent 9p device and live
+migrates, the source QEMU crashes before migration completetion...
+This happens because virtio-9p devices have a realize handler which
+calls virtio_init() and register_savevm().  Both calls store pointers
+to the device internals, that get dereferenced during migration even
+if the device got unplugged.
+
+This patch simply adds an unrealize handler to perform minimal
+cleanup and avoid the crash.  Hot unplug of non-quiescent 9p devices
+is still not supported in QEMU, and not supported by linux guests
+either.
+
+Signed-off-by: Greg Kurz <gkurz@linux.vnet.ibm.com>
+Reviewed-by: Michael S. Tsirkin <mst@redhat.com>
+Message-id: 20151208155457.27775.69441.stgit@bahia.huguette.org
+[PMM: rewrapped long lines in commit message]
+Signed-off-by: Peter Maydell <peter.maydell@linaro.org>
+---
+ hw/9pfs/virtio-9p-device.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/hw/9pfs/virtio-9p-device.c b/hw/9pfs/virtio-9p-device.c
+index e3abcfa..5026f05 100644
+--- a/hw/9pfs/virtio-9p-device.c
++++ b/hw/9pfs/virtio-9p-device.c
+@@ -149,6 +149,17 @@ out:
+     v9fs_path_free(&path);
+ }
+ 
++static void virtio_9p_device_unrealize(DeviceState *dev, Error **errp)
++{
++    VirtIODevice *vdev = VIRTIO_DEVICE(dev);
++    V9fsState *s = VIRTIO_9P(dev);
++
++    virtio_cleanup(vdev);
++    unregister_savevm(dev, "virtio-9p", s);
++    g_free(s->ctx.fs_root);
++    g_free(s->tag);
++}
++
+ /* virtio-9p device */
+ 
+ static Property virtio_9p_properties[] = {
+@@ -165,6 +176,7 @@ static void virtio_9p_class_init(ObjectClass *klass, void *data)
+     dc->props = virtio_9p_properties;
+     set_bit(DEVICE_CATEGORY_STORAGE, dc->categories);
+     vdc->realize = virtio_9p_device_realize;
++    vdc->unrealize = virtio_9p_device_unrealize;
+     vdc->get_features = virtio_9p_get_features;
+     vdc->get_config = virtio_9p_get_config;
+ }
+-- 
+2.5.4 (Apple Git-61)
+

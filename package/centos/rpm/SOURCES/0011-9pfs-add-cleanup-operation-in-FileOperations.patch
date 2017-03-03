@@ -1,0 +1,57 @@
+From 7d10da84294d75778e47543c85c4e0abd9a70864 Mon Sep 17 00:00:00 2001
+From: Li Qiang <liq3ea@gmail.com>
+Date: Wed, 23 Nov 2016 13:53:34 +0100
+Subject: [PATCH 11/34] 9pfs: add cleanup operation in FileOperations
+
+commit dd51452a3a2c3d27c39aae9bd179a0bb353365ad upstream
+
+    Currently, the backend of VirtFS doesn't have a cleanup
+    function. This will lead resource leak issues if the backed
+    driver allocates resources. This patch addresses this issue.
+
+Signed-off-by: Li Qiang <liq3ea@gmail.com>
+Reviewed-by: Greg Kurz <groug@kaod.org>
+Signed-off-by: Greg Kurz <groug@kaod.org>
+Signed-off-by: Peng Tao <bergwolf@gmail.com>
+---
+ fsdev/file-op-9p.h         | 1 +
+ hw/9pfs/virtio-9p-device.c | 4 ++++
+ 2 files changed, 5 insertions(+)
+
+diff --git a/fsdev/file-op-9p.h b/fsdev/file-op-9p.h
+index 956fda0..337a092 100644
+--- a/fsdev/file-op-9p.h
++++ b/fsdev/file-op-9p.h
+@@ -102,6 +102,7 @@ struct FileOperations
+ {
+     int (*parse_opts)(QemuOpts *, struct FsDriverEntry *);
+     int (*init)(struct FsContext *);
++    void (*cleanup) (FsContext *);
+     int (*lstat)(FsContext *, V9fsPath *, struct stat *);
+     ssize_t (*readlink)(FsContext *, V9fsPath *, char *, size_t);
+     int (*chmod)(FsContext *, V9fsPath *, FsCred *);
+diff --git a/hw/9pfs/virtio-9p-device.c b/hw/9pfs/virtio-9p-device.c
+index 5026f05..14a9658 100644
+--- a/hw/9pfs/virtio-9p-device.c
++++ b/hw/9pfs/virtio-9p-device.c
+@@ -143,6 +143,8 @@ static void virtio_9p_device_realize(DeviceState *dev, Error **errp)
+     register_savevm(dev, "virtio-9p", -1, 1, virtio_9p_save, virtio_9p_load, s);
+     return;
+ out:
++    if (s->ops && s->ops->cleanup)
++        s->ops->cleanup(&s->ctx);
+     g_free(s->ctx.fs_root);
+     g_free(s->tag);
+     virtio_cleanup(vdev);
+@@ -154,6 +156,8 @@ static void virtio_9p_device_unrealize(DeviceState *dev, Error **errp)
+     VirtIODevice *vdev = VIRTIO_DEVICE(dev);
+     V9fsState *s = VIRTIO_9P(dev);
+ 
++    if (s->ops && s->ops->cleanup)
++        s->ops->cleanup(&s->ctx);
+     virtio_cleanup(vdev);
+     unregister_savevm(dev, "virtio-9p", s);
+     g_free(s->ctx.fs_root);
+-- 
+2.10.1 (Apple Git-78)
+

@@ -1,0 +1,165 @@
+From 6c8aeecabe321f31f351391f1b250764a2053772 Mon Sep 17 00:00:00 2001
+From: Greg Kurz <groug@kaod.org>
+Date: Sun, 26 Feb 2017 23:42:51 +0100
+Subject: [PATCH 16/34] 9pfs: local: lremovexattr: don't follow symlinks
+
+The local_lremovexattr() callback is vulnerable to symlink attacks because
+it calls lremovexattr() which follows symbolic links in all path elements
+but the rightmost one.
+
+This patch introduces a helper to emulate the non-existing fremovexattrat()
+function: it is implemented with /proc/self/fd which provides a trusted
+path that can be safely passed to lremovexattr().
+
+local_lremovexattr() is converted to use this helper and opendir_nofollow().
+
+This partly fixes CVE-2016-9602.
+
+Signed-off-by: Greg Kurz <groug@kaod.org>
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+---
+ hw/9pfs/virtio-9p-posix-acl.c  | 10 ++--------
+ hw/9pfs/virtio-9p-xattr-user.c |  8 +-------
+ hw/9pfs/virtio-9p-xattr.c      | 36 +++++++++++++++++++++++++++++++-----
+ hw/9pfs/virtio-9p-xattr.h      |  2 ++
+ 4 files changed, 36 insertions(+), 20 deletions(-)
+
+diff --git a/hw/9pfs/virtio-9p-posix-acl.c b/hw/9pfs/virtio-9p-posix-acl.c
+index e64b52d..53d1691 100644
+--- a/hw/9pfs/virtio-9p-posix-acl.c
++++ b/hw/9pfs/virtio-9p-posix-acl.c
+@@ -59,10 +59,8 @@ static int mp_pacl_removexattr(FsContext *ctx,
+                                const char *path, const char *name)
+ {
+     int ret;
+-    char *buffer;
+ 
+-    buffer = rpath(ctx, path);
+-    ret  = lremovexattr(buffer, MAP_ACL_ACCESS);
++    ret = local_removexattr_nofollow(ctx, path, MAP_ACL_ACCESS);
+     if (ret == -1 && errno == ENODATA) {
+         /*
+          * We don't get ENODATA error when trying to remove a
+@@ -72,7 +70,6 @@ static int mp_pacl_removexattr(FsContext *ctx,
+         errno = 0;
+         ret = 0;
+     }
+-    g_free(buffer);
+     return ret;
+ }
+ 
+@@ -112,10 +109,8 @@ static int mp_dacl_removexattr(FsContext *ctx,
+                                const char *path, const char *name)
+ {
+     int ret;
+-    char *buffer;
+ 
+-    buffer = rpath(ctx, path);
+-    ret  = lremovexattr(buffer, MAP_ACL_DEFAULT);
++    ret = local_removexattr_nofollow(ctx, path, MAP_ACL_DEFAULT);
+     if (ret == -1 && errno == ENODATA) {
+         /*
+          * We don't get ENODATA error when trying to remove a
+@@ -125,7 +120,6 @@ static int mp_dacl_removexattr(FsContext *ctx,
+         errno = 0;
+         ret = 0;
+     }
+-    g_free(buffer);
+     return ret;
+ }
+ 
+diff --git a/hw/9pfs/virtio-9p-xattr-user.c b/hw/9pfs/virtio-9p-xattr-user.c
+index f6a95cf..483903f 100644
+--- a/hw/9pfs/virtio-9p-xattr-user.c
++++ b/hw/9pfs/virtio-9p-xattr-user.c
+@@ -82,9 +82,6 @@ static int mp_user_setxattr(FsContext *ctx, const char *path, const char *name,
+ static int mp_user_removexattr(FsContext *ctx,
+                                const char *path, const char *name)
+ {
+-    char *buffer;
+-    int ret;
+-
+     if (strncmp(name, "user.virtfs.", 12) == 0) {
+         /*
+          * Don't allow fetch of user.virtfs namesapce
+@@ -93,10 +90,7 @@ static int mp_user_removexattr(FsContext *ctx,
+         errno = EACCES;
+         return -1;
+     }
+-    buffer = rpath(ctx, path);
+-    ret = lremovexattr(buffer, name);
+-    g_free(buffer);
+-    return ret;
++    return local_removexattr_nofollow(ctx, path, name);
+ }
+ 
+ XattrOperations mapped_user_xattr = {
+diff --git a/hw/9pfs/virtio-9p-xattr.c b/hw/9pfs/virtio-9p-xattr.c
+index a1336a5..5f75030 100644
+--- a/hw/9pfs/virtio-9p-xattr.c
++++ b/hw/9pfs/virtio-9p-xattr.c
+@@ -234,17 +234,43 @@ int pt_setxattr(FsContext *ctx, const char *path, const char *name, void *value,
+     return local_setxattr_nofollow(ctx, path, name, value, size, flags);
+ }
+ 
+-int pt_removexattr(FsContext *ctx, const char *path, const char *name)
++static ssize_t fremovexattrat_nofollow(int dirfd, const char *filename,
++                                       const char *name)
+ {
+-    char *buffer;
++    char *proc_path = g_strdup_printf("/proc/self/fd/%d/%s", dirfd, filename);
+     int ret;
+ 
+-    buffer = rpath(ctx, path);
+-    ret = lremovexattr(path, name);
+-    g_free(buffer);
++    ret = lremovexattr(proc_path, name);
++    g_free(proc_path);
+     return ret;
+ }
+ 
++ssize_t local_removexattr_nofollow(FsContext *ctx, const char *path,
++                                   const char *name)
++{
++    char *dirpath = g_path_get_dirname(path);
++    char *filename = g_path_get_basename(path);
++    int dirfd;
++    ssize_t ret = -1;
++
++    dirfd = local_opendir_nofollow(ctx, dirpath);
++    if (dirfd == -1) {
++        goto out;
++    }
++
++    ret = fremovexattrat_nofollow(dirfd, filename, name);
++    close_preserve_errno(dirfd);
++out:
++    g_free(dirpath);
++    g_free(filename);
++    return ret;
++}
++
++int pt_removexattr(FsContext *ctx, const char *path, const char *name)
++{
++    return local_removexattr_nofollow(ctx, path, name);
++}
++
+ ssize_t notsup_getxattr(FsContext *ctx, const char *path, const char *name,
+                         void *value, size_t size)
+ {
+diff --git a/hw/9pfs/virtio-9p-xattr.h b/hw/9pfs/virtio-9p-xattr.h
+index fc20456..7485a95 100644
+--- a/hw/9pfs/virtio-9p-xattr.h
++++ b/hw/9pfs/virtio-9p-xattr.h
+@@ -33,6 +33,8 @@ ssize_t local_getxattr_nofollow(FsContext *ctx, const char *path,
+ ssize_t local_setxattr_nofollow(FsContext *ctx, const char *path,
+                                 const char *name, void *value, size_t size,
+                                 int flags);
++ssize_t local_removexattr_nofollow(FsContext *ctx, const char *path,
++                                   const char *name);
+ 
+ extern XattrOperations mapped_user_xattr;
+ extern XattrOperations passthrough_user_xattr;
+-- 
+2.10.1 (Apple Git-78)
+
