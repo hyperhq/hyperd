@@ -708,15 +708,18 @@ func (devices *DeviceSet) initMetaData() error {
 	devices.Lock()
 	defer devices.Unlock()
 
+	logrus.Debugf("devicemapper: initMetaData 1")
 	if err := devices.migrateOldMetaData(); err != nil {
 		return err
 	}
 
+	logrus.Debugf("devicemapper: initMetaData 2")
 	_, transactionID, _, _, _, _, err := devices.poolStatus()
 	if err != nil {
 		return err
 	}
 
+	logrus.Debugf("devicemapper: initMetaData 3")
 	devices.TransactionID = transactionID
 
 	if err := devices.loadDeviceFilesOnStart(); err != nil {
@@ -1744,9 +1747,12 @@ func (devices *DeviceSet) initDevmapper(doInit bool) error {
 		}
 		defer metadataFile.Close()
 
+		logrus.Debugf("devicemapper: initDevmapper 1")
 		if err := devicemapper.CreatePool(devices.getPoolName(), dataFile, metadataFile, devices.thinpBlockSize); err != nil {
+			logrus.Debugf("devicemapper: initDevmapper 2")
 			return err
 		}
+		logrus.Debugf("devicemapper: initDevmapper 3")
 	}
 
 	// Pool already exists and caller did not pass us a pool. That means
@@ -1760,6 +1766,7 @@ func (devices *DeviceSet) initDevmapper(doInit bool) error {
 		}
 	}
 
+	logrus.Debugf("devicemapper: initDevmapper 4")
 	// If we didn't just create the data or metadata image, we need to
 	// load the transaction id and migrate old metadata
 	if !createdLoopback {
