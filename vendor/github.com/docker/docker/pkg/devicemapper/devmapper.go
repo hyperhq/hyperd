@@ -435,21 +435,25 @@ func BlockDeviceDiscard(path string) error {
 // CreatePool is the programmatic example of "dmsetup create".
 // It creates a device with the specified poolName, data and metadata file and block size.
 func CreatePool(poolName string, dataFile, metadataFile *os.File, poolBlockSize uint32) error {
+	logrus.Debugf("devicemapper: CreatePool 1")
 	task, err := TaskCreateNamed(deviceCreate, poolName)
 	if task == nil {
 		return err
 	}
 
+	logrus.Debugf("devicemapper: CreatePool 2")
 	size, err := GetBlockDeviceSize(dataFile)
 	if err != nil {
 		return fmt.Errorf("devicemapper: Can't get data size %s", err)
 	}
 
+	logrus.Debugf("devicemapper: CreatePool 3")
 	params := fmt.Sprintf("%s %s %d 32768 1 skip_block_zeroing", metadataFile.Name(), dataFile.Name(), poolBlockSize)
 	if err := task.addTarget(0, size/512, "thin-pool", params); err != nil {
 		return fmt.Errorf("devicemapper: Can't add target %s", err)
 	}
 
+	logrus.Debugf("devicemapper: CreatePool 4")
 	var cookie uint
 	var flags uint16
 	flags = DmUdevDisableSubsystemRulesFlag | DmUdevDisableDiskRulesFlag | DmUdevDisableOtherRulesFlag
@@ -458,10 +462,12 @@ func CreatePool(poolName string, dataFile, metadataFile *os.File, poolBlockSize 
 	}
 	defer UdevWait(&cookie)
 
+	logrus.Debugf("devicemapper: CreatePool 5")
 	if err := task.run(); err != nil {
 		return fmt.Errorf("devicemapper: Error running deviceCreate (CreatePool) %s", err)
 	}
 
+	logrus.Debugf("devicemapper: CreatePool 6")
 	return nil
 }
 
