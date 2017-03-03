@@ -78,10 +78,10 @@ func (ctx *VmContext) Launch() {
 	if ctx.Boot.BootFromTemplate {
 		glog.Info("boot from template")
 		ctx.PauseState = PauseStatePaused
-		ctx.hyperstart = libhyperstart.NewSerialJsonBasedHyperstart(ctx.HyperSockName, ctx.TtySockName, 1, false)
+		ctx.hyperstart = libhyperstart.NewJsonBasedHyperstart(ctx.ctlSockAddr(), ctx.ttySockAddr(), 1, false)
 		ctx.Hub <- &InitConnectedEvent{}
 	} else {
-		ctx.hyperstart = libhyperstart.NewSerialJsonBasedHyperstart(ctx.HyperSockName, ctx.TtySockName, 1, true)
+		ctx.hyperstart = libhyperstart.NewJsonBasedHyperstart(ctx.ctlSockAddr(), ctx.ttySockAddr(), 1, true)
 		go ctx.watchHyperstart(true)
 	}
 	if glog.V(1) {
@@ -112,7 +112,7 @@ func VmAssociate(vmId string, hub chan VmEvent, client chan *types.VmResponse, p
 		return nil, err
 	}
 
-	context.hyperstart = libhyperstart.NewSerialJsonBasedHyperstart(context.HyperSockName, context.TtySockName, pinfo.HwStat.AttachId, false)
+	context.hyperstart = libhyperstart.NewJsonBasedHyperstart(context.ctlSockAddr(), context.ttySockAddr(), pinfo.HwStat.AttachId, false)
 	context.DCtx.Associate(context)
 
 	if glog.V(1) {

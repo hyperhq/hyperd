@@ -7,6 +7,7 @@ import (
 	"github.com/hyperhq/runv/api"
 	"github.com/hyperhq/runv/hypervisor/network"
 	"github.com/hyperhq/runv/hypervisor/types"
+	"github.com/hyperhq/runv/lib/vsock"
 )
 
 type BootConfig struct {
@@ -15,6 +16,7 @@ type BootConfig struct {
 	HotAddCpuMem     bool
 	BootToBeTemplate bool
 	BootFromTemplate bool
+	EnableVsock      bool
 	MemoryPath       string
 	DevicesStatePath string
 	Kernel           string
@@ -57,9 +59,11 @@ type HypervisorDriver interface {
 	InitNetwork(bIface, bIP string, disableIptables bool) error
 
 	SupportLazyMode() bool
+	SupportVmSocket() bool
 }
 
 var HDriver HypervisorDriver
+var VsockCidManager vsock.VsockCidAllocator
 
 type DriverContext interface {
 	Launch(ctx *VmContext)
@@ -72,15 +76,15 @@ type DriverContext interface {
 	AddNic(ctx *VmContext, host *HostNicInfo, guest *GuestNicInfo, result chan<- VmEvent)
 	RemoveNic(ctx *VmContext, n *InterfaceCreated, callback VmEvent, result chan<- VmEvent)
 
-	SetCpus(ctx *VmContext, cpus int, result chan<- error)
-	AddMem(ctx *VmContext, slot, size int, result chan<- error)
+	SetCpus(ctx *VmContext, cpus int) error
+	AddMem(ctx *VmContext, slot, size int) error
 
-	Save(ctx *VmContext, path string, result chan<- error)
+	Save(ctx *VmContext, path string) error
 
 	Shutdown(ctx *VmContext)
 	Kill(ctx *VmContext)
 
-	Pause(ctx *VmContext, pause bool, result chan<- error)
+	Pause(ctx *VmContext, pause bool) error
 
 	ConfigureNetwork(vmId, requestedIP string, config *api.InterfaceDescription) (*network.Settings, error)
 	AllocateNetwork(vmId, requestedIP string) (*network.Settings, error)
@@ -127,6 +131,10 @@ func (ed *EmptyDriver) SupportLazyMode() bool {
 	return false
 }
 
+func (ed *EmptyDriver) SupportVmSocket() bool {
+	return false
+}
+
 func (ec *EmptyContext) Launch(ctx *VmContext) {}
 
 func (ec *EmptyContext) Associate(ctx *VmContext) {}
@@ -147,17 +155,16 @@ func (ec *EmptyContext) AddNic(ctx *VmContext, host *HostNicInfo, guest *GuestNi
 func (ec *EmptyContext) RemoveNic(ctx *VmContext, n *InterfaceCreated, callback VmEvent, result chan<- VmEvent) {
 }
 
-func (ec *EmptyContext) SetCpus(ctx *VmContext, cpus int, result chan<- error) {}
-func (ec *EmptyContext) AddMem(ctx *VmContext, slot, size int, result chan<- error) {
-}
+func (ec *EmptyContext) SetCpus(ctx *VmContext, cpus int) error      { return nil }
+func (ec *EmptyContext) AddMem(ctx *VmContext, slot, size int) error { return nil }
 
-func (ec *EmptyContext) Save(ctx *VmContext, path string, result chan<- error) {}
+func (ec *EmptyContext) Save(ctx *VmContext, path string) error { return nil }
 
 func (ec *EmptyContext) Shutdown(ctx *VmContext) {}
 
 func (ec *EmptyContext) Kill(ctx *VmContext) {}
 
-func (ec *EmptyContext) Pause(ctx *VmContext, pause bool, result chan<- error) {}
+func (ec *EmptyContext) Pause(ctx *VmContext, pause bool) error { return nil }
 
 func (ec *EmptyContext) BuildinNetwork() bool { return false }
 

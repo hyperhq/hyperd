@@ -51,6 +51,7 @@ const (
 	AF_TIPC                          = 0x1e
 	AF_UNIX                          = 0x1
 	AF_UNSPEC                        = 0x0
+	AF_VSOCK                         = 0x28
 	AF_WANPIPE                       = 0x19
 	AF_X25                           = 0x9
 	ARPHRD_ADAPT                     = 0x108

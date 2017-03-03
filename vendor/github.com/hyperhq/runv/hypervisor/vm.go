@@ -72,32 +72,22 @@ func (vm *Vm) Launch(b *BootConfig) (err error) {
 }
 
 // This function will only be invoked during daemon start
-func (vm *Vm) AssociateVm(data []byte) error {
-	glog.V(1).Infof("Associate the POD(%s) with VM(%s)", vm.Id)
+func AssociateVm(vmId string, data []byte) (*Vm, error) {
 	var (
 		PodEvent = make(chan VmEvent, 128)
 		Status   = make(chan *types.VmResponse, 128)
 		err      error
 	)
 
+	vm := newVm(vmId, 0, 0)
 	vm.ctx, err = VmAssociate(vm.Id, PodEvent, Status, data)
 	if err != nil {
 		glog.Errorf("cannot associate with vm: %v", err)
-		return err
+		return nil, err
 	}
 
-	//	go vm.handlePodEvent(mypod)
-	//
 	vm.clients = CreateFanout(Status, 128, false)
-
-	//	mypod.Status = types.S_POD_RUNNING
-	//	mypod.StartedAt = time.Now().Format("2006-01-02T15:04:05Z")
-	//	mypod.SetContainerStatus(types.S_POD_RUNNING)
-	//
-	//	//vm.Status = types.S_VM_ASSOCIATED
-	//	//vm.Pod = mypod
-	//
-	return nil
+	return vm, nil
 }
 
 type matchResponse func(response *types.VmResponse) (error, bool)
@@ -152,10 +142,6 @@ func (vm *Vm) ReleaseVm() error {
 	}, -1)
 
 	releasePodEvent := &ReleaseVMCommand{}
-
-	if vm.ctx == nil {
-		return fmt.Errorf("ReleaseVm(%s) failed: VmContext is nil", vm.Id)
-	}
 
 	if err := vm.ctx.SendVmEvent(releasePodEvent); err != nil {
 		return err
@@ -280,11 +266,6 @@ func (vm *Vm) WaitProcess(isContainer bool, ids []string, timeout int) <-chan *a
 //}
 
 func (vm *Vm) InitSandbox(config *api.SandboxConfig) {
-	if vm.ctx == nil {
-		vm.ctx.Log(ERROR, "%v", NewNotReadyError(vm.Id))
-		return
-	}
-
 	vm.ctx.SetNetworkEnvironment(config)
 	vm.ctx.startPod()
 }
@@ -315,10 +296,6 @@ func (vm *Vm) Shutdown() api.Result {
 		}
 		return nil, false
 	}, -1)
-
-	if vm.ctx == nil {
-		return api.NewResultBase(vm.Id, false, "internal error - context == nil")
-	}
 
 	if err := vm.ctx.SendVmEvent(&ShutdownCommand{}); err != nil {
 		return api.NewResultBase(vm.Id, false, "vm context already exited")
@@ -357,10 +334,12 @@ func (vm *Vm) AddRoute() error {
 }
 
 func (vm *Vm) AddNic(info *api.InterfaceDescription) error {
+	if vm.ctx.current != StateRunning {
+		return NewNotReadyError(vm.Id)
+	}
+
 	client := make(chan api.Result, 1)
-	vm.sendGenericOperation("CreateInterface", func(ctx *VmContext, result chan<- error) {
-		go ctx.AddInterface(info, client)
-	}, StateRunning)
+	vm.ctx.AddInterface(info, client)
 
 	ev, ok := <-client
 	if !ok {
@@ -378,10 +357,12 @@ func (vm *Vm) AddNic(info *api.InterfaceDescription) error {
 }
 
 func (vm *Vm) DeleteNic(id string) error {
+	if vm.ctx.current != StateRunning {
+		return NewNotReadyError(vm.Id)
+	}
+
 	client := make(chan api.Result, 1)
-	vm.sendGenericOperation("NetDevRemovedEvent", func(ctx *VmContext, result chan<- error) {
-		ctx.RemoveInterface(id, client)
-	}, StateRunning)
+	vm.ctx.RemoveInterface(id, client)
 
 	ev, ok := <-client
 	if !ok {
@@ -404,10 +385,11 @@ func (vm *Vm) SetCpus(cpus int) error {
 		return nil
 	}
 
-	err := vm.GenericOperation("SetCpus", func(ctx *VmContext, result chan<- error) {
-		ctx.DCtx.SetCpus(ctx, cpus, result)
-	}, StateRunning)
+	if vm.ctx.current != StateRunning {
+		return NewNotReadyError(vm.Id)
+	}
 
+	err := vm.ctx.DCtx.SetCpus(vm.ctx, cpus)
 	if err == nil {
 		vm.Cpu = cpus
 	}
@@ -420,10 +402,11 @@ func (vm *Vm) AddMem(totalMem int) error {
 	}
 
 	size := totalMem - vm.Mem
-	err := vm.GenericOperation("AddMem", func(ctx *VmContext, result chan<- error) {
-		ctx.DCtx.AddMem(ctx, 1, size, result)
-	}, StateRunning)
+	if vm.ctx.current != StateRunning {
+		return NewNotReadyError(vm.Id)
+	}
 
+	err := vm.ctx.DCtx.AddMem(vm.ctx, 1, size)
 	if err == nil {
 		vm.Mem = totalMem
 	}
@@ -517,7 +500,7 @@ func (vm *Vm) AddProcess(container, execId string, terminal bool, args []string,
 }
 
 func (vm *Vm) AddVolume(vol *api.VolumeDescription) api.Result {
-	if vm.ctx == nil || vm.ctx.current != StateRunning {
+	if vm.ctx.current != StateRunning {
 		glog.Errorf("VM is not ready for insert volume %#v", vol)
 		return NewNotReadyError(vm.Id)
 	}
@@ -528,7 +511,7 @@ func (vm *Vm) AddVolume(vol *api.VolumeDescription) api.Result {
 }
 
 func (vm *Vm) AddContainer(c *api.ContainerDescription) api.Result {
-	if vm.ctx == nil || vm.ctx.current != StateRunning {
+	if vm.ctx.current != StateRunning {
 		return NewNotReadyError(vm.Id)
 	}
 
@@ -595,22 +578,17 @@ func (vm *Vm) batchWaitResult(names []string, op waitResultOp) (bool, map[string
 }
 
 func (vm *Vm) StartContainer(id string) error {
+	if vm.ctx.current != StateRunning {
+		return NewNotReadyError(vm.Id)
+	}
 
-	err := vm.GenericOperation("NewContainer", func(ctx *VmContext, result chan<- error) {
-		ctx.newContainer(id, result)
-	}, StateRunning)
-
+	err := vm.ctx.newContainer(id)
 	if err != nil {
 		return fmt.Errorf("Create new container failed: %v", err)
 	}
 
 	vm.ctx.Log(DEBUG, "container %s start: done.", id)
 	return nil
-}
-
-type WindowSize struct {
-	Row    uint16 `json:"row"`
-	Column uint16 `json:"column"`
 }
 
 func (vm *Vm) Tty(containerId, execId string, row, column int) error {
@@ -620,16 +598,16 @@ func (vm *Vm) Tty(containerId, execId string, row, column int) error {
 	return vm.ctx.hyperstart.TtyWinResize(containerId, execId, uint16(row), uint16(column))
 }
 
-func (vm *Vm) Attach(tty *TtyIO, container string, size *WindowSize) error {
-	cmd := &AttachCommand{
-		Streams:   tty,
-		Size:      size,
-		Container: container,
+func (vm *Vm) Attach(tty *TtyIO, container string) error {
+	if vm.ctx.current != StateRunning {
+		return NewNotReadyError(vm.Id)
 	}
 
-	return vm.GenericOperation("Attach", func(ctx *VmContext, result chan<- error) {
-		ctx.attachCmd(cmd, result)
-	}, StateRunning)
+	cmd := &AttachCommand{
+		Streams:   tty,
+		Container: container,
+	}
+	return vm.ctx.attachCmd(cmd)
 }
 
 func (vm *Vm) Stats() *types.PodStats {
@@ -649,99 +627,61 @@ func (vm *Vm) Stats() *types.PodStats {
 }
 
 func (vm *Vm) Pause(pause bool) error {
+	ctx := vm.ctx
+	if ctx.current != StateRunning {
+		return NewNotReadyError(vm.Id)
+	}
+
 	command := "Pause"
 	pauseState := PauseStatePaused
-	oldPauseState := PauseStateUnpaused
 	if !pause {
 		pauseState = PauseStateUnpaused
 		command = "Unpause"
 	}
 
-	err := vm.GenericOperation(command, func(ctx *VmContext, result chan<- error) {
-		oldPauseState = ctx.PauseState
-		if ctx.PauseState == PauseStateBusy {
-			result <- fmt.Errorf("%s fails: earlier Pause or Unpause operation has not finished", command)
-			return
-		} else if ctx.PauseState == pauseState {
-			result <- nil
-			return
-		}
-		ctx.PauseState = PauseStateBusy
+	var err error
+	ctx.pauseLock.Lock()
+	defer ctx.pauseLock.Unlock()
+	if ctx.PauseState != pauseState {
 		/* FIXME: only support pause whole vm now */
-		ctx.DCtx.Pause(ctx, pause, result)
-	}, StateRunning)
+		// should not change pause state inside ctx.DCtx.Pause!
+		err = ctx.DCtx.Pause(ctx, pause)
+		if err != nil {
+			glog.Errorf("%s sandbox failed: %v", command, err)
+			return err
+		}
 
-	if oldPauseState == pauseState {
-		return nil
+		glog.V(3).Infof("sandbox state turn to %s now", command)
+		ctx.PauseState = pauseState // change the state.
 	}
-	if err != nil {
-		pauseState = oldPauseState // recover the state
-	}
-	vm.GenericOperation(command+" result", func(ctx *VmContext, result chan<- error) {
-		ctx.PauseState = pauseState
-		result <- nil
-	}, StateRunning)
-	return err
+
+	return nil
 }
 
 func (vm *Vm) Save(path string) error {
-	return vm.GenericOperation("Save", func(ctx *VmContext, result chan<- error) {
-		if ctx.PauseState == PauseStatePaused {
-			ctx.DCtx.Save(ctx, path, result)
-		} else {
-			result <- fmt.Errorf("the vm should paused on non-live Save()")
-		}
-	}, StateRunning)
+	ctx := vm.ctx
+
+	ctx.pauseLock.Lock()
+	defer ctx.pauseLock.Unlock()
+	if ctx.current != StateRunning || ctx.PauseState != PauseStatePaused {
+		return NewNotReadyError(vm.Id)
+	}
+
+	return ctx.DCtx.Save(ctx, path)
 }
 
 func (vm *Vm) GetIPAddrs() []string {
 	ips := []string{}
 
-	err := vm.GenericOperation("GetIP", func(ctx *VmContext, result chan<- error) {
-		res := ctx.networks.getIpAddrs()
-		ips = append(ips, res...)
-
-		result <- nil
-	}, StateRunning)
-
-	if err != nil {
-		glog.Errorf("get pod ip failed: %v", err)
+	if vm.ctx.current != StateRunning {
+		glog.Errorf("get pod ip failed: %v", NewNotReadyError(vm.Id))
+		return ips
 	}
+
+	res := vm.ctx.networks.getIpAddrs()
+	ips = append(ips, res...)
 
 	return ips
-}
-
-// sendGenericOperation queues a generic operation onto the VM's context if it
-// is in position to handle it.
-func (vm *Vm) sendGenericOperation(name string, op func(ctx *VmContext, result chan<- error), states ...string) <-chan error {
-	result := make(chan error, 1)
-
-	// Check vm context is available
-	if vm.ctx == nil {
-		result <- fmt.Errorf("sendGenericOperation(%s) failed: VmContext is nil", name)
-		return result
-	}
-
-	// Setup the generic operation
-	goe := &GenericOperation{
-		OpName: name,
-		State:  states,
-		OpFunc: op,
-		Result: result,
-	}
-
-	// Try and send it - if we fail here, discard the channel and immediately
-	// push the failure state instead (goe isn't sent, so the result channel
-	// isn't used).
-	if err := vm.ctx.SendVmEvent(goe); err != nil {
-		result <- err
-	}
-
-	return result
-}
-
-func (vm *Vm) GenericOperation(name string, op func(ctx *VmContext, result chan<- error), states ...string) error {
-	return <-vm.sendGenericOperation(name, op, states...)
 }
 
 func errorResponse(cause string) *types.VmResponse {
@@ -752,17 +692,15 @@ func errorResponse(cause string) *types.VmResponse {
 	}
 }
 
-func NewVm(vmId string, cpu, memory int, lazy bool) *Vm {
+func newVm(vmId string, cpu, memory int) *Vm {
 	return &Vm{
-		Id: vmId,
-		//Pod:    nil,
-		Lazy: lazy,
-		Cpu:  cpu,
-		Mem:  memory,
+		Id:  vmId,
+		Cpu: cpu,
+		Mem: memory,
 	}
 }
 
-func GetVm(vmId string, b *BootConfig, waitStarted, lazy bool) (*Vm, error) {
+func GetVm(vmId string, b *BootConfig, waitStarted bool) (*Vm, error) {
 	id := vmId
 	if id == "" {
 		for {
@@ -773,7 +711,7 @@ func GetVm(vmId string, b *BootConfig, waitStarted, lazy bool) (*Vm, error) {
 		}
 	}
 
-	vm := NewVm(id, b.CPU, b.Memory, lazy)
+	vm := newVm(id, b.CPU, b.Memory)
 	if err := vm.Launch(b); err != nil {
 		return nil, err
 	}

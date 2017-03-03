@@ -341,6 +341,16 @@ func (sa *SockaddrUnix) sockaddr() (unsafe.Pointer, _Socklen, error) {
 	return unsafe.Pointer(&sa.raw), sl, nil
 }
 
+func (sa *SockaddrVsock) sockaddr() (unsafe.Pointer, _Socklen, error) {
+	if sa.Port > 0xFFFF {
+		return nil, 0, EINVAL
+	}
+	sa.raw.Family = AF_VSOCK
+	sa.raw.Port = sa.Port
+	sa.raw.Cid = sa.Cid
+	return unsafe.Pointer(&sa.raw), SizeofSockaddrAny, nil
+}
+
 type SockaddrLinklayer struct {
 	Protocol uint16
 	Ifindex  int
@@ -451,6 +461,12 @@ func anyToSockaddr(rsa *RawSockaddrAny) (Sockaddr, error) {
 		for i := 0; i < len(sa.Addr); i++ {
 			sa.Addr[i] = pp.Addr[i]
 		}
+		return sa, nil
+	case AF_VSOCK:
+		pp := (*SockaddrVsock)(unsafe.Pointer(rsa))
+		sa := new(SockaddrVsock)
+		sa.Cid = pp.Cid
+		sa.Port = pp.Port
 		return sa, nil
 	}
 	return nil, EAFNOSUPPORT

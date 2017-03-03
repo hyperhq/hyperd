@@ -50,6 +50,7 @@ package unix
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 #include <linux/icmpv6.h>
+#include <linux/vm_sockets.h>
 #include <asm/termbits.h>
 #include <time.h>
 #include <unistd.h>
@@ -190,6 +191,8 @@ type RawSockaddrInet6 C.struct_sockaddr_in6
 
 type RawSockaddrUnix C.struct_my_sockaddr_un
 
+type RawSockaddrVsock C.struct_sockaddr_vm
+
 type RawSockaddrLinklayer C.struct_sockaddr_ll
 
 type RawSockaddrNetlink C.struct_sockaddr_nl
@@ -231,6 +234,7 @@ const (
 	SizeofSockaddrInet6     = C.sizeof_struct_sockaddr_in6
 	SizeofSockaddrAny       = C.sizeof_struct_sockaddr_any
 	SizeofSockaddrUnix      = C.sizeof_struct_sockaddr_un
+	SizeofSockaddrVsock     = C.sizeof_struct_sockaddr_vm
 	SizeofSockaddrLinklayer = C.sizeof_struct_sockaddr_ll
 	SizeofSockaddrNetlink   = C.sizeof_struct_sockaddr_nl
 	SizeofLinger            = C.sizeof_struct_linger

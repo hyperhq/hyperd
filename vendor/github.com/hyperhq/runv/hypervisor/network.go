@@ -118,7 +118,7 @@ func (nc *NetworkContext) addInterface(inf *api.InterfaceDescription, result cha
 			return
 		}
 
-		nc.configureInterface(idx, nc.sandbox.nextPciAddr(), fmt.Sprintf("eth%d", idx), inf, devChan)
+		nc.configureInterface(idx, nc.sandbox.NextPciAddr(), fmt.Sprintf("eth%d", idx), inf, devChan)
 	}()
 
 	go func() {

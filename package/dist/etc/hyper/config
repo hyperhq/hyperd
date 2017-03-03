@@ -44,6 +44,9 @@ Initrd=/var/lib/hyper/hyper-initrd.img
 # This is only useful for hypernetes, to disable the iptables setup by hyperd
 # DisableIptables=false
 
+# Enable vsock support. This only works with libvirt/qemu hypervisor and template disabled
+# EnableVsock=false
+
 # VmFactoryPolicy defines the policies to create factories
 # VmFactoryPolicy = [FactoryConfig,]*FactoryConfig
 # FactoryConfig   = {["cache":NUMBER,]["template":(true|false),]"cpu":NUMBER,"memory":NUMBER}

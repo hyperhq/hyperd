@@ -3,6 +3,7 @@ package hypervisor
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -10,17 +11,18 @@ import (
 	hyperstartapi "github.com/hyperhq/runv/hyperstart/api/json"
 	"github.com/hyperhq/runv/hyperstart/libhyperstart"
 	"github.com/hyperhq/runv/hypervisor/types"
+	"github.com/hyperhq/runv/lib/utils"
 )
 
 type VmHwStatus struct {
 	PciAddr  int    //next available pci addr for pci hotplug
 	ScsiId   int    //next available scsi id for scsi hotplug
 	AttachId uint64 //next available attachId for attached tty
+	GuestCid uint32 //vsock guest cid
 }
 
 const (
 	PauseStateUnpaused = iota
-	PauseStateBusy
 	PauseStatePaused
 )
 
@@ -43,6 +45,7 @@ type VmContext struct {
 	TtySockName     string
 	ConsoleSockName string
 	ShareDir        string
+	GuestCid        uint32
 
 	pciAddr int //next available pci addr for pci hotplug
 	scsiId  int //next available scsi id for scsi hotplug
@@ -66,8 +69,9 @@ type VmContext struct {
 
 	logPrefix string
 
-	lock   sync.Mutex //protect update of context
-	idLock sync.Mutex
+	lock      sync.Mutex //protect update of context
+	idLock    sync.Mutex
+	pauseLock sync.Mutex
 }
 
 type stateHandler func(ctx *VmContext, event VmEvent)
@@ -87,6 +91,7 @@ func InitContext(id string, hub chan VmEvent, client chan *types.VmResponse, dc 
 		consoleSockName = homeDir + ConsoleSockName
 		shareDir        = homeDir + ShareDirTag
 		ctx             *VmContext
+		cid             uint32
 	)
 
 	err := os.MkdirAll(shareDir, 0755)
@@ -104,12 +109,26 @@ func InitContext(id string, hub chan VmEvent, client chan *types.VmResponse, dc 
 		}
 	}
 
+	if boot.EnableVsock {
+		if !HDriver.SupportVmSocket() {
+			err := fmt.Errorf("vsock feature requested but not supported")
+			ctx.Log(ERROR, "%v", err)
+			return nil, err
+		}
+		cid, err = VsockCidManager.GetCid()
+		if err != nil {
+			ctx.Log(ERROR, "failed to get vsock guest cid: %v", err)
+			return nil, err
+		}
+	}
+
 	ctx = &VmContext{
 		Id:              id,
 		Boot:            boot,
 		PauseState:      PauseStateUnpaused,
 		pciAddr:         PciAddrFrom,
 		scsiId:          0,
+		GuestCid:        cid,
 		Hub:             hub,
 		client:          client,
 		DCtx:            dc,
@@ -172,7 +191,7 @@ func (ctx *VmContext) nextScsiId() int {
 	return id
 }
 
-func (ctx *VmContext) nextPciAddr() int {
+func (ctx *VmContext) NextPciAddr() int {
 	ctx.idLock.Lock()
 	addr := ctx.pciAddr
 	ctx.pciAddr++
@@ -243,6 +262,10 @@ func (ctx *VmContext) Close() {
 	os.Remove(ctx.ShareDir)
 	ctx.handler = nil
 	ctx.current = "None"
+	if ctx.Boot.EnableVsock && ctx.GuestCid > 0 {
+		VsockCidManager.ReleaseCid(ctx.GuestCid)
+		ctx.GuestCid = 0
+	}
 }
 
 func (ctx *VmContext) Become(handler stateHandler, desc string) {
@@ -409,4 +432,20 @@ func (ctx *VmContext) RemoveVolume(name string, result chan<- api.Result) {
 	ctx.Log(INFO, "remove disk %s", name)
 	delete(ctx.volumes, name)
 	disk.remove(result)
+}
+
+func (ctx *VmContext) ctlSockAddr() string {
+	if ctx.Boot.EnableVsock {
+		return utils.VSOCK_SOCKET_PREFIX + strconv.FormatUint(uint64(ctx.GuestCid), 10) + ":" + strconv.FormatInt(hyperstartapi.HYPER_VSOCK_CTL_PORT, 10)
+	} else {
+		return utils.UNIX_SOCKET_PREFIX + ctx.HyperSockName
+	}
+}
+
+func (ctx *VmContext) ttySockAddr() string {
+	if ctx.Boot.EnableVsock {
+		return utils.VSOCK_SOCKET_PREFIX + strconv.FormatUint(uint64(ctx.GuestCid), 10) + ":" + strconv.FormatInt(hyperstartapi.HYPER_VSOCK_MSG_PORT, 10)
+	} else {
+		return utils.UNIX_SOCKET_PREFIX + ctx.TtySockName
+	}
 }

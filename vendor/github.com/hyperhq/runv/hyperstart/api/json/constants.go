@@ -33,3 +33,6 @@ const (
 
 // "hyperstart" is the special container ID for adding processes.
 const HYPERSTART_EXEC_CONTAINER = "hyperstart"
+
+const HYPER_VSOCK_CTL_PORT = 2718
+const HYPER_VSOCK_MSG_PORT = 2719

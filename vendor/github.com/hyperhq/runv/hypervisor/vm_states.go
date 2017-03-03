@@ -25,7 +25,7 @@ func (ctx *VmContext) timedKill(seconds int) {
 	})
 }
 
-func (ctx *VmContext) newContainer(id string, result chan<- error) {
+func (ctx *VmContext) newContainer(id string) error {
 	ctx.lock.Lock()
 	defer ctx.lock.Unlock()
 
@@ -37,10 +37,10 @@ func (ctx *VmContext) newContainer(id string, result chan<- error) {
 		if err == nil && c.tty != nil {
 			go streamCopy(c.tty, c.stdinPipe, c.stdoutPipe, c.stderrPipe)
 		}
-		result <- err
 		glog.Infof("sent INIT_NEWCONTAINER")
+		return err
 	} else {
-		result <- fmt.Errorf("container %s not exist", id)
+		return fmt.Errorf("container %s not exist", id)
 	}
 }
 
@@ -53,7 +53,7 @@ func (ctx *VmContext) updateInterface(id string) error {
 }
 
 // TODO remove attachCmd and move streamCopy to hyperd
-func (ctx *VmContext) attachCmd(cmd *AttachCommand, result chan<- error) {
+func (ctx *VmContext) attachCmd(cmd *AttachCommand) error {
 	ctx.lock.Lock()
 	defer ctx.lock.Unlock()
 
@@ -61,20 +61,18 @@ func (ctx *VmContext) attachCmd(cmd *AttachCommand, result chan<- error) {
 	if !ok {
 		estr := fmt.Sprintf("cannot find container %s to attach", cmd.Container)
 		ctx.Log(ERROR, estr)
-		result <- errors.New(estr)
-		return
+		return errors.New(estr)
 	}
 
 	if c.tty != nil {
-		result <- fmt.Errorf("we can attach only once")
-		return
+		return fmt.Errorf("we can attach only once")
 	}
 	c.tty = cmd.Streams
 	if c.stdinPipe != nil {
 		go streamCopy(c.tty, c.stdinPipe, c.stdoutPipe, c.stderrPipe)
 	}
 
-	result <- nil
+	return nil
 }
 
 // TODO move this logic to hyperd
@@ -183,19 +181,6 @@ func (ctx *VmContext) poweroffVM(err bool, msg string) {
 	}
 }
 
-func (ctx *VmContext) handleGenericOperation(goe *GenericOperation) {
-	for _, allowd := range goe.State {
-		if ctx.current == allowd {
-			glog.V(3).Infof("handle GenericOperation(%s) on state(%s)", goe.OpName, ctx.current)
-			goe.OpFunc(ctx, goe.Result)
-			return
-		}
-	}
-
-	glog.V(3).Infof("GenericOperation(%s) is unsupported on state(%s)", goe.OpName, ctx.current)
-	goe.Result <- fmt.Errorf("GenericOperation(%s) is unsupported on state(%s)", goe.OpName, ctx.current)
-}
-
 // state machine
 func unexpectedEventHandler(ctx *VmContext, ev VmEvent, state string) {
 	switch ev.Event() {
@@ -236,8 +221,6 @@ func stateRunning(ctx *VmContext, ev VmEvent) {
 		glog.Info("Connection interrupted, quit...")
 		ctx.poweroffVM(true, "connection to vm broken")
 		ctx.Close()
-	case GENERIC_OPERATION:
-		ctx.handleGenericOperation(ev.(*GenericOperation))
 	default:
 		unexpectedEventHandler(ctx, ev, "pod running")
 	}
@@ -262,8 +245,6 @@ func stateTerminating(ctx *VmContext, ev VmEvent) {
 	case ERROR_INTERRUPTED:
 		interruptEv := ev.(*Interrupted)
 		glog.V(1).Info("Connection interrupted while terminating: %s", interruptEv.Reason)
-	case GENERIC_OPERATION:
-		ctx.handleGenericOperation(ev.(*GenericOperation))
 	default:
 		unexpectedEventHandler(ctx, ev, "terminating")
 	}

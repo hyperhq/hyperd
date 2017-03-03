@@ -2,6 +2,7 @@ package hypervisor
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/golang/glog"
 	hyperstartapi "github.com/hyperhq/runv/hyperstart/api/json"
@@ -92,12 +93,21 @@ func (ctx *VmContext) dumpHwInfo() *VmHwStatus {
 		PciAddr:  ctx.pciAddr,
 		ScsiId:   ctx.scsiId,
 		AttachId: ctx.hyperstart.LastStreamSeq(),
+		GuestCid: ctx.GuestCid,
 	}
 }
 
-func (ctx *VmContext) loadHwStatus(pinfo *PersistInfo) {
+func (ctx *VmContext) loadHwStatus(pinfo *PersistInfo) error {
 	ctx.pciAddr = pinfo.HwStat.PciAddr
 	ctx.scsiId = pinfo.HwStat.ScsiId
+	ctx.GuestCid = pinfo.HwStat.GuestCid
+	if ctx.GuestCid != 0 {
+		if !VsockCidManager.MarkCidInuse(ctx.GuestCid) {
+			return fmt.Errorf("conflicting vsock guest cid %d: already in use", ctx.GuestCid)
+		}
+		ctx.Boot.EnableVsock = true
+	}
+	return nil
 }
 
 func (blk *DiskDescriptor) dump() *PersistVolumeInfo {
@@ -149,7 +159,10 @@ func (pinfo *PersistInfo) vmContext(hub chan VmEvent, client chan *types.VmRespo
 	//ctx.userSpec = pinfo.UserSpec
 	//ctx.wg = wg
 
-	ctx.loadHwStatus(pinfo)
+	err = ctx.loadHwStatus(pinfo)
+	if err != nil {
+		return nil, err
+	}
 
 	//for _, vol := range pinfo.VolumeList {
 	//	binfo := vol.blockInfo()
