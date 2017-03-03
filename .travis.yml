@@ -3,9 +3,9 @@ dist: trusty
 
 language: go
 
-matrix:
-  include:
-    - go: 1.7
+go:
+  - 1.7
+  - 1.8
 
 before_install:
   - sudo apt-get update -qq
