@@ -257,7 +257,7 @@ func GetImage(blockBase, mntBase, id, fstype, mountLabel string, uid, gid int) e
 	}
 
 	if err := idtools.MkdirAllAs(rootFs, 0755, uid, gid); err != nil && !os.IsExist(err) {
-		exec.Command("umount", "--detach-loop", mnt).CombinedOutput()
+		exec.Command("umount", "-d", mnt).CombinedOutput()
 		os.RemoveAll(mnt)
 		return err
 	}
@@ -267,7 +267,7 @@ func GetImage(blockBase, mntBase, id, fstype, mountLabel string, uid, gid int) e
 
 func PutImage(mntBase, id string) error {
 	mnt := filepath.Join(mntBase, id)
-	if out, err := exec.Command("umount", "--detach-loop", mnt).CombinedOutput(); err != nil {
+	if out, err := exec.Command("umount", "-d", mnt).CombinedOutput(); err != nil {
 		return fmt.Errorf("Failed to umount block:%v:%s", err, string(out))
 	}
 	os.RemoveAll(mnt)
