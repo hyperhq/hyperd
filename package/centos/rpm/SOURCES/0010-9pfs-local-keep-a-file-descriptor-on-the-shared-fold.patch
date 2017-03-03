@@ -1,0 +1,93 @@
+From a86a4beda7953351dc879563736786360b446a5a Mon Sep 17 00:00:00 2001
+From: Greg Kurz <groug@kaod.org>
+Date: Sun, 26 Feb 2017 23:42:10 +0100
+Subject: [PATCH 10/34] 9pfs: local: keep a file descriptor on the shared
+ folder
+
+This patch opens the shared folder and caches the file descriptor, so that
+it can be used to do symlink-safe path walk.
+
+Signed-off-by: Greg Kurz <groug@kaod.org>
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+---
+ hw/9pfs/virtio-9p-local.c | 30 ++++++++++++++++++++++++++++--
+ 1 file changed, 28 insertions(+), 2 deletions(-)
+
+diff --git a/hw/9pfs/virtio-9p-local.c b/hw/9pfs/virtio-9p-local.c
+index 15dfb28..79f259a 100644
+--- a/hw/9pfs/virtio-9p-local.c
++++ b/hw/9pfs/virtio-9p-local.c
+@@ -14,6 +14,7 @@
+ #include "hw/virtio/virtio.h"
+ #include "virtio-9p.h"
+ #include "virtio-9p-xattr.h"
++#include "virtio-9p-util.h"
+ #include "fsdev/qemu-fsdev.h"   /* local_ops */
+ #include <arpa/inet.h>
+ #include <pwd.h>
+@@ -41,6 +42,10 @@
+ #define BTRFS_SUPER_MAGIC 0x9123683E
+ #endif
+ 
++typedef struct {
++    int mountfd;
++} LocalData;
++
+ #define VIRTFS_META_DIR ".virtfs_metadata"
+ 
+ static char *local_mapped_attr_path(FsContext *ctx, const char *path)
+@@ -1176,13 +1181,20 @@ static int local_ioc_getversion(FsContext *ctx, V9fsPath *path,
+ static int local_init(FsContext *ctx)
+ {
+     struct statfs stbuf;
++    LocalData *data = g_malloc(sizeof(*data));
++
++    data->mountfd = open(ctx->fs_root, O_DIRECTORY | O_RDONLY);
++    if (data->mountfd == -1) {
++        goto err;
++    }
+ 
+ #ifdef FS_IOC_GETVERSION
+     /*
+      * use ioc_getversion only if the ioctl is definied
+      */
+-    if (statfs(ctx->fs_root, &stbuf) < 0) {
+-        return -1;
++    if (fstatfs(data->mountfd, &stbuf) < 0) {
++        close_preserve_errno(data->mountfd);
++        goto err;
+     }
+     switch (stbuf.f_type) {
+     case EXT2_SUPER_MAGIC:
+@@ -1209,7 +1221,20 @@ static int local_init(FsContext *ctx)
+     }
+     ctx->export_flags |= V9FS_PATHNAME_FSCONTEXT;
+ 
++    ctx->private = data;
+     return 0;
++
++err:
++    g_free(data);
++    return -1;
++}
++
++static void local_cleanup(FsContext *ctx)
++{
++    LocalData *data = ctx->private;
++
++    close(data->mountfd);
++    g_free(data);
+ }
+ 
+ static int local_parse_opts(QemuOpts *opts, struct FsDriverEntry *fse)
+@@ -1252,6 +1277,7 @@ static int local_parse_opts(QemuOpts *opts, struct FsDriverEntry *fse)
+ FileOperations local_ops = {
+     .parse_opts = local_parse_opts,
+     .init  = local_init,
++    .cleanup = local_cleanup,
+     .lstat = local_lstat,
+     .readlink = local_readlink,
+     .close = local_close,
+-- 
+2.10.1 (Apple Git-78)
+

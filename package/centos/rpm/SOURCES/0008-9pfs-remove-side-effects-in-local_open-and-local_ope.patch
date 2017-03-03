@@ -1,0 +1,57 @@
+From eda97358ffbde6c044ee9a024632b187b6149b8c Mon Sep 17 00:00:00 2001
+From: Greg Kurz <groug@kaod.org>
+Date: Sun, 26 Feb 2017 23:41:55 +0100
+Subject: [PATCH 08/34] 9pfs: remove side-effects in local_open() and
+ local_opendir()
+
+If these functions fail, they should not change *fs. Let's use local
+variables to fix this.
+
+Signed-off-by: Greg Kurz <groug@kaod.org>
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+---
+ hw/9pfs/virtio-9p-local.c | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
+
+diff --git a/hw/9pfs/virtio-9p-local.c b/hw/9pfs/virtio-9p-local.c
+index bbad576..15dfb28 100644
+--- a/hw/9pfs/virtio-9p-local.c
++++ b/hw/9pfs/virtio-9p-local.c
+@@ -354,10 +354,15 @@ static int local_open(FsContext *ctx, V9fsPath *fs_path,
+ {
+     char *buffer;
+     char *path = fs_path->data;
++    int fd;
+ 
+     buffer = rpath(ctx, path);
+-    fs->fd = open(buffer, flags | O_NOFOLLOW);
++    fd = open(buffer, flags | O_NOFOLLOW);
+     g_free(buffer);
++    if (fd == -1) {
++        return -1;
++    }
++    fs->fd = fd;
+     return fs->fd;
+ }
+ 
+@@ -366,13 +371,15 @@ static int local_opendir(FsContext *ctx,
+ {
+     char *buffer;
+     char *path = fs_path->data;
++    DIR *stream;
+ 
+     buffer = rpath(ctx, path);
+-    fs->dir = opendir(buffer);
++    stream = opendir(buffer);
+     g_free(buffer);
+-    if (!fs->dir) {
++    if (!stream) {
+         return -1;
+     }
++    fs->dir = stream;
+     return 0;
+ }
+ 
+-- 
+2.10.1 (Apple Git-78)
+

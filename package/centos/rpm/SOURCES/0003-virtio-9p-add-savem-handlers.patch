@@ -1,0 +1,54 @@
+From b2f8ad1c1f662df9986ff9d835a0fd97778d6236 Mon Sep 17 00:00:00 2001
+From: Greg Kurz <gkurz@linux.vnet.ibm.com>
+Date: Thu, 22 Oct 2015 19:38:42 +0200
+Subject: [PATCH 3/5] virtio-9p: add savem handlers
+
+We don't support migration of mounted 9p shares. This is handled by a
+migration blocker.
+
+One would expect, however, to be able to migrate if the share is unmounted.
+Unfortunately virtio-9p-device does not register savevm handlers at all !
+Migration succeeds and leaves the guest with a dangling device...
+
+This patch simply registers migration handlers for virtio-9p-device. Whether
+migration is possible or not still depends on the migration blocker.
+
+Signed-off-by: Greg Kurz <gkurz@linux.vnet.ibm.com>
+Reviewed-by: Michael S. Tsirkin <mst@redhat.com>
+Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+---
+ hw/9pfs/virtio-9p-device.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/hw/9pfs/virtio-9p-device.c b/hw/9pfs/virtio-9p-device.c
+index 93a407c..e3abcfa 100644
+--- a/hw/9pfs/virtio-9p-device.c
++++ b/hw/9pfs/virtio-9p-device.c
+@@ -43,6 +43,16 @@ static void virtio_9p_get_config(VirtIODevice *vdev, uint8_t *config)
+     g_free(cfg);
+ }
+ 
++static void virtio_9p_save(QEMUFile *f, void *opaque)
++{
++    virtio_save(VIRTIO_DEVICE(opaque), f);
++}
++
++static int virtio_9p_load(QEMUFile *f, void *opaque, int version_id)
++{
++    return virtio_load(VIRTIO_DEVICE(opaque), f, version_id);
++}
++
+ static void virtio_9p_device_realize(DeviceState *dev, Error **errp)
+ {
+     VirtIODevice *vdev = VIRTIO_DEVICE(dev);
+@@ -130,6 +140,7 @@ static void virtio_9p_device_realize(DeviceState *dev, Error **errp)
+     }
+     v9fs_path_free(&path);
+ 
++    register_savevm(dev, "virtio-9p", -1, 1, virtio_9p_save, virtio_9p_load, s);
+     return;
+ out:
+     g_free(s->ctx.fs_root);
+-- 
+2.5.4 (Apple Git-61)
+

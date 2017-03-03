@@ -1,0 +1,38 @@
+From a1aeac5f028c2d5c31b34fecad0c939a48352d77 Mon Sep 17 00:00:00 2001
+From: "Daniel P. Berrange" <berrange@redhat.com>
+Date: Wed, 25 Nov 2015 10:52:29 +0000
+Subject: [PATCH 2/5] exec: remove warning about mempath and hugetlbfs
+
+The gethugepagesize() method in exec.c printed a warning if
+the file path for "-mem-path" or "-object memory-backend-file"
+was not on a hugetlbfs filesystem. This warning is bogus, because
+QEMU functions perfectly well with the path on a regular tmpfs
+filesystem. Use of hugetlbfs vs tmpfs is a choice for the management
+application or end user to make as best fits their needs. As such it
+is inappropriate for QEMU to have an opinion on whether the user's
+choice is right or wrong in this case.
+
+Signed-off-by: Daniel P. Berrange <berrange@redhat.com>
+Message-Id: <1448448749-1332-3-git-send-email-berrange@redhat.com>
+Signed-off-by: Paolo Bonzini <pbonzini@redhat.com>
+---
+ exec.c | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/exec.c b/exec.c
+index 161c711..756c164 100644
+--- a/exec.c
++++ b/exec.c
+@@ -1150,9 +1150,6 @@ static long gethugepagesize(const char *path, Error **errp)
+         return 0;
+     }
+ 
+-    if (fs.f_type != HUGETLBFS_MAGIC)
+-        fprintf(stderr, "Warning: path not on HugeTLBFS: %s\n", path);
+-
+     return fs.f_bsize;
+ }
+ 
+-- 
+2.5.4 (Apple Git-61)
+

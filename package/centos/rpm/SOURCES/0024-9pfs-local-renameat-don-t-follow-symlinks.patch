@@ -1,0 +1,124 @@
+From 9f7aae72e2f7bb28f0dc8fca6b896264305d1c99 Mon Sep 17 00:00:00 2001
+From: Greg Kurz <groug@kaod.org>
+Date: Sun, 26 Feb 2017 23:43:55 +0100
+Subject: [PATCH 24/34] 9pfs: local: renameat: don't follow symlinks
+
+The local_renameat() callback is currently a wrapper around local_rename()
+which is vulnerable to symlink attacks.
+
+This patch rewrites local_renameat() to have its own implementation, based
+on local_opendir_nofollow() and renameat().
+
+This partly fixes CVE-2016-9602.
+
+Signed-off-by: Greg Kurz <groug@kaod.org>
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+---
+ hw/9pfs/virtio-9p-local.c | 74 ++++++++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 64 insertions(+), 10 deletions(-)
+
+diff --git a/hw/9pfs/virtio-9p-local.c b/hw/9pfs/virtio-9p-local.c
+index 394f03a..ac70a25 100644
+--- a/hw/9pfs/virtio-9p-local.c
++++ b/hw/9pfs/virtio-9p-local.c
+@@ -65,6 +65,14 @@ int local_opendir_nofollow(FsContext *fs_ctx, const char *path)
+     return local_open_nofollow(fs_ctx, path, O_DIRECTORY | O_RDONLY, 0);
+ }
+ 
++static void renameat_preserve_errno(int odirfd, const char *opath, int ndirfd,
++                                    const char *npath)
++{
++    int serrno = errno;
++    renameat(odirfd, opath, ndirfd, npath);
++    errno = serrno;
++}
++
+ #define VIRTFS_META_DIR ".virtfs_metadata"
+ 
+ static char *local_mapped_attr_path(FsContext *ctx, const char *path)
+@@ -144,8 +152,7 @@ static void local_mapped_file_attr(int dirfd, const char *name,
+     char buf[ATTR_MAX];
+     int map_dirfd;
+ 
+-    map_dirfd = openat(dirfd, VIRTFS_META_DIR,
+-                       O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
++    map_dirfd = openat_dir(dirfd, VIRTFS_META_DIR);
+     if (map_dirfd == -1) {
+         return;
+     }
+@@ -1186,17 +1193,64 @@ static int local_renameat(FsContext *ctx, V9fsPath *olddir,
+                           const char *new_name)
+ {
+     int ret;
+-    V9fsString old_full_name, new_full_name;
++    int odirfd, ndirfd;
++
++    odirfd = local_opendir_nofollow(ctx, olddir->data);
++    if (odirfd == -1) {
++        return -1;
++    }
++
++    ndirfd = local_opendir_nofollow(ctx, newdir->data);
++    if (ndirfd == -1) {
++        close_preserve_errno(odirfd);
++        return -1;
++    }
++
++    ret = renameat(odirfd, old_name, ndirfd, new_name);
++    if (ret < 0) {
++        goto out;
++    }
+ 
+-    v9fs_string_init(&old_full_name);
+-    v9fs_string_init(&new_full_name);
++    if (ctx->export_flags & V9FS_SM_MAPPED_FILE) {
++        int omap_dirfd, nmap_dirfd;
+ 
+-    v9fs_string_sprintf(&old_full_name, "%s/%s", olddir->data, old_name);
+-    v9fs_string_sprintf(&new_full_name, "%s/%s", newdir->data, new_name);
++        ret = mkdirat(ndirfd, VIRTFS_META_DIR, 0700);
++        if (ret < 0 && errno != EEXIST) {
++            goto err_undo_rename;
++        }
+ 
+-    ret = local_rename(ctx, old_full_name.data, new_full_name.data);
+-    v9fs_string_free(&old_full_name);
+-    v9fs_string_free(&new_full_name);
++        omap_dirfd = openat(odirfd, VIRTFS_META_DIR,
++                            O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
++        if (omap_dirfd == -1) {
++            goto err;
++        }
++
++        nmap_dirfd = openat(ndirfd, VIRTFS_META_DIR,
++                            O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
++        if (nmap_dirfd == -1) {
++            close_preserve_errno(omap_dirfd);
++            goto err;
++        }
++
++        /* rename the .virtfs_metadata files */
++        ret = renameat(omap_dirfd, old_name, nmap_dirfd, new_name);
++        close_preserve_errno(nmap_dirfd);
++        close_preserve_errno(omap_dirfd);
++        if (ret < 0 && errno != ENOENT) {
++            goto err_undo_rename;
++        }
++
++        ret = 0;
++    }
++    goto out;
++
++err:
++    ret = -1;
++err_undo_rename:
++    renameat_preserve_errno(ndirfd, new_name, odirfd, old_name);
++out:
++    close_preserve_errno(ndirfd);
++    close_preserve_errno(odirfd);
+     return ret;
+ }
+ 
+-- 
+2.10.1 (Apple Git-78)
+

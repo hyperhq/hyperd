@@ -1,0 +1,199 @@
+From 70cfacabe142e42295f6c17baa259963821405c1 Mon Sep 17 00:00:00 2001
+From: Greg Kurz <groug@kaod.org>
+Date: Sun, 26 Feb 2017 23:42:03 +0100
+Subject: [PATCH 09/34] 9pfs: introduce relative_openat_nofollow() helper
+
+When using the passthrough security mode, symbolic links created by the
+guest are actual symbolic links on the host file system.
+
+Since the resolution of symbolic links during path walk is supposed to
+occur on the client side. The server should hence never receive any path
+pointing to an actual symbolic link. This isn't guaranteed by the protocol
+though, and malicious code in the guest can trick the server to issue
+various syscalls on paths whose one or more elements are symbolic links.
+In the case of the "local" backend using the "passthrough" or "none"
+security modes, the guest can directly create symbolic links to arbitrary
+locations on the host (as per spec). The "mapped-xattr" and "mapped-file"
+security modes are also affected to a lesser extent as they require some
+help from an external entity to create actual symbolic links on the host,
+i.e. another guest using "passthrough" mode for example.
+
+The current code hence relies on O_NOFOLLOW and "l*()" variants of system
+calls. Unfortunately, this only applies to the rightmost path component.
+A guest could maliciously replace any component in a trusted path with a
+symbolic link. This could allow any guest to escape a virtfs shared folder.
+
+This patch introduces a variant of the openat() syscall that successively
+opens each path element with O_NOFOLLOW. When passing a file descriptor
+pointing to a trusted directory, one is guaranteed to be returned a
+file descriptor pointing to a path which is beneath the trusted directory.
+This will be used by subsequent patches to implement symlink-safe path walk
+for any access to the backend.
+
+Symbolic links aren't the only threats actually: a malicious guest could
+change a path element to point to other types of file with undesirable
+effects:
+- a named pipe or any other thing that would cause openat() to block
+- a terminal device which would become QEMU's controlling terminal
+
+These issues can be addressed with O_NONBLOCK and O_NOCTTY.
+
+Two helpers are introduced: one to open intermediate path elements and one
+to open the rightmost path element.
+
+Suggested-by: Jann Horn <jannh@google.com>
+Signed-off-by: Greg Kurz <groug@kaod.org>
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+(renamed openat_nofollow() to relative_openat_nofollow(),
+ assert path is relative and doesn't contain '//',
+ fixed side-effect in assert, Greg Kurz)
+Signed-off-by: Greg Kurz <groug@kaod.org>
+---
+ hw/9pfs/Makefile.objs    |  2 +-
+ hw/9pfs/virtio-9p-util.c | 59 ++++++++++++++++++++++++++++++++++++++++++++++++
+ hw/9pfs/virtio-9p-util.h | 57 ++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 117 insertions(+), 1 deletion(-)
+ create mode 100644 hw/9pfs/virtio-9p-util.c
+ create mode 100644 hw/9pfs/virtio-9p-util.h
+
+diff --git a/hw/9pfs/Makefile.objs b/hw/9pfs/Makefile.objs
+index 1e9b595..874e89d 100644
+--- a/hw/9pfs/Makefile.objs
++++ b/hw/9pfs/Makefile.objs
+@@ -1,4 +1,4 @@
+-common-obj-y  = virtio-9p.o
++common-obj-y  = virtio-9p.o virtio-9p-util.o
+ common-obj-y += virtio-9p-local.o virtio-9p-xattr.o
+ common-obj-y += virtio-9p-xattr-user.o virtio-9p-posix-acl.o
+ common-obj-y += virtio-9p-coth.o cofs.o codir.o cofile.o
+diff --git a/hw/9pfs/virtio-9p-util.c b/hw/9pfs/virtio-9p-util.c
+new file mode 100644
+index 0000000..d0ad017
+--- /dev/null
++++ b/hw/9pfs/virtio-9p-util.c
+@@ -0,0 +1,59 @@
++/*
++ * 9p utilities
++ *
++ * Copyright IBM, Corp. 2017
++ *
++ * Authors:
++ *  Greg Kurz <groug@kaod.org>
++ *
++ * This work is licensed under the terms of the GNU GPL, version 2 or later.
++ * See the COPYING file in the top-level directory.
++ */
++
++#include <string.h>
++#include "qemu/osdep.h"
++#include "virtio-9p.h"
++#include "virtio-9p-util.h"
++
++int relative_openat_nofollow(int dirfd, const char *path, int flags,
++                             mode_t mode)
++{
++    int fd;
++
++    fd = dup(dirfd);
++    if (fd == -1) {
++        return -1;
++    }
++
++    while (*path) {
++        const char *c;
++        int next_fd;
++        char *head;
++
++        /* Only relative paths without consecutive slashes */
++        assert(path[0] != '/');
++
++        head = g_strdup(path);
++        c = strchr(path, '/');
++        if (c) {
++            head[c - path] = 0;
++            next_fd = openat_dir(fd, head);
++        } else {
++            next_fd = openat_file(fd, head, flags, mode);
++        }
++        g_free(head);
++        if (next_fd == -1) {
++            close_preserve_errno(fd);
++            return -1;
++        }
++        close(fd);
++        fd = next_fd;
++
++        if (!c) {
++            break;
++        }
++        path = c + 1;
++    }
++
++    return fd;
++}
+diff --git a/hw/9pfs/virtio-9p-util.h b/hw/9pfs/virtio-9p-util.h
+new file mode 100644
+index 0000000..9ed992a
+--- /dev/null
++++ b/hw/9pfs/virtio-9p-util.h
+@@ -0,0 +1,57 @@
++/*
++ * 9p utilities
++ *
++ * Copyright IBM, Corp. 2017
++ *
++ * Authors:
++ *  Greg Kurz <groug@kaod.org>
++ *
++ * This work is licensed under the terms of the GNU GPL, version 2 or later.
++ * See the COPYING file in the top-level directory.
++ */
++
++#ifndef QEMU_9P_UTIL_H
++#define QEMU_9P_UTIL_H
++
++#include <unistd.h>
++#include <sys/types.h>
++#include <sys/stat.h>
++#include <fcntl.h>
++#include <errno.h>
++#include <assert.h>
++
++static inline void close_preserve_errno(int fd)
++{
++    int serrno = errno;
++    close(fd);
++    errno = serrno;
++}
++
++static inline int openat_dir(int dirfd, const char *name)
++{
++    return openat(dirfd, name, O_DIRECTORY | O_RDONLY | O_PATH);
++}
++
++static inline int openat_file(int dirfd, const char *name, int flags,
++                              mode_t mode)
++{
++    int fd, serrno, ret;
++
++    fd = openat(dirfd, name, flags | O_NOFOLLOW | O_NOCTTY | O_NONBLOCK,
++                mode);
++    if (fd == -1) {
++        return -1;
++    }
++
++    serrno = errno;
++    /* O_NONBLOCK was only needed to open the file. Let's drop it. */
++    ret = fcntl(fd, F_SETFL, flags);
++    assert(!ret);
++    errno = serrno;
++    return fd;
++}
++
++int relative_openat_nofollow(int dirfd, const char *path, int flags,
++                             mode_t mode);
++
++#endif
+-- 
+2.10.1 (Apple Git-78)
+
