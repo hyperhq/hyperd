@@ -181,32 +181,23 @@ __EOF__
   stop_hyperd
 }
 
-hyper_storage_drivers=(
-  "rawblock"
-  "aufs"
-  "dm"
-)
+test_matrix="\
+qemu overlay
+qemu rawblock
+libvirt overlay
+libvirt devicemapper
+--"
 
-hyper_exec_drivers=(
-  ""
-  "qemu"
-  "libvirt"
-)
-
-# set hyper_exec_drivers if HYPER_EXEC_DRIVER was set
-if [ -n ${HYPER_EXEC_DRIVER+x} ]; then
-	hyper_exec_drivers=("$HYPER_EXEC_DRIVER")
+# set test_matrix if HYPER_EXEC_DRIVER and HYPER_STORATE_DRIVER are both set
+if (set -u; echo -e "HYPER_EXEC_DRIVER is $HYPER_EXEC_DRIVER\nHYPER_STORAGE_DRIVER is $HYPER_STORAGE_DRIVER") 2>/dev/null ; then
+    test_matrix="$HYPER_EXEC_DRIVER $HYPER_STORAGE_DRIVER"
 fi
 
-# set hyper_storage_drivers if HYPER_STORAGE_DRIVER was set
-if [ -n ${HYPER_STORAGE_DRIVER+x} ]; then
-	hyper_storage_drivers=("$HYPER_STORAGE_DRIVER")
-fi
-
-for sdriver in "${hyper_storage_drivers[@]}"; do
-  for edriver in "${hyper_exec_drivers[@]}"; do
-    runTests "${edriver}" "${sdriver}"
-  done
+IFSBK=$IFS
+IFS=$'\n'
+for drvs in ${test_matrix%%[[:space:]]--}; do
+    IFS=$IFSBK
+    runTests $drvs
 done
 
 hyper::test::clear_all
