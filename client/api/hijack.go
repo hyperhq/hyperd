@@ -120,10 +120,6 @@ func (cli *Client) hijack(method, path string, setRawTerminal bool, in io.ReadCl
 		receiveStdout chan error
 	)
 
-	if in != nil && setRawTerminal {
-		// fmt.Printf("In the Raw Terminal!!!\n")
-	}
-
 	if stdout != nil || stderr != nil {
 		receiveStdout = promise.Go(func() (err error) {
 			defer func() {

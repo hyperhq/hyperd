@@ -14,6 +14,7 @@ func (cli *HyperClient) HyperCmdExec(args ...string) error {
 	var opts struct {
 		Attach bool `short:"a" long:"attach" default:"true" description:"attach current terminal to the stdio of command"`
 		Tty    bool `short:"t" long:"tty" description:"Allocate a pseudo-TTY"`
+		VM     bool `short:"m" long:"vm" description:"Execute outside of any containers"`
 	}
 	var parser = gflag.NewParser(&opts, gflag.Default|gflag.IgnoreUnknown)
 	parser.Usage = "exec [OPTIONS] POD|CONTAINER COMMAND [ARGS...]\n\nRun a command in a container of a running pod"
@@ -26,16 +27,24 @@ func (cli *HyperClient) HyperCmdExec(args ...string) error {
 		}
 	}
 	if len(args) == 0 {
-		return fmt.Errorf("Can not accept the 'exec' command without Container ID!")
+		return fmt.Errorf("Can not accept the 'exec' command without Container ID and command!")
 	}
-	if len(args) == 1 {
+	if len(args) == 1 && !opts.VM {
 		return fmt.Errorf("Can not accept the 'exec' command without command!")
 	}
+
+	command, err := json.Marshal(args[1:])
+	if err != nil {
+		return err
+	}
+	if opts.VM {
+		return cli.client.ExecVM(args[0], command, cli.in, cli.out, cli.err)
+	}
+
 	var (
 		podName     = args[0]
 		containerId string
 	)
-
 	if strings.Contains(podName, "pod-") {
 		containerId, err = cli.client.GetContainerByPod(podName)
 		if err != nil {
@@ -43,11 +52,6 @@ func (cli *HyperClient) HyperCmdExec(args ...string) error {
 		}
 	} else {
 		containerId = args[0]
-	}
-
-	command, err := json.Marshal(args[1:])
-	if err != nil {
-		return err
 	}
 
 	execId, err := cli.client.CreateExec(containerId, command, opts.Tty)
