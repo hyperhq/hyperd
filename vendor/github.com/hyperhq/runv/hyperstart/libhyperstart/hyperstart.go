@@ -14,6 +14,7 @@ type Hyperstart interface {
 	APIVersion() (uint32, error)
 	ProcessAsyncEvents() (<-chan hyperstartapi.ProcessAsyncEvent, error)
 	NewContainer(c *hyperstartapi.Container) (io.WriteCloser, io.ReadCloser, io.ReadCloser, error)
+	RestoreContainer(c *hyperstartapi.Container) (io.WriteCloser, io.ReadCloser, io.ReadCloser, error)
 	AddProcess(container string, p *hyperstartapi.Process) (io.WriteCloser, io.ReadCloser, io.ReadCloser, error)
 	SignalProcess(container, process string, signal syscall.Signal) error
 	TtyWinResize(container, process string, row, col uint16) error

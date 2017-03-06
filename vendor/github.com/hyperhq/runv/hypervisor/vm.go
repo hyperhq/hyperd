@@ -328,6 +328,11 @@ func (vm *Vm) KillContainer(container string, signal syscall.Signal) error {
 	return vm.SignalProcess(container, "init", signal)
 }
 
+// Should only be called near after AssociateVm
+func (vm *Vm) AssociateContainer(container string) (alive bool, err error) {
+	return vm.ctx.restoreContainer(container)
+}
+
 func (vm *Vm) AddRoute() error {
 	routes := vm.ctx.networks.getRoutes()
 	return vm.ctx.hyperstart.AddRoute(routes)
@@ -682,6 +687,15 @@ func (vm *Vm) GetIPAddrs() []string {
 	ips = append(ips, res...)
 
 	return ips
+}
+
+func (vm *Vm) Dump() ([]byte, error) {
+	pinfo, err := vm.ctx.dump()
+	if err != nil {
+		return nil, err
+	}
+
+	return pinfo.serialize()
 }
 
 func errorResponse(cause string) *types.VmResponse {

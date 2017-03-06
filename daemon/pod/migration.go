@@ -85,7 +85,7 @@ func MigrateLagecyPersistentData(db *daemondb.DaemonDB, podFactory func() *PodFa
 				Id:          vmID,
 				PersistInfo: vmData,
 			}
-			err = saveMessage(db, fmt.Sprintf(SB_KEY_FMT, podID), &sandboxInfo, nil, "sandbox info")
+			err = saveMessage(db, fmt.Sprintf(SB_KEY_FMT, podSpec.Id), &sandboxInfo, nil, "sandbox info")
 			if err != nil {
 				return err
 			}
