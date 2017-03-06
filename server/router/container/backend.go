@@ -23,4 +23,5 @@ type Backend interface {
 	CmdTtyResize(podId, tag string, h, w int) error
 	CreateExec(id, cmd string, terminal bool) (string, error)
 	StartExec(stdin io.ReadCloser, stdout io.WriteCloser, containerId, execId string) error
+	ExecVM(podID, cmd string, stdin io.ReadCloser, stdout, stderr io.WriteCloser) (int, error)
 }

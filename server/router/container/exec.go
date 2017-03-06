@@ -41,6 +41,26 @@ func (s *containerRouter) postContainerExecCreate(ctx context.Context, w http.Re
 	return httputils.WriteJSON(w, http.StatusCreated, execId)
 }
 
+func (s *containerRouter) postExecVM(ctx context.Context, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+	if err := httputils.ParseForm(r); err != nil {
+		return err
+	}
+
+	id := r.Form.Get("pod")
+	command := r.Form.Get("command")
+
+	// Setting up the streaming http interface.
+	inStream, outStream, err := httputils.HijackConnection(w)
+	if err != nil {
+		return err
+	}
+	defer httputils.CloseStreams(inStream, outStream)
+	fmt.Fprintf(outStream, "HTTP/1.1 101 UPGRADED\r\nContent-Type: application/vnd.docker.raw-stream\r\nConnection: Upgrade\r\nUpgrade: tcp\r\n\r\n")
+
+	_, err = s.backend.ExecVM(id, command, inStream, outStream.(io.WriteCloser), outStream.(io.WriteCloser))
+	return err
+}
+
 func (s *containerRouter) postContainerExecStart(ctx context.Context, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
 	if err := httputils.ParseForm(r); err != nil {
 		return err

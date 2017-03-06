@@ -44,6 +44,7 @@ func (r *containerRouter) initRoutes() {
 		local.NewPostRoute("/exec/start", r.postContainerExecStart),
 		local.NewPostRoute("/attach", r.postContainerAttach),
 		local.NewPostRoute("/tty/resize", r.postTtyResize),
+		local.NewPostRoute("/execvm", r.postExecVM),
 		// PUT
 		// DELETE
 	}
