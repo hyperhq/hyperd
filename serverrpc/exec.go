@@ -2,10 +2,11 @@ package serverrpc
 
 import (
 	"encoding/json"
+	"io"
+
 	"github.com/golang/glog"
 	"github.com/hyperhq/hyperd/types"
 	"golang.org/x/net/context"
-	"io"
 )
 
 func (s *ServerRPC) ExecCreate(ctx context.Context, req *types.ExecCreateRequest) (*types.ExecCreateResponse, error) {
@@ -114,4 +115,79 @@ func (s *ServerRPC) ExecSignal(ctx context.Context, req *types.ExecSignalRequest
 	}
 
 	return &types.ExecSignalResponse{}, nil
+}
+
+func (s *ServerRPC) ExecVM(stream types.PublicAPI_ExecVMServer) error {
+	req, err := stream.Recv()
+	if err != nil {
+		return err
+	}
+
+	cmd, err := json.Marshal(req.Command)
+	if err != nil {
+		return err
+	}
+
+	inReader, inWriter := io.Pipe()
+	outReader, outWriter := io.Pipe()
+	go func() {
+		defer outReader.Close()
+		buf := make([]byte, 32)
+		for {
+			nr, err := outReader.Read(buf)
+			if nr > 0 {
+				if err := stream.Send(&types.ExecVMResponse{
+					Stdout: buf[:nr],
+				}); err != nil {
+					glog.Errorf("Send to stream error: %v", err)
+					return
+				}
+			}
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				glog.Errorf("Read from pipe error: %v", err)
+				return
+			}
+		}
+	}()
+
+	go func() {
+		defer inWriter.Close()
+		for {
+			recv, err := stream.Recv()
+			if err != nil && err != io.EOF {
+				glog.Errorf("Receive from stream error: %v", err)
+				return
+			}
+			if recv != nil && recv.Stdin != nil {
+				nw, ew := inWriter.Write(recv.Stdin)
+				if ew != nil {
+					glog.Errorf("Write pipe error: %v", ew)
+					return
+				}
+				if nw != len(recv.Stdin) {
+					glog.Errorf("Write data length is not enougt, write: %d success: %d", len(recv.Stdin), nw)
+					return
+				}
+			}
+			if err == io.EOF {
+				break
+			}
+		}
+	}()
+
+	code, err := s.daemon.ExecVM(req.PodID, string(cmd), inReader, outWriter, outWriter)
+	if err != nil {
+		return err
+	}
+	if err := stream.Send(&types.ExecVMResponse{
+		ExitCode: int32(code),
+	}); err != nil {
+		glog.Errorf("Send to stream error: %v", err)
+		return err
+	}
+
+	return nil
 }
