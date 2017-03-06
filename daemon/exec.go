@@ -58,3 +58,15 @@ func (daemon *Daemon) KillExec(containerId string, execId string, signal int64) 
 	glog.V(1).Infof("Kill Exec for container %s", containerId)
 	return p.KillExec(execId, signal)
 }
+
+func (daemon *Daemon) ExecVM(podID, cmd string, stdin io.ReadCloser, stdout, stderr io.WriteCloser) (int, error) {
+	glog.V(3).Infof("Starting ExecVM for pod %s", podID)
+	p, ok := daemon.PodList.Get(podID)
+	if !ok {
+		err := fmt.Errorf("cannot find pod %s", podID)
+		glog.Error(err)
+		return -1, err
+	}
+
+	return p.ExecVM(cmd, stdin, stdout, stderr)
+}
