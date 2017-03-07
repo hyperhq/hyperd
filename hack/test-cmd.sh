@@ -181,24 +181,15 @@ __EOF__
   stop_hyperd
 }
 
-test_matrix="\
-qemu overlay
-qemu rawblock
-libvirt overlay
-libvirt devicemapper
---"
-
-# set test_matrix if HYPER_EXEC_DRIVER and HYPER_STORATE_DRIVER are both set
+# test only one combination if HYPER_EXEC_DRIVER and HYPER_STORATE_DRIVER are both set
 if (set -u; echo -e "HYPER_EXEC_DRIVER is $HYPER_EXEC_DRIVER\nHYPER_STORAGE_DRIVER is $HYPER_STORAGE_DRIVER") 2>/dev/null ; then
-    test_matrix="$HYPER_EXEC_DRIVER $HYPER_STORAGE_DRIVER"
+  runTests "$HYPER_EXEC_DRIVER" "$HYPER_STORAGE_DRIVER"
+else
+  runTests qemu overlay
+  runTests qemu rawblock
+  runTests libvirt overlay
+  runTests libvirt devicemapper
 fi
-
-IFSBK=$IFS
-IFS=$'\n'
-for drvs in ${test_matrix%%[[:space:]]--}; do
-    IFS=$IFSBK
-    runTests $drvs
-done
 
 hyper::test::clear_all
 hyper::log::status "TEST PASSED"
