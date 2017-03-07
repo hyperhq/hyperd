@@ -96,6 +96,11 @@ fi
 
 AM_CONDITIONAL([WITH_XEN], [test "x$with_xen" == "xyes"])
 
+AC_CHECK_HEADERS([btrfs/ioctl.h, btrfs/ctree.h], [with_btrfs=yes], [with_btrfs=no])
+AM_CONDITIONAL([WITH_BTRFS], [test "x$with_btrfs" == "xyes"])
+AC_CHECK_HEADERS([btrfs/version.h], [with_btrfs_header_version=yes], [with_btrfs_header_version=no])
+AM_CONDITIONAL([WITH_BTRFS_HEADER_VERSION], [test "x$with_btrfs_header_version" == "xyes"])
+
 AC_CONFIG_FILES([Makefile])
 case $build_os in
 	darwin*)
@@ -115,6 +120,8 @@ AC_MSG_RESULT([
 	with xen:   ${with_xen}
 
 	with libvirt: ${with_libvirt}
+
+	with btrfs: ${with_btrfs}
 
 	has virtualbox: ${has_virtualbox}
 ])

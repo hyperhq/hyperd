@@ -11,7 +11,17 @@ else
 LIBVIRT_BUILD_TAG=
 endif
 
-HYPER_BULD_TAGS=$(XEN_BUILD_TAG) $(LIBVIRT_BUILD_TAG) libdm_no_deferred_remove exclude_graphdriver_btrfs
+if WITH_BTRFS
+if WITH_BTRFS_HEADER_VERSION
+BTRFS_BUILD_TAG=
+else
+BTRFS_BUILD_TAG=btrfs_noversion
+endif
+else
+BTRFS_BUILD_TAG=exclude_graphdriver_btrfs
+endif
+
+HYPER_BULD_TAGS=$(XEN_BUILD_TAG) $(LIBVIRT_BUILD_TAG) $(BTRFS_BUILD_TAG) libdm_no_deferred_remove
 if ON_DARWIN
 SUBDIRS=mac_installer
 endif

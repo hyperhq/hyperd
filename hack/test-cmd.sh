@@ -193,6 +193,8 @@ if (set -u; echo -e "HYPER_EXEC_DRIVER is $HYPER_EXEC_DRIVER\nHYPER_STORAGE_DRIV
   # qemu+rawblock: test with non-cow-rawblock, libvirt+rawblock: test with cow-enabled-rawblock
   if [ x"$TRAVIS" == xtrue -a x"$HYPER_EXEC_DRIVER" == xlibvirt -a x"$HYPER_STORAGE_DRIVER" == xrawblock ]; then
     setup_btrfs
+  elif [ x"$TRAVIS" == xtrue -a x"$HYPER_STORAGE_DRIVER" == xbtrfs ]; then
+    setup_btrfs
   fi
   runTests "$HYPER_EXEC_DRIVER" "$HYPER_STORAGE_DRIVER"
 else

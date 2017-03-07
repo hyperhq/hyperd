@@ -44,6 +44,7 @@ var StorageDrivers map[string]func(*dockertypes.Info, *daemondb.DaemonDB) (Stora
 	"devicemapper": DMFactory,
 	"aufs":         AufsFactory,
 	"overlay":      OverlayFsFactory,
+	"btrfs":        BtrfsFactory,
 	"rawblock":     RawBlockFactory,
 	"vbox":         VBoxStorageFactory,
 }
@@ -400,6 +401,80 @@ func (o *OverlayFsStorage) CreateVolume(podId string, spec *apitypes.UserVolume)
 }
 
 func (o *OverlayFsStorage) RemoveVolume(podId string, record []byte) error {
+	return nil
+}
+
+type BtrfsStorage struct {
+	rootPath string
+}
+
+func BtrfsFactory(_ *dockertypes.Info, _ *daemondb.DaemonDB) (Storage, error) {
+	driver := &BtrfsStorage{
+		rootPath: filepath.Join(utils.HYPER_ROOT, "btrfs"),
+	}
+	return driver, nil
+}
+
+func (s *BtrfsStorage) Type() string {
+	return "btrfs"
+}
+
+func (s *BtrfsStorage) RootPath() string {
+	return s.rootPath
+}
+
+func (s *BtrfsStorage) subvolumesDirID(id string) string {
+	return filepath.Join(s.RootPath(), "subvolumes", id)
+}
+
+func (*BtrfsStorage) Init() error { return nil }
+
+func (*BtrfsStorage) CleanUp() error { return nil }
+
+func (s *BtrfsStorage) PrepareContainer(containerId, sharedDir string) (*runv.VolumeDescription, error) {
+	btrfsRootfs := s.subvolumesDirID(containerId)
+	mountPoint := filepath.Join(sharedDir, containerId, "rootfs")
+
+	if _, err := os.Stat(mountPoint); err != nil {
+		if err = os.MkdirAll(mountPoint, 0755); err != nil {
+			return nil, err
+		}
+	}
+	if err := syscall.Mount(btrfsRootfs, mountPoint, "bind", syscall.MS_BIND, ""); err != nil {
+		return nil, fmt.Errorf("failed to mount %s to %s: %v", btrfsRootfs, mountPoint, err)
+	}
+
+	containerPath := "/" + containerId
+	vol := &runv.VolumeDescription{
+		Name:   containerPath,
+		Source: containerPath,
+		Fstype: "dir",
+		Format: "vfs",
+	}
+
+	return vol, nil
+}
+
+func (s *BtrfsStorage) CleanupContainer(id, sharedDir string) error {
+	return syscall.Unmount(filepath.Join(sharedDir, id, "rootfs"), 0)
+}
+
+func (s *BtrfsStorage) InjectFile(src io.Reader, mountId, target, baseDir string, perm, uid, gid int) error {
+	return storage.FsInjectFile(src, mountId, target, filepath.Dir(s.subvolumesDirID(mountId)), perm, uid, gid)
+}
+
+func (s *BtrfsStorage) CreateVolume(podId string, spec *apitypes.UserVolume) error {
+	volName, err := storage.CreateVFSVolume(podId, spec.Name)
+	if err != nil {
+		return err
+	}
+	spec.Source = volName
+	spec.Format = "vfs"
+	spec.Fstype = "dir"
+	return nil
+}
+
+func (s *BtrfsStorage) RemoveVolume(podId string, record []byte) error {
 	return nil
 }
 
