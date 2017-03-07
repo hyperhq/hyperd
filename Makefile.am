@@ -12,7 +12,11 @@ LIBVIRT_BUILD_TAG=
 endif
 
 if WITH_BTRFS
+if WITH_BTRFS_HEADER_VERSION
 BTRFS_BUILD_TAG=
+else
+BTRFS_BUILD_TAG=btrfs_noversion
+endif
 else
 BTRFS_BUILD_TAG=exclude_graphdriver_btrfs
 endif
