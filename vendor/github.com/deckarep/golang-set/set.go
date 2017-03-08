@@ -84,8 +84,8 @@ type Set interface {
 	// panic.
 	Intersect(other Set) Set
 
-	// Determines if every element in the other set
-	// is in this set.
+	// Determines if every element in this set is in
+	// the other set.
 	//
 	// Note that the argument to IsSubset
 	// must be of the same type as the receiver
@@ -93,8 +93,8 @@ type Set interface {
 	// panic.
 	IsSubset(other Set) bool
 
-	// Determines if every element in this set is in
-	// the other set.
+	// Determines if every element in the other set
+	// is in this set.
 	//
 	// Note that the argument to IsSuperset
 	// must be of the same type as the receiver
@@ -105,6 +105,10 @@ type Set interface {
 	// Returns a channel of elements that you can
 	// range over.
 	Iter() <-chan interface{}
+
+	// Returns an Iterator object that you can
+	// use to range over the set.
+	Iterator() *Iterator
 
 	// Remove a single element from the set.
 	Remove(i interface{})
@@ -125,6 +129,7 @@ type Set interface {
 	// Returns a new set with all elements in both sets.
 	//
 	// Note that the argument to Union must be of the
+
 	// same type as the receiver of the method.
 	// Otherwise, IsSuperset will panic.
 	Union(other Set) Set
@@ -140,17 +145,22 @@ type Set interface {
 }
 
 // Creates and returns a reference to an empty set.
-func NewSet() Set {
+func NewSet(s ...interface{}) Set {
 	set := newThreadSafeSet()
+	for _, item := range s {
+		set.Add(item)
+	}
 	return &set
+}
+
+// Creates and returns a new set with the given elements
+func NewSetWith(elts ...interface{}) Set {
+	return NewSetFromSlice(elts)
 }
 
 // Creates and returns a reference to a set from an existing slice
 func NewSetFromSlice(s []interface{}) Set {
-	a := NewSet()
-	for _, item := range s {
-		a.Add(item)
-	}
+	a := NewSet(s...)
 	return a
 }
 

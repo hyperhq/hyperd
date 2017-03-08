@@ -9,7 +9,7 @@ import (
 
 func (cli *HyperClient) HyperCmdStart(args ...string) error {
 	var opts struct {
-		Container bool `short:"c" long:"container" default:"false" default-mask:"-" description:"start container"`
+		Container bool `short:"c" long:"container" default-mask:"-" description:"start container"`
 	}
 	var parser = gflag.NewParser(&opts, gflag.Default|gflag.IgnoreUnknown)
 	parser.Usage = "start [OPTIONS] POD_ID|CONTAINER_ID\n\nLaunch a created pod or container"

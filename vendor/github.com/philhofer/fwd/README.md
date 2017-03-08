@@ -11,9 +11,9 @@ The `fwd.Writer` and `fwd.Reader` type provide similar
 functionality to their counterparts in `bufio`, plus
 a few extra utility methods that simplify read-ahead
 and write-ahead. I wrote this package to improve serialization
-performance for <a href="http://github.com/philhofer/msgp">http://github.com/philhofer/msgp</a>,
-where it provided about a 2x speedup over `bufio`. However,
-care must be taken to understand the semantics of the
+performance for <a href="http://github.com/tinylib/msgp">http://github.com/tinylib/msgp</a>,
+where it provided about a 2x speedup over `bufio` for certain
+workloads. However, care must be taken to understand the semantics of the
 extra methods provided by this package, as they allow
 the user to access and manipulate the buffer memory
 directly.
@@ -26,7 +26,7 @@ in the stream, and uses the `io.Seeker` interface if the underlying
 stream implements it. `(*fwd.Reader).Next` returns a slice pointing
 to the next `n` bytes in the read buffer (like `Peek`), but also
 increments the read position. This allows users to process streams
-in aribtrary block sizes without having to manage appropriately-sized
+in arbitrary block sizes without having to manage appropriately-sized
 slices. Additionally, obviating the need to copy the data from the
 buffer to another location in memory can improve performance dramatically
 in CPU-bound applications.
@@ -110,13 +110,14 @@ Buffered returns the number of bytes currently in the buffer
 func (r *Reader) Next(n int) ([]byte, error)
 ```
 Next returns the next 'n' bytes in the stream.
-If the returned slice has a length less than 'n',
-an error will also be returned.
 Unlike Peek, Next advances the reader position.
 The returned bytes point to the same
 data as the buffer, so the slice is
 only valid until the next reader method call.
 An EOF is considered an unexpected error.
+If an the returned slice is less than the
+length asked for, an error will be returned,
+and the reader position will not be incremented.
 
 
 
@@ -156,6 +157,7 @@ func (r *Reader) ReadFull(b []byte) (int, error)
 ReadFull attempts to read len(b) bytes into
 'b'. It returns the number of bytes read into
 'b', and an error if it does not return len(b).
+EOF is considered an unexpected error.
 
 
 
@@ -174,7 +176,7 @@ func (r *Reader) Skip(n int) (int, error)
 ```
 Skip moves the reader forward 'n' bytes.
 Returns the number of bytes skipped and any
-errors encountered. It is analagous to Seek(n, 1).
+errors encountered. It is analogous to Seek(n, 1).
 If the underlying reader implements io.Seeker, then
 that method will be used to skip forward.
 
@@ -266,6 +268,8 @@ Next returns the next 'n' free bytes
 in the write buffer, flushing the writer
 as necessary. Next will return `io.ErrShortBuffer`
 if 'n' is greater than the size of the write buffer.
+Calls to 'next' increment the write position by
+the size of the returned buffer.
 
 
 
@@ -297,7 +301,7 @@ WriteByte implements `io.ByteWriter`
 ``` go
 func (w *Writer) WriteString(s string) (int, error)
 ```
-WriteString is analagous to Write, but it takes a string.
+WriteString is analogous to Write, but it takes a string.
 
 
 

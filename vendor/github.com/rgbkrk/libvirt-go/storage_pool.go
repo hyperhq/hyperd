@@ -199,6 +199,16 @@ func (p *VirStoragePool) StorageVolCreateXML(xmlConfig string, flags uint32) (Vi
 	return VirStorageVol{ptr: ptr}, nil
 }
 
+func (p *VirStoragePool) StorageVolCreateXMLFrom(xmlConfig string, clonevol VirStorageVol, flags uint32) (VirStorageVol, error) {
+	cXml := C.CString(string(xmlConfig))
+	defer C.free(unsafe.Pointer(cXml))
+	ptr := C.virStorageVolCreateXMLFrom(p.ptr, cXml, clonevol.ptr, C.uint(flags))
+	if ptr == nil {
+		return VirStorageVol{}, GetLastError()
+	}
+	return VirStorageVol{ptr: ptr}, nil
+}
+
 func (p *VirStoragePool) LookupStorageVolByName(name string) (VirStorageVol, error) {
 	cName := C.CString(name)
 	defer C.free(unsafe.Pointer(cName))

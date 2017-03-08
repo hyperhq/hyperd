@@ -1117,7 +1117,7 @@ func (lc *LibvirtContext) SetCpus(ctx *hypervisor.VmContext, cpus int) error {
 		return fmt.Errorf("Cannot find domain")
 	}
 
-	return lc.domain.SetVcpusFlags(uint(cpus), libvirtgo.VIR_DOMAIN_VCPU_LIVE)
+	return lc.domain.SetVcpusFlags(uint16(cpus), libvirtgo.VIR_DOMAIN_VCPU_LIVE)
 }
 
 func (lc *LibvirtContext) AddMem(ctx *hypervisor.VmContext, slot, size int) error {

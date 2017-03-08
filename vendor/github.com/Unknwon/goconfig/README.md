@@ -1,4 +1,4 @@
-goconfig [![Build Status](https://drone.io/github.com/Unknwon/goconfig/status.png)](https://drone.io/github.com/Unknwon/goconfig/latest) [![Go Walker](http://gowalker.org/api/v1/badge)](http://gowalker.org/github.com/Unknwon/goconfig) [![](http://gocover.io/_badge/github.com/Unknwon/goconfig)](http://gocover.io/github.com/Unknwon/goconfig)
+goconfig [![Build Status](https://drone.io/github.com/Unknwon/goconfig/status.png)](https://drone.io/github.com/Unknwon/goconfig/latest) [![Go Walker](http://gowalker.org/api/v1/badge)](http://gowalker.org/github.com/Unknwon/goconfig)
 ========
 
 [中文文档](README_ZH.md)
@@ -51,6 +51,11 @@ Please see [conf.ini](testdata/conf.ini) as an example.
 - Finally, `SaveConfigFile` saves your configuration to local file system.
 - Use method `Reload` in case someone else modified your file(s).
 - Methods contains `Comment` help you manipulate comments.
+- `LoadFromReader` allows loading data without an intermediate file.
+- `SaveConfigData` added, which writes configuration to an arbitrary writer.
+- `ReloadData` allows to reload data from memory.
+
+Note that you cannot mix in-memory configuration with on-disk configuration.
 
 ## More Information
 

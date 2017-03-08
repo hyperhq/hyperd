@@ -11,7 +11,7 @@ import (
 
 func (cli *HyperClient) HyperCmdKill(args ...string) error {
 	var opts struct {
-		Pod    bool   `short:"p" long:"pod" default:"false" default-mask:"-" description:"kill all containers in a pod"`
+		Pod    bool   `short:"p" long:"pod" default-mask:"-" description:"kill all containers in a pod"`
 		Signal string `short:"s" long:"signal" value-name:"\"\"" description:"The signal to kill containers, default is 9"`
 	}
 	var parser = gflag.NewParser(&opts, gflag.Default|gflag.IgnoreUnknown)

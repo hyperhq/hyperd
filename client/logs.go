@@ -10,9 +10,9 @@ import (
 
 func (cli *HyperClient) HyperCmdLogs(args ...string) error {
 	var opts struct {
-		Follow bool   `short:"f" long:"follow" default:"false" default-mask:"-" description:"Follow log output"`
+		Follow bool   `short:"f" long:"follow" default-mask:"-" description:"Follow log output"`
 		Since  string `long:"since" value-name:"\"\"" description:"Show logs since timestamp"`
-		Times  bool   `short:"t" long:"timestamps" default:"false" default-mask:"-" description:"Show timestamps"`
+		Times  bool   `short:"t" long:"timestamps" default-mask:"-" description:"Show timestamps"`
 		Tail   string `long:"tail" value-name:"\"all\"" description:"Number of lines to show from the end of the logs"`
 	}
 

@@ -1,19 +1,30 @@
-# Carving out the future
+# libvirt-go [![Build Status](https://travis-ci.org/rgbkrk/libvirt-go.svg?branch=master)](https://travis-ci.org/rgbkrk/libvirt-go) [![GoDoc](https://godoc.org/gopkg.in/alexzorin/libvirt-go.v2?status.svg)](http://godoc.org/gopkg.in/alexzorin/libvirt-go.v2)
 
-Go 1.6 is incompatible with libvirt's implementation of Domain Events (those things that callback to your code to let you know something changed in a domain's state), so builds of this under golang 1.6 will not include Domain Events unless someone comes up with a workaround.
-
-# libvirt-go
-
-[![Build Status](http://ci.serversaurus.com/github.com/alexzorin/libvirt-go/status.svg?branch=master)](http://ci.serversaurus.com/github.com/alexzorin/libvirt-go)
-
-Go bindings for libvirt.
+Go bindings for libvirt. These bindings are **deprecated**. Please,
+migrate to the
+[new official version](https://github.com/libvirt/libvirt-go).
+You'll have to do
+[some minor adjustments](https://www.berrange.com/posts/2016/12/15/announce-new-libvirt-project-go-language-bindings/)
+to your code.
 
 Make sure to have `libvirt-dev` package (or the development files otherwise somewhere in your include path)
 
 ## Version Support
-Currently, the only supported version of libvirt is **1.2.2**, tagged as `v2.x` releases `gopkg.in/alexzorin/libvirt-go.v2` [(docs)](http://gopkg.in/alexzorin/libvirt-go.v2).
 
-The bindings will probably work with versions of libvirt that are higher than 1.2.2, depending on what is added in those releases. However, no features are currently being added that will cause the build or tests to break against 1.2.2.
+The minimum supported version of libvirt is **1.2.2**. Due to the
+API/ABI compatibility promise of libvirt, more recent versions of
+libvirt should work too.
+
+Some features require a more recent version of libvirt. They are
+disabled by default. If you want to enable them, build using one of
+those additional tags (you need to use only the most recent one you
+are interested in):
+
+ - **1.2.14**
+
+For example:
+
+    go build -tags libvirt.1.2.14
 
 ### OS Compatibility Matrix
 
@@ -22,9 +33,11 @@ To quickly see what version of libvirt your OS can easily support (may be outdat
 | OS Release   | libvirt Version                |
 | ------------ | ------------------------------ |
 | FC19         | 1.2.9 from libvirt.org/sources |
-| Debian 7     | 1.2.4 from wheezy-backports    |
-| Debian 6     | 0.9.12 from squeeze-backports  |
+| Debian 8     | 1.2.9 from jessie              |
+| Debian 7     | 1.2.9 from wheezy-backports    |
 | Ubuntu 14.04 | 1.2.2 from trusty              |
+| Ubuntu 16.04 | 1.3.1 from xenial              |
+| RHEL 7       | 1.2.17                         |
 | RHEL 6       | 0.10.x                         |
 | RHEL 5       | 0.8.x                          |
 
@@ -46,8 +59,8 @@ Integration tests are available where functionality isn't provided by the test d
 
 A `Vagrantfile` is included to run the integration tests:
 
-* `cd ./vagrant/{branch}` (i.e `./vagrant/master`, where you will find a `Vagrantfile` for the `master` branch)
+* `cd ./vagrant`
 * `vagrant up` to provision the virtual machine
 * `vagrant ssh` to login to the virtual machine
 
-Once inside, `sudo su -`, `cd /libvirt-go` and `go test -tags integration`.
+Once inside, `sudo su -` and `go test -tags integration libvirt`.

@@ -22,9 +22,45 @@ type PersistPodLayout struct {
 	Interfaces []string `protobuf:"bytes,23,rep,name=interfaces" json:"interfaces,omitempty"`
 }
 
-func (m *PersistPodLayout) Reset()         { *m = PersistPodLayout{} }
-func (m *PersistPodLayout) String() string { return proto.CompactTextString(m) }
-func (*PersistPodLayout) ProtoMessage()    {}
+func (m *PersistPodLayout) Reset()                    { *m = PersistPodLayout{} }
+func (m *PersistPodLayout) String() string            { return proto.CompactTextString(m) }
+func (*PersistPodLayout) ProtoMessage()               {}
+func (*PersistPodLayout) Descriptor() ([]byte, []int) { return fileDescriptorPersist, []int{0} }
+
+func (m *PersistPodLayout) GetId() string {
+	if m != nil {
+		return m.Id
+	}
+	return ""
+}
+
+func (m *PersistPodLayout) GetGlobalSpec() string {
+	if m != nil {
+		return m.GlobalSpec
+	}
+	return ""
+}
+
+func (m *PersistPodLayout) GetContainers() []string {
+	if m != nil {
+		return m.Containers
+	}
+	return nil
+}
+
+func (m *PersistPodLayout) GetVolumes() []string {
+	if m != nil {
+		return m.Volumes
+	}
+	return nil
+}
+
+func (m *PersistPodLayout) GetInterfaces() []string {
+	if m != nil {
+		return m.Interfaces
+	}
+	return nil
+}
 
 type PersistPodMeta struct {
 	Id        string            `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -33,9 +69,17 @@ type PersistPodMeta struct {
 	CreatedAt int64             `protobuf:"varint,21,opt,name=createdAt,proto3" json:"createdAt,omitempty"`
 }
 
-func (m *PersistPodMeta) Reset()         { *m = PersistPodMeta{} }
-func (m *PersistPodMeta) String() string { return proto.CompactTextString(m) }
-func (*PersistPodMeta) ProtoMessage()    {}
+func (m *PersistPodMeta) Reset()                    { *m = PersistPodMeta{} }
+func (m *PersistPodMeta) String() string            { return proto.CompactTextString(m) }
+func (*PersistPodMeta) ProtoMessage()               {}
+func (*PersistPodMeta) Descriptor() ([]byte, []int) { return fileDescriptorPersist, []int{1} }
+
+func (m *PersistPodMeta) GetId() string {
+	if m != nil {
+		return m.Id
+	}
+	return ""
+}
 
 func (m *PersistPodMeta) GetServices() []*UserService {
 	if m != nil {
@@ -51,14 +95,36 @@ func (m *PersistPodMeta) GetLabels() map[string]string {
 	return nil
 }
 
+func (m *PersistPodMeta) GetCreatedAt() int64 {
+	if m != nil {
+		return m.CreatedAt
+	}
+	return 0
+}
+
 type SandboxPersistInfo struct {
 	Id          string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	PersistInfo []byte `protobuf:"bytes,2,opt,name=PersistInfo,proto3" json:"PersistInfo,omitempty"`
 }
 
-func (m *SandboxPersistInfo) Reset()         { *m = SandboxPersistInfo{} }
-func (m *SandboxPersistInfo) String() string { return proto.CompactTextString(m) }
-func (*SandboxPersistInfo) ProtoMessage()    {}
+func (m *SandboxPersistInfo) Reset()                    { *m = SandboxPersistInfo{} }
+func (m *SandboxPersistInfo) String() string            { return proto.CompactTextString(m) }
+func (*SandboxPersistInfo) ProtoMessage()               {}
+func (*SandboxPersistInfo) Descriptor() ([]byte, []int) { return fileDescriptorPersist, []int{2} }
+
+func (m *SandboxPersistInfo) GetId() string {
+	if m != nil {
+		return m.Id
+	}
+	return ""
+}
+
+func (m *SandboxPersistInfo) GetPersistInfo() []byte {
+	if m != nil {
+		return m.PersistInfo
+	}
+	return nil
+}
 
 type PersistContainer struct {
 	Id       string                    `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -67,9 +133,24 @@ type PersistContainer struct {
 	Descript *api.ContainerDescription `protobuf:"bytes,12,opt,name=descript" json:"descript,omitempty"`
 }
 
-func (m *PersistContainer) Reset()         { *m = PersistContainer{} }
-func (m *PersistContainer) String() string { return proto.CompactTextString(m) }
-func (*PersistContainer) ProtoMessage()    {}
+func (m *PersistContainer) Reset()                    { *m = PersistContainer{} }
+func (m *PersistContainer) String() string            { return proto.CompactTextString(m) }
+func (*PersistContainer) ProtoMessage()               {}
+func (*PersistContainer) Descriptor() ([]byte, []int) { return fileDescriptorPersist, []int{3} }
+
+func (m *PersistContainer) GetId() string {
+	if m != nil {
+		return m.Id
+	}
+	return ""
+}
+
+func (m *PersistContainer) GetPod() string {
+	if m != nil {
+		return m.Pod
+	}
+	return ""
+}
 
 func (m *PersistContainer) GetSpec() *UserContainer {
 	if m != nil {
@@ -92,9 +173,24 @@ type PersistVolume struct {
 	Descript *api.VolumeDescription `protobuf:"bytes,12,opt,name=descript" json:"descript,omitempty"`
 }
 
-func (m *PersistVolume) Reset()         { *m = PersistVolume{} }
-func (m *PersistVolume) String() string { return proto.CompactTextString(m) }
-func (*PersistVolume) ProtoMessage()    {}
+func (m *PersistVolume) Reset()                    { *m = PersistVolume{} }
+func (m *PersistVolume) String() string            { return proto.CompactTextString(m) }
+func (*PersistVolume) ProtoMessage()               {}
+func (*PersistVolume) Descriptor() ([]byte, []int) { return fileDescriptorPersist, []int{4} }
+
+func (m *PersistVolume) GetName() string {
+	if m != nil {
+		return m.Name
+	}
+	return ""
+}
+
+func (m *PersistVolume) GetPod() string {
+	if m != nil {
+		return m.Pod
+	}
+	return ""
+}
 
 func (m *PersistVolume) GetSpec() *UserVolume {
 	if m != nil {
@@ -117,9 +213,24 @@ type PersistInterface struct {
 	Descript *api.InterfaceDescription `protobuf:"bytes,12,opt,name=descript" json:"descript,omitempty"`
 }
 
-func (m *PersistInterface) Reset()         { *m = PersistInterface{} }
-func (m *PersistInterface) String() string { return proto.CompactTextString(m) }
-func (*PersistInterface) ProtoMessage()    {}
+func (m *PersistInterface) Reset()                    { *m = PersistInterface{} }
+func (m *PersistInterface) String() string            { return proto.CompactTextString(m) }
+func (*PersistInterface) ProtoMessage()               {}
+func (*PersistInterface) Descriptor() ([]byte, []int) { return fileDescriptorPersist, []int{5} }
+
+func (m *PersistInterface) GetId() string {
+	if m != nil {
+		return m.Id
+	}
+	return ""
+}
+
+func (m *PersistInterface) GetPod() string {
+	if m != nil {
+		return m.Pod
+	}
+	return ""
+}
 
 func (m *PersistInterface) GetSpec() *UserInterface {
 	if m != nil {
@@ -142,4 +253,40 @@ func init() {
 	proto.RegisterType((*PersistContainer)(nil), "types.PersistContainer")
 	proto.RegisterType((*PersistVolume)(nil), "types.PersistVolume")
 	proto.RegisterType((*PersistInterface)(nil), "types.PersistInterface")
+}
+
+func init() { proto.RegisterFile("persist.proto", fileDescriptorPersist) }
+
+var fileDescriptorPersist = []byte{
+	// 467 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0xa4, 0x93, 0xdf, 0x6a, 0xdb, 0x30,
+	0x14, 0xc6, 0x71, 0xd2, 0x76, 0xed, 0x71, 0x5a, 0x32, 0xd1, 0x76, 0x5a, 0x18, 0xc3, 0x33, 0x0c,
+	0x72, 0xe5, 0x40, 0xc6, 0x60, 0xdd, 0xdd, 0xd8, 0x1f, 0x28, 0x74, 0x50, 0x1c, 0xb6, 0x7b, 0xd9,
+	0x3e, 0x6d, 0xc4, 0x1c, 0x4b, 0x93, 0xe4, 0x30, 0xbf, 0xc5, 0x6e, 0x76, 0xb7, 0xc7, 0xdb, 0x83,
+	0x0c, 0x4b, 0xfe, 0x57, 0x12, 0xd8, 0xc5, 0xee, 0xa4, 0xef, 0x7c, 0xe7, 0xf3, 0x4f, 0x47, 0x32,
+	0x9c, 0x4a, 0x54, 0x9a, 0x6b, 0x13, 0x49, 0x25, 0x8c, 0x20, 0x87, 0xa6, 0x92, 0xa8, 0x67, 0xd1,
+	0x3d, 0x37, 0xeb, 0x32, 0x89, 0x52, 0xb1, 0x59, 0xac, 0x2b, 0x89, 0x6a, 0xfd, 0x7d, 0xa1, 0xca,
+	0x62, 0xbb, 0x60, 0x92, 0x2f, 0x32, 0xd4, 0xa9, 0xe2, 0xd2, 0x70, 0x51, 0x68, 0xd7, 0x36, 0xf3,
+	0x6d, 0x9b, 0xdb, 0x84, 0xbf, 0x3d, 0x98, 0xde, 0xba, 0xd4, 0x5b, 0x91, 0xdd, 0xb0, 0x4a, 0x94,
+	0x86, 0x9c, 0xc1, 0x88, 0x67, 0xd4, 0x0b, 0xbc, 0xf9, 0x49, 0x3c, 0xe2, 0x19, 0x79, 0x0e, 0x70,
+	0x9f, 0x8b, 0x84, 0xe5, 0x2b, 0x89, 0x29, 0xf5, 0xad, 0x3e, 0x50, 0xea, 0x7a, 0x2a, 0x0a, 0xc3,
+	0x78, 0x81, 0x4a, 0xd3, 0x8b, 0x60, 0x5c, 0xd7, 0x7b, 0x85, 0x50, 0x78, 0xb4, 0x15, 0x79, 0xb9,
+	0x41, 0x4d, 0x2f, 0x6d, 0xb1, 0xdd, 0xd6, 0x9d, 0xbc, 0x30, 0xa8, 0xee, 0x58, 0x8a, 0x9a, 0x3e,
+	0x71, 0x9d, 0xbd, 0x12, 0xfe, 0xf1, 0xe0, 0xac, 0xc7, 0xfb, 0x8c, 0x86, 0xed, 0xc0, 0x45, 0x70,
+	0xac, 0x51, 0x6d, 0x79, 0x1d, 0xe0, 0x07, 0xe3, 0xb9, 0xbf, 0x24, 0x91, 0x3b, 0xe1, 0x17, 0x8d,
+	0x6a, 0xe5, 0x4a, 0x71, 0xe7, 0x21, 0x57, 0x70, 0x94, 0xb3, 0x04, 0x73, 0x4d, 0x27, 0xd6, 0xfd,
+	0xa2, 0x71, 0x3f, 0xfc, 0x4c, 0x74, 0x63, 0x3d, 0x1f, 0x0b, 0xa3, 0xaa, 0xb8, 0x69, 0x20, 0xcf,
+	0xe0, 0x24, 0x55, 0xc8, 0x0c, 0x66, 0xef, 0x0c, 0xbd, 0x08, 0xbc, 0xf9, 0x38, 0xee, 0x85, 0xd9,
+	0x15, 0xf8, 0x83, 0x26, 0x32, 0x85, 0xf1, 0x37, 0xac, 0x1a, 0xd0, 0x7a, 0x49, 0xce, 0xe1, 0x70,
+	0xcb, 0xf2, 0x12, 0xe9, 0xc8, 0x6a, 0x6e, 0xf3, 0x76, 0xf4, 0xc6, 0x0b, 0x3f, 0x01, 0x59, 0xb1,
+	0x22, 0x4b, 0xc4, 0x8f, 0x86, 0xe2, 0xba, 0xb8, 0x13, 0x3b, 0x27, 0x0d, 0xc0, 0x1f, 0x94, 0x6d,
+	0xca, 0x24, 0x1e, 0x4a, 0xe1, 0xaf, 0xfe, 0x36, 0xdf, 0xb7, 0xe3, 0xdf, 0x89, 0x99, 0xc2, 0x58,
+	0x8a, 0xac, 0x81, 0xa8, 0x97, 0x64, 0x0e, 0x07, 0xba, 0xbd, 0x59, 0x7f, 0x79, 0x3e, 0x18, 0x5f,
+	0x97, 0x12, 0x5b, 0x07, 0x79, 0x0d, 0xc7, 0xed, 0x8b, 0xa2, 0x13, 0xeb, 0x7e, 0x1a, 0x31, 0xc9,
+	0xa3, 0xce, 0xf7, 0xa1, 0x7f, 0x6f, 0x71, 0x67, 0x0d, 0x7f, 0x7a, 0x70, 0xda, 0x70, 0x7d, 0xb5,
+	0x37, 0x4f, 0x08, 0x1c, 0x14, 0x6c, 0x83, 0x0d, 0x96, 0x5d, 0xef, 0x01, 0x7b, 0xf9, 0x00, 0xec,
+	0xf1, 0x00, 0xcc, 0xc5, 0x34, 0x54, 0xcb, 0x1d, 0xaa, 0x4b, 0x4b, 0xe5, 0x4c, 0xfb, 0x91, 0x06,
+	0xa3, 0xba, 0x6e, 0xdf, 0xdb, 0x7f, 0x8d, 0xaa, 0x4b, 0xf9, 0xc7, 0xa8, 0x3a, 0xdf, 0x5e, 0xae,
+	0xe4, 0xc8, 0xfe, 0x97, 0xaf, 0xfe, 0x06, 0x00, 0x00, 0xff, 0xff, 0x92, 0x40, 0xb8, 0x94, 0xec,
+	0x03, 0x00, 0x00,
 }

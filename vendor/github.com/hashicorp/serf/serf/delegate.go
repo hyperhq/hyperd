@@ -1,8 +1,11 @@
 package serf
 
 import (
+	"bytes"
 	"fmt"
+
 	"github.com/armon/go-metrics"
+	"github.com/hashicorp/go-msgpack/codec"
 )
 
 // delegate is the memberlist.Delegate implementation that Serf uses.
@@ -81,6 +84,25 @@ func (d *delegate) NotifyMsg(buf []byte) {
 
 		d.serf.logger.Printf("[DEBUG] serf: messageQueryResponseType: %v", resp.From)
 		d.serf.handleQueryResponse(&resp)
+
+	case messageRelayType:
+		var header relayHeader
+		var handle codec.MsgpackHandle
+		reader := bytes.NewReader(buf[1:])
+		decoder := codec.NewDecoder(reader, &handle)
+		if err := decoder.Decode(&header); err != nil {
+			d.serf.logger.Printf("[ERR] serf: Error decoding relay header: %s", err)
+			break
+		}
+
+		// The remaining contents are the message itself, so forward that
+		raw := make([]byte, reader.Len())
+		reader.Read(raw)
+		d.serf.logger.Printf("[DEBUG] serf: Relaying response to addr: %s", header.DestAddr.String())
+		if err := d.serf.memberlist.SendTo(&header.DestAddr, raw); err != nil {
+			d.serf.logger.Printf("[ERR] serf: Error forwarding message to %s: %s", header.DestAddr.String(), err)
+			break
+		}
 
 	default:
 		d.serf.logger.Printf("[WARN] serf: Received message of unknown type: %d", t)
@@ -170,6 +192,12 @@ func (d *delegate) LocalState(join bool) []byte {
 }
 
 func (d *delegate) MergeRemoteState(buf []byte, isJoin bool) {
+	// Ensure we have a message
+	if len(buf) == 0 {
+		d.serf.logger.Printf("[ERR] serf: Remote state is zero bytes")
+		return
+	}
+
 	// Check the message type
 	if messageType(buf[0]) != messagePushPullType {
 		d.serf.logger.Printf("[ERR] serf: Remote state has bad type prefix: %v", buf[0])
