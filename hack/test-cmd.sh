@@ -177,6 +177,7 @@ __EOF__
   hyper::test::with_volume
   hyper::test::service
   hyper::test::nfs_volume
+  hyper::test::execvm
 
   stop_hyperd
 }
