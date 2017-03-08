@@ -463,6 +463,41 @@ func (vm *Vm) HyperstartExecSync(cmd []string, stdin []byte) (stdout, stderr []b
 	return stdoutBuf.Bytes(), stderrBuf.Bytes(), nil
 }
 
+func (vm *Vm) HyperstartExec(cmd string, tty *TtyIO) (int, error) {
+	var command []string
+
+	if cmd == "" {
+		return -1, fmt.Errorf("'hyperstart exec' without command")
+	}
+
+	if err := json.Unmarshal([]byte(cmd), &command); err != nil {
+		return 0, err
+	}
+
+	execID := fmt.Sprintf("hyperstart-exec-%s", utils.RandStr(10, "alpha"))
+	result := vm.WaitProcess(false, []string{execID}, -1)
+	if result == nil {
+		err := fmt.Errorf("can not wait hyperstart-exec %q", execID)
+		glog.Error(err)
+		return -1, err
+	}
+
+	err := vm.AddProcess(hyperstartapi.HYPERSTART_EXEC_CONTAINER, execID, false, command, []string{}, "/", tty)
+	if err != nil {
+		return -1, err
+	}
+
+	r, ok := <-result
+	if !ok {
+		err = fmt.Errorf("wait hyperstart-exec %q interrupted", execID)
+		glog.Error(err)
+		return -1, err
+	}
+
+	glog.V(3).Infof("hyperstart-exec %q terminated at %v with code %d", execID, r.FinishedAt, r.Code)
+	return r.Code, nil
+}
+
 func (vm *Vm) Exec(container, execId, cmd string, terminal bool, tty *TtyIO) error {
 	var command []string
 
