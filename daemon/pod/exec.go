@@ -204,3 +204,11 @@ func (p *XPod) CleanupExecs() {
 	p.execs = make(map[string]*Exec)
 	p.statusLock.Unlock()
 }
+
+func (p *XPod) ExecVM(cmd string, stdin io.ReadCloser, stdout, stderr io.WriteCloser) (int, error) {
+	return p.sandbox.HyperstartExec(cmd, &hypervisor.TtyIO{
+		Stdin:  stdin,
+		Stdout: stdout,
+		Stderr: stderr,
+	})
+}

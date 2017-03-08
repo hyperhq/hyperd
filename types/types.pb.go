@@ -86,6 +86,8 @@ It has these top-level messages:
 	ExecCreateResponse
 	ExecStartRequest
 	ExecStartResponse
+	ExecVMRequest
+	ExecVMResponse
 	ExecSignalRequest
 	ExecSignalResponse
 	PodStartRequest
@@ -1545,6 +1547,25 @@ func (m *ExecStartResponse) Reset()         { *m = ExecStartResponse{} }
 func (m *ExecStartResponse) String() string { return proto.CompactTextString(m) }
 func (*ExecStartResponse) ProtoMessage()    {}
 
+type ExecVMRequest struct {
+	PodID   string   `protobuf:"bytes,1,opt,name=podID,proto3" json:"podID,omitempty"`
+	Command []string `protobuf:"bytes,2,rep,name=command" json:"command,omitempty"`
+	Stdin   []byte   `protobuf:"bytes,3,opt,name=stdin,proto3" json:"stdin,omitempty"`
+}
+
+func (m *ExecVMRequest) Reset()         { *m = ExecVMRequest{} }
+func (m *ExecVMRequest) String() string { return proto.CompactTextString(m) }
+func (*ExecVMRequest) ProtoMessage()    {}
+
+type ExecVMResponse struct {
+	Stdout   []byte `protobuf:"bytes,1,opt,name=stdout,proto3" json:"stdout,omitempty"`
+	ExitCode int32  `protobuf:"varint,2,opt,name=exitCode,proto3" json:"exitCode,omitempty"`
+}
+
+func (m *ExecVMResponse) Reset()         { *m = ExecVMResponse{} }
+func (m *ExecVMResponse) String() string { return proto.CompactTextString(m) }
+func (*ExecVMResponse) ProtoMessage()    {}
+
 type ExecSignalRequest struct {
 	ContainerID string `protobuf:"bytes,1,opt,name=containerID,proto3" json:"containerID,omitempty"`
 	ExecID      string `protobuf:"bytes,2,opt,name=execID,proto3" json:"execID,omitempty"`
@@ -2116,6 +2137,8 @@ func init() {
 	proto.RegisterType((*ExecCreateResponse)(nil), "types.ExecCreateResponse")
 	proto.RegisterType((*ExecStartRequest)(nil), "types.ExecStartRequest")
 	proto.RegisterType((*ExecStartResponse)(nil), "types.ExecStartResponse")
+	proto.RegisterType((*ExecVMRequest)(nil), "types.ExecVMRequest")
+	proto.RegisterType((*ExecVMResponse)(nil), "types.ExecVMResponse")
 	proto.RegisterType((*ExecSignalRequest)(nil), "types.ExecSignalRequest")
 	proto.RegisterType((*ExecSignalResponse)(nil), "types.ExecSignalResponse")
 	proto.RegisterType((*PodStartRequest)(nil), "types.PodStartRequest")
@@ -2194,6 +2217,8 @@ type PublicAPIClient interface {
 	PodPause(ctx context.Context, in *PodPauseRequest, opts ...grpc.CallOption) (*PodPauseResponse, error)
 	// PodUnpause unpauses a pod
 	PodUnpause(ctx context.Context, in *PodUnpauseRequest, opts ...grpc.CallOption) (*PodUnpauseResponse, error)
+	// ExecVM executes a command outside of any containers.
+	ExecVM(ctx context.Context, opts ...grpc.CallOption) (PublicAPI_ExecVMClient, error)
 	// ContainerList gets a list of containers
 	ContainerList(ctx context.Context, in *ContainerListRequest, opts ...grpc.CallOption) (*ContainerListResponse, error)
 	// ContainerInfo gets container's info by container's id or name
@@ -2343,6 +2368,37 @@ func (c *publicAPIClient) PodUnpause(ctx context.Context, in *PodUnpauseRequest,
 	return out, nil
 }
 
+func (c *publicAPIClient) ExecVM(ctx context.Context, opts ...grpc.CallOption) (PublicAPI_ExecVMClient, error) {
+	stream, err := grpc.NewClientStream(ctx, &_PublicAPI_serviceDesc.Streams[0], c.cc, "/types.PublicAPI/ExecVM", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &publicAPIExecVMClient{stream}
+	return x, nil
+}
+
+type PublicAPI_ExecVMClient interface {
+	Send(*ExecVMRequest) error
+	Recv() (*ExecVMResponse, error)
+	grpc.ClientStream
+}
+
+type publicAPIExecVMClient struct {
+	grpc.ClientStream
+}
+
+func (x *publicAPIExecVMClient) Send(m *ExecVMRequest) error {
+	return x.ClientStream.SendMsg(m)
+}
+
+func (x *publicAPIExecVMClient) Recv() (*ExecVMResponse, error) {
+	m := new(ExecVMResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 func (c *publicAPIClient) ContainerList(ctx context.Context, in *ContainerListRequest, opts ...grpc.CallOption) (*ContainerListResponse, error) {
 	out := new(ContainerListResponse)
 	err := grpc.Invoke(ctx, "/types.PublicAPI/ContainerList", in, out, c.cc, opts...)
@@ -2398,7 +2454,7 @@ func (c *publicAPIClient) PodStats(ctx context.Context, in *PodStatsRequest, opt
 }
 
 func (c *publicAPIClient) ContainerLogs(ctx context.Context, in *ContainerLogsRequest, opts ...grpc.CallOption) (PublicAPI_ContainerLogsClient, error) {
-	stream, err := grpc.NewClientStream(ctx, &_PublicAPI_serviceDesc.Streams[0], c.cc, "/types.PublicAPI/ContainerLogs", opts...)
+	stream, err := grpc.NewClientStream(ctx, &_PublicAPI_serviceDesc.Streams[1], c.cc, "/types.PublicAPI/ContainerLogs", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2493,7 +2549,7 @@ func (c *publicAPIClient) ExecCreate(ctx context.Context, in *ExecCreateRequest,
 }
 
 func (c *publicAPIClient) ExecStart(ctx context.Context, opts ...grpc.CallOption) (PublicAPI_ExecStartClient, error) {
-	stream, err := grpc.NewClientStream(ctx, &_PublicAPI_serviceDesc.Streams[1], c.cc, "/types.PublicAPI/ExecStart", opts...)
+	stream, err := grpc.NewClientStream(ctx, &_PublicAPI_serviceDesc.Streams[2], c.cc, "/types.PublicAPI/ExecStart", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2533,7 +2589,7 @@ func (c *publicAPIClient) ExecSignal(ctx context.Context, in *ExecSignalRequest,
 }
 
 func (c *publicAPIClient) Attach(ctx context.Context, opts ...grpc.CallOption) (PublicAPI_AttachClient, error) {
-	stream, err := grpc.NewClientStream(ctx, &_PublicAPI_serviceDesc.Streams[2], c.cc, "/types.PublicAPI/Attach", opts...)
+	stream, err := grpc.NewClientStream(ctx, &_PublicAPI_serviceDesc.Streams[3], c.cc, "/types.PublicAPI/Attach", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2609,7 +2665,7 @@ func (c *publicAPIClient) ServiceUpdate(ctx context.Context, in *ServiceUpdateRe
 }
 
 func (c *publicAPIClient) ImagePull(ctx context.Context, in *ImagePullRequest, opts ...grpc.CallOption) (PublicAPI_ImagePullClient, error) {
-	stream, err := grpc.NewClientStream(ctx, &_PublicAPI_serviceDesc.Streams[3], c.cc, "/types.PublicAPI/ImagePull", opts...)
+	stream, err := grpc.NewClientStream(ctx, &_PublicAPI_serviceDesc.Streams[4], c.cc, "/types.PublicAPI/ImagePull", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2641,7 +2697,7 @@ func (x *publicAPIImagePullClient) Recv() (*ImagePullResponse, error) {
 }
 
 func (c *publicAPIClient) ImagePush(ctx context.Context, in *ImagePushRequest, opts ...grpc.CallOption) (PublicAPI_ImagePushClient, error) {
-	stream, err := grpc.NewClientStream(ctx, &_PublicAPI_serviceDesc.Streams[4], c.cc, "/types.PublicAPI/ImagePush", opts...)
+	stream, err := grpc.NewClientStream(ctx, &_PublicAPI_serviceDesc.Streams[5], c.cc, "/types.PublicAPI/ImagePush", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2729,6 +2785,8 @@ type PublicAPIServer interface {
 	PodPause(context.Context, *PodPauseRequest) (*PodPauseResponse, error)
 	// PodUnpause unpauses a pod
 	PodUnpause(context.Context, *PodUnpauseRequest) (*PodUnpauseResponse, error)
+	// ExecVM executes a command outside of any containers.
+	ExecVM(PublicAPI_ExecVMServer) error
 	// ContainerList gets a list of containers
 	ContainerList(context.Context, *ContainerListRequest) (*ContainerListResponse, error)
 	// ContainerInfo gets container's info by container's id or name
@@ -2899,6 +2957,32 @@ func _PublicAPI_PodUnpause_Handler(srv interface{}, ctx context.Context, dec fun
 		return nil, err
 	}
 	return out, nil
+}
+
+func _PublicAPI_ExecVM_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(PublicAPIServer).ExecVM(&publicAPIExecVMServer{stream})
+}
+
+type PublicAPI_ExecVMServer interface {
+	Send(*ExecVMResponse) error
+	Recv() (*ExecVMRequest, error)
+	grpc.ServerStream
+}
+
+type publicAPIExecVMServer struct {
+	grpc.ServerStream
+}
+
+func (x *publicAPIExecVMServer) Send(m *ExecVMResponse) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func (x *publicAPIExecVMServer) Recv() (*ExecVMRequest, error) {
+	m := new(ExecVMRequest)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
 func _PublicAPI_ContainerList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
@@ -3426,6 +3510,12 @@ var _PublicAPI_serviceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "ExecVM",
+			Handler:       _PublicAPI_ExecVM_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
 		{
 			StreamName:    "ContainerLogs",
 			Handler:       _PublicAPI_ContainerLogs_Handler,

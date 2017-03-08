@@ -145,3 +145,13 @@ hyper::test::integration() {
   export GOPATH=${HYPER_ROOT}/Godeps/_workspace:$GOPATH
   go test github.com/hyperhq/hyperd/integration -check.vv -v
 }
+
+hyper::test::execvm() {
+  echo "Pod execvm echo test"
+  id=$(sudo hyperctl run -d busybox /bin/sh | sed -ne "s/POD id is \(.*\)/\1/p")
+  echo "test pod ID is $id"
+  res=$(sudo hyperctl exec -m $id /sbin/busybox sh -c "echo aaa")
+  echo "should return aaa, actual: $res"
+  test $res == aaa
+  sudo hyperctl rm $id
+}

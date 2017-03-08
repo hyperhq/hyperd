@@ -15,6 +15,7 @@ type APIInterface interface {
 	Attach(container string, tty bool, stdin io.ReadCloser, stdout, stderr io.Writer) error
 	CreateExec(containerId string, command []byte, tty bool) (string, error)
 	StartExec(containerId, execId string, tty bool, stdin io.ReadCloser, stdout, stderr io.Writer) error
+	ExecVM(podID string, command []byte, stdin io.ReadCloser, stdout, stderr io.Writer) error
 
 	WinResize(id, tag string, height, width int) error
 

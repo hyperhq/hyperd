@@ -565,6 +565,17 @@ message ExecStartResponse{
     bytes stdout = 1;
 }
 
+message ExecVMRequest{
+    string podID            = 1;
+    repeated string command = 2;
+    bytes  stdin            = 3;
+}
+
+message ExecVMResponse{
+    bytes stdout   = 1;
+    int32 exitCode = 2;
+}
+
 message ExecSignalRequest{
     string containerID      = 1;
     string execID           = 2;
@@ -789,6 +800,8 @@ service PublicAPI {
     rpc PodPause(PodPauseRequest) returns (PodPauseResponse) {}
     // PodUnpause unpauses a pod
     rpc PodUnpause(PodUnpauseRequest) returns (PodUnpauseResponse) {}
+    // ExecVM executes a command outside of any containers.
+    rpc ExecVM(stream ExecVMRequest) returns (stream ExecVMResponse) {}
 
     // ContainerList gets a list of containers
     rpc ContainerList(ContainerListRequest) returns (ContainerListResponse) {}
