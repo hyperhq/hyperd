@@ -9,7 +9,7 @@ import (
 
 func (cli *HyperClient) HyperCmdRm(args ...string) error {
 	var opts struct {
-		Container bool `short:"c" long:"container" default:"false" default-mask:"-" description:"stop container"`
+		Container bool `short:"c" long:"container" default-mask:"-" description:"stop container"`
 	}
 	var parser = gflag.NewParser(&opts, gflag.Default)
 	parser.Usage = "rm [OPTIONS] CONTAINER|POD [CONTAINER|POD...]\n\nRemove one or more containers/pods"

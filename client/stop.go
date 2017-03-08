@@ -10,7 +10,7 @@ import (
 func (cli *HyperClient) HyperCmdStop(args ...string) error {
 
 	var opts struct {
-		Container bool `short:"c" long:"container" default:"false" default-mask:"-" description:"stop container"`
+		Container bool `short:"c" long:"container" default-mask:"-" description:"stop container"`
 	}
 	var parser = gflag.NewParser(&opts, gflag.Default)
 	parser.Usage = "stop [OPTIONS] CONTAINER_ID|POD_ID\n\nStop running container or pod"

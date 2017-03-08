@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"io/ioutil"
 	"reflect"
+	"sync"
 	"unsafe"
 )
 
@@ -12,23 +13,63 @@ import (
 #include <libvirt/libvirt.h>
 #include <libvirt/virterror.h>
 #include <stdlib.h>
-
-void virErrorFuncDummy(void *userData, virErrorPtr error);
-
-void virErrorFuncDummy(void *userData, virErrorPtr error)
-{
-}
-
+#include "go_libvirt.h"
 */
 import "C"
 
-func init() {
-	// libvirt won't print to stderr
-	C.virSetErrorFunc(nil, C.virErrorFunc(unsafe.Pointer(C.virErrorFuncDummy)))
-}
-
 type VirConnection struct {
 	ptr C.virConnectPtr
+}
+
+// Additional data associated to the connection.
+type virConnectionData struct {
+	errCallbackId   *int
+	closeCallbackId *int
+}
+
+var connections map[C.virConnectPtr]*virConnectionData
+var connectionsLock sync.RWMutex
+
+func init() {
+	connections = make(map[C.virConnectPtr]*virConnectionData)
+}
+
+func saveConnectionData(c *VirConnection, d *virConnectionData) {
+	if c.ptr == nil {
+		return // Or panic?
+	}
+	connectionsLock.Lock()
+	defer connectionsLock.Unlock()
+	connections[c.ptr] = d
+}
+
+func getConnectionData(c *VirConnection) *virConnectionData {
+	connectionsLock.RLock()
+	d := connections[c.ptr]
+	connectionsLock.RUnlock()
+	if d != nil {
+		return d
+	}
+	d = &virConnectionData{}
+	saveConnectionData(c, d)
+	return d
+}
+
+func releaseConnectionData(c *VirConnection) {
+	if c.ptr == nil {
+		return
+	}
+	connectionsLock.Lock()
+	defer connectionsLock.Unlock()
+	delete(connections, c.ptr)
+}
+
+func GetVersion() (uint32, error) {
+	var version C.ulong
+	if err := C.virGetVersion(&version, nil, nil); err < 0 {
+		return 0, GetLastError()
+	}
+	return uint32(version), nil
 }
 
 func NewVirConnection(uri string) (VirConnection, error) {
@@ -38,6 +79,37 @@ func NewVirConnection(uri string) (VirConnection, error) {
 		defer C.free(unsafe.Pointer(cUri))
 	}
 	ptr := C.virConnectOpen(cUri)
+	if ptr == nil {
+		return VirConnection{}, GetLastError()
+	}
+	obj := VirConnection{ptr: ptr}
+	return obj, nil
+}
+
+func NewVirConnectionWithAuth(uri string, username string, password string) (VirConnection, error) {
+	var cUri *C.char
+
+	authMechs := C.authMechs()
+	defer C.free(unsafe.Pointer(authMechs))
+	cUsername := C.CString(username)
+	defer C.free(unsafe.Pointer(cUsername))
+	cPassword := C.CString(password)
+	defer C.free(unsafe.Pointer(cPassword))
+	cbData := C.authData(cUsername, C.uint(len(username)), cPassword, C.uint(len(password)))
+	defer C.free(unsafe.Pointer(cbData))
+
+	auth := C.virConnectAuth{
+		credtype:  authMechs,
+		ncredtype: C.uint(2),
+		cb:        C.virConnectAuthCallbackPtr(unsafe.Pointer(C.authCb)),
+		cbdata:    unsafe.Pointer(cbData),
+	}
+
+	if uri != "" {
+		cUri = C.CString(uri)
+		defer C.free(unsafe.Pointer(cUri))
+	}
+	ptr := C.virConnectOpenAuth(cUri, (*C.struct__virConnectAuth)(unsafe.Pointer(&auth)), C.uint(0))
 	if ptr == nil {
 		return VirConnection{}, GetLastError()
 	}
@@ -59,37 +131,69 @@ func NewVirConnectionReadOnly(uri string) (VirConnection, error) {
 	return obj, nil
 }
 
-func GetLastError() VirError {
-	var virErr VirError
-	err := C.virGetLastError()
-
-	virErr.Code = int(err.code)
-	virErr.Domain = int(err.domain)
-	virErr.Message = C.GoString(err.message)
-	virErr.Level = int(err.level)
-
-	C.virResetError(err)
-	return virErr
-}
-
 func (c *VirConnection) CloseConnection() (int, error) {
+	c.UnsetErrorFunc()
 	result := int(C.virConnectClose(c.ptr))
 	if result == -1 {
 		return result, GetLastError()
 	}
+	if result == 0 {
+		// No more reference to this connection, release data.
+		releaseConnectionData(c)
+	}
 	return result, nil
 }
 
-func (c *VirConnection) UnrefAndCloseConnection() error {
-	closeRes := 1
-	var err error
-	for closeRes > 0 {
-		closeRes, err = c.CloseConnection()
-		if err != nil {
-			return err
-		}
+type CloseCallback func(conn VirConnection, reason int, opaque func())
+type closeContext struct {
+	cb CloseCallback
+	f  func()
+}
+
+// Register a close callback for the given destination. Only one
+// callback per connection is allowed. Setting a callback will remove
+// the previous one.
+func (c *VirConnection) RegisterCloseCallback(cb CloseCallback, opaque func()) error {
+	c.UnregisterCloseCallback()
+	context := &closeContext{
+		cb: cb,
+		f:  opaque,
 	}
+	goCallbackId := registerCallbackId(context)
+	callbackPtr := unsafe.Pointer(C.closeCallback_cgo)
+	res := C.virConnectRegisterCloseCallback_cgo(c.ptr, C.virConnectCloseFunc(callbackPtr), C.long(goCallbackId))
+	if res != 0 {
+		freeCallbackId(goCallbackId)
+		return GetLastError()
+	}
+	connData := getConnectionData(c)
+	connData.closeCallbackId = &goCallbackId
 	return nil
+}
+
+func (c *VirConnection) UnregisterCloseCallback() error {
+	connData := getConnectionData(c)
+	if connData.closeCallbackId == nil {
+		return nil
+	}
+	callbackPtr := unsafe.Pointer(C.closeCallback_cgo)
+	res := C.virConnectUnregisterCloseCallback(c.ptr, C.virConnectCloseFunc(callbackPtr))
+	if res != 0 {
+		return GetLastError()
+	}
+	connData.closeCallbackId = nil
+	return nil
+}
+
+//export closeCallback
+func closeCallback(conn C.virConnectPtr, reason int, goCallbackId int) {
+	ctx := getCallbackId(goCallbackId)
+	switch cctx := ctx.(type) {
+	case *closeContext:
+		cctx.cb(VirConnection{ptr: conn}, reason, cctx.f)
+	default:
+		panic("Inappropriate callback type called")
+	}
 }
 
 func (c *VirConnection) GetCapabilities() (string, error) {
@@ -462,6 +566,16 @@ func (c *VirConnection) NetworkDefineXML(xmlConfig string) (VirNetwork, error) {
 	return VirNetwork{ptr: ptr}, nil
 }
 
+func (c *VirConnection) NetworkCreateXML(xmlConfig string) (VirNetwork, error) {
+	cXml := C.CString(string(xmlConfig))
+	defer C.free(unsafe.Pointer(cXml))
+	ptr := C.virNetworkCreateXML(c.ptr, cXml)
+	if ptr == nil {
+		return VirNetwork{}, GetLastError()
+	}
+	return VirNetwork{ptr: ptr}, nil
+}
+
 func (c *VirConnection) LookupNetworkByName(name string) (VirNetwork, error) {
 	cName := C.CString(name)
 	defer C.free(unsafe.Pointer(cName))
@@ -470,6 +584,26 @@ func (c *VirConnection) LookupNetworkByName(name string) (VirNetwork, error) {
 		return VirNetwork{}, GetLastError()
 	}
 	return VirNetwork{ptr: ptr}, nil
+}
+
+func (c *VirConnection) LookupNetworkByUUIDString(uuid string) (VirNetwork, error) {
+	cUuid := C.CString(uuid)
+	defer C.free(unsafe.Pointer(cUuid))
+	ptr := C.virNetworkLookupByUUIDString(c.ptr, cUuid)
+	if ptr == nil {
+		return VirNetwork{}, GetLastError()
+	}
+	return VirNetwork{ptr: ptr}, nil
+}
+
+func (c *VirConnection) SetKeepAlive(interval int, count uint) error {
+	res := int(C.virConnectSetKeepAlive(c.ptr, C.int(interval), C.uint(count)))
+	switch res {
+	case 0:
+		return nil
+	default:
+		return GetLastError()
+	}
 }
 
 func (c *VirConnection) GetSysinfo(flags uint) (string, error) {

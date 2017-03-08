@@ -12,7 +12,7 @@ import (
 
 func (cli *HyperClient) HyperCmdExec(args ...string) error {
 	var opts struct {
-		Attach bool `short:"a" long:"attach" default:"true" description:"attach current terminal to the stdio of command"`
+		Detach bool `short:"d" long:"detach" default-mask:"-" description:"Not Attach the stdin, stdout and stderr to the process"`
 		Tty    bool `short:"t" long:"tty" description:"Allocate a pseudo-TTY"`
 		VM     bool `short:"m" long:"vm" description:"Execute outside of any containers"`
 	}

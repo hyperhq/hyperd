@@ -3,15 +3,14 @@ roaring [![Build Status](https://travis-ci.org/RoaringBitmap/roaring.png)](https
 
 This is a go port of the Roaring bitmap data structure.
 
-Roaring is  used by Apache Spark (https://spark.apache.org/), Apache Kylin (http://kylin.io),
-Druid.io (http://druid.io/), Whoosh (https://pypi.python.org/pypi/Whoosh/)
+Roaring is  used by Apache Spark (https://spark.apache.org/), Apache Kylin (http://kylin.io),  [Netflix Atlas](https://github.com/Netflix/atlas), [LinkedIn Pinot](https://github.com/linkedin/pinot/wiki), Druid.io (http://druid.io/), Whoosh (https://pypi.python.org/pypi/Whoosh/)
 and  Apache Lucene (http://lucene.apache.org/) (as well as supporting systems
 such as Solr and Elastic).
 
-The original java version can be found at https://github.com/RoaringBitmap/RoaringBitmap
+The original java version can be found at https://github.com/RoaringBitmap/RoaringBitmap and there is a C/C++ version at  https://github.com/RoaringBitmap/CRoaring
 
-The Java and Go version are meant to be binary compatible: you can save bitmaps
-from a Java program and load them back in Go, and vice versa.
+The Java, C, C++ and Go version are binary compatible: e.g,  you can save bitmaps
+from a Java program and load them back in Go, and vice versa. The format specification can be found at https://github.com/RoaringBitmap/RoaringFormatSpec
 
 
 This code is licensed under Apache License, Version 2.0 (ASL2.0).
@@ -28,17 +27,21 @@ http://arxiv.org/abs/1402.6407 This paper used data from http://lemire.me/data/r
 - Daniel Lemire, Gregory Ssi-Yan-Kai, Owen Kaser, Consistently faster and smaller compressed bitmaps with Roaring, Software: Practice and Experience (accepted in 2016, to appear) http://arxiv.org/abs/1603.06549
 
 
-
 ### Dependencies
 
-  - go get github.com/smartystreets/goconvey/convey
-  - go get github.com/willf/bitset
-  - go get github.com/mschoch/smat
+Dependencies are fetched automatically by giving the `-t` flag to `go get`.
+
+they include
+
+  - github.com/smartystreets/goconvey/convey
+  - github.com/willf/bitset
+  - github.com/mschoch/smat
 
 Note that the smat library requires Go 1.6 or better.
 
-Naturally, you also need to grab the roaring code itself:
-  - go get github.com/RoaringBitmap/roaring
+#### Installation
+
+  - go get -t github.com/RoaringBitmap/roaring
 
 
 ### Example
@@ -91,7 +94,7 @@ func main() {
     newrb:= roaring.NewBitmap()
     newrb.ReadFrom(buf)
     if rb1.Equals(newrb) {
-	fmt.Println("I wrote the content to a byte stream and read it back.")
+    	fmt.Println("I wrote the content to a byte stream and read it back.")
     }
 }
 ```
@@ -130,13 +133,15 @@ bitmaps never use more than 2 bytes per integer. You can call
 
 Current documentation is available at http://godoc.org/github.com/RoaringBitmap/roaring
 
-### Thread-safety
+### Goroutine safety
 
-In general, it should generally be considered safe to access
-the same bitmaps using different threads as
-long as they are not being modified. However, if some of your
-bitmaps use copy-on-write, then more care is needed: pass
-to your threads a (shallow) copy of your bitmaps.
+In general, it should not generally be considered safe to access
+the same bitmaps using different goroutines--they are left
+unsynchronized for performance. Should you want to access
+a Bitmap from more than one goroutine, you should
+provide synchronization. Typically this is done by using channels to pass
+the *Bitmap around (in Go style; so there is only ever one owner),
+or by using `sync.Mutex` to serialize operations on Bitmaps.
 
 ### Coverage
 
@@ -183,17 +188,14 @@ Let it run, and if the # of crashers is > 0, check out the reports in
 the workdir where you should be able to find the panic goroutine stack
 traces.
 
-### Compatibility with Java RoaringBitmap library
-
-You can read bitmaps in Go (resp. Java) that have been serialized in Java (resp. Go)
-with the caveat that the Go library does not yet support run containers. So if you plan
-to read bitmaps serialized from Java in Go, you might want to call ``removeRunCompression``
-prior to serializing your Java instances. This is a temporary limitation: we plan to
-add support for run containers to the Go library.
-
 ### Alternative in Go
 
 There is a Go version wrapping the C/C++ implementation https://github.com/RoaringBitmap/gocroaring
 
 For an alternative implementation in Go, see https://github.com/fzandona/goroar
 The two versions were written independently.
+
+
+### Mailing list/discussion group
+
+https://groups.google.com/forum/#!forum/roaring-bitmaps

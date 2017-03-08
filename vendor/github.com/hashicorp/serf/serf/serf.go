@@ -10,6 +10,7 @@ import (
 	"log"
 	"math/rand"
 	"net"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -17,6 +18,7 @@ import (
 	"github.com/armon/go-metrics"
 	"github.com/hashicorp/go-msgpack/codec"
 	"github.com/hashicorp/memberlist"
+	"github.com/hashicorp/serf/coordinate"
 )
 
 // These are the protocol versions that Serf can _understand_. These are
@@ -24,7 +26,7 @@ import (
 // version to memberlist below.
 const (
 	ProtocolVersionMin uint8 = 2
-	ProtocolVersionMax       = 4
+	ProtocolVersionMax       = 5
 )
 
 const (
@@ -64,12 +66,11 @@ type Serf struct {
 	memberLock    sync.RWMutex
 	members       map[string]*memberState
 
-	// Circular buffers for recent intents, used
-	// in case we get the intent before the relevant event
-	recentLeave      []nodeIntent
-	recentLeaveIndex int
-	recentJoin       []nodeIntent
-	recentJoinIndex  int
+	// recentIntents the lamport time and type of intent for a given node in
+	// case we get an intent before the relevant memberlist event. This is
+	// indexed by node, and always store the latest lamport time / intent
+	// we've seen. The memberLock protects this structure.
+	recentIntents map[string]nodeIntent
 
 	eventBroadcasts *memberlist.TransmitLimitedQueue
 	eventBuffer     []*userEvents
@@ -91,6 +92,10 @@ type Serf struct {
 
 	snapshotter *Snapshotter
 	keyManager  *KeyManager
+
+	coordClient    *coordinate.Client
+	coordCache     map[string]*coordinate.Coordinate
+	coordCacheLock sync.RWMutex
 }
 
 // SerfState is the state of the Serf instance.
@@ -174,10 +179,18 @@ type memberState struct {
 	leaveTime   time.Time   // wall clock time of leave
 }
 
-// nodeIntent is used to buffer intents for out-of-order deliveries
+// nodeIntent is used to buffer intents for out-of-order deliveries.
 type nodeIntent struct {
+	// Type is the intent being tracked. Only messageJoinType and
+	// messageLeaveType are tracked.
+	Type messageType
+
+	// WallTime is the wall clock time we saw this intent in order to
+	// expire it from the buffer.
+	WallTime time.Time
+
+	// LTime is the Lamport time, used for cluster-wide ordering of events.
 	LTime LamportTime
-	Node  string
 }
 
 // userEvent is used to buffer events to prevent re-delivery
@@ -209,10 +222,8 @@ type queries struct {
 }
 
 const (
-	UserEventSizeLimit     = 512        // Maximum byte size for event name and payload
-	QuerySizeLimit         = 1024       // Maximum byte size for query
-	QueryResponseSizeLimit = 1024       // Maximum bytes size for response
-	snapshotSizeLimit      = 128 * 1024 // Maximum 128 KB snapshot
+	UserEventSizeLimit = 512        // Maximum byte size for event name and payload
+	snapshotSizeLimit  = 128 * 1024 // Maximum 128 KB snapshot
 )
 
 // Create creates a new Serf instance, starting all the background tasks
@@ -230,9 +241,23 @@ func Create(conf *Config) (*Serf, error) {
 			conf.ProtocolVersion, ProtocolVersionMin, ProtocolVersionMax)
 	}
 
+	if conf.LogOutput != nil && conf.Logger != nil {
+		return nil, fmt.Errorf("Cannot specify both LogOutput and Logger. Please choose a single log configuration setting.")
+	}
+
+	logDest := conf.LogOutput
+	if logDest == nil {
+		logDest = os.Stderr
+	}
+
+	logger := conf.Logger
+	if logger == nil {
+		logger = log.New(logDest, "", log.LstdFlags)
+	}
+
 	serf := &Serf{
 		config:        conf,
-		logger:        log.New(conf.LogOutput, "", log.LstdFlags),
+		logger:        logger,
 		members:       make(map[string]*memberState),
 		queryResponse: make(map[LamportTime]*QueryResponse),
 		shutdownCh:    make(chan struct{}),
@@ -274,15 +299,25 @@ func Create(conf *Config) (*Serf, error) {
 	}
 	conf.EventCh = outCh
 
+	// Set up network coordinate client.
+	if !conf.DisableCoordinates {
+		serf.coordClient, err = coordinate.NewClient(coordinate.DefaultConfig())
+		if err != nil {
+			return nil, fmt.Errorf("Failed to create coordinate client: %v", err)
+		}
+	}
+
 	// Try access the snapshot
 	var oldClock, oldEventClock, oldQueryClock LamportTime
 	var prev []*PreviousNode
 	if conf.SnapshotPath != "" {
-		eventCh, snap, err := NewSnapshotter(conf.SnapshotPath,
+		eventCh, snap, err := NewSnapshotter(
+			conf.SnapshotPath,
 			snapshotSizeLimit,
 			conf.RejoinAfterLeave,
 			serf.logger,
 			&serf.clock,
+			serf.coordClient,
 			conf.EventCh,
 			serf.shutdownCh)
 		if err != nil {
@@ -298,30 +333,30 @@ func Create(conf *Config) (*Serf, error) {
 		serf.queryMinTime = oldQueryClock + 1
 	}
 
+	// Set up the coordinate cache. We do this after we read the snapshot to
+	// make sure we get a good initial value from there, if we got one.
+	if !conf.DisableCoordinates {
+		serf.coordCache = make(map[string]*coordinate.Coordinate)
+		serf.coordCache[conf.NodeName] = serf.coordClient.GetCoordinate()
+	}
+
 	// Setup the various broadcast queues, which we use to send our own
 	// custom broadcasts along the gossip channel.
 	serf.broadcasts = &memberlist.TransmitLimitedQueue{
-		NumNodes: func() int {
-			return len(serf.members)
-		},
+		NumNodes:       serf.NumNodes,
 		RetransmitMult: conf.MemberlistConfig.RetransmitMult,
 	}
 	serf.eventBroadcasts = &memberlist.TransmitLimitedQueue{
-		NumNodes: func() int {
-			return len(serf.members)
-		},
+		NumNodes:       serf.NumNodes,
 		RetransmitMult: conf.MemberlistConfig.RetransmitMult,
 	}
 	serf.queryBroadcasts = &memberlist.TransmitLimitedQueue{
-		NumNodes: func() int {
-			return len(serf.members)
-		},
+		NumNodes:       serf.NumNodes,
 		RetransmitMult: conf.MemberlistConfig.RetransmitMult,
 	}
 
 	// Create the buffer for recent intents
-	serf.recentJoin = make([]nodeIntent, conf.RecentIntentBuffer)
-	serf.recentLeave = make([]nodeIntent, conf.RecentIntentBuffer)
+	serf.recentIntents = make(map[string]nodeIntent)
 
 	// Create a buffer for events and queries
 	serf.eventBuffer = make([]*userEvents, conf.EventBuffer)
@@ -347,17 +382,22 @@ func Create(conf *Config) (*Serf, error) {
 	conf.MemberlistConfig.DelegateProtocolMax = ProtocolVersionMax
 	conf.MemberlistConfig.Name = conf.NodeName
 	conf.MemberlistConfig.ProtocolVersion = ProtocolVersionMap[conf.ProtocolVersion]
+	if !conf.DisableCoordinates {
+		conf.MemberlistConfig.Ping = &pingDelegate{serf: serf}
+	}
 
 	// Setup a merge delegate if necessary
 	if conf.Merge != nil {
-		conf.MemberlistConfig.Merge = &mergeDelegate{serf: serf}
+		md := &mergeDelegate{serf: serf}
+		conf.MemberlistConfig.Merge = md
+		conf.MemberlistConfig.Alive = md
 	}
 
 	// Create the underlying memberlist that will manage membership
 	// and failure detection for the Serf instance.
 	memberlist, err := memberlist.Create(conf.MemberlistConfig)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Failed to create memberlist: %v", err)
 	}
 
 	serf.memberlist = memberlist
@@ -468,15 +508,16 @@ func (s *Serf) Query(name string, payload []byte, params *QueryParam) (*QueryRes
 
 	// Create a message
 	q := messageQuery{
-		LTime:   s.queryClock.Time(),
-		ID:      uint32(rand.Int31()),
-		Addr:    local.Addr,
-		Port:    local.Port,
-		Filters: filters,
-		Flags:   flags,
-		Timeout: params.Timeout,
-		Name:    name,
-		Payload: payload,
+		LTime:       s.queryClock.Time(),
+		ID:          uint32(rand.Int31()),
+		Addr:        local.Addr,
+		Port:        local.Port,
+		Filters:     filters,
+		Flags:       flags,
+		RelayFactor: params.RelayFactor,
+		Timeout:     params.Timeout,
+		Name:        name,
+		Payload:     payload,
 	}
 
 	// Encode the query
@@ -486,8 +527,8 @@ func (s *Serf) Query(name string, payload []byte, params *QueryParam) (*QueryRes
 	}
 
 	// Check the size
-	if len(raw) > QuerySizeLimit {
-		return nil, fmt.Errorf("query exceeds limit of %d bytes", QuerySizeLimit)
+	if len(raw) > s.config.QuerySizeLimit {
+		return nil, fmt.Errorf("query exceeds limit of %d bytes", s.config.QuerySizeLimit)
 	}
 
 	// Register QueryResponse to track acks and responses
@@ -760,13 +801,15 @@ func (s *Serf) Shutdown() error {
 		s.logger.Printf("[WARN] serf: Shutdown without a Leave")
 	}
 
+	// Wait to close the shutdown channel until after we've shut down the
+	// memberlist and its associated network resources, since the shutdown
+	// channel signals that we are cleaned up outside of Serf.
 	s.state = SerfShutdown
-	close(s.shutdownCh)
-
 	err := s.memberlist.Shutdown()
 	if err != nil {
 		return err
 	}
+	close(s.shutdownCh)
 
 	// Wait for the snapshoter to finish if we have one
 	if s.snapshotter != nil {
@@ -830,22 +873,25 @@ func (s *Serf) handleNodeJoin(n *memberlist.Node) {
 			},
 		}
 
-		// Check if we have a join intent and use the LTime
-		if join := recentIntent(s.recentJoin, n.Name); join != nil {
-			member.statusLTime = join.LTime
+		// Check if we have a join or leave intent. The intent buffer
+		// will only hold one event for this node, so the more recent
+		// one will take effect.
+		if join, ok := recentIntent(s.recentIntents, n.Name, messageJoinType); ok {
+			member.statusLTime = join
 		}
-
-		// Check if we have a leave intent
-		if leave := recentIntent(s.recentLeave, n.Name); leave != nil {
-			if leave.LTime > member.statusLTime {
-				member.Status = StatusLeaving
-				member.statusLTime = leave.LTime
-			}
+		if leave, ok := recentIntent(s.recentIntents, n.Name, messageLeaveType); ok {
+			member.Status = StatusLeaving
+			member.statusLTime = leave
 		}
 
 		s.members[n.Name] = member
 	} else {
 		oldStatus = member.Status
+		deadTime := time.Now().Sub(member.leaveTime)
+		if oldStatus == StatusFailed && deadTime < s.config.FlapTimeout {
+			metrics.IncrCounter([]string{"serf", "member", "flap"}, 1)
+		}
+
 		member.Status = StatusAlive
 		member.leaveTime = time.Time{}
 		member.Addr = net.IP(n.Addr)
@@ -950,6 +996,19 @@ func (s *Serf) handleNodeUpdate(n *memberlist.Node) {
 	member.Port = n.Port
 	member.Tags = s.decodeTags(n.Meta)
 
+	// Snag the latest versions. NOTE - the current memberlist code will NOT
+	// fire an update event if the metadata (for Serf, tags) stays the same
+	// and only the protocol versions change. If we wake any Serf-level
+	// protocol changes where we want to get this event under those
+	// circumstances, we will need to update memberlist to do a check of
+	// versions as well as the metadata.
+	member.ProtocolMin = n.PMin
+	member.ProtocolMax = n.PMax
+	member.ProtocolCur = n.PCur
+	member.DelegateMin = n.DMin
+	member.DelegateMax = n.DMax
+	member.DelegateCur = n.DCur
+
 	// Update some metrics
 	metrics.IncrCounter([]string{"serf", "member", "update"}, 1)
 
@@ -973,18 +1032,8 @@ func (s *Serf) handleNodeLeaveIntent(leaveMsg *messageLeave) bool {
 
 	member, ok := s.members[leaveMsg.Node]
 	if !ok {
-		// If we've already seen this message don't rebroadcast
-		if recentIntent(s.recentLeave, leaveMsg.Node) != nil {
-			return false
-		}
-
-		// We don't know this member so store it in a buffer for now
-		s.recentLeave[s.recentLeaveIndex] = nodeIntent{
-			LTime: leaveMsg.LTime,
-			Node:  leaveMsg.Node,
-		}
-		s.recentLeaveIndex = (s.recentLeaveIndex + 1) % len(s.recentLeave)
-		return true
+		// Rebroadcast only if this was an update we hadn't seen before.
+		return upsertIntent(s.recentIntents, leaveMsg.Node, messageLeaveType, leaveMsg.LTime, time.Now)
 	}
 
 	// If the message is old, then it is irrelevant and we can skip it
@@ -1016,6 +1065,17 @@ func (s *Serf) handleNodeLeaveIntent(leaveMsg *messageLeave) bool {
 		s.failedMembers = removeOldMember(s.failedMembers, member.Name)
 		s.leftMembers = append(s.leftMembers, member)
 
+		// We must push a message indicating the node has now
+		// left to allow higher-level applications to handle the
+		// graceful leave.
+		s.logger.Printf("[INFO] serf: EventMemberLeave (forced): %s %s",
+			member.Member.Name, member.Member.Addr)
+		if s.config.EventCh != nil {
+			s.config.EventCh <- MemberEvent{
+				Type:    EventMemberLeave,
+				Members: []Member{member.Member},
+			}
+		}
 		return true
 	default:
 		return false
@@ -1033,15 +1093,8 @@ func (s *Serf) handleNodeJoinIntent(joinMsg *messageJoin) bool {
 
 	member, ok := s.members[joinMsg.Node]
 	if !ok {
-		// If we've already seen this message don't rebroadcast
-		if recentIntent(s.recentJoin, joinMsg.Node) != nil {
-			return false
-		}
-
-		// We don't know this member so store it in a buffer for now
-		s.recentJoin[s.recentJoinIndex] = nodeIntent{LTime: joinMsg.LTime, Node: joinMsg.Node}
-		s.recentJoinIndex = (s.recentJoinIndex + 1) % len(s.recentJoin)
-		return true
+		// Rebroadcast only if this was an update we hadn't seen before.
+		return upsertIntent(s.recentIntents, joinMsg.Node, messageJoinType, joinMsg.LTime, time.Now)
 	}
 
 	// Check if this time is newer than what we have
@@ -1196,19 +1249,23 @@ func (s *Serf) handleQuery(query *messageQuery) bool {
 			if err := s.memberlist.SendTo(&addr, raw); err != nil {
 				s.logger.Printf("[ERR] serf: failed to send ack: %v", err)
 			}
+			if err := s.relayResponse(query.RelayFactor, addr, &ack); err != nil {
+				s.logger.Printf("[ERR] serf: failed to relay ack: %v", err)
+			}
 		}
 	}
 
 	if s.config.EventCh != nil {
 		s.config.EventCh <- &Query{
-			LTime:    query.LTime,
-			Name:     query.Name,
-			Payload:  query.Payload,
-			serf:     s,
-			id:       query.ID,
-			addr:     query.Addr,
-			port:     query.Port,
-			deadline: time.Now().Add(query.Timeout),
+			LTime:       query.LTime,
+			Name:        query.Name,
+			Payload:     query.Payload,
+			serf:        s,
+			id:          query.ID,
+			addr:        query.Addr,
+			port:        query.Port,
+			deadline:    time.Now().Add(query.Timeout),
+			relayFactor: query.RelayFactor,
 		}
 	}
 	return rebroadcast
@@ -1241,18 +1298,32 @@ func (s *Serf) handleQueryResponse(resp *messageQueryResponse) {
 
 	// Process each type of response
 	if resp.Ack() {
+		// Exit early if this is a duplicate ack
+		if _, ok := query.acks[resp.From]; ok {
+			metrics.IncrCounter([]string{"serf", "query_duplicate_acks"}, 1)
+			return
+		}
+
 		metrics.IncrCounter([]string{"serf", "query_acks"}, 1)
 		select {
 		case query.ackCh <- resp.From:
+			query.acks[resp.From] = struct{}{}
 		default:
-			s.logger.Printf("[WARN] serf: Failed to delivery query ack, dropping")
+			s.logger.Printf("[WARN] serf: Failed to deliver query ack, dropping")
 		}
 	} else {
+		// Exit early if this is a duplicate response
+		if _, ok := query.responses[resp.From]; ok {
+			metrics.IncrCounter([]string{"serf", "query_duplicate_responses"}, 1)
+			return
+		}
+
 		metrics.IncrCounter([]string{"serf", "query_responses"}, 1)
 		select {
 		case query.respCh <- NodeResponse{From: resp.From, Payload: resp.Payload}:
+			query.responses[resp.From] = struct{}{}
 		default:
-			s.logger.Printf("[WARN] serf: Failed to delivery query response, dropping")
+			s.logger.Printf("[WARN] serf: Failed to deliver query response, dropping")
 		}
 	}
 }
@@ -1312,7 +1383,7 @@ func (s *Serf) resolveNodeConflict() {
 
 		// Update the counters
 		responses++
-		if bytes.Equal(member.Addr, local.Addr) && member.Port == local.Port {
+		if member.Addr.Equal(local.Addr) && member.Port == local.Port {
 			matching++
 		}
 	}
@@ -1333,14 +1404,17 @@ func (s *Serf) resolveNodeConflict() {
 	}
 }
 
-// handleReap periodically reaps the list of failed and left members.
+// handleReap periodically reaps the list of failed and left members, as well
+// as old buffered intents.
 func (s *Serf) handleReap() {
 	for {
 		select {
 		case <-time.After(s.config.ReapInterval):
 			s.memberLock.Lock()
-			s.failedMembers = s.reap(s.failedMembers, s.config.ReconnectTimeout)
-			s.leftMembers = s.reap(s.leftMembers, s.config.TombstoneTimeout)
+			now := time.Now()
+			s.failedMembers = s.reap(s.failedMembers, now, s.config.ReconnectTimeout)
+			s.leftMembers = s.reap(s.leftMembers, now, s.config.TombstoneTimeout)
+			reapIntents(s.recentIntents, now, s.config.RecentIntentTimeout)
 			s.memberLock.Unlock()
 		case <-s.shutdownCh:
 			return
@@ -1364,8 +1438,7 @@ func (s *Serf) handleReconnect() {
 // reap is called with a list of old members and a timeout, and removes
 // members that have exceeded the timeout. The members are removed from
 // both the old list and the members itself. Locking is left to the caller.
-func (s *Serf) reap(old []*memberState, timeout time.Duration) []*memberState {
-	now := time.Now()
+func (s *Serf) reap(old []*memberState, now time.Time, timeout time.Duration) []*memberState {
 	n := len(old)
 	for i := 0; i < n; i++ {
 		m := old[i]
@@ -1383,6 +1456,16 @@ func (s *Serf) reap(old []*memberState, timeout time.Duration) []*memberState {
 
 		// Delete from members
 		delete(s.members, m.Name)
+
+		// Tell the coordinate client the node has gone away and delete
+		// its cached coordinates.
+		if !s.config.DisableCoordinates {
+			s.coordClient.ForgetNode(m.Name)
+
+			s.coordCacheLock.Lock()
+			delete(s.coordCache, m.Name)
+			s.coordCacheLock.Unlock()
+		}
 
 		// Send an event along
 		s.logger.Printf("[INFO] serf: EventMemberReap: %s", m.Name)
@@ -1426,7 +1509,7 @@ func (s *Serf) reconnect() {
 	}
 
 	// Select a random member to try and join
-	idx := int(rand.Uint32() % uint32(n))
+	idx := rand.Int31n(int32(n))
 	mem := s.failedMembers[idx]
 	s.memberLock.RUnlock()
 
@@ -1474,24 +1557,46 @@ func removeOldMember(old []*memberState, name string) []*memberState {
 	return old
 }
 
-// recentIntent checks the recent intent buffer for a matching
-// entry for a given node, and either returns the message or nil
-func recentIntent(recent []nodeIntent, node string) (intent *nodeIntent) {
-	for i := 0; i < len(recent); i++ {
-		// Break fast if we hit a zero entry
-		if recent[i].LTime == 0 {
-			break
-		}
-
-		// Check for a node match
-		if recent[i].Node == node {
-			// Take the most recent entry
-			if intent == nil || recent[i].LTime > intent.LTime {
-				intent = &recent[i]
-			}
+// reapIntents clears out any intents that are older than the timeout. Make sure
+// the memberLock is held when passing in the Serf instance's recentIntents
+// member.
+func reapIntents(intents map[string]nodeIntent, now time.Time, timeout time.Duration) {
+	for node, intent := range intents {
+		if now.Sub(intent.WallTime) > timeout {
+			delete(intents, node)
 		}
 	}
-	return
+}
+
+// upsertIntent will update an existing intent with the supplied Lamport time,
+// or create a new entry. This will return true if a new entry was added. The
+// stamper is used to capture the wall clock time for expiring these buffered
+// intents. Make sure the memberLock is held when passing in the Serf instance's
+// recentIntents member.
+func upsertIntent(intents map[string]nodeIntent, node string, itype messageType,
+	ltime LamportTime, stamper func() time.Time) bool {
+	if intent, ok := intents[node]; !ok || ltime > intent.LTime {
+		intents[node] = nodeIntent{
+			Type:     itype,
+			WallTime: stamper(),
+			LTime:    ltime,
+		}
+		return true
+	}
+
+	return false
+}
+
+// recentIntent checks the recent intent buffer for a matching entry for a given
+// node, and returns the Lamport time, if an intent is present, indicated by the
+// returned boolean. Make sure the memberLock is held for read when passing in
+// the Serf instance's recentIntents member.
+func recentIntent(intents map[string]nodeIntent, node string, itype messageType) (LamportTime, bool) {
+	if intent, ok := intents[node]; ok && intent.Type == itype {
+		return intent.LTime, true
+	}
+
+	return LamportTime(0), false
 }
 
 // handleRejoin attempts to reconnect to previously known alive nodes
@@ -1558,6 +1663,7 @@ func (s *Serf) Stats() map[string]string {
 		"members":      toString(uint64(len(s.members))),
 		"failed":       toString(uint64(len(s.failedMembers))),
 		"left":         toString(uint64(len(s.leftMembers))),
+		"health_score": toString(uint64(s.memberlist.GetHealthScore())),
 		"member_time":  toString(uint64(s.clock.Time())),
 		"event_time":   toString(uint64(s.eventClock.Time())),
 		"query_time":   toString(uint64(s.queryClock.Time())),
@@ -1595,4 +1701,39 @@ func (s *Serf) writeKeyringFile() error {
 
 	// Success!
 	return nil
+}
+
+// GetCoordinate returns the network coordinate of the local node.
+func (s *Serf) GetCoordinate() (*coordinate.Coordinate, error) {
+	if !s.config.DisableCoordinates {
+		return s.coordClient.GetCoordinate(), nil
+	}
+
+	return nil, fmt.Errorf("Coordinates are disabled")
+}
+
+// GetCachedCoordinate returns the network coordinate for the node with the given
+// name. This will only be valid if DisableCoordinates is set to false.
+func (s *Serf) GetCachedCoordinate(name string) (coord *coordinate.Coordinate, ok bool) {
+	if !s.config.DisableCoordinates {
+		s.coordCacheLock.RLock()
+		defer s.coordCacheLock.RUnlock()
+		if coord, ok = s.coordCache[name]; ok {
+			return coord, true
+		}
+
+		return nil, false
+	}
+
+	return nil, false
+}
+
+// NumNodes returns the number of nodes in the serf cluster, regardless of
+// their health or status.
+func (s *Serf) NumNodes() (numNodes int) {
+	s.memberLock.RLock()
+	numNodes = len(s.members)
+	s.memberLock.RUnlock()
+
+	return numNodes
 }

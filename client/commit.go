@@ -20,7 +20,7 @@ func (cli *HyperClient) HyperCmdCommit(args ...string) error {
 		Author  string   `short:"a" long:"author" default:"" value-name:"\"\"" description:"Author (e.g., \"Hello World <hello@a-team.com>\")"`
 		Change  []string `short:"c" long:"change" default:"" value-name:"[]" description:"Apply Dockerfile instruction to the created image"`
 		Message string   `short:"m" long:"message" default:"" value-name:"\"\"" description:"Commit message"`
-		Pause   bool     `short:"p" long:"pause" default:"false" description:"Pause container during Commit"`
+		Pause   bool     `short:"p" long:"pause" description:"Pause container during Commit"`
 	}
 	var parser = gflag.NewParser(&opts, gflag.Default)
 

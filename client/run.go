@@ -124,13 +124,13 @@ type CreateOptions struct {
 func (cli *HyperClient) ParseCreateOptions(cmd string, args ...string) (*CreateOptions, error) {
 	var opts struct {
 		PodFile       string   `short:"p" long:"podfile" value-name:"\"\"" description:"Create and Run a pod based on the pod file"`
-		Container     bool     `short:"c" long:"container" default:"false" default-mast:"-" description:"Create container inside a pod"`
-		Yaml          bool     `short:"y" long:"yaml" default:"false" default-mask:"-" description:"Create a pod based on Yaml file"`
+		Container     bool     `short:"c" long:"container" default-mast:"-" description:"Create container inside a pod"`
+		Yaml          bool     `short:"y" long:"yaml" default-mask:"-" description:"Create a pod based on Yaml file"`
 		Name          string   `long:"name" value-name:"\"\"" description:"Assign a name to the container"`
-		Attach        bool     `short:"a" long:"attach" default:"false" default-mask:"-" description:"(from podfile) Attach the stdin, stdout and stderr to the container"`
-		Detach        bool     `short:"d" long:"detach" default:"false" default-mask:"-" description:"(from cmdline) Not Attach the stdin, stdout and stderr to the container"`
+		Attach        bool     `short:"a" long:"attach" default-mask:"-" description:"(from podfile) Attach the stdin, stdout and stderr to the container"`
+		Detach        bool     `short:"d" long:"detach" default-mask:"-" description:"(from cmdline) Not Attach the stdin, stdout and stderr to the container"`
 		Workdir       string   `long:"workdir" value-name:"\"\"" default-mask:"-" description:"Working directory inside the container"`
-		Tty           bool     `short:"t" long:"tty" default:"false" default-mask:"-" description:"the run command in tty, such as bash shell"`
+		Tty           bool     `short:"t" long:"tty" default-mask:"-" description:"the run command in tty, such as bash shell"`
 		Cpu           int      `long:"cpu" default:"1" value-name:"1" default-mask:"-" description:"CPU number for the VM"`
 		Memory        int      `long:"memory" default:"128" value-name:"128" default-mask:"-" description:"Memory size (MB) for the VM"`
 		Env           []string `long:"env" value-name:"[]" default-mask:"-" description:"Set environment variables"`
@@ -138,7 +138,7 @@ func (cli *HyperClient) ParseCreateOptions(cmd string, args ...string) (*CreateO
 		RestartPolicy string   `long:"restart" default:"never" value-name:"\"\"" default-mask:"-" description:"Restart policy to apply when a container exits (never, onFailure, always)"`
 		LogDriver     string   `long:"log-driver" value-name:"\"\"" description:"Logging driver for Pod"`
 		LogOpts       []string `long:"log-opt" description:"Log driver options"`
-		Remove        bool     `long:"rm" default:"false" default-mask:"-" description:"Automatically remove the pod when it exits"`
+		Remove        bool     `long:"rm" default-mask:"-" description:"Automatically remove the pod when it exits"`
 		Portmap       []string `long:"publish" value-name:"[]" default-mask:"-" description:"Publish a container's port to the host, format: --publish [tcp/udp:]hostPort:containerPort"`
 		Labels        []string `long:"label" value-name:"[]" default-mask:"-" description:"Add labels for Pod, format: --label key=value"`
 		Volumes       []string `short:"v" long:"volume" value-name:"[]" default-mask:"-" description:"Mount host file/directory as a data file/volume, format: -v|--volume=[[hostDir:]containerDir[:options]]"`

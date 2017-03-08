@@ -1,7 +1,7 @@
 package libvirt
 
 /*
-#cgo LDFLAGS: -lvirt 
+#cgo LDFLAGS: -lvirt
 #include <libvirt/libvirt.h>
 #include <libvirt/virterror.h>
 #include <stdlib.h>
@@ -47,4 +47,9 @@ func (ni *VirNodeInfo) GetCores() uint32 {
 
 func (ni *VirNodeInfo) GetThreads() uint32 {
 	return uint32(ni.ptr.threads)
+}
+
+// libvirt.h: VIR_NODEINFO_MAXCPUS
+func (ni *VirNodeInfo) GetMaxCPUs() uint32 {
+	return ni.GetNodes() * ni.GetSockets() * ni.GetCores() * ni.GetThreads()
 }
