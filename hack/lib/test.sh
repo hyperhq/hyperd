@@ -142,7 +142,6 @@ hyper::test::command() {
 }
 
 hyper::test::integration() {
-  export GOPATH=${HYPER_ROOT}/Godeps/_workspace:$GOPATH
   go test github.com/hyperhq/hyperd/integration -check.vv -v
 }
 
