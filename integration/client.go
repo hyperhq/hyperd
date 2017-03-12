@@ -733,9 +733,18 @@ func (c *HyperClient) ContainerSignal(podID, containerID string, signal int64) e
 		ContainerID: containerID,
 		Signal:      signal,
 	})
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
+}
+
+// TTYResize resizes the tty of the specified container
+func (c *HyperClient) TTYResize(containerID, execID string, height, width int32) error {
+	_, err := c.client.TTYResize(c.ctx, &types.TTYResizeRequest{
+		ContainerID: containerID,
+		ExecID:      execID,
+		Height:      height,
+		Width:       width,
+	})
+
+	return err
 }

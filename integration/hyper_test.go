@@ -592,3 +592,32 @@ func (s *TestSuite) TestSendExecSignal(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(exitCode, Equals, int32(0))
 }
+
+func (s *TestSuite) TestTTYResize(c *C) {
+	cName := "test-tty-resize"
+	spec := types.UserPod{
+		Id: "busybox",
+		Containers: []*types.UserContainer{
+			{
+				Name:  cName,
+				Image: "busybox",
+				Tty:   true,
+			},
+		},
+	}
+	podID, err := s.client.CreatePod(&spec)
+	c.Assert(err, IsNil)
+
+	defer func() {
+		err = s.client.RemovePod(podID)
+		c.Assert(err, IsNil)
+	}()
+
+	err = s.client.StartPod(podID)
+	c.Assert(err, IsNil)
+
+	err = s.client.TTYResize(cName, "", 400, 600)
+	c.Assert(err, IsNil)
+
+	//TODO: add a user process test when ListProcess is ready.
+}
