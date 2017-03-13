@@ -108,7 +108,17 @@ func (s *router) postImagesLoad(ctx context.Context, w http.ResponseWriter, r *h
 	w.Header().Set("Content-Type", "application/json")
 	output := ioutils.NewWriteFlusher(w)
 	defer output.Close()
-	err := s.daemon.LoadImage(r.Body, output)
+
+	name := r.FormValue("name")
+	var refs = map[string]string{}
+	refsJSON := r.FormValue("refs")
+	if refsJSON != "" {
+		if err := json.NewDecoder(strings.NewReader(refsJSON)).Decode(&refs); err != nil {
+			return err
+		}
+	}
+
+	err := s.daemon.LoadImage(r.Body, name, refs, output)
 	if err != nil {
 		if !output.Flushed() {
 			return err
@@ -217,7 +227,16 @@ func (s *router) getImagesSave(ctx context.Context, w http.ResponseWriter, r *ht
 		names = r.Form["names"]
 	}
 
-	if err := s.daemon.ExportImage(names, output); err != nil {
+	format := r.FormValue("format")
+	refs := map[string]string{}
+	refsJSON := r.FormValue("refs")
+	if refsJSON != "" {
+		if err := json.NewDecoder(strings.NewReader(refsJSON)).Decode(&refs); err != nil {
+			return err
+		}
+	}
+
+	if err := s.daemon.ExportImage(names, format, refs, output); err != nil {
 		if !output.Flushed() {
 			return err
 		}

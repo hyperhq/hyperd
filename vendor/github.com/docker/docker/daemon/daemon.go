@@ -132,6 +132,18 @@ type Daemon struct {
 	linkIndex                 *linkIndex
 }
 
+func (daemon *Daemon) ImageStore() image.Store {
+	return daemon.imageStore
+}
+
+func (daemon *Daemon) LayerStore() layer.Store {
+	return daemon.layerStore
+}
+
+func (daemon *Daemon) ReferenceStore() reference.Store {
+	return daemon.referenceStore
+}
+
 // GetContainer looks for a container using the provided information, which could be
 // one of the following inputs from the caller:
 //  - A full container ID, which will exact match a container in daemon's list
