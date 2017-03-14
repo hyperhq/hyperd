@@ -163,9 +163,9 @@ func mainDaemon(opt *Options) {
 
 	api.InitRouters(d)
 
+	var rpcServer *serverrpc.ServerRPC = nil
 	if c.GRPCHost != "" {
-		rpcServer := serverrpc.NewServerRPC(d)
-		defer rpcServer.Stop()
+		rpcServer = serverrpc.NewServerRPC(d)
 
 		go func() {
 			err := rpcServer.Serve(c.GRPCHost)
@@ -188,6 +188,13 @@ func mainDaemon(opt *Options) {
 
 	glog.V(0).Infof("Hyper daemon: %s %s", utils.VERSION, utils.GITCOMMIT)
 
+	stopServer := func() {
+		api.Close()
+		if rpcServer != nil {
+			rpcServer.Stop()
+		}
+	}
+
 	// Daemon is fully initialized and handling API traffic
 	// Wait for serve API job to complete
 	select {
@@ -197,15 +204,17 @@ func mainDaemon(opt *Options) {
 		if errAPI != nil {
 			glog.Warningf("Shutting down due to ServeAPI error: %v", errAPI)
 		}
+		stopServer()
 		break
 	case <-stop:
+		stopServer()
 		d.DestroyAndKeepVm()
 		break
 	case <-stopAll:
+		stopServer()
 		d.DestroyAllVm()
 		break
 	}
-	api.Close()
 	d.Shutdown()
 }
 
