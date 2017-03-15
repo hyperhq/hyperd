@@ -178,6 +178,7 @@ __EOF__
   hyper::test::service
   hyper::test::nfs_volume
   hyper::test::execvm
+  hyper::test::remove_container_with_volume
 
   stop_hyperd
 }
