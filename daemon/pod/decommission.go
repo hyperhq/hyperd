@@ -241,6 +241,7 @@ func (p *XPod) RemoveContainer(id string) error {
 	}()
 
 	cvols := c.volumes()
+	removedVols := make([]string, 0, len(cvols))
 
 	if p.IsRunning() {
 		if c.IsRunning() {
@@ -266,6 +267,21 @@ func (p *XPod) RemoveContainer(id string) error {
 			c.Log(ERROR, "failed to remove from sandbox")
 			return err
 		}
+		for _, cv := range cvols {
+			if v, ok := p.volumes[cv.Name]; ok {
+				removed, err := v.tryRemoveFromSandbox()
+				if err != nil {
+					v.Log(ERROR, "failed to unplug vol: %v", err)
+					continue
+				}
+				if !removed {
+					v.Log(DEBUG, "volume did not unplug because it is in use")
+					continue
+				}
+				v.Log(DEBUG, "volume unplugged")
+				removedVols = append(removedVols, cv.Name)
+			}
+		}
 	}
 	err = c.umountRootVol()
 	if err != nil {
@@ -279,23 +295,6 @@ func (p *XPod) RemoveContainer(id string) error {
 	}
 	p.factory.registry.ReleaseContainer(id, c.SpecName())
 	delete(p.containers, id)
-
-	removedVols := make([]string, 0, len(cvols))
-	for _, cv := range cvols {
-		if v, ok := p.volumes[cv.Name]; ok {
-			removed, err := v.tryRemoveFromSandbox()
-			if err != nil {
-				v.Log(ERROR, "failed to unplug vol: %v", err)
-				continue
-			}
-			if !removed {
-				v.Log(DEBUG, "volume did not unplug because it is in use")
-				continue
-			}
-			v.Log(DEBUG, "volume unplugged")
-			removedVols = append(removedVols, cv.Name)
-		}
-	}
 
 	//remove volumes from daemondb
 	for _, vName := range removedVols {
