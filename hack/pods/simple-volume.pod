@@ -1,0 +1,23 @@
+{
+        "id": "test-remove-container-with-volume",
+        "containers" : [{
+            "name": "container-with-volume",
+            "image": "busybox",
+            "volumes": [{
+                "volume": "tmp",
+                "path": "/mnt",
+                "readOnly": false
+             }]
+        }],
+        "resource": {
+            "vcpu": 1,
+            "memory": 256
+        },
+        "files": [],
+        "volumes": [{
+            "name": "tmp",
+            "source": "TMPDIR",
+            "format": "vfs"
+        }],
+        "tty": true
+}

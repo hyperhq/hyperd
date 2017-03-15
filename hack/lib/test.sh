@@ -154,3 +154,19 @@ hyper::test::execvm() {
   test $res == aaa
   sudo hyperctl rm $id
 }
+
+# regression test for #542 and #537
+hyper::test::remove_container_with_volume() {
+  mkdir -p  ${HYPER_TEMP}/tmp
+  sed -e "s|TMPDIR|${HYPER_TEMP}/tmp|" ${HYPER_ROOT}/hack/pods/simple-volume.pod > ${HYPER_TEMP}/simple-volume.pod
+  echo "run pod with volume"
+  pod_id=$(sudo hyperctl run -d -p ${HYPER_TEMP}/simple-volume.pod | sed -ne "s/POD id is \(.*\)/\1/p")
+  echo "test pod ID is $pod_id"
+  sudo hyperctl stop $pod_id
+  echo "stop pod $pod_id"
+  echo "remove container container-with-volume in $pod_id"
+  res=$(sudo hyperctl rm -c container-with-volume > /dev/null 2>&1; echo $?)
+  sudo hyperctl rm $pod_id
+  echo "check result should be 0, got: $res"
+  test $res -eq 0
+}
