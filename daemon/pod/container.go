@@ -569,8 +569,19 @@ func (c *Container) describeContainer(cjson *dockertypes.ContainerJSON) (*runv.C
 	}
 
 	if cjson.Config.User != "" {
-		cdesc.UGI = &runv.UserGroupInfo{
-			User: cjson.Config.User,
+		users := strings.Split(cjson.Config.User, ":")
+		if len(users) > 2 {
+			return nil, fmt.Errorf("container %s invalid user group config: %s", cjson.Name, cjson.Config.User)
+		}
+		if len(users) == 2 {
+			cdesc.UGI = &runv.UserGroupInfo{
+				User:  users[0],
+				Group: users[1],
+			}
+		} else {
+			cdesc.UGI = &runv.UserGroupInfo{
+				User: cjson.Config.User,
+			}
 		}
 	}
 
