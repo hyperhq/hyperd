@@ -405,22 +405,23 @@ func (c *Container) init(allowCreate bool) error {
 		return err
 	}
 
+	c.mergeVolumes(cjson)
+
 	if !loaded {
 		if err = c.createVolumes(); err != nil {
 			c.Log(ERROR, err)
 			return err
 		}
 
-		// configEtcHosts should be called later than parse volumes, guarantee the file is not described in container
+		// configEtcHosts should be called later than mergevolumes, guarantee the file is not described in container
 		c.configEtcHosts()
 
 		c.configDNS()
 		c.injectFiles(desc.MountId)
 	}
 
-	desc.Volumes = c.parseVolumes(cjson)
+	desc.Volumes = c.parseVolumes()
 	desc.Initialize = !loaded
-
 	c.descript = desc
 
 	return nil
@@ -599,14 +600,9 @@ func (c *Container) describeContainer(cjson *dockertypes.ContainerJSON) (*runv.C
 	return cdesc, nil
 }
 
-func (c *Container) parseVolumes(cjson *dockertypes.ContainerJSON) map[string]*runv.VolumeReference {
-
-	var (
-		existed = make(map[string]*apitypes.UserVolume)
-		refs    = make(map[string]*runv.VolumeReference)
-	)
+func (c *Container) parseVolumes() map[string]*runv.VolumeReference {
+	refs := make(map[string]*runv.VolumeReference)
 	for _, vol := range c.spec.Volumes {
-		existed[vol.Path] = vol.Detail
 		if r, ok := refs[vol.Volume]; !ok {
 			refs[vol.Volume] = &runv.VolumeReference{
 				Name: vol.Volume,
@@ -622,9 +618,18 @@ func (c *Container) parseVolumes(cjson *dockertypes.ContainerJSON) map[string]*r
 			})
 		}
 	}
+	return refs
+}
+
+func (c *Container) mergeVolumes(cjson *dockertypes.ContainerJSON) {
 
 	if cjson == nil {
-		return refs
+		return
+	}
+
+	existed := make(map[string]*apitypes.UserVolume)
+	for _, vol := range c.spec.Volumes {
+		existed[vol.Path] = vol.Detail
 	}
 
 	for tgt := range cjson.Config.Volumes {
@@ -645,17 +650,7 @@ func (c *Container) parseVolumes(cjson *dockertypes.ContainerJSON) map[string]*r
 		}
 
 		c.spec.Volumes = append(c.spec.Volumes, &r)
-		refs[n] = &runv.VolumeReference{
-			Name: n,
-			MountPoints: []*runv.VolumeMount{{
-				Path:     tgt,
-				ReadOnly: false,
-			}},
-		}
 	}
-
-	return refs
-
 }
 
 func (c *Container) configEtcHosts() {
