@@ -198,3 +198,13 @@ hyper::test::specuseroverride() {
   sudo hyperctl rm $id
   test $res -eq 0
 }
+
+# regression test for #551 and #490
+hyper::test::imagevolume() {
+  echo "Pod image volume and /etc/hosts insertion test"
+  id=$(sudo hyperctl run -d rethinkdb:2.3.5 | sed -ne "s/POD id is \(.*\)/\1/p")
+  res1=$(sudo hyperctl exec $id mount | grep '/data' > /dev/null 2>&1; echo $?)
+  res2=$(sudo hyperctl exec $id mount | grep '/etc/hosts' > /dev/null 2>&1; echo $?)
+  sudo hyperctl rm $id
+  test $res1 -eq 0 -a $res2 -eq 0
+}
