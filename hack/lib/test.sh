@@ -170,3 +170,31 @@ hyper::test::remove_container_with_volume() {
   echo "check result should be 0, got: $res"
   test $res -eq 0
 }
+
+hyper::test::imageuser() {
+  echo "Pod image user config test"
+  # irssi image has "User": "user"
+  id=$(sudo hyperctl run -d --env="TERM=xterm" irssi:1 | sed -ne "s/POD id is \(.*\)/\1/p")
+  res=$(sudo hyperctl exec $id ps aux | grep user > /dev/null 2>&1; echo $?)
+  sudo hyperctl rm $id
+  test $res -eq 0
+}
+
+hyper::test::imageusergroup() {
+  echo "Pod image user group config test"
+  # k8s-dns-sidecar-amd64:1.14.1 image has "User": "nobody" and "Group": "nobody"
+  id=$(sudo hyperctl run -d gcr.io/google_containers/k8s-dns-sidecar-amd64:1.14.1 | sed -ne "s/POD id is \(.*\)/\1/p")
+  res=$(sudo hyperctl exec $id ps aux | grep nobody > /dev/null 2>&1; echo $?)
+  sudo hyperctl rm $id
+  test $res -eq 0
+}
+
+hyper::test::specuseroverride() {
+  echo "Pod spec user override test"
+  # irssi image has "User": "user"
+  # user-override.pod overrides it with "User": "nobody"
+  id=$(sudo hyperctl run -p ${HYPER_ROOT}/hack/pods/user-override.pod | sed -ne "s/POD id is \(.*\)/\1/p")
+  res=$(sudo hyperctl exec $id ps aux | grep nobody > /dev/null 2>&1; echo $?)
+  sudo hyperctl rm $id
+  test $res -eq 0
+}

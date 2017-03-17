@@ -179,6 +179,9 @@ __EOF__
   hyper::test::nfs_volume
   hyper::test::execvm
   hyper::test::remove_container_with_volume
+  hyper::test::imageuser
+  hyper::test::imageusergroup
+  hyper::test::specuseroverride
 
   stop_hyperd
 }

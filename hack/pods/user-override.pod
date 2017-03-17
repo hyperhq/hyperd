@@ -1,0 +1,9 @@
+{
+	"containers" : [{
+	    "image": "irssi:1",
+	    "user": {
+		"name": "nobody"
+	    },
+	    "command": ["sh"]
+	}]
+}
