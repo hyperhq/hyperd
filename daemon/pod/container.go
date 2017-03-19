@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/docker/docker/daemon/logger"
@@ -1058,7 +1059,7 @@ func (c *Container) waitFinish(timeout int) {
 	}
 }
 
-func (c *Container) terminate() (err error) {
+func (c *Container) terminate(force bool) (err error) {
 	if c.descript == nil {
 		return
 	}
@@ -1070,7 +1071,10 @@ func (c *Container) terminate() (err error) {
 		}
 	}()
 
-	sig := utils.StringToSignal(c.descript.StopSignal)
+	sig := syscall.SIGKILL
+	if !force {
+		sig = utils.StringToSignal(c.descript.StopSignal)
+	}
 	c.setKill()
 	c.Log(DEBUG, "stopping: killing container with %d", sig)
 	err = c.p.sandbox.KillContainer(c.Id(), sig)
