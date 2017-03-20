@@ -16,8 +16,8 @@ func (cli *HyperClient) HyperCmdExec(args ...string) error {
 		Tty    bool `short:"t" long:"tty" description:"Allocate a pseudo-TTY"`
 		VM     bool `short:"m" long:"vm" description:"Execute outside of any containers"`
 	}
-	var parser = gflag.NewParser(&opts, gflag.Default|gflag.IgnoreUnknown)
-	parser.Usage = "exec [OPTIONS] POD|CONTAINER COMMAND [ARGS...]\n\nRun a command in a container of a running pod"
+	var parser = gflag.NewParser(&opts, gflag.Default|gflag.IgnoreUnknown|gflag.PassAfterNonOption)
+	parser.Usage = "exec [OPTIONS] POD|CONTAINER COMMAND [ARGS...]\n\nRun a command in a container or a Pod"
 	args, err := parser.ParseArgs(args)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {
