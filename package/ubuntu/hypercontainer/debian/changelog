@@ -1,3 +1,9 @@
+hypercontainer (0.8.0-1) xenial; urgency=low
+
+  * Release 0.8.0
+
+ -- Hyper Dev Team <dev@hyper.sh>  Mon, 20 Mar 2017 22:30:08 +0800
+
 hypercontainer (0.7.0-2) xenial; urgency=low
 
   * add service and config file to package
