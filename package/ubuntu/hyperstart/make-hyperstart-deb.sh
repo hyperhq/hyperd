@@ -2,7 +2,7 @@
 
 PROJECT=$(readlink -f $(dirname $0)/../../..)
 UBUNTU_DIR=${PROJECT}/package/ubuntu/hyperstart
-VERSION=0.7.0
+VERSION=0.8.0
 
 if [ $# -gt 0 ] ; then
     VERSION=$1

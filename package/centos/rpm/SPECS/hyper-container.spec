@@ -1,6 +1,6 @@
 Summary:            Hyper Container is a VM based docker runtime
 Name:               hyper-container
-Version:            0.7.0
+Version:            0.8.0
 Release:            1%{?dist}
 License:            Apache License, Version 2.0
 Group:              System Environment/Base
@@ -8,9 +8,6 @@ Group:              System Environment/Base
 # following commands to generate the tarball:
 #  git archive --format=tar.gz master > hyperd-%{version}.tar.gz
 Source0:            hyperd-%{version}.tar.gz
-# and the https://github.com/hyperhq/runv.git
-#  git archive --format=tar.gz master > runv-%{version}.tar.gz
-Source1:            runv-%{version}.tar.gz
 URL:                https://hyper.sh/
 ExclusiveArch:      x86_64
 Requires:           device-mapper,sqlite
@@ -25,9 +22,7 @@ VM without a full guest OS
 
 %prep
 mkdir -p %{_builddir}/src/github.com/hyperhq/hyperd
-mkdir -p %{_builddir}/src/github.com/hyperhq/runv
 tar -C %{_builddir}/src/github.com/hyperhq/hyperd -xvf %SOURCE0
-tar -C %{_builddir}/src/github.com/hyperhq/runv -xvf %SOURCE1
 
 %build
 cd %{_builddir}/src/github.com/hyperhq/hyperd
@@ -53,6 +48,8 @@ rm -rf %{buildroot}
 /lib/systemd/system/hyperd.service
 
 %changelog
+* Mon Mar 20 2017 Hyper Dev Team <dev@hyper.sh> - 0.8.0-1
+- update source to 0.8.0
 * Fri Oct 28 2016 Hyper Dev Team <dev@hyper.sh> - 0.7.0-1
 - update source to 0.7.0
 * Mon Aug 29 2016 Hyper Dev Team <dev@hyper.sh> - 0.6.2-1
