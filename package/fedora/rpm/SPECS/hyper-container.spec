@@ -13,7 +13,6 @@ ExclusiveArch:      x86_64
 Requires:           device-mapper,sqlite,libvirt
 BuildRequires:      device-mapper-devel,pcre-devel,libsepol-devel,libselinux-devel,systemd-devel,libvirt-devel
 BuildRequires:      sqlite-devel
-BuildRequires:      libuuid-devel,xen-devel
 
 %description
 Hyper is a VM based docker engine, it start a container image in

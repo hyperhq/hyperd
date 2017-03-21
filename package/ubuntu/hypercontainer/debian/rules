@@ -25,7 +25,6 @@ override_dh_auto_install:
 	mkdir -p debian/hypercontainer/usr/bin
 	cp -aT hyperd debian/hypercontainer/usr/bin/hyperd
 	cp -aT hyperctl debian/hypercontainer/usr/bin/hyperctl
-	cp -aT $(CURDIR)/go/src/github.com/hyperhq/hyperd/package/dist/etc/hyper/config debian/hypercontainer/etc/hyper/config
 	cp -r package/dist/* debian/hypercontainer/
 
 override_dh_auto_clean:

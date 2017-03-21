@@ -5,9 +5,7 @@ Maintainer: Hyper Dev Team <dev@hyper.sh>
 Build-Depends: debhelper (>=9),
                libdevmapper-dev,
                libsqlite3-dev,
-               libvirt-dev,
-               libxen-dev,
-               uuid-dev
+               libvirt-dev
 Standards-Version: 3.9.6
 Homepage: http://hypercontainer.io
 Vcs-Git: git://github.com/hyperhq/hyperd.git
