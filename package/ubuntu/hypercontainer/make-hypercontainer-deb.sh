@@ -2,7 +2,8 @@
 
 PROJECT=$(readlink -f $(dirname $0)/../../..)
 UBUNTU_DIR=${PROJECT}/package/ubuntu/hypercontainer
-VERSION=0.8.0
+VERSION=${VERSION:-0.8.0}
+BRANCH=${BRANCH:-master}
 
 if [ $# -gt 0 ] ; then
     VERSION=$1
@@ -13,7 +14,7 @@ fi
 
 # get hyperd tar ball
 cd $PROJECT
-git archive --format=tar.gz master > ${UBUNTU_DIR}/hypercontainer-${VERSION}.tar.gz
+git archive --format=tar.gz ${BRANCH} > ${UBUNTU_DIR}/hypercontainer-${VERSION}.tar.gz
 
 # prepair to create source pkg
 mkdir -p ${UBUNTU_DIR}/hypercontainer-${VERSION}
