@@ -9,7 +9,7 @@ if [ $# -gt 0 ] ; then
 fi
 
 # install addtional pkgs in order to build deb pkg
-sudo apt-get install -y autoconf automake pkg-config dh-make
+# sudo apt-get install -y autoconf automake pkg-config dh-make
 
 # get hyperstart tar ball
 cd $PROJECT/../hyperstart
