@@ -13,8 +13,7 @@ ExclusiveArch:      x86_64
 
 %description
 Hyperstart is the initrd for hyper VM, hyperstart 
-includes the kernel and initrd, qboot bios and cbfs rom
-image.
+includes the kernel and initrd.
 
 %prep
 mkdir -p %{_builddir}/src/github.com/hyperhq/hyperstart

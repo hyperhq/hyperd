@@ -2,7 +2,7 @@
 # See debhelper(7) (uncomment to enable)
 # output every command that modifies files on the build system.
 export DH_VERBOSE = 1
-export GOPATH=$(CURDIR)/go
+
 
 # see FEATURE AREAS in dpkg-buildflags(1)
 #export DEB_BUILD_MAINT_OPTIONS = hardening=+all
@@ -14,26 +14,17 @@ export GOPATH=$(CURDIR)/go
 #export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
 
 override_dh_auto_build:
-	echo "begin build"
-	mkdir -p go/src/github.com/hyperhq go/pkg
-	ln -sf $(CURDIR) go/src/github.com/hyperhq/hyperd
 	./autogen.sh
 	./configure
-	cd go/src/github.com/hyperhq/hyperd && make
-	echo "end build"
+	make
 
 override_dh_auto_install:
-	echo "begin install"
-	mkdir -p debian/hypercontainer/usr/bin
-	cp -aT hyperd debian/hypercontainer/usr/bin/hyperd
-	cp -aT hyperctl debian/hypercontainer/usr/bin/hyperctl
-	cp -r package/dist/* debian/hypercontainer/
-	echo "end install"
+	mkdir -p debian/hyperstart/var/lib/hyper/
+	cp -aT build/kernel debian/hyperstart/var/lib/hyper/kernel
+	cp -aT build/hyper-initrd.img debian/hyperstart/var/lib/hyper/hyper-initrd.img
 
 override_dh_auto_clean:
-	rm -rf go hyperd hyperctl
-
-override_dh_auto_test:
+	rm -rf build/hyper-initrd.img
 
 %:
 	dh $@

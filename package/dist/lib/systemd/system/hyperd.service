@@ -1,6 +1,6 @@
 [Unit]
 Description=hyperd
-+Documentation=http://docs.hypercontainer.io
+Documentation=http://docs.hypercontainer.io
 After=network.target
 Requires=
 
