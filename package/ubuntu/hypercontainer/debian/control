@@ -14,6 +14,6 @@ Vcs-Browser: https://github.com/hyperhq/hyperd
 Package: hypercontainer
 Architecture: amd64
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: HyperContainer - Hypervisor-agnostic Docker Runtime
- Hyper is a VM based docker engine, it start a container image in
- VM without a full guest OS
+Description: HyperContainer - Virtualized Container Runtime
+ Hyper is a VM based docker engine, it start container image in
+ a light weight VM instead of a container.
