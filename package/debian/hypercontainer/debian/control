@@ -1,0 +1,19 @@
+Source: hypercontainer
+Section: admin
+Priority: optional
+Maintainer: Hyper Dev Team <dev@hyper.sh>
+Build-Depends: debhelper (>=9),
+               libdevmapper-dev,
+               libsqlite3-dev,
+               libvirt-dev
+Standards-Version: 3.9.6
+Homepage: http://hypercontainer.io
+Vcs-Git: git://github.com/hyperhq/hyperd.git
+Vcs-Browser: https://github.com/hyperhq/hyperd
+
+Package: hypercontainer
+Architecture: amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: HyperContainer - Virtualized Container Runtime
+ Hyper is a VM based docker engine, it start container image in
+ a light weight VM instead of a container.

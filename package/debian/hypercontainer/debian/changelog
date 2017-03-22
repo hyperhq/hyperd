@@ -1,0 +1,23 @@
+hypercontainer (0.8.0-1) unstable; urgency=low
+
+  * Release 0.8.0
+
+ -- Hyper Dev Team <dev@hyper.sh>  Mon, 20 Mar 2017 22:30:08 +0800
+
+hypercontainer (0.7.0-2) unstable; urgency=low
+
+  * add service and config file to package
+
+ -- Hyper Dev Team <dev@hyper.sh>  Sat, 30 Oct 2016 16:21:08 +0800
+
+hypercontainer (0.7.0-1) unstable; urgency=low
+
+  * Release 0.7.0
+
+ -- Hyper Dev Team <dev@hyper.sh>  Fri, 29 Oct 2016 22:30:08 +0800
+
+hypercontainer (0.6.2-1) unstable; urgency=low
+
+  * Initial release
+
+ -- Hyper Dev Team <dev@hyper.sh>  Thu, 08 Sep 2016 19:01:17 +0800
