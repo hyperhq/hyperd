@@ -19,17 +19,17 @@ git archive --format=tar.gz ${BRANCH} > ${UBUNTU_DIR}/hyperstart-${VERSION}.tar.
 # prepair to create source pkg
 mkdir -p ${UBUNTU_DIR}/hyperstart-${VERSION}
 cd ${UBUNTU_DIR}
-tar -zxvf hyperstart-${VERSION}.tar.gz -C ${UBUNTU_DIR}/hyperstart-${VERSION}
+tar -zxf hyperstart-${VERSION}.tar.gz -C ${UBUNTU_DIR}/hyperstart-${VERSION}
 
 # in order to use debian/* to create deb, so put them in the hyperstart.
 cp -a ${UBUNTU_DIR}/debian ${UBUNTU_DIR}/hyperstart-${VERSION}
 
 # run dh_make
 cd ${UBUNTU_DIR}/hyperstart-${VERSION}
-dh_make -s -y -f ../hyperstart-${VERSION}.tar.gz
+dh_make -s -y -f ../hyperstart_${VERSION}.orig.tar.gz -e dev@hyper.sh
 
 # run dpkg-buildpackage
-dpkg-buildpackage -us -uc -rfakeroot
+dpkg-buildpackage -b -us -uc -rfakeroot
 
 #clean up intermediate files
 rm -rf ${UBUNTU_DIR}/hyperstart-${VERSION}

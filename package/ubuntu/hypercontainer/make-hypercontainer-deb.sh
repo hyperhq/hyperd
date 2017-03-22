@@ -19,17 +19,18 @@ git archive --format=tar.gz ${BRANCH} > ${UBUNTU_DIR}/hypercontainer-${VERSION}.
 # prepair to create source pkg
 mkdir -p ${UBUNTU_DIR}/hypercontainer-${VERSION}
 cd ${UBUNTU_DIR}
-tar -zxvf hypercontainer-${VERSION}.tar.gz -C ${UBUNTU_DIR}/hypercontainer-${VERSION}
+tar -zxf hypercontainer-${VERSION}.tar.gz -C ${UBUNTU_DIR}/hypercontainer-${VERSION}
 
 # in order to use debian/* to create deb, so put them in the hypercontainer.
 cp -a ${UBUNTU_DIR}/debian ${UBUNTU_DIR}/hypercontainer-${VERSION}
 
 # run dh_make
 cd ${UBUNTU_DIR}/hypercontainer-${VERSION}
-dh_make -s -y -f ../hypercontainer-${VERSION}.tar.gz
+export DEBFULLNAME=Hyper Dev Team
+dh_make -s -y -f ../hypercontainer-${VERSION}.tar.gz -e dev@hyper.sh
 
 # run dpkg-buildpackage
-dpkg-buildpackage -us -uc -rfakeroot
+dpkg-buildpackage -us -uc -b -rfakeroot
 
 #clean up intermediate files
 rm -rf ${UBUNTU_DIR}/hypercontainer-${VERSION}
