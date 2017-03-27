@@ -3,17 +3,22 @@
 package qemu
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
+	"unicode"
 
 	"github.com/golang/glog"
 	"github.com/hyperhq/runv/hypervisor"
 )
 
 const (
-	QEMU_SYSTEM_EXE    = "qemu-system-aarch64"
-	VM_MIN_MEMORY_SIZE = 128
+	QEMU_SYSTEM_EXE               = "qemu-system-aarch64"
+	VM_MIN_MEMORY_SIZE            = 128
+	CAVIUM_CPU_PART_THUNDERX      = 0x0A1
+	CAVIUM_CPU_PART_THUNDERX_81XX = 0x0A2
 )
 
 func (qc *QemuContext) arguments(ctx *hypervisor.VmContext) []string {
@@ -42,10 +47,38 @@ func (qc *QemuContext) arguments(ctx *hypervisor.VmContext) []string {
 		cpuParams = strconv.Itoa(boot.CPU)
 	}
 
-	params := []string{"-machine", "virt,accel=kvm,usb=off", "-global", "kvm-pit.lost_tick_policy=discard", "-cpu", "cortex-a57"}
+	gic_version3 := false
+	if f, err := os.Open("/proc/cpuinfo"); err == nil {
+		defer f.Close()
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			infos := strings.FieldsFunc(scanner.Text(), func(c rune) bool {
+				return !unicode.IsLetter(c) && !unicode.IsNumber(c)
+			})
+			if len(infos) == 3 && infos[0] == "CPU" && infos[1] == "part" {
+				if partnum, err := strconv.ParseInt(infos[2], 0, 32); err == nil {
+					glog.Infof("partnum is %v, cpu type is thunder", partnum)
+					if partnum == CAVIUM_CPU_PART_THUNDERX || partnum == CAVIUM_CPU_PART_THUNDERX_81XX {
+						gic_version3 = true
+					}
+				}
+				break
+			}
+		}
+	}
+
+	kvm_available := true
 	if _, err := os.Stat("/dev/kvm"); os.IsNotExist(err) {
+		kvm_available = false
 		glog.V(1).Info("kvm not exist change to no kvm mode")
-		params = []string{"-machine", "virt,usb=off", "-cpu", "cortex-a57"}
+	}
+
+	params := []string{"-machine", "virt,usb=off", "-cpu", "cortex-a57"}
+	if gic_version3 {
+		params = []string{"-machine", "virt,accel=kvm,gic-version=3,usb=off", "-global", "kvm-pit.lost_tick_policy=discard", "-cpu", "host"}
+		if !kvm_available {
+			params = []string{"-machine", "virt,gic-version=3,usb=off", "-cpu", "host"}
+		}
 	}
 
 	return append(params,

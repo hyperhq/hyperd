@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -627,7 +628,7 @@ func (vm *Vm) StartContainer(id string) error {
 		return fmt.Errorf("Create new container failed: %v", err)
 	}
 
-	vm.ctx.Log(DEBUG, "container %s start: done.", id)
+	vm.ctx.Log(TRACE, "container %s start: done.", id)
 	return nil
 }
 
@@ -754,7 +755,7 @@ func GetVm(vmId string, b *BootConfig, waitStarted bool) (*Vm, error) {
 	if id == "" {
 		for {
 			id = fmt.Sprintf("vm-%s", utils.RandStr(10, "alpha"))
-			if _, err := os.Stat(BaseDir + "/" + id); os.IsNotExist(err) {
+			if _, err := os.Stat(filepath.Join(BaseDir, id)); os.IsNotExist(err) {
 				break
 			}
 		}
@@ -766,14 +767,14 @@ func GetVm(vmId string, b *BootConfig, waitStarted bool) (*Vm, error) {
 	}
 
 	if waitStarted {
-		glog.V(1).Info("waiting for vm to start")
+		glog.V(3).Info("waiting for vm to start")
 		if err := <-vm.WaitResponse(func(response *types.VmResponse) (error, bool) {
 			if response.Code == types.E_FAILED {
 				glog.Error("VM start failed")
-				return fmt.Errorf("vm start failed"), true
+				return fmt.Errorf("VM start failed"), true
 			}
 			if response.Code == types.E_VM_RUNNING {
-				glog.V(1).Info("VM started successfully")
+				glog.V(3).Info("VM started successfully")
 				return nil, true
 			}
 			glog.Error("VM never started")
@@ -783,6 +784,6 @@ func GetVm(vmId string, b *BootConfig, waitStarted bool) (*Vm, error) {
 		}
 	}
 
-	glog.V(1).Info("GetVm succeeded (not waiting for startup)")
+	glog.V(3).Info("GetVm succeeded (not waiting for startup)")
 	return vm, nil
 }

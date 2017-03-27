@@ -3,6 +3,7 @@ package template
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/golang/glog"
 	"github.com/hyperhq/runv/factory/base"
@@ -21,14 +22,14 @@ func New(templateRoot string, cpu, mem int, kernel, initrd string, vsock bool) b
 
 	for {
 		vmName = fmt.Sprintf("template-vm-%s", utils.RandStr(10, "alpha"))
-		if _, err := os.Stat(templateRoot + "/" + vmName); os.IsNotExist(err) {
+		if _, err := os.Stat(filepath.Join(templateRoot, vmName)); os.IsNotExist(err) {
 			break
 		}
 	}
-	s, err := template.CreateTemplateVM(templateRoot+"/"+vmName, vmName, cpu, mem, kernel, initrd, vsock)
+	s, err := template.CreateTemplateVM(filepath.Join(templateRoot, vmName), vmName, cpu, mem, kernel, initrd, vsock)
 	if err != nil {
-		glog.Infof("failed to create template factory: %v", err)
-		glog.Infof("use direct factory instead")
+		glog.Errorf("failed to create template factory: %v", err)
+		glog.V(3).Infof("use direct factory instead")
 		return direct.New(cpu, mem, kernel, initrd, vsock)
 	}
 	return &templateFactory{s: s}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -64,7 +65,7 @@ func (qd *QemuDriver) InitContext(homeDir string) hypervisor.DriverContext {
 		os.Mkdir(QemuLogDir, 0755)
 	}
 
-	logFile := QemuLogDir + "/" + homeDir[strings.Index(homeDir, "vm-"):len(homeDir)-1] + ".log"
+	logFile := filepath.Join(QemuLogDir, homeDir[strings.Index(homeDir, "vm-"):len(homeDir)-1]+".log")
 	if _, err := os.Create(logFile); err != nil {
 		glog.Errorf("create qemu log file failed: %v", err)
 	}
@@ -78,8 +79,8 @@ func (qd *QemuDriver) InitContext(homeDir string) hypervisor.DriverContext {
 		qmp:         make(chan QmpInteraction, 128),
 		wdt:         make(chan string, 16),
 		waitQmp:     make(chan int, 1),
-		qmpSockName: homeDir + QmpSockName,
-		qemuPidFile: homeDir + QemuPidFile,
+		qmpSockName: filepath.Join(homeDir, QmpSockName),
+		qemuPidFile: filepath.Join(homeDir, QemuPidFile),
 		qemuLogFile: qemuLogFile,
 		process:     nil,
 	}

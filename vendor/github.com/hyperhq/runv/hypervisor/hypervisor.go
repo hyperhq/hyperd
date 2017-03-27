@@ -20,7 +20,7 @@ func (ctx *VmContext) loop() {
 			glog.V(1).Info("got nil event.")
 			continue
 		}
-		glog.V(1).Infof("vm %s: main event loop got message %d(%s)", ctx.Id, ev.Event(), EventString(ev.Event()))
+		glog.V(3).Infof("VM [%s]: main event loop got message %d(%s)", ctx.Id, ev.Event(), EventString(ev.Event()))
 		ctx.handler(ctx, ev)
 	}
 
@@ -76,7 +76,7 @@ func (ctx *VmContext) Launch() {
 
 	//launch routines
 	if ctx.Boot.BootFromTemplate {
-		glog.Info("boot from template")
+		glog.V(3).Info("boot from template")
 		ctx.PauseState = PauseStatePaused
 		ctx.hyperstart = libhyperstart.NewJsonBasedHyperstart(ctx.ctlSockAddr(), ctx.ttySockAddr(), 1, false)
 		ctx.Hub <- &InitConnectedEvent{}

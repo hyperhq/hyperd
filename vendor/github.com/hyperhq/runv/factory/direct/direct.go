@@ -28,7 +28,7 @@ func (d *directFactory) Config() *hypervisor.BootConfig {
 }
 
 func (d *directFactory) GetBaseVm() (*hypervisor.Vm, error) {
-	glog.V(2).Infof("direct factory start create vm")
+	glog.V(3).Infof("direct factory start create vm")
 	vm, err := hypervisor.GetVm("", d.Config(), true)
 	if err == nil {
 		err = vm.Pause(true)
@@ -38,10 +38,9 @@ func (d *directFactory) GetBaseVm() (*hypervisor.Vm, error) {
 		}
 	}
 	if err == nil {
-		glog.V(2).Infof("direct factory created vm:%s", vm.Id)
+		glog.V(3).Infof("direct factory created vm: %s", vm.Id)
 	} else {
-		glog.V(2).Infof("direct factory failed to create vm")
-
+		glog.Errorf("direct factory failed to create vm")
 	}
 	return vm, err
 }

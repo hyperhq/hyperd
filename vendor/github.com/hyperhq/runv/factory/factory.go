@@ -6,6 +6,7 @@ package factory
 
 import (
 	"encoding/json"
+	"path/filepath"
 
 	"github.com/golang/glog"
 	"github.com/hyperhq/runv/factory/base"
@@ -34,7 +35,7 @@ func NewFromConfigs(kernel, initrd string, vsock bool, configs []FactoryConfig) 
 	for i, c := range configs {
 		var b base.Factory
 		if c.Template {
-			b = template.New(hypervisor.BaseDir+"/template", c.Cpu, c.Memory, kernel, initrd, vsock)
+			b = template.New(filepath.Join(hypervisor.BaseDir, "template"), c.Cpu, c.Memory, kernel, initrd, vsock)
 		} else {
 			b = direct.New(c.Cpu, c.Memory, kernel, initrd, vsock)
 		}

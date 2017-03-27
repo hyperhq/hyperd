@@ -31,13 +31,13 @@ func (ctx *VmContext) newContainer(id string) error {
 
 	c, ok := ctx.containers[id]
 	if ok {
-		glog.Infof("start sending INIT_NEWCONTAINER")
+		glog.V(3).Infof("start sending INIT_NEWCONTAINER")
 		var err error
 		c.stdinPipe, c.stdoutPipe, c.stderrPipe, err = ctx.hyperstart.NewContainer(c.VmSpec())
 		if err == nil && c.tty != nil {
 			go streamCopy(c.tty, c.stdinPipe, c.stdoutPipe, c.stderrPipe)
 		}
-		glog.Infof("sent INIT_NEWCONTAINER")
+		glog.V(3).Infof("sent INIT_NEWCONTAINER")
 		return err
 	} else {
 		return fmt.Errorf("container %s not exist", id)
@@ -99,7 +99,7 @@ type TtyIO struct {
 }
 
 func (tty *TtyIO) Close() {
-	glog.V(1).Info("Close tty ")
+	glog.V(3).Info("Close tty ")
 
 	if tty.Stdin != nil {
 		tty.Stdin.Close()
@@ -164,7 +164,7 @@ func streamCopy(tty *TtyIO, stdinPipe io.WriteCloser, stdoutPipe, stderrPipe io.
 func (ctx *VmContext) startPod() {
 	err := ctx.hyperstart.StartSandbox(ctx.networks.sandboxInfo())
 	if err == nil {
-		ctx.Log(INFO, "pod start success")
+		ctx.Log(INFO, "pod start successfully")
 		ctx.reportSuccess("Start POD success", []byte{})
 	} else {
 		reason := "Start POD failed"
@@ -177,7 +177,7 @@ func (ctx *VmContext) shutdownVM() {
 	ctx.setTimeout(10)
 	err := ctx.hyperstart.DestroySandbox()
 	if err == nil {
-		glog.Info("POD destroyed")
+		glog.V(1).Info("POD destroyed")
 		ctx.poweroffVM(false, "")
 	} else {
 		glog.Warning("Destroy pod failed")
@@ -212,18 +212,18 @@ func unexpectedEventHandler(ctx *VmContext, ev VmEvent, state string) {
 func stateRunning(ctx *VmContext, ev VmEvent) {
 	switch ev.Event() {
 	case COMMAND_SHUTDOWN:
-		ctx.Log(INFO, "got shutdown command, shutting down")
+		ctx.Log(TRACE, "got shutdown command, shutting down")
 		go ctx.shutdownVM()
 		ctx.Become(stateTerminating, StateTerminating)
 	case COMMAND_RELEASE:
-		ctx.Log(INFO, "pod is running, got release command, let VM fly")
+		ctx.Log(TRACE, "pod is running, got release command, let VM fly")
 		ctx.Become(nil, StateNone)
 		ctx.reportSuccess("", nil)
 	case EVENT_INIT_CONNECTED:
-		ctx.Log(INFO, "hyperstart is ready to accept vm commands")
+		ctx.Log(TRACE, "hyperstart is ready to accept vm commands")
 		ctx.reportVmRun()
 	case EVENT_VM_EXIT, ERROR_VM_START_FAILED:
-		ctx.Log(INFO, "VM has exit, or not started at all (%d)", ev.Event())
+		ctx.Log(TRACE, "VM has exit, or not started at all (%d)", ev.Event())
 		ctx.reportVmShutdown()
 		ctx.Close()
 	case EVENT_VM_TIMEOUT: // REFACTOR: we do not set timeout for prepare devices after the refactor, then we do not need wait this event any more
@@ -234,7 +234,7 @@ func stateRunning(ctx *VmContext, ev VmEvent) {
 		ctx.poweroffVM(true, "connection to vm broken")
 		ctx.Close()
 	case ERROR_INTERRUPTED:
-		glog.Info("Connection interrupted, quit...")
+		ctx.Log(TRACE, "Connection interrupted, quit...")
 		ctx.poweroffVM(true, "connection to vm broken")
 		ctx.Close()
 	default:
@@ -245,22 +245,22 @@ func stateRunning(ctx *VmContext, ev VmEvent) {
 func stateTerminating(ctx *VmContext, ev VmEvent) {
 	switch ev.Event() {
 	case EVENT_VM_EXIT:
-		glog.Info("Got VM shutdown event while terminating, go to cleaning up")
+		glog.V(3).Info("Got VM shutdown event while terminating, go to cleaning up")
 		ctx.reportVmShutdown()
 		ctx.Close()
 	case EVENT_VM_KILL:
-		glog.Info("Got VM force killed message, go to cleaning up")
+		glog.V(3).Info("Got VM force killed message, go to cleaning up")
 		ctx.reportVmShutdown()
 		ctx.Close()
 	case COMMAND_RELEASE:
-		glog.Info("vm terminating, got release")
+		glog.V(3).Info("vm terminating, got release")
 	case EVENT_VM_TIMEOUT:
 		glog.Warning("VM did not exit in time, try to stop it")
 		ctx.poweroffVM(true, "vm terminating timeout")
 		ctx.Close()
 	case ERROR_INTERRUPTED:
 		interruptEv := ev.(*Interrupted)
-		glog.V(1).Info("Connection interrupted while terminating: %s", interruptEv.Reason)
+		glog.V(3).Info("Connection interrupted while terminating: %s", interruptEv.Reason)
 	default:
 		unexpectedEventHandler(ctx, ev, "terminating")
 	}

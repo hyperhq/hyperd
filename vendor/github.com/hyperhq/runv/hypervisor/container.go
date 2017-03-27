@@ -2,6 +2,7 @@ package hypervisor
 
 import (
 	"io"
+	"path/filepath"
 	"sync"
 
 	"github.com/hyperhq/runv/api"
@@ -73,7 +74,7 @@ func (cc *ContainerContext) add(wgDisk *sync.WaitGroup, result chan api.Result) 
 				cc.Log(DEBUG, "volume (fs mapping) %s is ready", vn)
 				cc.fsmap = append(cc.fsmap, &hyperstartapi.FsmapDescriptor{
 					Source:       vol.Filename,
-					Path:         mp.Path,
+					Path:         filepath.Clean(mp.Path),
 					ReadOnly:     mp.ReadOnly,
 					DockerVolume: vol.DockerVolume,
 				})
@@ -82,7 +83,7 @@ func (cc *ContainerContext) add(wgDisk *sync.WaitGroup, result chan api.Result) 
 				cc.vmVolumes = append(cc.vmVolumes, &hyperstartapi.VolumeDescriptor{
 					Device:       vol.DeviceName,
 					Addr:         vol.ScsiAddr,
-					Mount:        mp.Path,
+					Mount:        filepath.Clean(mp.Path),
 					Fstype:       vol.Fstype,
 					ReadOnly:     mp.ReadOnly,
 					DockerVolume: vol.DockerVolume,
@@ -101,7 +102,7 @@ func (cc *ContainerContext) add(wgDisk *sync.WaitGroup, result chan api.Result) 
 		cc.Log(TRACE, "resource ready for container: %#v", vmspec)
 	}
 
-	cc.Log(INFO, "all images and volume resources have been added to sandbox")
+	cc.Log(TRACE, "all images and volume resources have been added to sandbox")
 	result <- api.NewResultBase(cc.Id, true, "")
 }
 
