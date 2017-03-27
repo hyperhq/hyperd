@@ -208,3 +208,12 @@ hyper::test::imagevolume() {
   sudo hyperctl rm $id
   test $res1 -eq 0 -a $res2 -eq 0
 }
+
+# regression test for #549
+hyper::test::force_kill_container() {
+  echo "Container force kill test"
+  id=$(sudo hyperctl run -d -p ${HYPER_ROOT}/hack/pods/busybox-tty.pod | sed -ne "s/POD id is \(.*\)/\1/p")
+  res=$(sudo hyperctl stop -c container-with-tty > /dev/null 2>&1; echo $?)
+  sudo hyperctl rm $id
+  test $res -eq 0
+}

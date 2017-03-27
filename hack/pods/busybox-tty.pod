@@ -1,0 +1,13 @@
+{
+        "id": "test-container-force-killing",
+        "containers" : [{
+            "name": "busybox-with-tty",
+            "image": "busybox",
+            "command": ["/bin/sh"]
+        }],
+        "resource": {
+            "vcpu": 1,
+            "memory": 256
+        },
+        "tty": true
+}

@@ -680,6 +680,7 @@ message ImageRemoveResponse {
 
 message ContainerStopRequest {
   string containerID   = 1;
+  int64  timeout       = 2;
 }
 
 message ContainerStopResponse {}

@@ -35,7 +35,7 @@ func (s *ServerRPC) ContainerStart(ctx context.Context, req *types.ContainerStar
 func (s *ServerRPC) ContainerStop(c context.Context, req *types.ContainerStopRequest) (*types.ContainerStopResponse, error) {
 	glog.V(3).Infof("ContainerStop with request %v", req.String())
 
-	err := s.daemon.StopContainer(req.ContainerID, 5)
+	err := s.daemon.StopContainer(req.ContainerID, int(req.Timeout))
 	if err != nil {
 		glog.Errorf("ContainerStop error: %v", err)
 		return nil, err

@@ -183,6 +183,7 @@ __EOF__
   hyper::test::imageusergroup
   hyper::test::specuseroverride
   hyper::test::imagevolume
+  hyper::test::force_kill_container
 
   stop_hyperd
 }

@@ -200,16 +200,9 @@ func (p *XPod) StopContainer(id string, graceful int) error {
 		return err
 	}
 
-	err, eMap := p.stopContainers([]string{id}, map[string]bool{id: true}, graceful)
+	err := p.stopContainers([]string{id}, graceful)
 	if err != nil {
 		p.Log(ERROR, "fail during stop container %s: %v", id, err)
-	}
-	if len(eMap) != 0 {
-		if e, exist := eMap[id]; exist {
-			//override err with the kill error
-			err = e
-			p.Log(ERROR, "fail during terminating %s: %v", id, err)
-		}
 	}
 	return err
 }
@@ -226,8 +219,7 @@ func (p *XPod) RemoveContainer(id string) error {
 	}
 
 	var (
-		err  error
-		eMap map[string]error
+		err error
 	)
 
 	defer func() {
@@ -245,21 +237,10 @@ func (p *XPod) RemoveContainer(id string) error {
 
 	if p.IsRunning() {
 		if c.IsRunning() {
-			err, eMap = p.stopContainers([]string{id}, map[string]bool{id: true}, 5)
+			err = p.stopContainers([]string{id}, 5)
 			if err != nil {
 				p.Log(ERROR, "fail during stop container %s: %v", id, err)
 				return err
-			}
-			if len(eMap) != 0 {
-				// let's sleep and check the state of container, this
-				// will be the last chance we can avoid fall into error state
-				// check if there are duplicate kill
-				time.Sleep(1000 * time.Millisecond)
-				if e, exist := eMap[id]; exist && !c.IsStopped() {
-					err = e
-					p.Log(ERROR, "fail during terminating %s: %v", id, err)
-					return err
-				}
 			}
 		}
 		err = c.removeFromSandbox()
@@ -421,96 +402,97 @@ func (p *XPod) stopAllContainers(graceful int) error {
 	}
 
 	var (
-		cMap  = make(map[string]bool, len(p.containers))
 		cList = make([]string, 0, len(p.containers))
 	)
 
 	for cid := range p.containers {
-		cMap[cid] = true
 		cList = append(cList, cid)
 	}
 
-	err, eMap := p.stopContainers(cList, cMap, graceful)
+	err := p.stopContainers(cList, graceful)
 	if err != nil {
 		p.Log(ERROR, "exception during stop all containers: %v", err)
-	}
-	if len(eMap) > 0 {
-		e := fmt.Errorf("some container failed during stopping %#v", eMap)
-		p.Log(ERROR, eMap)
-		if err == nil {
-			err = e
-		}
 	}
 
 	return err
 }
 
-func (p *XPod) stopContainers(cList []string, cMap map[string]bool, graceful int) (error, map[string]error) {
-	type containerException struct {
-		id  string
-		err error
-	}
-
+func (p *XPod) stopContainers(cList []string, graceful int) error {
 	p.Log(INFO, "begin stop containers %s", cList)
-	resChan := p.sandbox.WaitProcess(true, cList, graceful)
-	errChan := make(chan *containerException, 1)
 
+	future := utils.NewFutureSet()
+	waitTime := time.Duration(graceful) * time.Second
+	if graceful == 0 {
+		// set default waiting time to 5s
+		waitTime = time.Duration(5) * time.Second
+	}
 	for _, cid := range cList {
 		c, ok := p.containers[cid]
 		if !ok {
 			p.Log(WARNING, "no container %s to be stopped", cid)
-			delete(cMap, cid)
 			continue
 		}
 		if !c.IsRunning() {
 			c.Log(DEBUG, "container state %v is not running(3), ignore during stop", c.CurrentState())
-			delete(cMap, cid)
 			continue
 		}
-		go func(c *Container) {
+		future.Add(c.Id(), func() error {
+			var toc <-chan time.Time
+			if int64(graceful) < 0 {
+				toc = make(chan time.Time)
+			} else {
+				toc = time.After(waitTime)
+			}
+			forceKill := graceful == 0
+			resChan := p.sandbox.WaitProcess(true, []string{c.Id()}, -1)
 			c.Log(DEBUG, "now, stop container")
-			err := c.terminate()
-			if err != nil {
-				errChan <- &containerException{
-					id:  c.Id(),
-					err: err,
+			err := c.terminate(forceKill)
+			// TODO filter container/process can't find error
+			if err != nil && !forceKill {
+				forceKill = true
+				if err = c.terminate(true); err != nil {
+					return err
 				}
 			}
-		}(c)
+			if resChan == nil {
+				err := fmt.Errorf("cannot wait container %s", c.Id())
+				p.Log(ERROR, err)
+				return err
+			}
+			for {
+				select {
+				case ex, ok := <-resChan:
+					if !ok {
+						err := fmt.Errorf("chan broken while waiting container: %s", c.Id())
+						p.Log(WARNING, err)
+						return err
+					}
+					p.Log(DEBUG, "container %s stopped (%v)", ex.Id, ex.Code)
+					break
+				case <-toc:
+					if forceKill {
+						return fmt.Errorf("timeout for killing container %s", c.Id())
+					}
+					c.Log(DEBUG, "kill container with default signal failed, try SIGKILL")
+					forceKill = true
+					toc = time.After(time.Duration(graceful) * time.Second)
+					// TODO filter container/process can't find error
+					if err = c.terminate(true); err != nil {
+						return err
+					}
+				}
+			}
+			return nil
+		})
 	}
 
-	if len(cMap) > 0 && resChan == nil {
-		err := fmt.Errorf("cannot wait containers %v", cList)
-		p.Log(ERROR, err)
-		return err, nil
-	}
-
-	errMap := map[string]error{}
-
-	for len(cMap) > 0 {
-		select {
-		case ex, ok := <-resChan:
-			if !ok {
-				err := fmt.Errorf("chan broken while waiting containers: %#v", cMap)
-				p.Log(WARNING, err)
-				return err, errMap
-			}
-			p.Log(DEBUG, "container %s stopped (%v)", ex.Id, ex.Code)
-			if _, exist := errMap[ex.Id]; exist { //if it exited, ignore the exceptions
-				delete(errMap, ex.Id)
-			}
-			delete(cMap, ex.Id)
-		case ex := <-errChan:
-			if cMap[ex.id] { //if not waited (maybe already exit, ignore the exception)
-				p.Log(WARNING, "fail during killing container %s: %v", ex.id, ex.err)
-				errMap[ex.id] = ex.err
-				delete(cMap, ex.id)
-			}
-		}
+	err := future.Wait(waitTime * 2)
+	if err != nil {
+		return err
 	}
 
 	p.Log(INFO, "complete stop containers %s", cList)
-	return nil, errMap
+	return nil
 }
 
 func (p *XPod) waitStopDone(timeout int, comments string) bool {
