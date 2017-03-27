@@ -170,7 +170,7 @@ func mainDaemon(opt *Options) {
 		go func() {
 			err := rpcServer.Serve(c.GRPCHost)
 			if err != nil {
-				glog.Fatalf("Hyper serve RPC error: %v", err)
+				glog.Errorf("Hyper serve RPC error: %v", err)
 			}
 		}()
 	}

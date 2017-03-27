@@ -34,7 +34,7 @@ func (s *ServerRPC) Serve(addr string) error {
 	glog.V(1).Infof("Start gRPC server at %s", addr)
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
-		glog.Fatalf("Failed to listen %s: %v", addr, err)
+		glog.Errorf("Failed to listen %s: %v", addr, err)
 		return err
 	}
 
