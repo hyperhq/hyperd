@@ -468,7 +468,7 @@ func (p *XPod) stopContainers(cList []string, graceful int) error {
 						return err
 					}
 					p.Log(DEBUG, "container %s stopped (%v)", ex.Id, ex.Code)
-					break
+					return nil
 				case <-toc:
 					if forceKill {
 						return fmt.Errorf("timeout for killing container %s", c.Id())
