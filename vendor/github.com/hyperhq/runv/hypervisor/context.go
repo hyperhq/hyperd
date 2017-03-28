@@ -3,6 +3,7 @@ package hypervisor
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"time"
@@ -72,6 +73,7 @@ type VmContext struct {
 	lock      sync.Mutex //protect update of context
 	idLock    sync.Mutex
 	pauseLock sync.Mutex
+	closeOnce sync.Once
 }
 
 type stateHandler func(ctx *VmContext, event VmEvent)
@@ -85,11 +87,11 @@ func NewVmSpec() *hyperstartapi.Pod {
 func InitContext(id string, hub chan VmEvent, client chan *types.VmResponse, dc DriverContext, boot *BootConfig) (*VmContext, error) {
 	var (
 		//dir and sockets:
-		homeDir         = BaseDir + "/" + id + "/"
-		hyperSockName   = homeDir + HyperSockName
-		ttySockName     = homeDir + TtySockName
-		consoleSockName = homeDir + ConsoleSockName
-		shareDir        = homeDir + ShareDirTag
+		homeDir         = filepath.Join(BaseDir, id)
+		hyperSockName   = filepath.Join(homeDir, HyperSockName)
+		ttySockName     = filepath.Join(homeDir, TtySockName)
+		consoleSockName = filepath.Join(homeDir, ConsoleSockName)
+		shareDir        = filepath.Join(homeDir, ShareDirTag)
 		ctx             *VmContext
 		cid             uint32
 	)
@@ -251,21 +253,23 @@ func (ctx *VmContext) handleProcessAsyncEvent(pae *hyperstartapi.ProcessAsyncEve
 }
 
 func (ctx *VmContext) Close() {
-	ctx.Log(INFO, "VmContext Close()")
-	ctx.lock.Lock()
-	defer ctx.lock.Unlock()
-	ctx.unsetTimeout()
-	ctx.networks.close()
-	ctx.DCtx.Close()
-	ctx.hyperstart.Close()
-	close(ctx.client)
-	os.Remove(ctx.ShareDir)
-	ctx.handler = nil
-	ctx.current = "None"
-	if ctx.Boot.EnableVsock && ctx.GuestCid > 0 {
-		VsockCidManager.ReleaseCid(ctx.GuestCid)
-		ctx.GuestCid = 0
-	}
+	ctx.closeOnce.Do(func() {
+		ctx.Log(INFO, "VmContext Close()")
+		ctx.lock.Lock()
+		defer ctx.lock.Unlock()
+		ctx.unsetTimeout()
+		ctx.networks.close()
+		ctx.DCtx.Close()
+		ctx.hyperstart.Close()
+		close(ctx.client)
+		os.Remove(ctx.ShareDir)
+		ctx.handler = nil
+		ctx.current = "None"
+		if ctx.Boot.EnableVsock && ctx.GuestCid > 0 {
+			VsockCidManager.ReleaseCid(ctx.GuestCid)
+			ctx.GuestCid = 0
+		}
+	})
 }
 
 func (ctx *VmContext) Become(handler stateHandler, desc string) {
@@ -304,6 +308,22 @@ func (ctx *VmContext) RemoveInterface(id string, result chan api.Result) {
 	ctx.networks.removeInterface(id, result)
 }
 
+func (ctx *VmContext) validateContainer(c *api.ContainerDescription) error {
+	for vn, vr := range c.Volumes {
+		if _, ok := ctx.volumes[vn]; !ok {
+			return fmt.Errorf("volume %s does not exist in volume map", vn)
+		}
+		for _, mp := range vr.MountPoints {
+			path := filepath.Clean(mp.Path)
+			if path == "/" {
+				return fmt.Errorf("mounting volume %s to rootfs is forbidden", vn)
+			}
+		}
+	}
+
+	return nil
+}
+
 func (ctx *VmContext) AddContainer(c *api.ContainerDescription, result chan api.Result) {
 	ctx.lock.Lock()
 	defer ctx.lock.Unlock()
@@ -334,7 +354,12 @@ func (ctx *VmContext) AddContainer(c *api.ContainerDescription, result chan api.
 		}
 	}
 
-	//TODO: should we validate container before we add them to volumeMap?
+	if err := ctx.validateContainer(c); err != nil {
+		cc.Log(ERROR, err.Error())
+		result <- NewSpecError(c.Id, err.Error())
+		return
+	}
+
 	for vn := range c.Volumes {
 		entry, ok := ctx.volumes[vn]
 		if !ok {

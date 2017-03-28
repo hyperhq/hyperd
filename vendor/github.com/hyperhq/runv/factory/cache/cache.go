@@ -31,18 +31,18 @@ func New(cacheSize int, b base.Factory) base.Factory {
 			for {
 				vm, err := b.GetBaseVm()
 				if err != nil {
-					glog.V(2).Infof("cache factory get error when allocate vm:%v", err)
+					glog.Errorf("cache factory get error when allocate vm: %v", err)
 					c.wg.Done()
 					c.CloseFactory()
 					return
 				}
-				glog.V(2).Infof("cache factory get vm from lower layer:%s", vm.Id)
+				glog.V(3).Infof("cache factory get vm from lower layer: %s", vm.Id)
 
 				select {
 				case cache <- vm:
-					glog.V(2).Infof("cache factory sent one vm:%s", vm.Id)
+					glog.V(3).Infof("cache factory sent one vm: %s", vm.Id)
 				case _ = <-closed:
-					glog.V(2).Infof("cache factory is going to close")
+					glog.V(3).Infof("cache factory is going to close")
 					vm.Kill()
 					c.wg.Done()
 					return
@@ -60,7 +60,7 @@ func (c *cacheFactory) Config() *hypervisor.BootConfig {
 func (c *cacheFactory) GetBaseVm() (*hypervisor.Vm, error) {
 	vm, ok := <-c.cache
 	if ok {
-		glog.V(2).Infof("cache factory get vm from cache:%s", vm.Id)
+		glog.V(3).Infof("cache factory get vm from cache: %s", vm.Id)
 		return vm, nil
 	}
 	return nil, fmt.Errorf("cache factory is closed")
@@ -68,11 +68,11 @@ func (c *cacheFactory) GetBaseVm() (*hypervisor.Vm, error) {
 
 func (c *cacheFactory) CloseFactory() {
 	c.closeOnce.Do(func() {
-		glog.V(2).Infof("CloseFactory() close cache factory")
+		glog.V(3).Infof("CloseFactory() close cache factory")
 		for len(c.closed) < cap(c.closed) { // send sufficient closed signal
 			c.closed <- 0
 		}
-		glog.V(2).Infof("CloseFactory() sent close signal")
+		glog.V(3).Infof("CloseFactory() sent close signal")
 		c.wg.Wait()
 		close(c.cache)
 		c.b.CloseFactory()
