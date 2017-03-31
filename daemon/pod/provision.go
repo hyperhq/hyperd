@@ -248,8 +248,10 @@ func (p *XPod) createSandbox(spec *apitypes.UserPod) error {
 	}
 
 	config := &runv.SandboxConfig{
-		Hostname: spec.Hostname,
-		Dns:      spec.Dns,
+		Hostname:   spec.Hostname,
+		Dns:        spec.Dns,
+		DnsOptions: spec.DnsOptions,
+		DnsSearch:  spec.DnsSearch,
 		Neighbors: &runv.NeighborNetworks{
 			InternalNetworks: spec.PortmappingWhiteLists.InternalNetworks,
 			ExternalNetworks: spec.PortmappingWhiteLists.ExternalNetworks,
