@@ -1,7 +1,7 @@
 {
 	"ImportPath": "github.com/hyperhq/hyperd",
 	"GoVersion": "go1.7",
-	"GodepVersion": "v79",
+	"GodepVersion": "v74",
 	"Packages": [
 		".",
 		"github.com/hyperhq/hyperd/cmds/protoc-gen-gogo",
@@ -1296,138 +1296,138 @@
 		},
 		{
 			"ImportPath": "github.com/hyperhq/runv/api",
-			"Comment": "v0.8.0-4-g8c80ae1",
-			"Rev": "8c80ae12c6396a35c784d732b22b9a7d3ca93754"
+			"Comment": "v0.8.0-15-g126b724",
+			"Rev": "126b724488de1434aaea3e8348815c3acd0b7d67"
 		},
 		{
 			"ImportPath": "github.com/hyperhq/runv/driverloader",
-			"Comment": "v0.8.0-4-g8c80ae1",
-			"Rev": "8c80ae12c6396a35c784d732b22b9a7d3ca93754"
+			"Comment": "v0.8.0-15-g126b724",
+			"Rev": "126b724488de1434aaea3e8348815c3acd0b7d67"
 		},
 		{
 			"ImportPath": "github.com/hyperhq/runv/factory",
-			"Comment": "v0.8.0-4-g8c80ae1",
-			"Rev": "8c80ae12c6396a35c784d732b22b9a7d3ca93754"
+			"Comment": "v0.8.0-15-g126b724",
+			"Rev": "126b724488de1434aaea3e8348815c3acd0b7d67"
 		},
 		{
 			"ImportPath": "github.com/hyperhq/runv/factory/base",
-			"Comment": "v0.8.0-4-g8c80ae1",
-			"Rev": "8c80ae12c6396a35c784d732b22b9a7d3ca93754"
+			"Comment": "v0.8.0-15-g126b724",
+			"Rev": "126b724488de1434aaea3e8348815c3acd0b7d67"
 		},
 		{
 			"ImportPath": "github.com/hyperhq/runv/factory/cache",
-			"Comment": "v0.8.0-4-g8c80ae1",
-			"Rev": "8c80ae12c6396a35c784d732b22b9a7d3ca93754"
+			"Comment": "v0.8.0-15-g126b724",
+			"Rev": "126b724488de1434aaea3e8348815c3acd0b7d67"
 		},
 		{
 			"ImportPath": "github.com/hyperhq/runv/factory/direct",
-			"Comment": "v0.8.0-4-g8c80ae1",
-			"Rev": "8c80ae12c6396a35c784d732b22b9a7d3ca93754"
+			"Comment": "v0.8.0-15-g126b724",
+			"Rev": "126b724488de1434aaea3e8348815c3acd0b7d67"
 		},
 		{
 			"ImportPath": "github.com/hyperhq/runv/factory/multi",
-			"Comment": "v0.8.0-4-g8c80ae1",
-			"Rev": "8c80ae12c6396a35c784d732b22b9a7d3ca93754"
+			"Comment": "v0.8.0-15-g126b724",
+			"Rev": "126b724488de1434aaea3e8348815c3acd0b7d67"
 		},
 		{
 			"ImportPath": "github.com/hyperhq/runv/factory/single",
-			"Comment": "v0.8.0-4-g8c80ae1",
-			"Rev": "8c80ae12c6396a35c784d732b22b9a7d3ca93754"
+			"Comment": "v0.8.0-15-g126b724",
+			"Rev": "126b724488de1434aaea3e8348815c3acd0b7d67"
 		},
 		{
 			"ImportPath": "github.com/hyperhq/runv/factory/template",
-			"Comment": "v0.8.0-4-g8c80ae1",
-			"Rev": "8c80ae12c6396a35c784d732b22b9a7d3ca93754"
+			"Comment": "v0.8.0-15-g126b724",
+			"Rev": "126b724488de1434aaea3e8348815c3acd0b7d67"
 		},
 		{
 			"ImportPath": "github.com/hyperhq/runv/hyperstart/api/json",
-			"Comment": "v0.8.0-4-g8c80ae1",
-			"Rev": "8c80ae12c6396a35c784d732b22b9a7d3ca93754"
+			"Comment": "v0.8.0-15-g126b724",
+			"Rev": "126b724488de1434aaea3e8348815c3acd0b7d67"
 		},
 		{
 			"ImportPath": "github.com/hyperhq/runv/hyperstart/libhyperstart",
-			"Comment": "v0.8.0-4-g8c80ae1",
-			"Rev": "8c80ae12c6396a35c784d732b22b9a7d3ca93754"
+			"Comment": "v0.8.0-15-g126b724",
+			"Rev": "126b724488de1434aaea3e8348815c3acd0b7d67"
 		},
 		{
 			"ImportPath": "github.com/hyperhq/runv/hypervisor",
-			"Comment": "v0.8.0-4-g8c80ae1",
-			"Rev": "8c80ae12c6396a35c784d732b22b9a7d3ca93754"
+			"Comment": "v0.8.0-15-g126b724",
+			"Rev": "126b724488de1434aaea3e8348815c3acd0b7d67"
 		},
 		{
 			"ImportPath": "github.com/hyperhq/runv/hypervisor/libvirt",
-			"Comment": "v0.8.0-4-g8c80ae1",
-			"Rev": "8c80ae12c6396a35c784d732b22b9a7d3ca93754"
+			"Comment": "v0.8.0-15-g126b724",
+			"Rev": "126b724488de1434aaea3e8348815c3acd0b7d67"
 		},
 		{
 			"ImportPath": "github.com/hyperhq/runv/hypervisor/network",
-			"Comment": "v0.8.0-4-g8c80ae1",
-			"Rev": "8c80ae12c6396a35c784d732b22b9a7d3ca93754"
+			"Comment": "v0.8.0-15-g126b724",
+			"Rev": "126b724488de1434aaea3e8348815c3acd0b7d67"
 		},
 		{
 			"ImportPath": "github.com/hyperhq/runv/hypervisor/network/ipallocator",
-			"Comment": "v0.8.0-4-g8c80ae1",
-			"Rev": "8c80ae12c6396a35c784d732b22b9a7d3ca93754"
+			"Comment": "v0.8.0-15-g126b724",
+			"Rev": "126b724488de1434aaea3e8348815c3acd0b7d67"
 		},
 		{
 			"ImportPath": "github.com/hyperhq/runv/hypervisor/network/iptables",
-			"Comment": "v0.8.0-4-g8c80ae1",
-			"Rev": "8c80ae12c6396a35c784d732b22b9a7d3ca93754"
+			"Comment": "v0.8.0-15-g126b724",
+			"Rev": "126b724488de1434aaea3e8348815c3acd0b7d67"
 		},
 		{
 			"ImportPath": "github.com/hyperhq/runv/hypervisor/network/portmapper",
-			"Comment": "v0.8.0-4-g8c80ae1",
-			"Rev": "8c80ae12c6396a35c784d732b22b9a7d3ca93754"
+			"Comment": "v0.8.0-15-g126b724",
+			"Rev": "126b724488de1434aaea3e8348815c3acd0b7d67"
 		},
 		{
 			"ImportPath": "github.com/hyperhq/runv/hypervisor/qemu",
-			"Comment": "v0.8.0-4-g8c80ae1",
-			"Rev": "8c80ae12c6396a35c784d732b22b9a7d3ca93754"
+			"Comment": "v0.8.0-15-g126b724",
+			"Rev": "126b724488de1434aaea3e8348815c3acd0b7d67"
 		},
 		{
 			"ImportPath": "github.com/hyperhq/runv/hypervisor/types",
-			"Comment": "v0.8.0-4-g8c80ae1",
-			"Rev": "8c80ae12c6396a35c784d732b22b9a7d3ca93754"
+			"Comment": "v0.8.0-15-g126b724",
+			"Rev": "126b724488de1434aaea3e8348815c3acd0b7d67"
 		},
 		{
 			"ImportPath": "github.com/hyperhq/runv/hypervisor/vbox",
-			"Comment": "v0.8.0-4-g8c80ae1",
-			"Rev": "8c80ae12c6396a35c784d732b22b9a7d3ca93754"
+			"Comment": "v0.8.0-15-g126b724",
+			"Rev": "126b724488de1434aaea3e8348815c3acd0b7d67"
 		},
 		{
 			"ImportPath": "github.com/hyperhq/runv/hypervisor/xen",
-			"Comment": "v0.8.0-4-g8c80ae1",
-			"Rev": "8c80ae12c6396a35c784d732b22b9a7d3ca93754"
+			"Comment": "v0.8.0-15-g126b724",
+			"Rev": "126b724488de1434aaea3e8348815c3acd0b7d67"
 		},
 		{
 			"ImportPath": "github.com/hyperhq/runv/lib/govbox",
-			"Comment": "v0.8.0-4-g8c80ae1",
-			"Rev": "8c80ae12c6396a35c784d732b22b9a7d3ca93754"
+			"Comment": "v0.8.0-15-g126b724",
+			"Rev": "126b724488de1434aaea3e8348815c3acd0b7d67"
 		},
 		{
 			"ImportPath": "github.com/hyperhq/runv/lib/telnet",
-			"Comment": "v0.8.0-4-g8c80ae1",
-			"Rev": "8c80ae12c6396a35c784d732b22b9a7d3ca93754"
+			"Comment": "v0.8.0-15-g126b724",
+			"Rev": "126b724488de1434aaea3e8348815c3acd0b7d67"
 		},
 		{
 			"ImportPath": "github.com/hyperhq/runv/lib/term",
-			"Comment": "v0.8.0-4-g8c80ae1",
-			"Rev": "8c80ae12c6396a35c784d732b22b9a7d3ca93754"
+			"Comment": "v0.8.0-15-g126b724",
+			"Rev": "126b724488de1434aaea3e8348815c3acd0b7d67"
 		},
 		{
 			"ImportPath": "github.com/hyperhq/runv/lib/utils",
-			"Comment": "v0.8.0-4-g8c80ae1",
-			"Rev": "8c80ae12c6396a35c784d732b22b9a7d3ca93754"
+			"Comment": "v0.8.0-15-g126b724",
+			"Rev": "126b724488de1434aaea3e8348815c3acd0b7d67"
 		},
 		{
 			"ImportPath": "github.com/hyperhq/runv/lib/vsock",
-			"Comment": "v0.8.0-4-g8c80ae1",
-			"Rev": "8c80ae12c6396a35c784d732b22b9a7d3ca93754"
+			"Comment": "v0.8.0-15-g126b724",
+			"Rev": "126b724488de1434aaea3e8348815c3acd0b7d67"
 		},
 		{
 			"ImportPath": "github.com/hyperhq/runv/template",
-			"Comment": "v0.8.0-4-g8c80ae1",
-			"Rev": "8c80ae12c6396a35c784d732b22b9a7d3ca93754"
+			"Comment": "v0.8.0-15-g126b724",
+			"Rev": "126b724488de1434aaea3e8348815c3acd0b7d67"
 		},
 		{
 			"ImportPath": "github.com/imdario/mergo",
@@ -1473,7 +1473,12 @@
 			"Rev": "aa2ec055abd10d26d539eb630a92241b781ce4bc"
 		},
 		{
-			"ImportPath": "github.com/opencontainers/image-spec",
+			"ImportPath": "github.com/opencontainers/image-spec/specs-go",
+			"Comment": "v1.0.0-rc5",
+			"Rev": "5faaada8762b465d5ce8a8da27b92d577a1aa576"
+		},
+		{
+			"ImportPath": "github.com/opencontainers/image-spec/specs-go/v1",
 			"Comment": "v1.0.0-rc5",
 			"Rev": "5faaada8762b465d5ce8a8da27b92d577a1aa576"
 		},

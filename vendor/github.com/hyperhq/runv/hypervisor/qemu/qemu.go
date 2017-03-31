@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/golang/glog"
 	"github.com/hyperhq/runv/hypervisor"
@@ -117,6 +118,10 @@ func (qd *QemuDriver) LoadContext(persisted map[string]interface{}) (hypervisor.
 			proc, err = os.FindProcess(int(p.(float64)))
 			if err != nil {
 				return nil, err
+			}
+			// test if process has already exited
+			if err = proc.Signal(syscall.Signal(0)); err != nil {
+				return nil, fmt.Errorf("signal 0 on Qemu process(%d) failed: %v", int(p.(float64)), err)
 			}
 		default:
 			return nil, errors.New("wrong pid field type in persist info")

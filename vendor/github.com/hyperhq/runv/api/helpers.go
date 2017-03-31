@@ -52,6 +52,13 @@ func ContainerDescriptionFromOCF(id string, s *specs.Spec) *ContainerDescription
 			Soft: s.Process.Rlimits[idx].Soft,
 		})
 	}
+	// TODO handle Rlimits in hyperstart
+	container.Rlimits = []*Rlimit{}
+
+	if container.Sysctl == nil {
+		container.Sysctl = map[string]string{}
+	}
+	container.Sysctl["vm.overcommit_memory"] = "1"
 
 	rootfs := &VolumeDescription{
 		Name:   id,

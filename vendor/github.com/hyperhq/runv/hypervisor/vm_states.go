@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"time"
 
@@ -55,6 +56,9 @@ func (ctx *VmContext) restoreContainer(id string) (alive bool, err error) {
 	c.stdinPipe, c.stdoutPipe, c.stderrPipe, err = ctx.hyperstart.RestoreContainer(c.VmSpec())
 	if err != nil {
 		ctx.Log(ERROR, "restore conatiner failed in hyperstart, mark as stopped: %v", err)
+		if strings.Contains(err.Error(), "hyperstart closed") {
+			return false, err
+		}
 		return false, nil
 	}
 	return true, nil

@@ -46,6 +46,8 @@ func (nc *NetworkContext) sandboxInfo() *hyperstartapi.Pod {
 
 	vmSpec.Hostname = nc.Hostname
 	vmSpec.Dns = nc.Dns
+	vmSpec.DnsSearch = nc.DnsSearch
+	vmSpec.DnsOptions = nc.DnsOptions
 	if nc.Neighbors != nil {
 		vmSpec.PortmappingWhiteLists = &hyperstartapi.PortmappingWhiteList{
 			InternalNetworks: nc.Neighbors.InternalNetworks,
