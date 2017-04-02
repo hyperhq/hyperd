@@ -6,6 +6,8 @@ message SandboxConfig {
     string hostname = 1;
     repeated string dns = 2;
     NeighborNetworks neighbors = 3;
+    repeated string dnsOptions = 4;
+    repeated string dnsSearch = 5;
 }
 
 message ContainerDescription {

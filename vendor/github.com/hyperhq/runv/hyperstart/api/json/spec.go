@@ -98,6 +98,8 @@ type Pod struct {
 	DeprecatedContainers  []Container           `json:"containers,omitempty"`
 	DeprecatedInterfaces  []NetworkInf          `json:"interfaces,omitempty"`
 	Dns                   []string              `json:"dns,omitempty"`
+	DnsOptions            []string              `json:"dnsOptions,omitempty"`
+	DnsSearch             []string              `json:"dnsSearch,omitempty"`
 	DeprecatedRoutes      []Route               `json:"routes,omitempty"`
 	ShareDir              string                `json:"shareDir"`
 	PortmappingWhiteLists *PortmappingWhiteList `json:"portmappingWhiteLists,omitempty"`

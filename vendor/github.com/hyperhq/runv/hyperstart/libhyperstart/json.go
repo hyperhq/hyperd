@@ -655,22 +655,25 @@ func (h *jsonBasedHyperstart) NewContainer(c *hyperstartapi.Container) (io.Write
 
 func (h *jsonBasedHyperstart) RestoreContainer(c *hyperstartapi.Container) (io.WriteCloser, io.ReadCloser, io.ReadCloser, error) {
 	h.Lock()
-	defer h.Unlock()
 	if _, existed := h.procs[pKey{c: c.Id, p: c.Process.Id}]; existed {
+		h.Unlock()
 		return nil, nil, nil, fmt.Errorf("process id conflicts, the process of the id %s already exists", c.Process.Id)
 	}
+	h.Unlock()
 	// Send SIGCONT signal to init to test whether it's alive.
 	err := h.SignalProcess(c.Id, "init", syscall.SIGCONT)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("container not exist or already stopped")
+		return nil, nil, nil, fmt.Errorf("container not exist or already stopped: %v", err)
 	}
 	// restore procs/streamOuts map
 	ps := &pState{
 		stdioSeq:  c.Process.Stdio,
 		stderrSeq: c.Process.Stderr,
 	}
+	h.Lock()
 	h.setupProcessIo(ps, c.Process.Terminal)
 	h.procs[pKey{c: c.Id, p: c.Process.Id}] = ps
+	h.Unlock()
 
 	return &ps.stdinPipe, ps.stdoutPipe, ps.stderrPipe, nil
 }
