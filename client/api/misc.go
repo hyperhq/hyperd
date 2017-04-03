@@ -20,7 +20,18 @@ func (e StatusError) Error() string {
 	return fmt.Sprintf("Status: %s, Code: %d", e.Status, e.StatusCode)
 }
 
-func (cli *Client) GetExitCode(containerId, execId string) error {
+func (cli *Client) GetExitCode(containerId, execId string, wait bool) error {
+	if !wait {
+		c, err := cli.GetContainerInfo(containerId)
+		if err != nil {
+			return err
+		}
+		if c.Status.Phase == "running" || c.Status.Terminated == nil {
+			return nil
+		}
+
+		return StatusError{StatusCode: int(c.Status.Terminated.ExitCode)}
+	}
 	v := url.Values{}
 	v.Set("container", containerId)
 	v.Set("exec", execId)

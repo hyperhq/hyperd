@@ -116,7 +116,8 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 
 	if res != nil {
 		err = <-res
-		return cli.client.GetExitCode(spec.Containers[0].Name, "")
+		// a container having tty may detach from the terminal, don't wait
+		return cli.client.GetExitCode(spec.Containers[0].Name, "", !tty)
 	}
 
 	return nil

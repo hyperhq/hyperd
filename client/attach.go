@@ -67,5 +67,6 @@ func (cli *HyperClient) HyperCmdAttach(args ...string) error {
 		return err
 	}
 
-	return cli.client.GetExitCode(containerId, "")
+	// a container having tty may detach from the terminal, don't wait
+	return cli.client.GetExitCode(containerId, "", !tty)
 }
