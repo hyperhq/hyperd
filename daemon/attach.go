@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/golang/glog"
+	"github.com/hyperhq/hyperd/daemon/pod"
 )
 
 func (daemon *Daemon) Attach(stdin io.ReadCloser, stdout io.WriteCloser, container string) error {
@@ -31,5 +32,8 @@ func (daemon *Daemon) Attach(stdin io.ReadCloser, stdout io.WriteCloser, contain
 
 	err = <-rsp
 
+	if err == pod.DetachError {
+		return nil
+	}
 	return err
 }

@@ -75,5 +75,5 @@ func (cli *HyperClient) HyperCmdExec(args ...string) error {
 		return err
 	}
 
-	return cli.client.GetExitCode(containerId, execId)
+	return cli.client.GetExitCode(containerId, execId, !opts.Tty)
 }
