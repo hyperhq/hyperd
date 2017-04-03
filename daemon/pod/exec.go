@@ -206,9 +206,16 @@ func (p *XPod) CleanupExecs() {
 }
 
 func (p *XPod) ExecVM(cmd string, stdin io.ReadCloser, stdout, stderr io.WriteCloser) (int, error) {
-	return p.sandbox.HyperstartExec(cmd, &hypervisor.TtyIO{
-		Stdin:  stdin,
+	wReader := &waitClose{ReadCloser: stdin, wait: make(chan bool)}
+	tty := &hypervisor.TtyIO{
+		Stdin:  wReader,
 		Stdout: stdout,
 		Stderr: stderr,
-	})
+	}
+	res, err := p.sandbox.HyperstartExec(cmd, tty)
+	if err != nil {
+		return res, err
+	}
+	<-wReader.wait
+	return res, err
 }
