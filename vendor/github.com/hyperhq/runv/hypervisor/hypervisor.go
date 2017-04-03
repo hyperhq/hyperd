@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
+	"github.com/hyperhq/hypercontainer-utils/hlog"
 	"github.com/hyperhq/runv/hyperstart/libhyperstart"
 	"github.com/hyperhq/runv/hypervisor/network"
 	"github.com/hyperhq/runv/hypervisor/types"
@@ -14,13 +14,13 @@ func (ctx *VmContext) loop() {
 	for ctx.handler != nil {
 		ev, ok := <-ctx.Hub
 		if !ok {
-			glog.Error("hub chan has already been closed")
+			ctx.Log(ERROR, "hub chan has already been closed")
 			break
 		} else if ev == nil {
-			glog.V(1).Info("got nil event.")
+			ctx.Log(DEBUG, "got nil event.")
 			continue
 		}
-		glog.V(3).Infof("VM [%s]: main event loop got message %d(%s)", ctx.Id, ev.Event(), EventString(ev.Event()))
+		ctx.Log(TRACE, "main event loop got message %d(%s)", ev.Event(), EventString(ev.Event()))
 		ctx.handler(ctx, ev)
 	}
 
@@ -28,7 +28,7 @@ func (ctx *VmContext) loop() {
 	// be left hanging waiting for a response. Since the handler is already
 	// gone, we return a fail to all these requests.
 
-	glog.V(1).Infof("vm %s: main event loop exiting", ctx.Id)
+	ctx.Log(DEBUG, "main event loop exiting")
 }
 
 func (ctx *VmContext) handlePAEs() {
@@ -51,9 +51,12 @@ func (ctx *VmContext) watchHyperstart(sendReadyEvent bool) {
 			ctx.hyperstart.Close()
 		}
 	})
+	ctx.Log(DEBUG, "watch hyperstart, send ready: %v", sendReadyEvent)
 	for {
+		ctx.Log(TRACE, "issue VERSION request for keep-alive test")
 		_, err := ctx.hyperstart.APIVersion()
 		if err != nil {
+			ctx.Log(WARNING, "keep-alive test end with error: %v", err)
 			ctx.hyperstart.Close()
 			ctx.Hub <- &InitFailedEvent{Reason: "hyperstart failed: " + err.Error()}
 			break
@@ -76,15 +79,15 @@ func (ctx *VmContext) Launch() {
 
 	//launch routines
 	if ctx.Boot.BootFromTemplate {
-		glog.V(3).Info("boot from template")
+		ctx.Log(TRACE, "boot from template")
 		ctx.PauseState = PauseStatePaused
-		ctx.hyperstart = libhyperstart.NewJsonBasedHyperstart(ctx.ctlSockAddr(), ctx.ttySockAddr(), 1, false)
+		ctx.hyperstart = libhyperstart.NewJsonBasedHyperstart(ctx.Id, ctx.ctlSockAddr(), ctx.ttySockAddr(), 1, false)
 		ctx.Hub <- &InitConnectedEvent{}
 	} else {
-		ctx.hyperstart = libhyperstart.NewJsonBasedHyperstart(ctx.ctlSockAddr(), ctx.ttySockAddr(), 1, true)
+		ctx.hyperstart = libhyperstart.NewJsonBasedHyperstart(ctx.Id, ctx.ctlSockAddr(), ctx.ttySockAddr(), 1, true)
 		go ctx.watchHyperstart(true)
 	}
-	if glog.V(1) {
+	if ctx.LogLevel(DEBUG) {
 		go watchVmConsole(ctx)
 	}
 
@@ -94,8 +97,8 @@ func (ctx *VmContext) Launch() {
 
 func VmAssociate(vmId string, hub chan VmEvent, client chan *types.VmResponse, pack []byte) (*VmContext, error) {
 
-	if glog.V(1) {
-		glog.Infof("VM %s trying to reload with serialized data: %s", vmId, string(pack))
+	if hlog.IsLogLevel(hlog.DEBUG) {
+		hlog.Log(DEBUG, "VM %s trying to reload with serialized data: %s", vmId, string(pack))
 	}
 
 	pinfo, err := vmDeserialize(pack)
@@ -112,10 +115,10 @@ func VmAssociate(vmId string, hub chan VmEvent, client chan *types.VmResponse, p
 		return nil, err
 	}
 
-	context.hyperstart = libhyperstart.NewJsonBasedHyperstart(context.ctlSockAddr(), context.ttySockAddr(), pinfo.HwStat.AttachId, false)
+	context.hyperstart = libhyperstart.NewJsonBasedHyperstart(context.Id, context.ctlSockAddr(), context.ttySockAddr(), pinfo.HwStat.AttachId, false)
 	context.DCtx.Associate(context)
 
-	if glog.V(1) {
+	if context.LogLevel(DEBUG) {
 		go watchVmConsole(context)
 	}
 

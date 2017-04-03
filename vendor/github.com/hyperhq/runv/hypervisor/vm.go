@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/golang/glog"
+	"github.com/hyperhq/hypercontainer-utils/hlog"
 	"github.com/hyperhq/runv/api"
 	hyperstartapi "github.com/hyperhq/runv/hyperstart/api/json"
 	"github.com/hyperhq/runv/hypervisor/types"
@@ -24,13 +24,25 @@ type Vm struct {
 
 	ctx *VmContext
 
-	//Pod    *PodStatus
-	//Status uint
 	Cpu  int
 	Mem  int
 	Lazy bool
 
+	logPrefix string
+
 	clients *Fanout
+}
+
+func (v *Vm) LogLevel(level hlog.LogLevel) bool {
+	return hlog.IsLogLevel(level)
+}
+
+func (v *Vm) LogPrefix() string {
+	return v.logPrefix
+}
+
+func (v *Vm) Log(level hlog.LogLevel, args ...interface{}) {
+	hlog.HLog(level, v, 1, args...)
 }
 
 func (vm *Vm) GetResponseChan() (chan *types.VmResponse, error) {
@@ -83,7 +95,7 @@ func AssociateVm(vmId string, data []byte) (*Vm, error) {
 	vm := newVm(vmId, 0, 0)
 	vm.ctx, err = VmAssociate(vm.Id, PodEvent, Status, data)
 	if err != nil {
-		glog.Errorf("cannot associate with vm: %v", err)
+		vm.Log(ERROR, "cannot associate with vm: %v", err)
 		return nil, err
 	}
 
@@ -357,7 +369,7 @@ func (vm *Vm) AddNic(info *api.InterfaceDescription) error {
 	}
 
 	if vm.ctx.LogLevel(TRACE) {
-		glog.Infof("finial vmSpec.Interface is %#v", vm.ctx.networks.getInterface(info.Id))
+		vm.Log(TRACE, "finial vmSpec.Interface is %#v", vm.ctx.networks.getInterface(info.Id))
 	}
 	return vm.ctx.updateInterface(info.Id)
 }
@@ -440,7 +452,7 @@ func (vm *Vm) HyperstartExecSync(cmd []string, stdin []byte) (stdout, stderr []b
 	result := vm.WaitProcess(false, []string{execId}, -1)
 	if result == nil {
 		err = fmt.Errorf("can not wait hyperstart-exec %q", execId)
-		glog.Error(err)
+		vm.Log(ERROR, err)
 		return nil, nil, err
 	}
 
@@ -452,11 +464,11 @@ func (vm *Vm) HyperstartExecSync(cmd []string, stdin []byte) (stdout, stderr []b
 	r, ok := <-result
 	if !ok {
 		err = fmt.Errorf("wait hyperstart-exec %q interrupted", execId)
-		glog.Error(err)
+		vm.Log(ERROR, err)
 		return nil, nil, err
 	}
 
-	glog.V(3).Infof("hyperstart-exec %q terminated at %v with code %d", execId, r.FinishedAt, r.Code)
+	vm.Log(TRACE, "hyperstart-exec %q terminated at %v with code %d", execId, r.FinishedAt, r.Code)
 
 	if r.Code != 0 {
 		return stdoutBuf.Bytes(), stderrBuf.Bytes(), fmt.Errorf("exit with error code:%d", r.Code)
@@ -479,7 +491,7 @@ func (vm *Vm) HyperstartExec(cmd string, tty *TtyIO) (int, error) {
 	result := vm.WaitProcess(false, []string{execID}, -1)
 	if result == nil {
 		err := fmt.Errorf("can not wait hyperstart-exec %q", execID)
-		glog.Error(err)
+		vm.Log(ERROR, err)
 		return -1, err
 	}
 
@@ -491,11 +503,11 @@ func (vm *Vm) HyperstartExec(cmd string, tty *TtyIO) (int, error) {
 	r, ok := <-result
 	if !ok {
 		err = fmt.Errorf("wait hyperstart-exec %q interrupted", execID)
-		glog.Error(err)
+		vm.Log(ERROR, err)
 		return -1, err
 	}
 
-	glog.V(3).Infof("hyperstart-exec %q terminated at %v with code %d", execID, r.FinishedAt, r.Code)
+	vm.Log(TRACE, "hyperstart-exec %q terminated at %v with code %d", execID, r.FinishedAt, r.Code)
 	return r.Code, nil
 }
 
@@ -542,7 +554,7 @@ func (vm *Vm) AddProcess(container, execId string, terminal bool, args []string,
 
 func (vm *Vm) AddVolume(vol *api.VolumeDescription) api.Result {
 	if vm.ctx.current != StateRunning {
-		glog.Errorf("VM is not ready for insert volume %#v", vol)
+		vm.Log(ERROR, "VM is not ready for insert volume %#v", vol)
 		return NewNotReadyError(vm.Id)
 	}
 
@@ -688,11 +700,11 @@ func (vm *Vm) Pause(pause bool) error {
 		// should not change pause state inside ctx.DCtx.Pause!
 		err = ctx.DCtx.Pause(ctx, pause)
 		if err != nil {
-			glog.Errorf("%s sandbox failed: %v", command, err)
+			vm.Log(ERROR, "%s sandbox failed: %v", command, err)
 			return err
 		}
 
-		glog.V(3).Infof("sandbox state turn to %s now", command)
+		vm.Log(TRACE, "sandbox state turn to %s now", command)
 		ctx.PauseState = pauseState // change the state.
 	}
 
@@ -715,7 +727,7 @@ func (vm *Vm) GetIPAddrs() []string {
 	ips := []string{}
 
 	if vm.ctx.current != StateRunning {
-		glog.Errorf("get pod ip failed: %v", NewNotReadyError(vm.Id))
+		vm.Log(ERROR, "get pod ip failed: %v", NewNotReadyError(vm.Id))
 		return ips
 	}
 
@@ -744,9 +756,10 @@ func errorResponse(cause string) *types.VmResponse {
 
 func newVm(vmId string, cpu, memory int) *Vm {
 	return &Vm{
-		Id:  vmId,
-		Cpu: cpu,
-		Mem: memory,
+		Id:        vmId,
+		Cpu:       cpu,
+		Mem:       memory,
+		logPrefix: fmt.Sprintf("VM[%s] ", vmId),
 	}
 }
 
@@ -767,23 +780,23 @@ func GetVm(vmId string, b *BootConfig, waitStarted bool) (*Vm, error) {
 	}
 
 	if waitStarted {
-		glog.V(3).Info("waiting for vm to start")
+		vm.Log(TRACE, "waiting for vm to start")
 		if err := <-vm.WaitResponse(func(response *types.VmResponse) (error, bool) {
 			if response.Code == types.E_FAILED {
-				glog.Error("VM start failed")
+				vm.Log(ERROR, "VM start failed")
 				return fmt.Errorf("VM start failed"), true
 			}
 			if response.Code == types.E_VM_RUNNING {
-				glog.V(3).Info("VM started successfully")
+				vm.Log(TRACE, "VM started successfully")
 				return nil, true
 			}
-			glog.Error("VM never started")
+			vm.Log(ERROR, "VM never started")
 			return nil, false
 		}, -1); err != nil {
 			vm.Kill()
 		}
 	}
 
-	glog.V(3).Info("GetVm succeeded (not waiting for startup)")
+	vm.Log(TRACE, "GetVm succeeded (not waiting for startup)")
 	return vm, nil
 }

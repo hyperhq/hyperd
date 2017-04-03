@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
+	"github.com/hyperhq/hypercontainer-utils/hlog"
 )
 
 // states
@@ -32,13 +32,13 @@ func (ctx *VmContext) newContainer(id string) error {
 
 	c, ok := ctx.containers[id]
 	if ok {
-		glog.V(3).Infof("start sending INIT_NEWCONTAINER")
+		ctx.Log(TRACE, "start sending INIT_NEWCONTAINER")
 		var err error
 		c.stdinPipe, c.stdoutPipe, c.stderrPipe, err = ctx.hyperstart.NewContainer(c.VmSpec())
 		if err == nil && c.tty != nil {
 			go streamCopy(c.tty, c.stdinPipe, c.stdoutPipe, c.stderrPipe)
 		}
-		glog.V(3).Infof("sent INIT_NEWCONTAINER")
+		ctx.Log(TRACE, "sent INIT_NEWCONTAINER")
 		return err
 	} else {
 		return fmt.Errorf("container %s not exist", id)
@@ -103,7 +103,7 @@ type TtyIO struct {
 }
 
 func (tty *TtyIO) Close() {
-	glog.V(3).Info("Close tty ")
+	hlog.Log(TRACE, "Close tty")
 
 	if tty.Stdin != nil {
 		tty.Stdin.Close()
@@ -181,10 +181,10 @@ func (ctx *VmContext) shutdownVM() {
 	ctx.setTimeout(10)
 	err := ctx.hyperstart.DestroySandbox()
 	if err == nil {
-		glog.V(1).Info("POD destroyed")
+		ctx.Log(DEBUG, "POD destroyed")
 		ctx.poweroffVM(false, "")
 	} else {
-		glog.Warning("Destroy pod failed")
+		ctx.Log(WARNING, "Destroy pod failed")
 		ctx.poweroffVM(true, "Destroy pod failed")
 		ctx.Close()
 	}
@@ -192,7 +192,7 @@ func (ctx *VmContext) shutdownVM() {
 
 func (ctx *VmContext) poweroffVM(err bool, msg string) {
 	if err {
-		glog.Error("Shutting down because of an exception: ", msg)
+		ctx.Log(ERROR, "Shutting down because of an exception: ", msg)
 	}
 	//REFACTOR: kill directly instead of DCtx.Shutdown() and send shutdown information
 	ctx.Log(INFO, "poweroff vm based on command: %s", msg)
@@ -209,7 +209,7 @@ func unexpectedEventHandler(ctx *VmContext, ev VmEvent, state string) {
 		COMMAND_PAUSEVM:
 		ctx.reportUnexpectedRequest(ev, state)
 	default:
-		glog.Warning("got unexpected event during ", state)
+		ctx.Log(WARNING, "got unexpected event during ", state)
 	}
 }
 
@@ -249,22 +249,22 @@ func stateRunning(ctx *VmContext, ev VmEvent) {
 func stateTerminating(ctx *VmContext, ev VmEvent) {
 	switch ev.Event() {
 	case EVENT_VM_EXIT:
-		glog.V(3).Info("Got VM shutdown event while terminating, go to cleaning up")
+		ctx.Log(TRACE, "Got VM shutdown event while terminating, go to cleaning up")
 		ctx.reportVmShutdown()
 		ctx.Close()
 	case EVENT_VM_KILL:
-		glog.V(3).Info("Got VM force killed message, go to cleaning up")
+		ctx.Log(TRACE, "Got VM force killed message, go to cleaning up")
 		ctx.reportVmShutdown()
 		ctx.Close()
 	case COMMAND_RELEASE:
-		glog.V(3).Info("vm terminating, got release")
+		ctx.Log(TRACE, "vm terminating, got release")
 	case EVENT_VM_TIMEOUT:
-		glog.Warning("VM did not exit in time, try to stop it")
+		ctx.Log(WARNING, "VM did not exit in time, try to stop it")
 		ctx.poweroffVM(true, "vm terminating timeout")
 		ctx.Close()
 	case ERROR_INTERRUPTED:
 		interruptEv := ev.(*Interrupted)
-		glog.V(3).Info("Connection interrupted while terminating: %s", interruptEv.Reason)
+		ctx.Log(TRACE, "Connection interrupted while terminating: %s", interruptEv.Reason)
 	default:
 		unexpectedEventHandler(ctx, ev, "terminating")
 	}
