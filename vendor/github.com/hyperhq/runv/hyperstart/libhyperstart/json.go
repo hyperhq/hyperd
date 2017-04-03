@@ -9,9 +9,18 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/golang/glog"
+	"github.com/hyperhq/hypercontainer-utils/hlog"
 	hyperstartapi "github.com/hyperhq/runv/hyperstart/api/json"
 	"github.com/hyperhq/runv/lib/utils"
+)
+
+const (
+	ERROR   = hlog.ERROR
+	WARNING = hlog.WARNING
+	INFO    = hlog.INFO
+	DEBUG   = hlog.DEBUG
+	TRACE   = hlog.TRACE
+	EXTRA   = hlog.EXTRA
 )
 
 type pKey struct{ c, p string }
@@ -25,6 +34,7 @@ type pState struct {
 
 type jsonBasedHyperstart struct {
 	sync.RWMutex
+	logPrefix          string
 	vmAPIVersion       uint32
 	closed             bool
 	lastStreamSeq      uint64
@@ -44,8 +54,9 @@ type hyperstartCmd struct {
 	result chan<- error
 }
 
-func NewJsonBasedHyperstart(ctlSock, streamSock string, lastStreamSeq uint64, waitReady bool) Hyperstart {
+func NewJsonBasedHyperstart(id, ctlSock, streamSock string, lastStreamSeq uint64, waitReady bool) Hyperstart {
 	h := &jsonBasedHyperstart{
+		logPrefix:          fmt.Sprintf("SB[%s] ", id),
 		procs:              make(map[pKey]*pState),
 		lastStreamSeq:      lastStreamSeq,
 		streamOuts:         make(map[uint64]streamOut),
@@ -58,11 +69,23 @@ func NewJsonBasedHyperstart(ctlSock, streamSock string, lastStreamSeq uint64, wa
 	return h
 }
 
+func (h *jsonBasedHyperstart) LogLevel(level hlog.LogLevel) bool {
+	return hlog.IsLogLevel(level)
+}
+
+func (h *jsonBasedHyperstart) LogPrefix() string {
+	return h.logPrefix
+}
+
+func (h *jsonBasedHyperstart) Log(level hlog.LogLevel, args ...interface{}) {
+	hlog.HLog(level, h, 1, args...)
+}
+
 func (h *jsonBasedHyperstart) Close() {
 	h.Lock()
 	defer h.Unlock()
 	if !h.closed {
-		glog.V(3).Info("close jsonBasedHyperstart")
+		h.Log(TRACE, "close jsonBasedHyperstart")
 		for pk := range h.procs {
 			h.processAsyncEvents <- hyperstartapi.ProcessAsyncEvent{Container: pk.c, Process: pk.p, Event: "finished", Status: 255}
 		}
@@ -113,7 +136,7 @@ func readVmMessage(conn io.Reader) (*hyperstartapi.DecodedMessage, error) {
 		}
 		nr, err := conn.Read(buf[:want])
 		if err != nil {
-			glog.Error("read init data failed")
+			hlog.Log(ERROR, "read init data failed")
 			return nil, err
 		}
 
@@ -137,22 +160,22 @@ func readVmMessage(conn io.Reader) (*hyperstartapi.DecodedMessage, error) {
 func handleCtlSock(h *jsonBasedHyperstart, ctlSock string, waitReady bool) error {
 	conn, err := utils.SocketConnect(ctlSock)
 	if err != nil {
-		glog.Errorf("Cannot connect to ctl socket %s: %v", ctlSock, err)
+		h.Log(ERROR, "Cannot connect to ctl socket %s: %v", ctlSock, err)
 		h.Close()
 		return err
 	}
 
 	if waitReady {
-		glog.V(3).Info("Wating for init messages...")
+		h.Log(TRACE, "Wating for init messages...")
 		msg, err := readVmMessage(conn)
 		if err != nil {
 			conn.Close()
-			glog.Errorf("error when readVmMessage() for ready message: %v", err)
+			h.Log(ERROR, "error when readVmMessage() for ready message: %v", err)
 			h.Close()
 			return err
 		} else if msg.Code != hyperstartapi.INIT_READY {
 			conn.Close()
-			glog.Errorf("Expect INIT_READY, but get init message %d", msg.Code)
+			h.Log(ERROR, "Expect INIT_READY, but get init message %d", msg.Code)
 			h.Close()
 			return fmt.Errorf("Expect INIT_READY, but get init message %d", msg.Code)
 		}
@@ -162,7 +185,7 @@ func handleCtlSock(h *jsonBasedHyperstart, ctlSock string, waitReady bool) error
 	go handleMsgFromHyperstart(h, conn)
 
 	h.vmAPIVersion, err = h.APIVersion()
-	glog.V(3).Infof("hyperstart API version:%d, VM hyperstart API version: %d\n", hyperstartapi.VERSION, h.vmAPIVersion)
+	h.Log(TRACE, "hyperstart API version:%d, VM hyperstart API version: %d\n", hyperstartapi.VERSION, h.vmAPIVersion)
 	if err != nil {
 		h.Close()
 	}
@@ -202,14 +225,14 @@ func handleMsgToHyperstart(h *jsonBasedHyperstart, conn io.WriteCloser) {
 	for looping {
 		cmd, ok := <-h.ctlChan
 		if !ok {
-			glog.V(3).Info("vm channel closed, quit")
+			h.Log(TRACE, "vm channel closed, quit")
 			break
 		}
-		glog.V(3).Infof("got cmd:%d", cmd.Code)
+		h.Log(TRACE, "got cmd:%d", cmd.Code)
 		if cmd.Code == hyperstartapi.INIT_ACK || cmd.Code == hyperstartapi.INIT_ERROR {
 			if len(cmds) > 0 {
 				if cmds[0].Code == hyperstartapi.INIT_DESTROYPOD {
-					glog.V(3).Info("got response of shutdown command, last round of command to init")
+					h.Log(TRACE, "got response of shutdown command, last round of command to init")
 					looping = false
 				}
 				if cmd.Code == hyperstartapi.INIT_ACK {
@@ -221,12 +244,12 @@ func handleMsgToHyperstart(h *jsonBasedHyperstart, conn io.WriteCloser) {
 				}
 				cmds = cmds[1:]
 			} else {
-				glog.Error("got ack but no command in queue")
+				h.Log(ERROR, "got ack but no command in queue")
 			}
 		} else {
 			if cmd.Code == hyperstartapi.INIT_NEXT {
 				got += int(binary.BigEndian.Uint32(cmd.retMsg[0:4]))
-				glog.V(3).Infof("get command NEXT: send %d, receive %d", index, got)
+				h.Log(TRACE, "get command NEXT: send %d, receive %d", index, got)
 				if index == got {
 					/* received the sent out message */
 					tmp := data[index:]
@@ -237,7 +260,7 @@ func handleMsgToHyperstart(h *jsonBasedHyperstart, conn io.WriteCloser) {
 			} else {
 				if h.vmAPIVersion == 0 && (cmd.Code == hyperstartapi.INIT_EXECCMD || cmd.Code == hyperstartapi.INIT_NEWCONTAINER) {
 					// delay version-awared command
-					glog.V(3).Infof("delay version-awared command :%d", cmd.Code)
+					h.Log(TRACE, "delay version-awared command :%d", cmd.Code)
 					time.AfterFunc(2*time.Millisecond, func() {
 						h.ctlChan <- cmd
 					})
@@ -249,7 +272,7 @@ func handleMsgToHyperstart(h *jsonBasedHyperstart, conn io.WriteCloser) {
 				} else if message2, err := json.Marshal(cmd.Message); err == nil {
 					message = message2
 				} else {
-					glog.Errorf("marshal command %d failed. object: %v", cmd.Code, cmd.Message)
+					h.Log(ERROR, "marshal command %d failed. object: %v", cmd.Code, cmd.Message)
 					cmd.result <- fmt.Errorf("marshal command %d failed", cmd.Code)
 					continue
 				}
@@ -276,7 +299,7 @@ func handleMsgToHyperstart(h *jsonBasedHyperstart, conn io.WriteCloser) {
 					Code:    cmd.Code,
 					Message: message,
 				}
-				glog.V(3).Infof("send command %d to init, payload: '%s'.", cmd.Code, string(msg.Message))
+				h.Log(TRACE, "send command %d to init, payload: '%s'.", cmd.Code, string(msg.Message))
 				cmds = append(cmds, cmd)
 				data = append(data, newVmMessage(msg)...)
 			}
@@ -288,7 +311,7 @@ func handleMsgToHyperstart(h *jsonBasedHyperstart, conn io.WriteCloser) {
 				}
 
 				wrote, _ := conn.Write(data[:end])
-				glog.V(3).Infof("write %d to hyperstart.", wrote)
+				h.Log(TRACE, "write %d to hyperstart.", wrote)
 				index += wrote
 			}
 		}
@@ -304,7 +327,7 @@ func handleMsgFromHyperstart(h *jsonBasedHyperstart, conn io.Reader) {
 	for {
 		res, err := readVmMessage(conn)
 		if err == nil {
-			glog.V(3).Infof("readVmMessage code: %d, len: %d", res.Code, len(res.Message))
+			h.Log(TRACE, "readVmMessage code: %d, len: %d", res.Code, len(res.Message))
 		}
 		if err != nil {
 			h.Close()
@@ -314,9 +337,9 @@ func handleMsgFromHyperstart(h *jsonBasedHyperstart, conn io.Reader) {
 			h.ctlChan <- &hyperstartCmd{Code: res.Code, retMsg: res.Message}
 		} else if res.Code == hyperstartapi.INIT_PROCESSASYNCEVENT {
 			var pae hyperstartapi.ProcessAsyncEvent
-			glog.V(3).Info("ProcessAsyncEvent: %s", string(res.Message))
+			h.Log(TRACE, "ProcessAsyncEvent: %s", string(res.Message))
 			if err := json.Unmarshal(res.Message, &pae); err != nil {
-				glog.Error("read invalid ProcessAsyncEvent")
+				h.Log(ERROR, "read invalid ProcessAsyncEvent")
 			} else {
 				h.sendProcessAsyncEvent(pae)
 			}
@@ -337,7 +360,7 @@ func readTtyMessage(conn io.Reader) (*hyperstartapi.TtyMessage, error) {
 		}
 		nr, err := conn.Read(buf[:want])
 		if err != nil {
-			glog.Error("read tty data failed")
+			hlog.Log(ERROR, "read tty data failed")
 			return nil, err
 		}
 
@@ -362,14 +385,14 @@ func handleStreamToHyperstart(h *jsonBasedHyperstart, conn io.WriteCloser) {
 	for {
 		msg, ok := <-h.streamChan
 		if !ok {
-			glog.V(3).Info("tty chan closed, quit sent goroutine")
+			h.Log(TRACE, "tty chan closed, quit sent goroutine")
 			conn.Close()
 			break
 		}
 
 		_, err := conn.Write(msg.ToBuffer())
 		if err != nil {
-			glog.Errorf("Cannot write to tty socket: %v", err)
+			h.Log(ERROR, "Cannot write to tty socket: %v", err)
 			return
 		}
 	}
@@ -378,11 +401,11 @@ func handleStreamToHyperstart(h *jsonBasedHyperstart, conn io.WriteCloser) {
 func handleStreamSock(h *jsonBasedHyperstart, streamSock string) error {
 	conn, err := utils.SocketConnect(streamSock)
 	if err != nil {
-		glog.Errorf("Cannot connect to stream socket %s: %v", streamSock, err)
+		h.Log(ERROR, "Cannot connect to stream socket %s: %v", streamSock, err)
 		h.Close()
 		return err
 	}
-	glog.V(3).Info("stream socket connected")
+	h.Log(TRACE, "stream socket connected")
 
 	go handleStreamToHyperstart(h, conn)
 	go handleStreamFromHyperstart(h, conn)
@@ -394,11 +417,11 @@ func handleStreamFromHyperstart(h *jsonBasedHyperstart, conn io.Reader) {
 	for {
 		res, err := readTtyMessage(conn)
 		if err != nil {
-			glog.Errorf("tty socket closed, quit the reading goroutine: %v", err)
+			h.Log(ERROR, "tty socket closed, quit the reading goroutine: %v", err)
 			h.Close()
 			return
 		}
-		glog.V(3).Infof("tty: read %d bytes for stream %d", len(res.Message), res.Session)
+		h.Log(TRACE, "tty: read %d bytes for stream %d", len(res.Message), res.Session)
 		h.RLock()
 		out, ok := h.streamOuts[res.Session]
 		h.RUnlock()
@@ -406,12 +429,12 @@ func handleStreamFromHyperstart(h *jsonBasedHyperstart, conn io.Reader) {
 			if len(res.Message) > 0 {
 				_, err := out.Write(res.Message)
 				if err != nil {
-					glog.Errorf("fail to write session %d, close stdio: %v", res.Session, err)
+					h.Log(ERROR, "fail to write session %d, close stdio: %v", res.Session, err)
 					out.Close()
 					h.removeStreamOut(res.Session)
 				}
 			} else {
-				glog.V(3).Infof("session %d closed by peer, close pty", res.Session)
+				h.Log(TRACE, "session %d closed by peer, close pty", res.Session)
 				out.Close()
 				h.removeStreamOut(res.Session)
 			}
@@ -420,7 +443,7 @@ func handleStreamFromHyperstart(h *jsonBasedHyperstart, conn io.Reader) {
 			if len(res.Message) == 1 {
 				code = uint8(res.Message[0])
 			}
-			glog.V(3).Infof("session %d, exit code %d", res.Session, code)
+			h.Log(TRACE, "session %d, exit code %d", res.Session, code)
 			h.sendProcessAsyncEvent4242(res.Session, code)
 		}
 	}
@@ -481,7 +504,7 @@ func (s *streamIn) Write(data []byte) (ret int, err error) {
 		if len(b) < nr {
 			nr = len(b)
 		}
-		glog.V(3).Infof("trying to input %d chars to stream %d", nr, s.streamSeq)
+		s.h.Log(TRACE, "trying to input %d chars to stream %d", nr, s.streamSeq)
 		mbuf := make([]byte, nr)
 		copy(mbuf, b[:nr])
 		s.h.streamChan <- &hyperstartapi.TtyMessage{
@@ -501,7 +524,7 @@ func (s *streamIn) Close() (err error) {
 	}()
 
 	// send eof to hyperstart
-	glog.V(3).Infof("session %d send eof to hyperstart", s.streamSeq)
+	s.h.Log(TRACE, "session %d send eof to hyperstart", s.streamSeq)
 	s.h.streamChan <- &hyperstartapi.TtyMessage{
 		Session: s.streamSeq,
 		Message: make([]byte, 0),
@@ -519,11 +542,11 @@ type streamOut struct {
 func (h *jsonBasedHyperstart) APIVersion() (uint32, error) {
 	retMsg, err := h.hyperstartCommandWithRetMsg(hyperstartapi.INIT_VERSION, nil)
 	if err != nil {
-		glog.Errorf("get hyperstart API version error: %v", err)
+		h.Log(ERROR, "get hyperstart API version error: %v", err)
 		return 0, err
 	}
 	if len(retMsg) < 4 {
-		glog.Errorf("get hyperstart API version error, wrong retMsg: %v\n", retMsg)
+		h.Log(ERROR, "get hyperstart API version error, wrong retMsg: %v\n", retMsg)
 		return 0, fmt.Errorf("unexpected version string: %v\n", retMsg)
 	}
 	return binary.BigEndian.Uint32(retMsg[:4]), nil
@@ -562,7 +585,7 @@ func (h *jsonBasedHyperstart) TtyWinResize4242(container, process string, row, c
 	p, ok := h.procs[pKey{c: container, p: process}]
 	h.RUnlock()
 	if !ok {
-		glog.Errorf("cannot find process: %s, %s", container, process)
+		h.Log(ERROR, "cannot find process: %s, %s", container, process)
 		return fmt.Errorf("cannot find process: %s, %s", container, process)
 	}
 

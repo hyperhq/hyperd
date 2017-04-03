@@ -1,7 +1,6 @@
 package hypervisor
 
 import (
-	"github.com/golang/glog"
 	"github.com/hyperhq/runv/hypervisor/types"
 )
 
@@ -22,7 +21,7 @@ func (ctx *VmContext) reportVmShutdown() {
 	defer func() {
 		err := recover()
 		if err != nil {
-			glog.Warning("panic during send shutdown message to channel")
+			ctx.Log(WARNING, "panic during send shutdown message to channel")
 		}
 	}()
 	ctx.client <- &types.VmResponse{

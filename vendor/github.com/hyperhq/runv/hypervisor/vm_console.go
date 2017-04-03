@@ -3,7 +3,7 @@ package hypervisor
 import (
 	"io"
 
-	"github.com/golang/glog"
+	"github.com/hyperhq/hypercontainer-utils/hlog"
 	"github.com/hyperhq/runv/lib/telnet"
 	"github.com/hyperhq/runv/lib/utils"
 )
@@ -11,18 +11,18 @@ import (
 func watchVmConsole(ctx *VmContext) {
 	conn, err := utils.UnixSocketConnect(ctx.ConsoleSockName)
 	if err != nil {
-		glog.Errorf("failed to connected to %s: %v", ctx.ConsoleSockName, err)
+		ctx.Log(ERROR, "failed to connected to %s: %v", ctx.ConsoleSockName, err)
 		return
 	}
 
-	glog.V(3).Infof("connected to %s", ctx.ConsoleSockName)
+	ctx.Log(TRACE, "connected to %s", ctx.ConsoleSockName)
 
 	tc, err := telnet.NewConn(conn)
 	if err != nil {
-		glog.Errorf("fail to init telnet connection to %s: %v", ctx.ConsoleSockName, err)
+		ctx.Log(ERROR, "fail to init telnet connection to %s: %v", ctx.ConsoleSockName, err)
 		return
 	}
-	glog.V(3).Infof("connected %s as telnet mode.", ctx.ConsoleSockName)
+	ctx.Log(TRACE, "connected %s as telnet mode.", ctx.ConsoleSockName)
 
 	cout := make(chan string, 128)
 	go TtyLiner(tc, cout)
@@ -60,7 +60,7 @@ func TtyLiner(conn io.Reader, output chan string) {
 
 		nr, err := conn.Read(buf)
 		if err != nil || nr < 1 {
-			glog.V(1).Info("Input byte chan closed, close the output string chan")
+			hlog.Log(DEBUG, "Input byte chan closed, close the output string chan")
 			close(output)
 			return
 		}

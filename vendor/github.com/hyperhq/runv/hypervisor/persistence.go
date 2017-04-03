@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/golang/glog"
+	"github.com/hyperhq/hypercontainer-utils/hlog"
 	"github.com/hyperhq/runv/api"
 	hyperstartapi "github.com/hyperhq/runv/hyperstart/api/json"
 	"github.com/hyperhq/runv/hypervisor/types"
@@ -44,6 +44,18 @@ type PersistInfo struct {
 	VolumeList     []*PersistVolumeInfo
 	NetworkList    []*PersistNetworkInfo
 	PortList       []*api.PortDescription
+}
+
+func (p *PersistInfo) LogLevel(level hlog.LogLevel) bool {
+	return hlog.IsLogLevel(level)
+}
+
+func (p *PersistInfo) LogPrefix() string {
+	return fmt.Sprintf("PSB[%s] ", p.Id)
+}
+
+func (p *PersistInfo) Log(level hlog.LogLevel, args ...interface{}) {
+	hlog.HLog(level, p, 1, args...)
 }
 
 func (ctx *VmContext) dump() (*PersistInfo, error) {
@@ -217,7 +229,7 @@ func (pinfo *PersistInfo) vmContext(hub chan VmEvent, client chan *types.VmRespo
 
 	dc, err := HDriver.LoadContext(pinfo.DriverInfo)
 	if err != nil {
-		glog.Error("cannot load driver context: ", err.Error())
+		pinfo.Log(ERROR, "cannot load driver context: %v", err)
 		return nil, err
 	}
 
