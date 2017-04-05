@@ -5,7 +5,6 @@
   },
   "containers": [{
       "image": "busybox",
-      "command": ["/bin/sh", "-c", "touch /export/foo"],
       "volumes": [{
 	"volume": "sharevolume",
 	"path": "/export",

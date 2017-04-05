@@ -127,8 +127,8 @@ hyper::test::nfs_volume() {
   echo "create nfs volume client"
   sed -e "s/NFSSERVER/$ip/" ${HYPER_ROOT}/hack/pods/nfs-client.pod > ${HYPER_TEMP}/nfs-client.pod
   client=$(sudo hyperctl run -p ${HYPER_TEMP}/nfs-client.pod | sed -ne "s/POD id is \(.*\)/\1/p")
+  sudo hyperctl exec $client touch /export/foo
   echo "check nfs file in nfs volume: /export/foo"
-  sleep 1 # sleep a bit to let client cmd to run
   res=$(sudo hyperctl exec $server ls /export | grep foo > /dev/null 2>&1; echo $?)
   echo "clean up nfs client/server"
   sudo hyperctl rm $server $client
