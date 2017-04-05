@@ -1007,11 +1007,22 @@ func (c *Container) startLogging() {
 		return
 	}
 
-	stdout, stdoutStub := io.Pipe()
-	stderr, stderrStub := io.Pipe()
-	go c.AttachStreams(c.streams, false, false, c.hasTty(), nil, stdoutStub, stderrStub, nil)
+	var (
+		stdout, stderr         io.Reader
+		stdoutStub, stderrStub io.Writer
+		sources                = map[string]io.Reader{}
+	)
 
-	c.logger.Copier = logger.NewCopier(c.Id(), map[string]io.Reader{"stdout": stdout, "stderr": stderr}, c.logger.Driver)
+	stdout, stdoutStub = io.Pipe()
+	sources["stdout"] = stdout
+
+	if !c.hasTty() {
+		stderr, stderrStub = io.Pipe()
+		sources["stderr"] = stderr
+	}
+
+	go c.AttachStreams(c.streams, false, false, c.hasTty(), nil, stdoutStub, stderrStub, nil)
+	c.logger.Copier = logger.NewCopier(c.Id(), sources, c.logger.Driver)
 	c.logger.Copier.Run()
 
 	if jl, ok := c.logger.Driver.(*jsonfilelog.JSONFileLogger); ok {
