@@ -242,7 +242,10 @@ func (c *Container) start() error {
 	go c.waitFinish(-1)
 
 	c.Log(INFO, "start container")
-	c.p.sandbox.StartContainer(c.Id())
+	if err := c.p.sandbox.StartContainer(c.Id()); err != nil {
+		c.Log(ERROR, "failed to start container: %v", err)
+		return err
+	}
 	c.Log(DEBUG, "container started")
 	c.status.Running(time.Now())
 
