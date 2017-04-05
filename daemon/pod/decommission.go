@@ -263,11 +263,11 @@ func (p *XPod) RemoveContainer(id string) error {
 				removedVols = append(removedVols, cv.Name)
 			}
 		}
-	}
-	err = c.umountRootVol()
-	if err != nil {
-		c.Log(ERROR, "failed to umount root volume")
-		return err
+		err = c.umountRootVol()
+		if err != nil {
+			c.Log(ERROR, "failed to umount root volume")
+			return err
+		}
 	}
 	err = p.factory.engine.ContainerRm(id, &dockertypes.ContainerRmConfig{})
 	if err != nil {
