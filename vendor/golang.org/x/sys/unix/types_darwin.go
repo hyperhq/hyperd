@@ -131,8 +131,6 @@ type RawSockaddrInet6 C.struct_sockaddr_in6
 
 type RawSockaddrUnix C.struct_sockaddr_un
 
-type RawSockaddrVsock C.struct_sockaddr_vm
-
 type RawSockaddrDatalink C.struct_sockaddr_dl
 
 type RawSockaddr C.struct_sockaddr
