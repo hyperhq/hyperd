@@ -489,6 +489,8 @@ message UserPod {
   repeated UserService services              = 14;
   PortmappingWhiteList portmappingWhiteLists = 15;
   repeated PortMapping portmappings          = 16;
+  repeated string dnsOptions		     = 17;
+  repeated string dnsSearch		     = 18;
 }
 
 message PodCreateRequest {
