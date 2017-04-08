@@ -183,14 +183,6 @@ type RawSockaddrUnix struct {
 	Path   [108]int8
 }
 
-type RawSockaddrVsock struct {
-	Family   uint16
-	Reserved uint16
-	Port     uint32
-	Cid      uint32
-	Zero     [4]uint8
-}
-
 type RawSockaddrLinklayer struct {
 	Family   uint16
 	Protocol uint16
@@ -227,6 +219,14 @@ type RawSockaddrALG struct {
 	Feat   uint32
 	Mask   uint32
 	Name   [64]uint8
+}
+
+type RawSockaddrVM struct {
+	Family    uint16
+	Reserved1 uint16
+	Port      uint32
+	Cid       uint32
+	Zero      [4]uint8
 }
 
 type RawSockaddr struct {
@@ -356,6 +356,7 @@ const (
 	SizeofSockaddrHCI       = 0x6
 	SizeofSockaddrCAN       = 0x10
 	SizeofSockaddrALG       = 0x58
+	SizeofSockaddrVM        = 0x10
 	SizeofLinger            = 0x8
 	SizeofIPMreq            = 0x8
 	SizeofIPMreqn           = 0xc

@@ -159,12 +159,6 @@ type SockaddrUnix struct {
 	raw  RawSockaddrUnix
 }
 
-type SockaddrVsock struct {
-	Cid  uint32
-	Port uint32
-	raw  RawSockaddrVsock
-}
-
 func Bind(fd int, sa Sockaddr) (err error) {
 	ptr, n, err := sa.sockaddr()
 	if err != nil {

@@ -51,7 +51,6 @@ package unix
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 #include <linux/icmpv6.h>
-#include <linux/vm_sockets.h>
 #include <asm/termbits.h>
 #include <time.h>
 #include <unistd.h>
@@ -61,6 +60,7 @@ package unix
 #include <bluetooth/hci.h>
 #include <linux/can.h>
 #include <linux/if_alg.h>
+#include <linux/vm_sockets.h>
 
 #ifdef TCSETS2
 // On systems that have "struct termios2" use this as type Termios.
@@ -215,8 +215,6 @@ type RawSockaddrInet6 C.struct_sockaddr_in6
 
 type RawSockaddrUnix C.struct_my_sockaddr_un
 
-type RawSockaddrVsock C.struct_sockaddr_vm
-
 type RawSockaddrLinklayer C.struct_sockaddr_ll
 
 type RawSockaddrNetlink C.struct_sockaddr_nl
@@ -226,6 +224,8 @@ type RawSockaddrHCI C.struct_sockaddr_hci
 type RawSockaddrCAN C.struct_sockaddr_can
 
 type RawSockaddrALG C.struct_sockaddr_alg
+
+type RawSockaddrVM C.struct_sockaddr_vm
 
 type RawSockaddr C.struct_sockaddr
 
@@ -264,12 +264,12 @@ const (
 	SizeofSockaddrInet6     = C.sizeof_struct_sockaddr_in6
 	SizeofSockaddrAny       = C.sizeof_struct_sockaddr_any
 	SizeofSockaddrUnix      = C.sizeof_struct_sockaddr_un
-	SizeofSockaddrVsock     = C.sizeof_struct_sockaddr_vm
 	SizeofSockaddrLinklayer = C.sizeof_struct_sockaddr_ll
 	SizeofSockaddrNetlink   = C.sizeof_struct_sockaddr_nl
 	SizeofSockaddrHCI       = C.sizeof_struct_sockaddr_hci
 	SizeofSockaddrCAN       = C.sizeof_struct_sockaddr_can
 	SizeofSockaddrALG       = C.sizeof_struct_sockaddr_alg
+	SizeofSockaddrVM        = C.sizeof_struct_sockaddr_vm
 	SizeofLinger            = C.sizeof_struct_linger
 	SizeofIPMreq            = C.sizeof_struct_ip_mreq
 	SizeofIPMreqn           = C.sizeof_struct_ip_mreqn

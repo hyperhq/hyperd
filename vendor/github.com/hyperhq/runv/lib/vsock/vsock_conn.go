@@ -40,12 +40,12 @@ type VsockConn struct {
 	laddr, raddr net.Addr
 }
 
-func newVsockConn(fd int, src, dst *unix.SockaddrVsock) *VsockConn {
+func newVsockConn(fd int, src, dst *unix.SockaddrVM) *VsockConn {
 	return &VsockConn{
 		sysFd: fd,
 		net:   VsockNetwork,
-		laddr: &VsockNetAddr{src.Cid, src.Port},
-		raddr: &VsockNetAddr{dst.Cid, dst.Port},
+		laddr: &VsockNetAddr{src.CID, src.Port},
+		raddr: &VsockNetAddr{dst.CID, dst.Port},
 	}
 }
 
@@ -209,7 +209,7 @@ func Dial(cid uint32, port uint32) (net.Conn, error) {
 	}
 	unix.SetNonblock(fd, false)
 
-	dst := &unix.SockaddrVsock{Cid: cid, Port: port}
+	dst := &unix.SockaddrVM{CID: cid, Port: port}
 	err = unix.Connect(fd, dst)
 	if err != nil {
 		unix.Close(fd)
@@ -222,7 +222,7 @@ func Dial(cid uint32, port uint32) (net.Conn, error) {
 		return nil, err
 	}
 
-	src, ok := sa.(*unix.SockaddrVsock)
+	src, ok := sa.(*unix.SockaddrVM)
 	if !ok {
 		unix.Close(fd)
 		return nil, fmt.Errorf("failed to make vsock connection")
