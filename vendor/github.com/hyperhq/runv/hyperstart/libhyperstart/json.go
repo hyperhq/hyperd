@@ -262,6 +262,11 @@ func handleMsgToHyperstart(h *jsonBasedHyperstart, conn io.WriteCloser) {
 					// delay version-awared command
 					h.Log(TRACE, "delay version-awared command :%d", cmd.Code)
 					time.AfterFunc(2*time.Millisecond, func() {
+						defer func() {
+							if err := recover(); err != nil && h.closed {
+								cmd.result <- fmt.Errorf("hyperstart closed")
+							}
+						}()
 						h.ctlChan <- cmd
 					})
 					continue
@@ -324,6 +329,11 @@ func handleMsgToHyperstart(h *jsonBasedHyperstart, conn io.WriteCloser) {
 }
 
 func handleMsgFromHyperstart(h *jsonBasedHyperstart, conn io.Reader) {
+	defer func() {
+		if err := recover(); err != nil {
+			h.Log(WARNING, "panic during handleMsgFromHyperstart (closed: %v): %v", h.closed, err)
+		}
+	}()
 	for {
 		res, err := readVmMessage(conn)
 		if err == nil {

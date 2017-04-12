@@ -30,6 +30,11 @@ func (ctx *VmContext) newContainer(id string) error {
 	ctx.lock.Lock()
 	defer ctx.lock.Unlock()
 
+	if ctx.current != StateRunning {
+		ctx.Log(DEBUG, "start container %s during %v", id, ctx.current)
+		return NewNotReadyError(ctx.Id)
+	}
+
 	c, ok := ctx.containers[id]
 	if ok {
 		ctx.Log(TRACE, "start sending INIT_NEWCONTAINER")
@@ -48,6 +53,12 @@ func (ctx *VmContext) newContainer(id string) error {
 func (ctx *VmContext) restoreContainer(id string) (alive bool, err error) {
 	ctx.lock.Lock()
 	defer ctx.lock.Unlock()
+
+	if ctx.current != StateRunning {
+		ctx.Log(DEBUG, "start container %s during %v", id, ctx.current)
+		return false, NewNotReadyError(ctx.Id)
+	}
+
 	c, ok := ctx.containers[id]
 	if !ok {
 		return false, fmt.Errorf("try to associate a container not exist in sandbox")
@@ -76,6 +87,11 @@ func (ctx *VmContext) updateInterface(id string) error {
 func (ctx *VmContext) attachCmd(cmd *AttachCommand) error {
 	ctx.lock.Lock()
 	defer ctx.lock.Unlock()
+
+	if ctx.current != StateRunning {
+		ctx.Log(DEBUG, "attach container %s during %v", cmd.Container, ctx.current)
+		return NewNotReadyError(ctx.Id)
+	}
 
 	c, ok := ctx.containers[cmd.Container]
 	if !ok {

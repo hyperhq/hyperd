@@ -186,10 +186,10 @@ func (xc *XenContext) Dump() (map[string]interface{}, error) {
 	}, nil
 }
 
-func (xc *XenContext) Pause(ctx *hypervisor.VmContext, pause bool, result chan<- error) {
+func (xc *XenContext) Pause(ctx *hypervisor.VmContext, pause bool) error {
 	err := fmt.Errorf("doesn't support pause for xen right now")
 	glog.Warning(err)
-	result <- err
+	return err
 }
 
 func (xc *XenContext) Shutdown(ctx *hypervisor.VmContext) {
@@ -342,16 +342,16 @@ func diskRoutine(add bool, xc *XenContext, ctx *hypervisor.VmContext,
 	}
 }
 
-func (xc *XenContext) SetCpus(ctx *hypervisor.VmContext, cpus int, result chan<- error) {
-	result <- fmt.Errorf("SetCpus is unsupported on xen driver")
+func (xc *XenContext) SetCpus(ctx *hypervisor.VmContext, cpus int) error {
+	return fmt.Errorf("SetCpus is unsupported on xen driver")
 }
 
-func (xc *XenContext) AddMem(ctx *hypervisor.VmContext, slot, size int, result chan<- error) {
-	result <- fmt.Errorf("AddMem is unsupported on xen driver")
+func (xc *XenContext) AddMem(ctx *hypervisor.VmContext, slot, size int) error {
+	return fmt.Errorf("AddMem is unsupported on xen driver")
 }
 
-func (xc *XenContext) Save(ctx *hypervisor.VmContext, path string, result chan<- error) {
-	result <- fmt.Errorf("Save is unsupported on xen driver")
+func (xc *XenContext) Save(ctx *hypervisor.VmContext, path string) error {
+	return fmt.Errorf("Save is unsupported on xen driver")
 }
 
 func XlStartDomain(ctx LibxlCtxPtr, id string, boot *hypervisor.BootConfig, hyperSock, ttySock, consoleSock string, extra []string) (int, unsafe.Pointer, error) {

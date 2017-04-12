@@ -70,7 +70,7 @@ type VmContext struct {
 
 	logPrefix string
 
-	lock      sync.Mutex //protect update of context
+	lock      sync.RWMutex //protect update of context
 	idLock    sync.Mutex
 	pauseLock sync.Mutex
 	closeOnce sync.Once
@@ -157,8 +157,8 @@ func InitContext(id string, hub chan VmEvent, client chan *types.VmResponse, dc 
 // no handler associated with the context. VmEvent handling happens in a
 // separate goroutine, so this is thread-safe and asynchronous.
 func (ctx *VmContext) SendVmEvent(ev VmEvent) error {
-	ctx.lock.Lock()
-	defer ctx.lock.Unlock()
+	ctx.lock.RLock()
+	defer ctx.lock.RUnlock()
 
 	if ctx.handler == nil {
 		return fmt.Errorf("VmContext(%s): event handler already shutdown.", ctx.Id)
@@ -202,8 +202,8 @@ func (ctx *VmContext) NextPciAddr() int {
 }
 
 func (ctx *VmContext) LookupExecBySession(session uint64) string {
-	ctx.lock.Lock()
-	defer ctx.lock.Unlock()
+	ctx.lock.RLock()
+	defer ctx.lock.RUnlock()
 
 	for id, exec := range ctx.vmExec {
 		if exec.Process.Stdio == session {
@@ -223,8 +223,8 @@ func (ctx *VmContext) DeleteExec(id string) {
 }
 
 func (ctx *VmContext) LookupBySession(session uint64) string {
-	ctx.lock.Lock()
-	defer ctx.lock.Unlock()
+	ctx.lock.RLock()
+	defer ctx.lock.RUnlock()
 
 	for id, c := range ctx.containers {
 		if c.process.Stdio == session {
@@ -244,6 +244,15 @@ func (ctx *VmContext) handleProcessAsyncEvent(pae *hyperstartapi.ProcessAsyncEve
 		ctx.reportProcessFinished(types.E_CONTAINER_FINISHED, &types.ProcessFinished{
 			Id: pae.Container, Code: uint8(pae.Status), Ack: make(chan bool, 1),
 		})
+		ctx.lock.Lock()
+		if c, ok := ctx.containers[pae.Container]; ok {
+			c.Log(TRACE, "container finished, unset iostream pipes")
+			c.stdinPipe = nil
+			c.stdoutPipe = nil
+			c.stderrPipe = nil
+			c.tty = nil
+		}
+		ctx.lock.Unlock()
 	} else {
 		ctx.DeleteExec(pae.Process)
 		ctx.reportProcessFinished(types.E_EXEC_FINISHED, &types.ProcessFinished{
@@ -281,6 +290,14 @@ func (ctx *VmContext) Become(handler stateHandler, desc string) {
 	ctx.Log(DEBUG, "state change from %s to '%s'", orig, desc)
 }
 
+func (ctx *VmContext) IsRunning() bool {
+	var running bool
+	ctx.lock.RLock()
+	running = ctx.current == StateRunning
+	ctx.lock.RUnlock()
+	return running
+}
+
 // User API
 func (ctx *VmContext) SetNetworkEnvironment(net *api.SandboxConfig) {
 	ctx.lock.Lock()
@@ -298,12 +315,22 @@ func (ctx *VmContext) AddInterface(inf *api.InterfaceDescription, result chan ap
 	ctx.lock.Lock()
 	defer ctx.lock.Unlock()
 
+	if ctx.current != StateRunning {
+		ctx.Log(DEBUG, "add interface %s during %v", inf.Id, ctx.current)
+		result <- NewNotReadyError(ctx.Id)
+	}
+
 	ctx.networks.addInterface(inf, result)
 }
 
 func (ctx *VmContext) RemoveInterface(id string, result chan api.Result) {
 	ctx.lock.Lock()
 	defer ctx.lock.Unlock()
+
+	if ctx.current != StateRunning {
+		ctx.Log(DEBUG, "remove interface %s during %v", id, ctx.current)
+		result <- api.NewResultBase(id, true, "pod not running")
+	}
 
 	ctx.networks.removeInterface(id, result)
 }
@@ -327,6 +354,11 @@ func (ctx *VmContext) validateContainer(c *api.ContainerDescription) error {
 func (ctx *VmContext) AddContainer(c *api.ContainerDescription, result chan api.Result) {
 	ctx.lock.Lock()
 	defer ctx.lock.Unlock()
+
+	if ctx.current != StateRunning {
+		ctx.Log(DEBUG, "add container %s during %v", c.Id, ctx.current)
+		result <- NewNotReadyError(ctx.Id)
+	}
 
 	if ctx.LogLevel(TRACE) {
 		ctx.Log(TRACE, "add container %#v", c)
@@ -393,6 +425,11 @@ func (ctx *VmContext) RemoveContainer(id string, result chan<- api.Result) {
 	ctx.lock.Lock()
 	defer ctx.lock.Unlock()
 
+	if ctx.current != StateRunning {
+		ctx.Log(DEBUG, "remove container %s during %v", id, ctx.current)
+		result <- api.NewResultBase(id, true, "pod not running")
+	}
+
 	cc, ok := ctx.containers[id]
 	if !ok {
 		ctx.Log(WARNING, "container %s not exist", id)
@@ -417,6 +454,11 @@ func (ctx *VmContext) AddVolume(vol *api.VolumeDescription, result chan api.Resu
 	ctx.lock.Lock()
 	defer ctx.lock.Unlock()
 
+	if ctx.current != StateRunning {
+		ctx.Log(DEBUG, "add volume %s during %v", vol.Name, ctx.current)
+		result <- NewNotReadyError(ctx.Id)
+	}
+
 	if _, ok := ctx.volumes[vol.Name]; ok {
 		estr := fmt.Sprintf("duplicate volume %s", vol.Name)
 		ctx.Log(WARNING, estr)
@@ -440,6 +482,11 @@ func (ctx *VmContext) AddVolume(vol *api.VolumeDescription, result chan api.Resu
 func (ctx *VmContext) RemoveVolume(name string, result chan<- api.Result) {
 	ctx.lock.Lock()
 	defer ctx.lock.Unlock()
+
+	if ctx.current != StateRunning {
+		ctx.Log(DEBUG, "remove container %s during %v", name, ctx.current)
+		result <- api.NewResultBase(name, true, "pod not running")
+	}
 
 	disk, ok := ctx.volumes[name]
 	if !ok {
