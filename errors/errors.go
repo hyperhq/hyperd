@@ -26,4 +26,10 @@ var (
 		Message:        "cannot complete the operation, because the pod %s is not running",
 		HTTPStatusCode: http.StatusPreconditionFailed,
 	})
+
+	ErrContainerAlreadyRunning = errcode.Register(errGroup, errcode.ErrorDescriptor{
+		Value:          "HYPER_CONTAINER_RUNNING",
+		Message:        "container %s is in running state",
+		HTTPStatusCode: http.StatusPreconditionFailed,
+	})
 )
