@@ -265,9 +265,7 @@ func (p *XPod) createSandbox(spec *apitypes.UserPod) error {
 
 	go p.waitVMInit()
 	go p.waitVMStop()
-	sandbox.InitSandbox(config)
-
-	return nil
+	return sandbox.InitSandbox(config)
 }
 
 func (p *XPod) reconnectSandbox(sandboxId string, pinfo []byte) error {
