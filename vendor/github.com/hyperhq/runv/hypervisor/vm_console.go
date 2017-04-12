@@ -1,14 +1,64 @@
 package hypervisor
 
 import (
+	"encoding/json"
+	"fmt"
 	"io"
+	"net"
 
 	"github.com/hyperhq/hypercontainer-utils/hlog"
 	"github.com/hyperhq/runv/lib/telnet"
 	"github.com/hyperhq/runv/lib/utils"
 )
 
+const (
+	VmLogdSock = "/var/run/vmlogd.sock"
+)
+
+type LogMessage struct {
+	Message string
+	Id      string
+	Path    string
+}
+
+func enableVmLogd(ctx *VmContext) error {
+	conn, err := net.Dial("unix", VmLogdSock)
+	if err != nil {
+		return err
+	}
+
+	defer conn.Close()
+	msg := LogMessage{
+		Message: "start",
+		Id:      ctx.Id,
+		Path:    ctx.ConsoleSockName,
+	}
+
+	if err := json.NewEncoder(conn).Encode(&msg); err != nil {
+		ctx.Log(ERROR, "fail to send message: %v", err)
+		return err
+	}
+
+	if err := json.NewDecoder(conn).Decode(&msg); err != nil {
+		ctx.Log(ERROR, "fail to receive message: %v", err)
+		return err
+	}
+
+	if msg.Message != "success" || msg.Id != ctx.Id {
+		return fmt.Errorf("fail to start vm logger")
+	}
+
+	return nil
+}
+
 func watchVmConsole(ctx *VmContext) {
+	if err := enableVmLogd(ctx); err != nil {
+		ctx.Log(TRACE, "fail to enable vmLogd: %v", err)
+	} else {
+		ctx.Log(TRACE, "log vm console through vmlogd")
+		return
+	}
+
 	conn, err := utils.UnixSocketConnect(ctx.ConsoleSockName)
 	if err != nil {
 		ctx.Log(ERROR, "failed to connected to %s: %v", ctx.ConsoleSockName, err)
