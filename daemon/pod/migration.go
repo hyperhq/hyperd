@@ -198,9 +198,6 @@ func persistLagecyPod(factory *PodFactory, spec *apitypes.UserPod) error {
 	if err = p.initResources(spec, false); err != nil {
 		return err
 	}
-	if err = p.prepareResources(); err != nil {
-		return err
-	}
 
 	if err = p.savePod(); err != nil {
 		return err

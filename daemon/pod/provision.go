@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/hyperhq/hypercontainer-utils/hlog"
+	"github.com/hyperhq/hyperd/errors"
 	apitypes "github.com/hyperhq/hyperd/types"
 	"github.com/hyperhq/hyperd/utils"
 	runv "github.com/hyperhq/runv/api"
@@ -84,7 +85,7 @@ func newXPod(factory *PodFactory, spec *apitypes.UserPod) (*XPod, error) {
 	}
 	factory.hosts = HostsCreator(spec.Id)
 	factory.logCreator = initLogCreator(factory, spec)
-	return &XPod{
+	p := &XPod{
 		name:         spec.Id,
 		logPrefix:    fmt.Sprintf("Pod[%s] ", spec.Id),
 		globalSpec:   spec.CloneGlobalPart(),
@@ -98,7 +99,9 @@ func newXPod(factory *PodFactory, spec *apitypes.UserPod) (*XPod, error) {
 		statusLock:   &sync.RWMutex{},
 		stoppedChan:  make(chan bool, 1),
 		factory:      factory,
-	}, nil
+	}
+	p.initCond = sync.NewCond(p.statusLock.RLocker())
+	return p, nil
 }
 
 func (p *XPod) ContainerCreate(c *apitypes.UserContainer) (string, error) {
@@ -211,7 +214,7 @@ func (p *XPod) ContainerStart(cid string) error {
 // Start() means start a STOPPED pod.
 func (p *XPod) Start() error {
 
-	if p.status == S_POD_STOPPED {
+	if p.IsStopped() {
 		if err := p.createSandbox(p.globalSpec); err != nil {
 			p.Log(ERROR, "failed to create sandbox for the stopped pod: %v", err)
 			return err
@@ -226,13 +229,12 @@ func (p *XPod) Start() error {
 		}
 	}
 
-	if p.status == S_POD_RUNNING {
-		if err := p.startAll(); err != nil {
-			return err
-		}
-	} else {
-		err := fmt.Errorf("not in proper status and could not be started: %v", p.status)
-		p.Log(ERROR, err)
+	err := p.waitPodRun("start pod")
+	if err != nil {
+		p.Log(ERROR, "wait running failed, cannot start pod")
+		return err
+	}
+	if err := p.startAll(); err != nil {
 		return err
 	}
 
@@ -299,20 +301,20 @@ func (p *XPod) waitVMInit() {
 	}
 	r := p.sandbox.WaitInit()
 	p.Log(INFO, "sandbox init result: %#v", r)
+	p.statusLock.Lock()
 	if r.IsSuccess() {
-		p.statusLock.Lock()
 		if p.status == S_POD_STARTING {
 			p.status = S_POD_RUNNING
 		}
-		p.statusLock.Unlock()
 	} else {
 		p.statusLock.Lock()
 		if p.sandbox != nil {
 			go p.sandbox.Shutdown()
 		}
 		p.status = S_POD_STOPPING
-		p.statusLock.Unlock()
 	}
+	p.initCond.Broadcast()
+	p.statusLock.Unlock()
 }
 
 func (p *XPod) reserveNames(containers []*apitypes.UserContainer) error {
@@ -391,6 +393,15 @@ func (p *XPod) prepareResources() error {
 	var (
 		err error
 	)
+
+	p.resourceLock.Lock()
+	defer p.resourceLock.Unlock()
+
+	if !p.IsAlive() {
+		p.Log(ERROR, "pod is not alive, can not prepare resources")
+		return errors.ErrPodNotAlive.WithArgs(p.Id())
+	}
+
 	//generate /etc/hosts
 	p.factory.hosts.Do()
 
@@ -414,6 +425,14 @@ func (p *XPod) prepareResources() error {
 // addResourcesToSandbox() add resources to sandbox parallelly, it issues
 // runV API parallelly to send the NIC, Vols, and Containers to sandbox
 func (p *XPod) addResourcesToSandbox() error {
+	p.resourceLock.Lock()
+	defer p.resourceLock.Unlock()
+
+	if !p.IsAlive() {
+		p.Log(ERROR, "pod is not alive, can not add resources to sandbox")
+		return errors.ErrPodNotAlive.WithArgs(p.Id())
+	}
+
 	p.Log(INFO, "adding resource to sandbox")
 	future := utils.NewFutureSet()
 
@@ -470,4 +489,26 @@ func (p *XPod) sandboxShareDir() string {
 		return "/dev/null/no-such-dir"
 	}
 	return filepath.Join(hypervisor.BaseDir, p.sandbox.Id, hypervisor.ShareDirTag)
+}
+
+func (p *XPod) waitPodRun(activity string) error {
+	p.statusLock.RLock()
+	for {
+		if p.status == S_POD_RUNNING || p.status == S_POD_PAUSED {
+			p.statusLock.RUnlock()
+			p.Log(DEBUG, "pod is running, proceed %s", activity)
+			return nil
+		}
+		if p.status != S_POD_STARTING {
+			p.statusLock.RUnlock()
+			// only starting could transit to running, if not starting, that's mean failed
+			p.Log(ERROR, "pod is not running, cannot %s", activity)
+			return errors.ErrPodNotRunning.WithArgs(p.Id())
+		}
+		p.Log(TRACE, "wait for pod running")
+		p.initCond.Wait()
+	}
+	// should never reach here
+	p.statusLock.RUnlock()
+	return errors.ErrorCodeCommon.WithArgs("reach unreachable code...")
 }

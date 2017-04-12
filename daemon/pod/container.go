@@ -20,6 +20,7 @@ import (
 	"github.com/docker/engine-api/types/strslice"
 
 	"github.com/hyperhq/hypercontainer-utils/hlog"
+	"github.com/hyperhq/hyperd/errors"
 	apitypes "github.com/hyperhq/hyperd/types"
 	"github.com/hyperhq/hyperd/utils"
 	runv "github.com/hyperhq/runv/api"
@@ -233,6 +234,11 @@ func (c *Container) Add() error {
 
 func (c *Container) start() error {
 	if err := c.status.Start(); err != nil {
+		if err == errors.ErrContainerAlreadyRunning {
+			err = nil
+			c.Log(INFO, "container in running state, do not need start")
+			return nil
+		}
 		c.Log(ERROR, err)
 		return err
 	}
@@ -1196,8 +1202,10 @@ func (cs *ContainerStatus) Start() error {
 	cs.Lock()
 	defer cs.Unlock()
 
-	if cs.State != S_CONTAINER_CREATED {
-		return fmt.Errorf("only CREATING container could be set to creatd, current: %d", cs.State)
+	if cs.State == S_CONTAINER_RUNNING {
+		return errors.ErrContainerAlreadyRunning
+	} else if cs.State != S_CONTAINER_CREATED {
+		return fmt.Errorf("only CREATED container could be set to running, current: %d", cs.State)
 	}
 
 	cs.Killed = false

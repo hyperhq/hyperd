@@ -74,6 +74,7 @@ type XPod struct {
 	// got a value from this chan, it should put an element to it again, in case other procedure may wait
 	// on it too.
 	stoppedChan chan bool
+	initCond    *sync.Cond
 }
 
 // The Log infrastructure, to add pod name as prefix of the log message.
@@ -110,27 +111,35 @@ func (p *XPod) SandboxName() string {
 }
 
 func (p *XPod) IsNone() bool {
-	p.statusLock.Lock()
+	p.statusLock.RLock()
 	isNone := p.status == S_POD_NONE
-	p.statusLock.Unlock()
+	p.statusLock.RUnlock()
 
 	return isNone
 }
 
 func (p *XPod) IsRunning() bool {
-	p.statusLock.Lock()
+	p.statusLock.RLock()
 	running := p.status == S_POD_RUNNING
-	p.statusLock.Unlock()
+	p.statusLock.RUnlock()
 
 	return running
 }
 
 func (p *XPod) IsAlive() bool {
-	p.statusLock.Lock()
+	p.statusLock.RLock()
 	alive := (p.status == S_POD_RUNNING) || (p.status == S_POD_STARTING)
-	p.statusLock.Unlock()
+	p.statusLock.RUnlock()
 
 	return alive
+}
+
+func (p *XPod) IsStopped() bool {
+	p.statusLock.RLock()
+	stopped := p.status == S_POD_STOPPED
+	p.statusLock.RUnlock()
+
+	return stopped
 }
 
 func (p *XPod) IsContainerRunning(cid string) bool {
