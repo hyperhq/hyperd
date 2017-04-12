@@ -26,6 +26,14 @@ type StreamConfig struct {
 	stdinPipe io.WriteCloser
 }
 
+type StreamCloser struct {
+	*broadcaster.Unbuffered
+}
+
+func (sc *StreamCloser) Close() error {
+	return sc.Clean()
+}
+
 // NewStreamConfig creates a stream config and initializes
 // the standard err and standard out to new unbuffered broadcasters.
 func NewStreamConfig() *StreamConfig {
@@ -36,13 +44,13 @@ func NewStreamConfig() *StreamConfig {
 }
 
 // Stdout returns the standard output in the configuration.
-func (streamConfig *StreamConfig) Stdout() *broadcaster.Unbuffered {
-	return streamConfig.stdout
+func (streamConfig *StreamConfig) Stdout() io.WriteCloser {
+	return &StreamCloser{streamConfig.stdout}
 }
 
 // Stderr returns the standard error in the configuration.
-func (streamConfig *StreamConfig) Stderr() *broadcaster.Unbuffered {
-	return streamConfig.stderr
+func (streamConfig *StreamConfig) Stderr() io.WriteCloser {
+	return &StreamCloser{streamConfig.stderr}
 }
 
 // Stdin returns the standard input in the configuration.
