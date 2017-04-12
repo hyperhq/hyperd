@@ -143,7 +143,7 @@ func (vm *Vm) WaitResponse(match matchResponse, timeout int) chan error {
 }
 
 func (vm *Vm) ReleaseVm() error {
-	if vm.ctx.current != StateRunning {
+	if !vm.ctx.IsRunning() {
 		return nil
 	}
 
@@ -226,58 +226,6 @@ func (vm *Vm) WaitProcess(isContainer bool, ids []string, timeout int) <-chan *a
 	return result
 }
 
-//func (vm *Vm) handlePodEvent(mypod *PodStatus) {
-//	glog.V(1).Infof("hyperHandlePodEvent pod %s, vm %s", mypod.Id, vm.Id)
-//
-//	Status, err := vm.GetResponseChan()
-//	if err != nil {
-//		return
-//	}
-//	defer vm.ReleaseResponseChan(Status)
-//
-//	exit := false
-//	mypod.Wg.Add(1)
-//	for {
-//		Response, ok := <-Status
-//		if !ok {
-//			break
-//		}
-//
-//		switch Response.Code {
-//		case types.E_CONTAINER_FINISHED:
-//			ps, ok := Response.Data.(*types.ProcessFinished)
-//			if ok {
-//				mypod.SetOneContainerStatus(ps.Id, ps.Code)
-//				close(ps.Ack)
-//			}
-//		case types.E_EXEC_FINISHED:
-//			ps, ok := Response.Data.(*types.ProcessFinished)
-//			if ok {
-//				mypod.SetExecStatus(ps.Id, ps.Code)
-//				close(ps.Ack)
-//			}
-//		case types.E_VM_SHUTDOWN: // vm exited, sucessful or not
-//			if mypod.Status == types.S_POD_RUNNING { // not received finished pod before
-//				mypod.Status = types.S_POD_FAILED
-//				mypod.FinishedAt = time.Now().Format("2006-01-02T15:04:05Z")
-//				mypod.SetContainerStatus(types.S_POD_FAILED)
-//			}
-//			mypod.Vm = ""
-//			exit = true
-//		}
-//
-//		if mypod.Handler != nil {
-//			mypod.Handler.Handle(Response, mypod.Handler.Data, mypod, vm)
-//		}
-//
-//		if exit {
-//			vm.clients = nil
-//			break
-//		}
-//	}
-//	mypod.Wg.Done()
-//}
-
 func (vm *Vm) InitSandbox(config *api.SandboxConfig) {
 	vm.ctx.SetNetworkEnvironment(config)
 	vm.ctx.startPod()
@@ -299,7 +247,7 @@ func (vm *Vm) WaitInit() api.Result {
 }
 
 func (vm *Vm) Shutdown() api.Result {
-	if vm.ctx.current != StateRunning {
+	if !vm.ctx.IsRunning() {
 		return api.NewResultBase(vm.Id, false, "not in running state")
 	}
 
@@ -352,10 +300,6 @@ func (vm *Vm) AddRoute() error {
 }
 
 func (vm *Vm) AddNic(info *api.InterfaceDescription) error {
-	if vm.ctx.current != StateRunning {
-		return NewNotReadyError(vm.Id)
-	}
-
 	client := make(chan api.Result, 1)
 	vm.ctx.AddInterface(info, client)
 
@@ -375,10 +319,6 @@ func (vm *Vm) AddNic(info *api.InterfaceDescription) error {
 }
 
 func (vm *Vm) DeleteNic(id string) error {
-	if vm.ctx.current != StateRunning {
-		return NewNotReadyError(vm.Id)
-	}
-
 	client := make(chan api.Result, 1)
 	vm.ctx.RemoveInterface(id, client)
 
@@ -403,7 +343,7 @@ func (vm *Vm) SetCpus(cpus int) error {
 		return nil
 	}
 
-	if vm.ctx.current != StateRunning {
+	if !vm.ctx.IsRunning() {
 		return NewNotReadyError(vm.Id)
 	}
 
@@ -420,7 +360,7 @@ func (vm *Vm) AddMem(totalMem int) error {
 	}
 
 	size := totalMem - vm.Mem
-	if vm.ctx.current != StateRunning {
+	if !vm.ctx.IsRunning() {
 		return NewNotReadyError(vm.Id)
 	}
 
@@ -525,6 +465,10 @@ func (vm *Vm) Exec(container, execId, cmd string, terminal bool, tty *TtyIO) err
 }
 
 func (vm *Vm) AddProcess(container, execId string, terminal bool, args []string, env []string, workdir string, tty *TtyIO) error {
+	if !vm.ctx.IsRunning() {
+		return NewNotReadyError(vm.Id)
+	}
+
 	envs := []hyperstartapi.EnvironmentVar{}
 
 	for _, v := range env {
@@ -553,21 +497,12 @@ func (vm *Vm) AddProcess(container, execId string, terminal bool, args []string,
 }
 
 func (vm *Vm) AddVolume(vol *api.VolumeDescription) api.Result {
-	if vm.ctx.current != StateRunning {
-		vm.Log(ERROR, "VM is not ready for insert volume %#v", vol)
-		return NewNotReadyError(vm.Id)
-	}
-
 	result := make(chan api.Result, 1)
 	vm.ctx.AddVolume(vol, result)
 	return <-result
 }
 
 func (vm *Vm) AddContainer(c *api.ContainerDescription) api.Result {
-	if vm.ctx.current != StateRunning {
-		return NewNotReadyError(vm.Id)
-	}
-
 	result := make(chan api.Result, 1)
 	vm.ctx.AddContainer(c, result)
 	return <-result
@@ -631,10 +566,6 @@ func (vm *Vm) batchWaitResult(names []string, op waitResultOp) (bool, map[string
 }
 
 func (vm *Vm) StartContainer(id string) error {
-	if vm.ctx.current != StateRunning {
-		return NewNotReadyError(vm.Id)
-	}
-
 	err := vm.ctx.newContainer(id)
 	if err != nil {
 		return fmt.Errorf("Create new container failed: %v", err)
@@ -652,10 +583,6 @@ func (vm *Vm) Tty(containerId, execId string, row, column int) error {
 }
 
 func (vm *Vm) Attach(tty *TtyIO, container string) error {
-	if vm.ctx.current != StateRunning {
-		return NewNotReadyError(vm.Id)
-	}
-
 	cmd := &AttachCommand{
 		Streams:   tty,
 		Container: container,
@@ -666,7 +593,7 @@ func (vm *Vm) Attach(tty *TtyIO, container string) error {
 func (vm *Vm) Stats() *types.PodStats {
 	ctx := vm.ctx
 
-	if ctx.current != StateRunning {
+	if !vm.ctx.IsRunning() {
 		vm.ctx.Log(WARNING, "could not get stats from non-running pod")
 		return nil
 	}
@@ -681,7 +608,7 @@ func (vm *Vm) Stats() *types.PodStats {
 
 func (vm *Vm) Pause(pause bool) error {
 	ctx := vm.ctx
-	if ctx.current != StateRunning {
+	if !vm.ctx.IsRunning() {
 		return NewNotReadyError(vm.Id)
 	}
 
@@ -713,10 +640,13 @@ func (vm *Vm) Pause(pause bool) error {
 
 func (vm *Vm) Save(path string) error {
 	ctx := vm.ctx
+	if !vm.ctx.IsRunning() {
+		return NewNotReadyError(vm.Id)
+	}
 
 	ctx.pauseLock.Lock()
 	defer ctx.pauseLock.Unlock()
-	if ctx.current != StateRunning || ctx.PauseState != PauseStatePaused {
+	if ctx.PauseState != PauseStatePaused {
 		return NewNotReadyError(vm.Id)
 	}
 
@@ -726,7 +656,7 @@ func (vm *Vm) Save(path string) error {
 func (vm *Vm) GetIPAddrs() []string {
 	ips := []string{}
 
-	if vm.ctx.current != StateRunning {
+	if !vm.ctx.IsRunning() {
 		vm.Log(ERROR, "get pod ip failed: %v", NewNotReadyError(vm.Id))
 		return ips
 	}
