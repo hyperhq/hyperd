@@ -30,19 +30,21 @@ type pState struct {
 	stdinPipe  streamIn
 	stdoutPipe io.ReadCloser
 	stderrPipe io.ReadCloser
+	exitStatus *int
+	outClosed  bool
+	waitChan   chan int
 }
 
 type jsonBasedHyperstart struct {
 	sync.RWMutex
-	logPrefix          string
-	vmAPIVersion       uint32
-	closed             bool
-	lastStreamSeq      uint64
-	procs              map[pKey]*pState
-	streamOuts         map[uint64]streamOut
-	ctlChan            chan *hyperstartCmd
-	streamChan         chan *hyperstartapi.TtyMessage
-	processAsyncEvents chan hyperstartapi.ProcessAsyncEvent
+	logPrefix     string
+	vmAPIVersion  uint32
+	closed        bool
+	lastStreamSeq uint64
+	procs         map[pKey]*pState
+	streamOuts    map[uint64]streamOut
+	ctlChan       chan *hyperstartCmd
+	streamChan    chan *hyperstartapi.TtyMessage
 }
 
 type hyperstartCmd struct {
@@ -56,13 +58,12 @@ type hyperstartCmd struct {
 
 func NewJsonBasedHyperstart(id, ctlSock, streamSock string, lastStreamSeq uint64, waitReady bool) Hyperstart {
 	h := &jsonBasedHyperstart{
-		logPrefix:          fmt.Sprintf("SB[%s] ", id),
-		procs:              make(map[pKey]*pState),
-		lastStreamSeq:      lastStreamSeq,
-		streamOuts:         make(map[uint64]streamOut),
-		ctlChan:            make(chan *hyperstartCmd, 128),
-		streamChan:         make(chan *hyperstartapi.TtyMessage, 128),
-		processAsyncEvents: make(chan hyperstartapi.ProcessAsyncEvent, 16),
+		logPrefix:     fmt.Sprintf("SB[%s] ", id),
+		procs:         make(map[pKey]*pState),
+		lastStreamSeq: lastStreamSeq,
+		streamOuts:    make(map[uint64]streamOut),
+		ctlChan:       make(chan *hyperstartCmd, 128),
+		streamChan:    make(chan *hyperstartapi.TtyMessage, 128),
 	}
 	go handleStreamSock(h, streamSock)
 	go handleCtlSock(h, ctlSock, waitReady)
@@ -86,17 +87,18 @@ func (h *jsonBasedHyperstart) Close() {
 	defer h.Unlock()
 	if !h.closed {
 		h.Log(TRACE, "close jsonBasedHyperstart")
-		for pk := range h.procs {
-			h.processAsyncEvents <- hyperstartapi.ProcessAsyncEvent{Container: pk.c, Process: pk.p, Event: "finished", Status: 255}
-		}
-		h.procs = make(map[pKey]*pState)
 		for _, out := range h.streamOuts {
 			out.Close()
 		}
 		h.streamOuts = make(map[uint64]streamOut)
+		for pk, ps := range h.procs {
+			ps.outClosed = true
+			ps.exitStatus = makeExitStatus(255)
+			h.handleWaitProcess(pk, ps)
+		}
+		h.procs = make(map[pKey]*pState)
 		close(h.ctlChan)
 		close(h.streamChan)
-		close(h.processAsyncEvents)
 		for cmd := range h.ctlChan {
 			if cmd.Code != hyperstartapi.INIT_ACK && cmd.Code != hyperstartapi.INIT_ERROR {
 				cmd.result <- fmt.Errorf("hyperstart closed")
@@ -104,10 +106,6 @@ func (h *jsonBasedHyperstart) Close() {
 		}
 		h.closed = true
 	}
-}
-
-func (h *jsonBasedHyperstart) ProcessAsyncEvents() (<-chan hyperstartapi.ProcessAsyncEvent, error) {
-	return h.processAsyncEvents, nil
 }
 
 func (h *jsonBasedHyperstart) LastStreamSeq() uint64 {
@@ -193,6 +191,18 @@ func handleCtlSock(h *jsonBasedHyperstart, ctlSock string, waitReady bool) error
 }
 
 func (h *jsonBasedHyperstart) hyperstartCommandWithRetMsg(code uint32, msg interface{}) (retMsg []byte, err error) {
+	if h.vmAPIVersion == 0 && (code == hyperstartapi.INIT_EXECCMD || code == hyperstartapi.INIT_NEWCONTAINER) {
+		// delay version-awared command
+		var t int64 = 2
+		for h.vmAPIVersion == 0 {
+			h.Log(TRACE, "delay version-awared command :%d by %dms", code)
+			time.Sleep(time.Duration(t) * time.Millisecond)
+			if t < 512 {
+				t = t * 2
+			}
+		}
+	}
+
 	defer func() {
 		if recover() != nil {
 			err = fmt.Errorf("send ctl channel error, the hyperstart might have closed")
@@ -258,19 +268,6 @@ func handleMsgToHyperstart(h *jsonBasedHyperstart, conn io.WriteCloser) {
 					got = 0
 				}
 			} else {
-				if h.vmAPIVersion == 0 && (cmd.Code == hyperstartapi.INIT_EXECCMD || cmd.Code == hyperstartapi.INIT_NEWCONTAINER) {
-					// delay version-awared command
-					h.Log(TRACE, "delay version-awared command :%d", cmd.Code)
-					time.AfterFunc(2*time.Millisecond, func() {
-						defer func() {
-							if err := recover(); err != nil && h.closed {
-								cmd.result <- fmt.Errorf("hyperstart closed")
-							}
-						}()
-						h.ctlChan <- cmd
-					})
-					continue
-				}
 				var message []byte
 				if message1, ok := cmd.Message.([]byte); ok {
 					message = message1
@@ -459,13 +456,22 @@ func handleStreamFromHyperstart(h *jsonBasedHyperstart, conn io.Reader) {
 	}
 }
 
+func makeExitStatus(status int) *int { return &status }
+
+func (h *jsonBasedHyperstart) handleWaitProcess(pk pKey, ps *pState) {
+	if ps.exitStatus != nil && ps.waitChan != nil && ps.outClosed {
+		delete(h.procs, pk)
+		ps.waitChan <- *ps.exitStatus
+	}
+}
+
 func (h *jsonBasedHyperstart) sendProcessAsyncEvent(pae hyperstartapi.ProcessAsyncEvent) {
 	h.Lock()
 	defer h.Unlock()
 	pk := pKey{c: pae.Container, p: pae.Process}
-	if _, ok := h.procs[pk]; ok {
-		delete(h.procs, pk)
-		h.processAsyncEvents <- pae
+	if ps, ok := h.procs[pk]; ok {
+		ps.exitStatus = makeExitStatus(pae.Status)
+		h.handleWaitProcess(pk, ps)
 	}
 }
 
@@ -474,8 +480,8 @@ func (h *jsonBasedHyperstart) sendProcessAsyncEvent4242(stdioSeq uint64, code ui
 	defer h.Unlock()
 	for pk, ps := range h.procs {
 		if ps.stdioSeq == stdioSeq {
-			delete(h.procs, pk)
-			h.processAsyncEvents <- hyperstartapi.ProcessAsyncEvent{Container: pk.c, Process: pk.p, Event: "finished", Status: int(code)}
+			ps.exitStatus = makeExitStatus(int(code))
+			h.handleWaitProcess(pk, ps)
 		}
 	}
 }
@@ -487,8 +493,17 @@ func (h *jsonBasedHyperstart) removeStreamOut(seq uint64) {
 	// doesn't send eof of the stderr back, so we also remove stderr seq here
 	if out, ok := h.streamOuts[seq]; ok {
 		delete(h.streamOuts, seq)
-		if seq == out.ps.stdioSeq && out.ps.stderrSeq > 0 {
-			delete(h.streamOuts, out.ps.stderrSeq)
+		if seq == out.ps.stdioSeq {
+			if out.ps.stderrSeq > 0 {
+				h.streamOuts[out.ps.stderrSeq].Close()
+				delete(h.streamOuts, out.ps.stderrSeq)
+			}
+			for pk, ps := range h.procs {
+				if ps.stdioSeq == seq {
+					ps.outClosed = true
+					h.handleWaitProcess(pk, ps)
+				}
+			}
 		}
 	}
 }
@@ -750,6 +765,26 @@ func (h *jsonBasedHyperstart) SignalProcess(container, process string, signal sy
 		Process:   process,
 		Signal:    signal,
 	})
+}
+
+// wait the process until exit. like waitpid()
+// the state is saved until someone calls WaitProcess() if the process exited earlier
+// the non-first call of WaitProcess() after process started MAY fail to find the process if the process exited earlier
+func (h *jsonBasedHyperstart) WaitProcess(container, process string) int {
+	h.Lock()
+	pk := pKey{c: container, p: process}
+	if ps, ok := h.procs[pk]; ok {
+		if ps.waitChan == nil {
+			ps.waitChan = make(chan int, 1)
+			h.handleWaitProcess(pk, ps)
+		}
+		h.Unlock()
+		status := <-ps.waitChan
+		ps.waitChan <- status
+		return status
+	}
+	h.Unlock()
+	return -1
 }
 
 func (h *jsonBasedHyperstart) StartSandbox(pod *hyperstartapi.Pod) error {

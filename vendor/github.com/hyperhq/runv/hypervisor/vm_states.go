@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/hyperhq/hypercontainer-utils/hlog"
+	"github.com/hyperhq/runv/hypervisor/types"
 )
 
 // states
@@ -44,6 +45,21 @@ func (ctx *VmContext) newContainer(id string) error {
 			go streamCopy(c.tty, c.stdinPipe, c.stdoutPipe, c.stderrPipe)
 		}
 		ctx.Log(TRACE, "sent INIT_NEWCONTAINER")
+		go func() {
+			status := ctx.hyperstart.WaitProcess(id, "init")
+			ctx.reportProcessFinished(types.E_CONTAINER_FINISHED, &types.ProcessFinished{
+				Id: id, Code: uint8(status), Ack: make(chan bool, 1),
+			})
+			ctx.lock.Lock()
+			if c, ok := ctx.containers[id]; ok {
+				c.Log(TRACE, "container finished, unset iostream pipes")
+				c.stdinPipe = nil
+				c.stdoutPipe = nil
+				c.stderrPipe = nil
+				c.tty = nil
+			}
+			ctx.lock.Unlock()
+		}()
 		return err
 	} else {
 		return fmt.Errorf("container %s not exist", id)
@@ -72,6 +88,21 @@ func (ctx *VmContext) restoreContainer(id string) (alive bool, err error) {
 		}
 		return false, nil
 	}
+	go func() {
+		status := ctx.hyperstart.WaitProcess(id, "init")
+		ctx.reportProcessFinished(types.E_CONTAINER_FINISHED, &types.ProcessFinished{
+			Id: id, Code: uint8(status), Ack: make(chan bool, 1),
+		})
+		ctx.lock.Lock()
+		if c, ok := ctx.containers[id]; ok {
+			c.Log(TRACE, "container finished, unset iostream pipes")
+			c.stdinPipe = nil
+			c.stdoutPipe = nil
+			c.stderrPipe = nil
+			c.tty = nil
+		}
+		ctx.lock.Unlock()
+	}()
 	return true, nil
 }
 
@@ -181,16 +212,17 @@ func streamCopy(tty *TtyIO, stdinPipe io.WriteCloser, stdoutPipe, stderrPipe io.
 	once.Do(cleanup)
 }
 
-func (ctx *VmContext) startPod() {
+func (ctx *VmContext) startPod() error {
 	err := ctx.hyperstart.StartSandbox(ctx.networks.sandboxInfo())
 	if err == nil {
 		ctx.Log(INFO, "pod start successfully")
 		ctx.reportSuccess("Start POD success", []byte{})
 	} else {
-		reason := "Start POD failed"
+		reason := fmt.Sprintf("Start POD failed: %s", err.Error())
 		ctx.reportVmFault(reason)
 		ctx.Log(ERROR, reason)
 	}
+	return err
 }
 
 func (ctx *VmContext) shutdownVM() {
