@@ -78,6 +78,15 @@ func (wc *waitClose) Close() error {
 	return wc.ReadCloser.Close()
 }
 
+type writeCloser struct {
+	io.Writer
+	closer io.Closer
+}
+
+func (wc *writeCloser) Close() error {
+	return wc.closer.Close()
+}
+
 func (p *XPod) StartExec(stdin io.ReadCloser, stdout io.WriteCloser, containerId, execId string) error {
 	c, ok := p.containers[containerId]
 	if !ok {
@@ -104,7 +113,7 @@ func (p *XPod) StartExec(stdin io.ReadCloser, stdout io.WriteCloser, containerId
 
 	if !es.Terminal && stdout != nil {
 		tty.Stderr = stdcopy.NewStdWriter(stdout, stdcopy.Stderr)
-		tty.Stdout = stdcopy.NewStdWriter(stdout, stdcopy.Stdout)
+		tty.Stdout = &writeCloser{stdcopy.NewStdWriter(stdout, stdcopy.Stdout), stdout}
 	}
 
 	var fin = true

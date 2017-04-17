@@ -1054,28 +1054,40 @@ func (c *Container) waitFinish(timeout int) {
 	result := c.p.sandbox.WaitProcess(true, []string{c.Id()}, timeout)
 	if result == nil {
 		c.Log(INFO, "wait container failed")
-		c.streams.CloseStreams()
 		firstStop = c.status.UnexpectedStopped()
 	} else {
 		r, ok := <-result
 		if !ok {
 			if timeout < 0 {
 				c.Log(INFO, "container unexpected failed, chan broken")
-				c.streams.CloseStreams()
 				firstStop = c.status.UnexpectedStopped()
 			}
 		} else {
 			c.Log(INFO, "container exited with code %v (at %v)", r.Code, r.FinishedAt)
-			c.streams.CloseStreams()
 			firstStop = c.status.Stopped(r.FinishedAt, r.Code)
 		}
 	}
 
 	if firstStop {
 		c.Log(INFO, "clean up container")
-		if c.logger.Driver != nil {
-			c.logger.Driver.Close()
-		}
+
+		//reset streams and loggers, in case restart may use them.
+		oldStreams := c.streams
+		oldLogger := c.logger.Driver
+		c.streams = NewStreamConfig()
+		c.logger.Driver = nil
+
+		//the streams should have been closed as the process terminated and hup the streams,
+		//however, we reclaim them in case they are leaved alone by some reason
+		time.AfterFunc(3*time.Second, func() {
+			if err := oldStreams.CloseStreams(); err != nil {
+				c.Log(WARNING, "failed to clean stopped streams of container: %v", err)
+				err = nil
+			}
+			if oldLogger != nil {
+				oldLogger.Close()
+			}
+		})
 	}
 }
 
@@ -1323,14 +1335,6 @@ func (c *Container) AttachStreams(streamConfig *StreamConfig, openStdin, stdinOn
 		}
 		if stdinOnce && !tty {
 			cStdin.Close()
-		} else {
-			// No matter what, when stdin is closed (io.Copy unblock), close stdout and stderr
-			if cStdout != nil {
-				cStdout.Close()
-			}
-			if cStderr != nil {
-				cStderr.Close()
-			}
 		}
 		c.Log(DEBUG, "attach: stdin: end")
 		wg.Done()
