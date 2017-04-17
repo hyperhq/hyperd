@@ -226,9 +226,9 @@ func (vm *Vm) WaitProcess(isContainer bool, ids []string, timeout int) <-chan *a
 	return result
 }
 
-func (vm *Vm) InitSandbox(config *api.SandboxConfig) {
+func (vm *Vm) InitSandbox(config *api.SandboxConfig) error {
 	vm.ctx.SetNetworkEnvironment(config)
-	vm.ctx.startPod()
+	return vm.ctx.startPod()
 }
 
 func (vm *Vm) WaitInit() api.Result {
@@ -493,6 +493,13 @@ func (vm *Vm) AddProcess(container, execId string, terminal bool, args []string,
 	}
 
 	go streamCopy(tty, stdinPipe, stdoutPipe, stderrPipe)
+	go func() {
+		status := vm.ctx.hyperstart.WaitProcess(container, execId)
+		vm.ctx.DeleteExec(execId)
+		vm.ctx.reportProcessFinished(types.E_EXEC_FINISHED, &types.ProcessFinished{
+			Id: execId, Code: uint8(status), Ack: make(chan bool, 1),
+		})
+	}()
 	return nil
 }
 

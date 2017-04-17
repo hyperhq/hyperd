@@ -1562,190 +1562,190 @@
 			"checksumSHA1": "sE+ChkSBNR9UX5wDne5FyqfN/zg=",
 			"comment": "v0.8.0-21-g2ff5bd5",
 			"path": "github.com/hyperhq/runv/api",
-			"revision": "652ea59442df17c4b8aac29c6c603d650baa3fc0",
-			"revisionTime": "2017-04-11T06:59:18Z"
+			"revision": "f92b0b26b1c29e51e33ad380cacb93148256911f",
+			"revisionTime": "2017-04-15T12:12:16Z"
 		},
 		{
-			"checksumSHA1": "rpg/EPhyWW/AuX+uvrHnRQHELt8=",
+			"checksumSHA1": "8YILZAPjZSzXy0I53S6TiVdd5pY=",
 			"comment": "v0.8.0-21-g2ff5bd5",
 			"path": "github.com/hyperhq/runv/driverloader",
-			"revision": "652ea59442df17c4b8aac29c6c603d650baa3fc0",
-			"revisionTime": "2017-04-11T06:59:18Z"
+			"revision": "f92b0b26b1c29e51e33ad380cacb93148256911f",
+			"revisionTime": "2017-04-15T12:12:16Z"
 		},
 		{
 			"checksumSHA1": "q6YN3/ZY/L6eGUiu9inc4VJy7bo=",
 			"comment": "v0.8.0-21-g2ff5bd5",
 			"path": "github.com/hyperhq/runv/factory",
-			"revision": "652ea59442df17c4b8aac29c6c603d650baa3fc0",
-			"revisionTime": "2017-04-11T06:59:18Z"
+			"revision": "f92b0b26b1c29e51e33ad380cacb93148256911f",
+			"revisionTime": "2017-04-15T12:12:16Z"
 		},
 		{
 			"checksumSHA1": "3fMRgjly6yNBVu+dK3+VAkA2Ijg=",
 			"comment": "v0.8.0-21-g2ff5bd5",
 			"path": "github.com/hyperhq/runv/factory/base",
-			"revision": "652ea59442df17c4b8aac29c6c603d650baa3fc0",
-			"revisionTime": "2017-04-11T06:59:18Z"
+			"revision": "f92b0b26b1c29e51e33ad380cacb93148256911f",
+			"revisionTime": "2017-04-15T12:12:16Z"
 		},
 		{
 			"checksumSHA1": "J0IhP6X/2ANAFulzfrZS3iPvlHE=",
 			"comment": "v0.8.0-21-g2ff5bd5",
 			"path": "github.com/hyperhq/runv/factory/cache",
-			"revision": "652ea59442df17c4b8aac29c6c603d650baa3fc0",
-			"revisionTime": "2017-04-11T06:59:18Z"
+			"revision": "f92b0b26b1c29e51e33ad380cacb93148256911f",
+			"revisionTime": "2017-04-15T12:12:16Z"
 		},
 		{
 			"checksumSHA1": "dMqyDvvPH/9jn08hg1smsu95qmQ=",
 			"comment": "v0.8.0-21-g2ff5bd5",
 			"path": "github.com/hyperhq/runv/factory/direct",
-			"revision": "652ea59442df17c4b8aac29c6c603d650baa3fc0",
-			"revisionTime": "2017-04-11T06:59:18Z"
+			"revision": "f92b0b26b1c29e51e33ad380cacb93148256911f",
+			"revisionTime": "2017-04-15T12:12:16Z"
 		},
 		{
 			"checksumSHA1": "uuz/WaRZ9KqIFKIxAXuLdL0qdbg=",
 			"comment": "v0.8.0-21-g2ff5bd5",
 			"path": "github.com/hyperhq/runv/factory/multi",
-			"revision": "652ea59442df17c4b8aac29c6c603d650baa3fc0",
-			"revisionTime": "2017-04-11T06:59:18Z"
+			"revision": "f92b0b26b1c29e51e33ad380cacb93148256911f",
+			"revisionTime": "2017-04-15T12:12:16Z"
 		},
 		{
 			"checksumSHA1": "TfPen9XyXhztUtbOCZQfsIgauRc=",
 			"comment": "v0.8.0-21-g2ff5bd5",
 			"path": "github.com/hyperhq/runv/factory/single",
-			"revision": "652ea59442df17c4b8aac29c6c603d650baa3fc0",
-			"revisionTime": "2017-04-11T06:59:18Z"
+			"revision": "f92b0b26b1c29e51e33ad380cacb93148256911f",
+			"revisionTime": "2017-04-15T12:12:16Z"
 		},
 		{
 			"checksumSHA1": "tHQbmmuYiQ5I4jEjLZDdWkuAt9Y=",
 			"comment": "v0.8.0-21-g2ff5bd5",
 			"path": "github.com/hyperhq/runv/factory/template",
-			"revision": "652ea59442df17c4b8aac29c6c603d650baa3fc0",
-			"revisionTime": "2017-04-11T06:59:18Z"
+			"revision": "f92b0b26b1c29e51e33ad380cacb93148256911f",
+			"revisionTime": "2017-04-15T12:12:16Z"
 		},
 		{
 			"checksumSHA1": "ShG4X3Myzi4GXZ7Q8wI1W27aa0M=",
 			"comment": "v0.8.0-21-g2ff5bd5",
 			"path": "github.com/hyperhq/runv/hyperstart/api/json",
-			"revision": "652ea59442df17c4b8aac29c6c603d650baa3fc0",
-			"revisionTime": "2017-04-11T06:59:18Z"
+			"revision": "f92b0b26b1c29e51e33ad380cacb93148256911f",
+			"revisionTime": "2017-04-15T12:12:16Z"
 		},
 		{
-			"checksumSHA1": "znvejY3Kt2sghwRgDvGTx6ctxeU=",
+			"checksumSHA1": "raItqW5UAOXxu44TKajkJ2BNidY=",
 			"comment": "v0.8.0-21-g2ff5bd5",
 			"path": "github.com/hyperhq/runv/hyperstart/libhyperstart",
-			"revision": "652ea59442df17c4b8aac29c6c603d650baa3fc0",
-			"revisionTime": "2017-04-11T06:59:18Z"
+			"revision": "f92b0b26b1c29e51e33ad380cacb93148256911f",
+			"revisionTime": "2017-04-15T12:12:16Z"
 		},
 		{
-			"checksumSHA1": "3PkibZtMKHnQGRWHalhPU8VQftM=",
+			"checksumSHA1": "thGDNtV2qQ8CrYkRFNJ3Y1xP8hg=",
 			"comment": "v0.8.0-21-g2ff5bd5",
 			"path": "github.com/hyperhq/runv/hypervisor",
-			"revision": "652ea59442df17c4b8aac29c6c603d650baa3fc0",
-			"revisionTime": "2017-04-11T06:59:18Z"
+			"revision": "f92b0b26b1c29e51e33ad380cacb93148256911f",
+			"revisionTime": "2017-04-15T12:12:16Z"
 		},
 		{
 			"checksumSHA1": "FsxwrErK+uPrjUQv92iqGYPdtyU=",
 			"comment": "v0.8.0-21-g2ff5bd5",
 			"path": "github.com/hyperhq/runv/hypervisor/libvirt",
-			"revision": "652ea59442df17c4b8aac29c6c603d650baa3fc0",
-			"revisionTime": "2017-04-11T06:59:18Z"
+			"revision": "f92b0b26b1c29e51e33ad380cacb93148256911f",
+			"revisionTime": "2017-04-15T12:12:16Z"
 		},
 		{
 			"checksumSHA1": "h/pDLdFw6PWPK6rt0XJIS8w01C8=",
 			"comment": "v0.8.0-21-g2ff5bd5",
 			"path": "github.com/hyperhq/runv/hypervisor/network",
-			"revision": "652ea59442df17c4b8aac29c6c603d650baa3fc0",
-			"revisionTime": "2017-04-11T06:59:18Z"
+			"revision": "f92b0b26b1c29e51e33ad380cacb93148256911f",
+			"revisionTime": "2017-04-15T12:12:16Z"
 		},
 		{
 			"checksumSHA1": "YAUAfc2PYReSINQp6X3xClJJpgs=",
 			"comment": "v0.8.0-21-g2ff5bd5",
 			"path": "github.com/hyperhq/runv/hypervisor/network/ipallocator",
-			"revision": "652ea59442df17c4b8aac29c6c603d650baa3fc0",
-			"revisionTime": "2017-04-11T06:59:18Z"
+			"revision": "f92b0b26b1c29e51e33ad380cacb93148256911f",
+			"revisionTime": "2017-04-15T12:12:16Z"
 		},
 		{
 			"checksumSHA1": "X0A7y9yULUB+nT28FCOZZrXSglU=",
 			"comment": "v0.8.0-21-g2ff5bd5",
 			"path": "github.com/hyperhq/runv/hypervisor/network/iptables",
-			"revision": "652ea59442df17c4b8aac29c6c603d650baa3fc0",
-			"revisionTime": "2017-04-11T06:59:18Z"
+			"revision": "f92b0b26b1c29e51e33ad380cacb93148256911f",
+			"revisionTime": "2017-04-15T12:12:16Z"
 		},
 		{
 			"checksumSHA1": "TYTgJQHjo1W4BpRsgGU0Kc/sH/U=",
 			"comment": "v0.8.0-21-g2ff5bd5",
 			"path": "github.com/hyperhq/runv/hypervisor/network/portmapper",
-			"revision": "652ea59442df17c4b8aac29c6c603d650baa3fc0",
-			"revisionTime": "2017-04-11T06:59:18Z"
+			"revision": "f92b0b26b1c29e51e33ad380cacb93148256911f",
+			"revisionTime": "2017-04-15T12:12:16Z"
 		},
 		{
-			"checksumSHA1": "S8RRPi4bQmClaoPqp7qk4/1xf9Q=",
+			"checksumSHA1": "ldYtRz7MMEvs2nmSsmpbyT0Ye+Y=",
 			"comment": "v0.8.0-21-g2ff5bd5",
 			"path": "github.com/hyperhq/runv/hypervisor/qemu",
-			"revision": "652ea59442df17c4b8aac29c6c603d650baa3fc0",
-			"revisionTime": "2017-04-11T06:59:18Z"
+			"revision": "f92b0b26b1c29e51e33ad380cacb93148256911f",
+			"revisionTime": "2017-04-15T12:12:16Z"
 		},
 		{
 			"checksumSHA1": "3THNIXtFjo57ExxWu0qIV2P4jJ4=",
 			"comment": "v0.8.0-21-g2ff5bd5",
 			"path": "github.com/hyperhq/runv/hypervisor/types",
-			"revision": "652ea59442df17c4b8aac29c6c603d650baa3fc0",
-			"revisionTime": "2017-04-11T06:59:18Z"
+			"revision": "f92b0b26b1c29e51e33ad380cacb93148256911f",
+			"revisionTime": "2017-04-15T12:12:16Z"
 		},
 		{
 			"checksumSHA1": "ZB5ND5VcrKnyqxfD0eW497ZCZyg=",
 			"comment": "v0.8.0-21-g2ff5bd5",
 			"path": "github.com/hyperhq/runv/hypervisor/vbox",
-			"revision": "652ea59442df17c4b8aac29c6c603d650baa3fc0",
-			"revisionTime": "2017-04-11T06:59:18Z"
+			"revision": "f92b0b26b1c29e51e33ad380cacb93148256911f",
+			"revisionTime": "2017-04-15T12:12:16Z"
 		},
 		{
 			"checksumSHA1": "WDwdjUNiB686Y639rAyUfvg17rE=",
 			"comment": "v0.8.0-21-g2ff5bd5",
 			"path": "github.com/hyperhq/runv/hypervisor/xen",
-			"revision": "652ea59442df17c4b8aac29c6c603d650baa3fc0",
-			"revisionTime": "2017-04-11T06:59:18Z"
+			"revision": "f92b0b26b1c29e51e33ad380cacb93148256911f",
+			"revisionTime": "2017-04-15T12:12:16Z"
 		},
 		{
 			"checksumSHA1": "CDAtmOBgEoM0EuL54NVwFc2Eynk=",
 			"comment": "v0.8.0-21-g2ff5bd5",
 			"path": "github.com/hyperhq/runv/lib/govbox",
-			"revision": "652ea59442df17c4b8aac29c6c603d650baa3fc0",
-			"revisionTime": "2017-04-11T06:59:18Z"
+			"revision": "f92b0b26b1c29e51e33ad380cacb93148256911f",
+			"revisionTime": "2017-04-15T12:12:16Z"
 		},
 		{
 			"checksumSHA1": "d0GuiUdHWWWsd8l8cfzAntU8AYw=",
 			"comment": "v0.8.0-21-g2ff5bd5",
 			"path": "github.com/hyperhq/runv/lib/telnet",
-			"revision": "652ea59442df17c4b8aac29c6c603d650baa3fc0",
-			"revisionTime": "2017-04-11T06:59:18Z"
+			"revision": "f92b0b26b1c29e51e33ad380cacb93148256911f",
+			"revisionTime": "2017-04-15T12:12:16Z"
 		},
 		{
 			"checksumSHA1": "EG1PoTyBE8u4bZvfCt7wKvqc6bU=",
 			"comment": "v0.8.0-21-g2ff5bd5",
 			"path": "github.com/hyperhq/runv/lib/term",
-			"revision": "652ea59442df17c4b8aac29c6c603d650baa3fc0",
-			"revisionTime": "2017-04-11T06:59:18Z"
+			"revision": "f92b0b26b1c29e51e33ad380cacb93148256911f",
+			"revisionTime": "2017-04-15T12:12:16Z"
 		},
 		{
-			"checksumSHA1": "ovVdfwcewRlI6Kha2Dx4ynC/Nyo=",
+			"checksumSHA1": "SnGYzTky8nYM8r1Hd2s7STWSuTQ=",
 			"comment": "v0.8.0-21-g2ff5bd5",
 			"path": "github.com/hyperhq/runv/lib/utils",
-			"revision": "652ea59442df17c4b8aac29c6c603d650baa3fc0",
-			"revisionTime": "2017-04-11T06:59:18Z"
+			"revision": "f92b0b26b1c29e51e33ad380cacb93148256911f",
+			"revisionTime": "2017-04-15T12:12:16Z"
 		},
 		{
 			"checksumSHA1": "qVEK/HSC/OfWvcecGBs5N7BPlvg=",
 			"comment": "v0.8.0-21-g2ff5bd5",
 			"path": "github.com/hyperhq/runv/lib/vsock",
-			"revision": "652ea59442df17c4b8aac29c6c603d650baa3fc0",
-			"revisionTime": "2017-04-11T06:59:18Z"
+			"revision": "f92b0b26b1c29e51e33ad380cacb93148256911f",
+			"revisionTime": "2017-04-15T12:12:16Z"
 		},
 		{
 			"checksumSHA1": "u8YbTIs1ALeZy2kkrDwHeA2j5U0=",
 			"comment": "v0.8.0-21-g2ff5bd5",
 			"path": "github.com/hyperhq/runv/template",
-			"revision": "652ea59442df17c4b8aac29c6c603d650baa3fc0",
-			"revisionTime": "2017-04-11T06:59:18Z"
+			"revision": "f92b0b26b1c29e51e33ad380cacb93148256911f",
+			"revisionTime": "2017-04-15T12:12:16Z"
 		},
 		{
 			"comment": "0.2.2-6-g50d4dbd",

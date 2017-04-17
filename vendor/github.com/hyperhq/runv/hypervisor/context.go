@@ -236,31 +236,6 @@ func (ctx *VmContext) LookupBySession(session uint64) string {
 	return ""
 }
 
-func (ctx *VmContext) handleProcessAsyncEvent(pae *hyperstartapi.ProcessAsyncEvent) {
-	if pae.Event != "finished" {
-		return
-	}
-	if pae.Process == "init" {
-		ctx.reportProcessFinished(types.E_CONTAINER_FINISHED, &types.ProcessFinished{
-			Id: pae.Container, Code: uint8(pae.Status), Ack: make(chan bool, 1),
-		})
-		ctx.lock.Lock()
-		if c, ok := ctx.containers[pae.Container]; ok {
-			c.Log(TRACE, "container finished, unset iostream pipes")
-			c.stdinPipe = nil
-			c.stdoutPipe = nil
-			c.stderrPipe = nil
-			c.tty = nil
-		}
-		ctx.lock.Unlock()
-	} else {
-		ctx.DeleteExec(pae.Process)
-		ctx.reportProcessFinished(types.E_EXEC_FINISHED, &types.ProcessFinished{
-			Id: pae.Process, Code: uint8(pae.Status), Ack: make(chan bool, 1),
-		})
-	}
-}
-
 func (ctx *VmContext) Close() {
 	ctx.closeOnce.Do(func() {
 		ctx.Log(INFO, "VmContext Close()")
