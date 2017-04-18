@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/golang/glog"
+	"github.com/hyperhq/hyperd/lib/promise"
 	"github.com/hyperhq/hyperd/types"
 	"golang.org/x/net/context"
 )
@@ -36,7 +37,7 @@ func (s *ServerRPC) ExecStart(stream types.PublicAPI_ExecStartServer) error {
 
 	inReader, inWriter := io.Pipe()
 	outReader, outWriter := io.Pipe()
-	go func() {
+	outErr := promise.Go(func() (err error) {
 		defer outReader.Close()
 		buf := make([]byte, 32)
 		for {
@@ -44,18 +45,18 @@ func (s *ServerRPC) ExecStart(stream types.PublicAPI_ExecStartServer) error {
 			if nr > 0 {
 				if err := stream.Send(&types.ExecStartResponse{buf[:nr]}); err != nil {
 					glog.Errorf("Send to stream error: %v", err)
-					return
+					return err
 				}
 			}
 			if err == io.EOF {
-				break
+				return nil
 			}
 			if err != nil {
 				glog.Errorf("Read from pipe error: %v", err)
-				return
+				return err
 			}
 		}
-	}()
+	})
 	go func() {
 		defer inWriter.Close()
 		for {
@@ -85,7 +86,8 @@ func (s *ServerRPC) ExecStart(stream types.PublicAPI_ExecStartServer) error {
 	if err != nil {
 		return err
 	}
-	return nil
+	err = <-outErr
+	return err
 }
 
 // Wait gets exitcode by container and processId
