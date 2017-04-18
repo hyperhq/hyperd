@@ -248,6 +248,10 @@ func (p *XPod) createSandbox(spec *apitypes.UserPod) error {
 		p.Log(ERROR, err)
 		return err
 	}
+	if sandbox == nil {
+		p.Log(ERROR, "startSandbox returns no sandbox and no error")
+		return errors.ErrSandboxNotExist
+	}
 
 	config := &runv.SandboxConfig{
 		Hostname:   spec.Hostname,

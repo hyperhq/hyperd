@@ -15,6 +15,12 @@ var (
 		HTTPStatusCode: http.StatusInternalServerError,
 	})
 
+	ErrSandboxNotExist = errcode.Register(errGroup, errcode.ErrorDescriptor{
+		Value:          "HYPER_SANDBOX_NOT_EXIST",
+		Message:        "sandbox does not exist",
+		HTTPStatusCode: http.StatusPreconditionFailed,
+	})
+
 	ErrPodNotAlive = errcode.Register(errGroup, errcode.ErrorDescriptor{
 		Value:          "HYPER_POD_NOT_ALIVE",
 		Message:        "cannot complete the operation, because the pod %s is not alive",
