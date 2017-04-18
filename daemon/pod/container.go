@@ -80,10 +80,9 @@ func newContainerStatus() *ContainerStatus {
 
 func newContainer(p *XPod, spec *apitypes.UserContainer, create bool) (*Container, error) {
 	c := &Container{
-		p:       p,
-		spec:    spec,
-		status:  newContainerStatus(),
-		streams: NewStreamConfig(),
+		p:      p,
+		spec:   spec,
+		status: newContainerStatus(),
 	}
 	c.updateLogPrefix()
 	if err := c.init(create); err != nil {
@@ -286,7 +285,7 @@ func (c *Container) attach(stdin io.ReadCloser, stdout io.Writer, rsp chan<- err
 	detachKeys, _ := term.ToBytes(DetachKeys)
 
 	go func() {
-		rsp <- c.AttachStreams(c.streams, true, true, c.hasTty(), stdin, stdout, stderr, detachKeys)
+		rsp <- c.AttachStreams(true, true, c.hasTty(), stdin, stdout, stderr, detachKeys)
 	}()
 	return nil
 }
@@ -909,17 +908,6 @@ func (c *Container) addToSandbox() error {
 		return err
 	}
 
-	c.streams.NewInputPipes()
-	tty := &hypervisor.TtyIO{
-		Stdin:  c.streams.Stdin(),
-		Stdout: c.streams.Stdout(),
-		Stderr: c.streams.Stderr(),
-	}
-	if err := c.p.sandbox.Attach(tty, c.Id()); err != nil {
-		c.Log(ERROR, err)
-		return err
-	}
-
 	c.status.Created(time.Now())
 	return nil
 }
@@ -939,21 +927,34 @@ func (c *Container) associateToSandbox() error {
 		c.status.CreatedAt = time.Now()
 	}
 
+	go c.waitFinish(-1)
+
+	c.startLogging()
+
+	return nil
+}
+
+// This method should be called when initialzing container or put into resource lock.
+func (c *Container) initStreams() error {
+	if c.streams != nil {
+		return nil
+	}
+	if !c.p.IsAlive() {
+		c.Log(ERROR, "can not init stream to a non-existing sandbox")
+		return errors.ErrPodNotAlive.WithArgs(c.p.Id())
+	}
+	c.Log(TRACE, "init io streams")
+	c.streams = NewStreamConfig()
 	c.streams.NewInputPipes()
 	tty := &hypervisor.TtyIO{
 		Stdin:  c.streams.Stdin(),
 		Stdout: c.streams.Stdout(),
 		Stderr: c.streams.Stderr(),
 	}
-	err = c.p.sandbox.Attach(tty, c.Id())
-	if err != nil {
+	if err := c.p.sandbox.Attach(tty, c.Id()); err != nil {
+		c.Log(ERROR, err)
 		return err
 	}
-
-	go c.waitFinish(-1)
-
-	c.startLogging()
-
 	return nil
 }
 
@@ -1030,7 +1031,7 @@ func (c *Container) startLogging() {
 		sources["stderr"] = stderr
 	}
 
-	go c.AttachStreams(c.streams, false, false, c.hasTty(), nil, stdoutStub, stderrStub, nil)
+	go c.AttachStreams(false, false, c.hasTty(), nil, stdoutStub, stderrStub, nil)
 	c.logger.Copier = logger.NewCopier(c.Id(), sources, c.logger.Driver)
 	c.logger.Copier.Run()
 
@@ -1074,7 +1075,7 @@ func (c *Container) waitFinish(timeout int) {
 		//reset streams and loggers, in case restart may use them.
 		oldStreams := c.streams
 		oldLogger := c.logger.Driver
-		c.streams = NewStreamConfig()
+		c.streams = nil
 		c.logger.Driver = nil
 
 		//the streams should have been closed as the process terminated and hup the streams,
@@ -1290,13 +1291,22 @@ func (cs *ContainerStatus) IsStopped() bool {
 
 // AttachStreams connects streams to a TTY.
 // Used by exec too. Should this move somewhere else?
-func (c *Container) AttachStreams(streamConfig *StreamConfig, openStdin, stdinOnce, tty bool, stdin io.ReadCloser, stdout io.Writer, stderr io.Writer, keys []byte) error {
+func (c *Container) AttachStreams(openStdin, stdinOnce, tty bool, stdin io.ReadCloser, stdout io.Writer, stderr io.Writer, keys []byte) error {
 	var (
 		cStdout, cStderr io.ReadCloser
 		cStdin           io.WriteCloser
 		wg               sync.WaitGroup
 		errors           = make(chan error, 3)
 	)
+
+	c.status.Lock()
+	err := c.initStreams()
+	streamConfig := c.streams
+	c.status.Unlock()
+	if err != nil {
+		c.Log(ERROR, "failed to init streams during attach: %v", err)
+		return err
+	}
 
 	if stdin != nil && openStdin {
 		cStdin = streamConfig.StdinPipe()
