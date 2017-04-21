@@ -28,14 +28,17 @@ endif
 
 VERSION_PARAM=-ldflags "-X github.com/hyperhq/hyperd/utils.VERSION=$(VERSION) -X github.com/hyperhq/hyperd/utils.GITCOMMIT=`git describe`"
 
-all-local: build-hyperd build-hyperctl
+all-local: build-hyperd build-hyperctl build-vmlogd
 clean-local:
-	-rm -f hyperd hyperctl
+	-rm -f hyperd hyperctl vmlogd
 install-exec-local:
 	$(INSTALL_PROGRAM) hyperctl $(bindir)
 	$(INSTALL_PROGRAM) hyperd $(bindir)
+	$(INSTALL_PROGRAM) vmlogd $(bindir)
 
 build-hyperd:
 	go build -tags "static_build $(HYPER_BULD_TAGS)" $(VERSION_PARAM) hyperd.go
 build-hyperctl:
 	go build $(VERSION_PARAM) hyperctl.go
+build-vmlogd:
+	go build $(VERSION_PARAM) vmlogd.go
