@@ -39,7 +39,7 @@ func (qc *QemuContext) arguments(ctx *hypervisor.VmContext) []string {
 		"-kernel", boot.Kernel, "-initrd", boot.Initrd,
 		"-append", "\"console=ttyS1 panic=1 no_timer_check\"",
 		"-realtime", "mlock=off", "-no-user-config", "-nodefaults", "-enable-kvm",
-		"-rtc", "base=utc,driftfix=slew", "-no-reboot", "-display", "none", "-boot", "strict=on",
+		"-rtc", "base=utc,clock=vm,driftfix=slew", "-no-reboot", "-display", "none", "-boot", "strict=on",
 		"-m", memParams, "-smp", cpuParams,
 		"-qmp", fmt.Sprintf("unix:%s,server,nowait", qc.qmpSockName),
 		"-chardev", fmt.Sprintf("socket,id=charconsole0,path=%s,server,nowait", ctx.ConsoleSockName),

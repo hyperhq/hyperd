@@ -11,6 +11,7 @@ import (
 
 	"github.com/hyperhq/hypercontainer-utils/hlog"
 	"github.com/hyperhq/hyperd/utils"
+	"github.com/hyperhq/runv/api"
 	"github.com/hyperhq/runv/hypervisor"
 )
 
@@ -155,7 +156,13 @@ func (p *XPod) StartExec(stdin io.ReadCloser, stdout io.WriteCloser, containerId
 		envs = append(envs, fmt.Sprintf("%s=%s", e, v))
 	}
 
-	err := p.sandbox.AddProcess(es.Container, es.Id, es.Terminal, es.Cmds, envs, c.descript.Workdir, tty)
+	err := p.sandbox.AddProcess(
+		&api.Process{Container: es.Container,
+			Id:       es.Id,
+			Terminal: es.Terminal,
+			Args:     es.Cmds,
+			Envs:     envs,
+			Workdir:  c.descript.Workdir}, tty)
 	<-wReader.wait
 	return err
 }

@@ -372,6 +372,27 @@ type qemucmd struct {
 	Value string `xml:"value,attr"`
 }
 
+type clock struct {
+	Offset string  `xml:"offset,attr"`
+	Timer  []timer `xml:"timer,omitempty"`
+}
+
+type timer struct {
+	Name       string  `xml:"name,attr"`
+	Track      string  `xml:"track,attr,omitempty"`
+	Tickpolicy string  `xml:"tickpolicy,attr,omitempty"`
+	CatchUp    catchup `xml:"catchup,omitempty"`
+	Frequency  uint32  `xml:"frequency,attr,omitempty"`
+	Mode       string  `xml:"mode,attr,omitempty"`
+	Present    string  `xml:"present,attr,omitempty"`
+}
+
+type catchup struct {
+	Threshold uint `xml:"threshold,attr,omitempty"`
+	Slew      uint `xml:"slew,attr,omitempty"`
+	Limit     uint `xml:"limit,attr,omitempty"`
+}
+
 type commandlines struct {
 	Cmds []qemucmd `xml:"qemu:arg"`
 }
@@ -392,6 +413,7 @@ type domain struct {
 	OnCrash     string       `xml:"on_crash"`
 	Devices     device       `xml:"devices"`
 	SecLabel    seclab       `xml:"seclabel"`
+	Clock       clock        `xml:"clock"`
 	CommandLine commandlines `xml:"qemu:commandline"`
 }
 
@@ -426,6 +448,7 @@ func (lc *LibvirtContext) domainXml(ctx *hypervisor.VmContext) (string, error) {
 	dom.SecLabel.Type = "none"
 
 	dom.CPU.Mode = "host-passthrough"
+	cmdline := "console=ttyS0 panic=1 no_timer_check"
 	if _, err := os.Stat("/dev/kvm"); os.IsNotExist(err) {
 		dom.Type = "qemu"
 		dom.CPU.Mode = "host-model"
@@ -434,6 +457,7 @@ func (lc *LibvirtContext) domainXml(ctx *hypervisor.VmContext) (string, error) {
 			Fallback: "allow",
 			Content:  "core2duo",
 		}
+		cmdline += " clocksource=acpi_pm notsc"
 	}
 
 	if ctx.Boot.HotAddCpuMem {
@@ -479,6 +503,9 @@ func (lc *LibvirtContext) domainXml(ctx *hypervisor.VmContext) (string, error) {
 	dom.OnPowerOff = "destroy"
 	dom.OnReboot = "destroy"
 	dom.OnCrash = "destroy"
+
+	dom.Clock.Offset = "utc"
+	dom.Clock.Timer = append(dom.Clock.Timer, timer{Name: "rtc", Track: "guest", Tickpolicy: "catchup"})
 
 	pcicontroller := controller{
 		Type:  "pci",
@@ -601,7 +628,7 @@ func (lc *LibvirtContext) domainXml(ctx *hypervisor.VmContext) (string, error) {
 	} else {
 		dom.OS.Kernel = boot.Kernel
 		dom.OS.Initrd = boot.Initrd
-		dom.OS.Cmdline = "console=ttyS0 panic=1 no_timer_check"
+		dom.OS.Cmdline = cmdline
 	}
 
 	data, err := xml.Marshal(dom)

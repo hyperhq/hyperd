@@ -99,3 +99,15 @@ message Rlimit {
     uint64 hard = 2;
     uint64 soft = 3;
 }
+
+message Process {
+    string Container = 1;
+    string Id = 2;
+    string User = 3;
+    string Group = 4;
+    repeated string AdditionalGroup = 5;
+    bool Terminal = 6;
+    repeated string Args = 7;
+    repeated string Envs = 8;
+    string Workdir = 9;
+}
