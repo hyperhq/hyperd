@@ -396,7 +396,13 @@ func (vm *Vm) HyperstartExecSync(cmd []string, stdin []byte) (stdout, stderr []b
 		return nil, nil, err
 	}
 
-	err = vm.AddProcess(hyperstartapi.HYPERSTART_EXEC_CONTAINER, execId, false, cmd, []string{}, "/", tty)
+	err = vm.AddProcess(&api.Process{
+		Container: hyperstartapi.HYPERSTART_EXEC_CONTAINER,
+		Id:        execId,
+		Terminal:  false,
+		Args:      cmd,
+		Envs:      []string{},
+		Workdir:   "/"}, tty)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -435,7 +441,13 @@ func (vm *Vm) HyperstartExec(cmd string, tty *TtyIO) (int, error) {
 		return -1, err
 	}
 
-	err := vm.AddProcess(hyperstartapi.HYPERSTART_EXEC_CONTAINER, execID, false, command, []string{}, "/", tty)
+	err := vm.AddProcess(&api.Process{
+		Container: hyperstartapi.HYPERSTART_EXEC_CONTAINER,
+		Id:        execID,
+		Terminal:  false,
+		Args:      command,
+		Envs:      []string{},
+		Workdir:   "/"}, tty)
 	if err != nil {
 		return -1, err
 	}
@@ -461,17 +473,23 @@ func (vm *Vm) Exec(container, execId, cmd string, terminal bool, tty *TtyIO) err
 	if err := json.Unmarshal([]byte(cmd), &command); err != nil {
 		return err
 	}
-	return vm.AddProcess(container, execId, terminal, command, []string{}, "/", tty)
+	return vm.AddProcess(&api.Process{
+		Container: container,
+		Id:        execId,
+		Terminal:  terminal,
+		Args:      command,
+		Envs:      []string{},
+		Workdir:   "/"}, tty)
 }
 
-func (vm *Vm) AddProcess(container, execId string, terminal bool, args []string, env []string, workdir string, tty *TtyIO) error {
+func (vm *Vm) AddProcess(process *api.Process, tty *TtyIO) error {
 	if !vm.ctx.IsRunning() {
 		return NewNotReadyError(vm.Id)
 	}
 
 	envs := []hyperstartapi.EnvironmentVar{}
 
-	for _, v := range env {
+	for _, v := range process.Envs {
 		if eqlIndex := strings.Index(v, "="); eqlIndex > 0 {
 			envs = append(envs, hyperstartapi.EnvironmentVar{
 				Env:   v[:eqlIndex],
@@ -480,24 +498,26 @@ func (vm *Vm) AddProcess(container, execId string, terminal bool, args []string,
 		}
 	}
 
-	stdinPipe, stdoutPipe, stderrPipe, err := vm.ctx.hyperstart.AddProcess(container, &hyperstartapi.Process{
-		Id:       execId,
-		Terminal: terminal,
-		Args:     args,
+	stdinPipe, stdoutPipe, stderrPipe, err := vm.ctx.hyperstart.AddProcess(process.Container, &hyperstartapi.Process{
+		Id:       process.Id,
+		Terminal: process.Terminal,
+		Args:     process.Args,
 		Envs:     envs,
-		Workdir:  workdir,
+		Workdir:  process.Workdir,
+		User:     process.User,
+		Group:    process.Group,
 	})
 
 	if err != nil {
-		return fmt.Errorf("exec command %v failed: %v", args, err)
+		return fmt.Errorf("exec command %v failed: %v", process.Args, err)
 	}
 
 	go streamCopy(tty, stdinPipe, stdoutPipe, stderrPipe)
 	go func() {
-		status := vm.ctx.hyperstart.WaitProcess(container, execId)
-		vm.ctx.DeleteExec(execId)
+		status := vm.ctx.hyperstart.WaitProcess(process.Container, process.Id)
+		vm.ctx.DeleteExec(process.Id)
 		vm.ctx.reportProcessFinished(types.E_EXEC_FINISHED, &types.ProcessFinished{
-			Id: execId, Code: uint8(status), Ack: make(chan bool, 1),
+			Id: process.Id, Code: uint8(status), Ack: make(chan bool, 1),
 		})
 	}()
 	return nil

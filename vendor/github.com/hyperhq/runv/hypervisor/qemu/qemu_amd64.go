@@ -38,11 +38,13 @@ func (qc *QemuContext) arguments(ctx *hypervisor.VmContext) []string {
 		cpuParams = strconv.Itoa(boot.CPU)
 	}
 
+	cmdline := "console=ttyS0 panic=1 no_timer_check"
 	params := []string{
 		"-machine", machineClass + ",accel=kvm,usb=off", "-global", "kvm-pit.lost_tick_policy=discard", "-cpu", "host"}
 	if _, err := os.Stat("/dev/kvm"); os.IsNotExist(err) {
 		glog.V(1).Info("kvm not exist change to no kvm mode")
 		params = []string{"-machine", machineClass + ",usb=off", "-cpu", "core2duo"}
+		cmdline += " clocksource=acpi_pm notsc"
 	}
 
 	if boot.Bios != "" && boot.Cbfs != "" {
@@ -52,18 +54,18 @@ func (qc *QemuContext) arguments(ctx *hypervisor.VmContext) []string {
 	} else if boot.Bios != "" {
 		params = append(params,
 			"-bios", boot.Bios,
-			"-kernel", boot.Kernel, "-initrd", boot.Initrd, "-append", "console=ttyS0 panic=1 no_timer_check")
+			"-kernel", boot.Kernel, "-initrd", boot.Initrd, "-append", cmdline)
 	} else if boot.Cbfs != "" {
 		params = append(params,
 			"-drive", fmt.Sprintf("if=pflash,file=%s,readonly=on", boot.Cbfs))
 	} else {
 		params = append(params,
-			"-kernel", boot.Kernel, "-initrd", boot.Initrd, "-append", "console=ttyS0 panic=1 no_timer_check")
+			"-kernel", boot.Kernel, "-initrd", boot.Initrd, "-append", cmdline)
 	}
 
 	params = append(params,
 		"-realtime", "mlock=off", "-no-user-config", "-nodefaults", "-no-hpet",
-		"-rtc", "base=utc,driftfix=slew", "-no-reboot", "-display", "none", "-boot", "strict=on",
+		"-rtc", "base=utc,clock=vm,driftfix=slew", "-no-reboot", "-display", "none", "-boot", "strict=on",
 		"-m", memParams, "-smp", cpuParams)
 
 	if boot.BootToBeTemplate || boot.BootFromTemplate {
