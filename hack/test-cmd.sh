@@ -105,7 +105,6 @@ EOF
 }
 
 hyper::util::trap_add cleanup EXIT SIGINT
-hyper::util::trap_add showvmlogs EXIT
 hyper::util::ensure-temp-dir
 
 API_PORT=${API_PORT:-12345}
@@ -173,8 +172,6 @@ __EOF__
   hyper::test::pull_image "haproxy:1.5"
   hyper::test::check_image "haproxy" "1.5"
 
-  SHOWVMLOGS=true
-
   ########################
   # gRPC API integration #
   ########################
@@ -201,8 +198,6 @@ __EOF__
   hyper::test::imagevolume
   hyper::test::force_kill_container
 
-  SHOWVMLOGS=false
-
   stop_hyperd
 }
 
@@ -212,8 +207,6 @@ setup_btrfs() {
   sudo mkfs.btrfs -f /dev/shm/hyper-btrfs.img
   sudo mount -t btrfs -oloop /dev/shm/hyper-btrfs.img /var/lib/hyper
 }
-
-start_vmlogd
 
 # test only one combination if HYPER_EXEC_DRIVER and HYPER_STORATE_DRIVER are both set
 if (set -u; echo -e "HYPER_EXEC_DRIVER is $HYPER_EXEC_DRIVER\nHYPER_STORAGE_DRIVER is $HYPER_STORAGE_DRIVER") 2>/dev/null ; then
