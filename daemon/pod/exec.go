@@ -156,13 +156,23 @@ func (p *XPod) StartExec(stdin io.ReadCloser, stdout io.WriteCloser, containerId
 		envs = append(envs, fmt.Sprintf("%s=%s", e, v))
 	}
 
-	err := p.sandbox.AddProcess(
-		&api.Process{Container: es.Container,
-			Id:       es.Id,
-			Terminal: es.Terminal,
-			Args:     es.Cmds,
-			Envs:     envs,
-			Workdir:  c.descript.Workdir}, tty)
+	process := &api.Process{
+		Container: es.Container,
+		Id:        es.Id,
+		Terminal:  es.Terminal,
+		Args:      es.Cmds,
+		Envs:      envs,
+		Workdir:   c.descript.Workdir,
+	}
+
+	if c.descript.UGI != nil {
+		process.User = c.descript.UGI.User
+		process.Group = c.descript.UGI.Group
+		process.AdditionalGroup = c.descript.UGI.AdditionalGroups
+	}
+
+	err := p.sandbox.AddProcess(process, tty)
+
 	<-wReader.wait
 	return err
 }
