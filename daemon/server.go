@@ -13,6 +13,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/hyperhq/hyperd/engine"
 	"github.com/hyperhq/hyperd/lib/sysinfo"
+	"github.com/hyperhq/hyperd/libmoby/distribution"
 	apitypes "github.com/hyperhq/hyperd/types"
 	"github.com/hyperhq/hyperd/utils"
 )
@@ -319,12 +320,17 @@ func (daemon *Daemon) CmdImagePull(image, tag string, authConfig *types.AuthConf
 	// compatibility.
 	image = strings.TrimSuffix(image, ":")
 
-	var ref reference.Named
+	var (
+		ref    reference.Named
+		pnamed reference.Named
+		tagged bool
+	)
 	ref, err := reference.ParseNamed(image)
 	if err != nil {
 		return err
 	}
 
+	glog.Infof("getting image: %s:%s", ref.String(), tag)
 	if tag != "" {
 		// The "tag" could actually be a digest.
 		var dgst digest.Digest
@@ -336,7 +342,37 @@ func (daemon *Daemon) CmdImagePull(image, tag string, authConfig *types.AuthConf
 		}
 	}
 
-	return daemon.Daemon.PullImage(ref, metaHeaders, authConfig, output)
+	err = daemon.Daemon.PullImage(ref, metaHeaders, authConfig, output)
+	if err != nil {
+		glog.Errorf("failed to pull image %s", ref.String())
+		return err
+	}
+
+	glog.Infof("got image: %s", ref.String())
+
+	// pull digest again for tagged reference. This is because of an issue of
+	// docker 1.10.3. And will remove this work around once we update the docker
+	// dep to the latest version.
+	if _, tagged = ref.(reference.NamedTagged); tagged {
+		pnamed, _ = reference.WithName(ref.FullName())
+		dgst, err := distribution.GetDigestFromTag(daemon.Daemon.RegistryService, ref, metaHeaders, authConfig)
+		if err != nil {
+			glog.Errorf("failed to get digest for %s: %v", ref.String(), err)
+			err = nil
+		} else if dgst != "" {
+			glog.Infof("pull image of %s for its digest: %v", ref.String(), dgst)
+			ref, err = reference.WithDigest(pnamed, dgst)
+			err = daemon.Daemon.PullImage(ref, metaHeaders, authConfig, output)
+			if err != nil {
+				glog.Warningf("failed to get accompanied digest image for %s: %v", ref.String(), err)
+				err = nil
+			}
+		} else {
+			glog.Infof("no digest available for %s", ref.String())
+		}
+	}
+
+	return nil
 }
 
 func (daemon *Daemon) CmdImagePush(repo, tag string, authConfig *types.AuthConfig, metaHeaders map[string][]string, output io.Writer) error {
