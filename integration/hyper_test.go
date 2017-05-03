@@ -520,11 +520,21 @@ func (s *TestSuite) TestSendContainerSignal(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(containerInfo.Status.Phase, Equals, "running")
 
+	ec := make(chan int32, 1)
+	go func() {
+		exitCode, err := s.client.Wait(container, "", false)
+		if err != nil {
+			c.Logf("wait container failed: %v", err)
+			ec <- 1024
+			return
+		}
+		ec <- exitCode
+	}()
+
 	err = s.client.ContainerSignal(pod, container, sigKill)
 	c.Assert(err, IsNil)
 
-	exitCode, err := s.client.Wait(container, "", false)
-	c.Assert(err, IsNil)
+	exitCode := <-ec
 	c.Assert(exitCode, Equals, int32(137))
 
 	containerInfo, err = s.client.GetContainerInfo(container)
