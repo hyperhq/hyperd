@@ -2,7 +2,7 @@
 
 PROJECT=$(readlink -f $(dirname $0)/../../..)
 DEBIAN_DIR=${PROJECT}/package/debian/hypercontainer
-VERSION=${VERSION:-0.8.0}
+VERSION=${VERSION:-0.8.1}
 BRANCH=${BRANCH:-master}
 
 if [ $# -gt 0 ] ; then

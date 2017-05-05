@@ -2,7 +2,7 @@
 
 PROJECT=$(readlink -f $(dirname $0)/../..)
 CENTOS_DIR=${PROJECT}/package/centos
-VERSION=0.8.0
+VERSION=0.8.1
 
 if [ $# -gt 0 ] ; then
     VERSION=$1
@@ -12,8 +12,6 @@ fi
 
 cd $PROJECT
 git archive --format=tar.gz master > ${CENTOS_DIR}/rpm/SOURCES/hyperd-${VERSION}.tar.gz
-cd $PROJECT/../runv
-git archive --format=tar.gz master > ${CENTOS_DIR}/rpm/SOURCES/runv-${VERSION}.tar.gz
 cd $PROJECT/../hyperstart
 git archive --format=tar.gz master > ${CENTOS_DIR}/rpm/SOURCES/hyperstart-${VERSION}.tar.gz
 

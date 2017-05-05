@@ -2,7 +2,7 @@
 
 PROJECT=$(readlink -f $(dirname $0)/../../..)
 UBUNTU_DIR=${PROJECT}/package/ubuntu/hypercontainer
-VERSION=${VERSION:-0.8.0}
+VERSION=${VERSION:-0.8.1}
 BRANCH=${BRANCH:-master}
 
 if [ $# -gt 0 ] ; then
