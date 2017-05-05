@@ -197,6 +197,7 @@ __EOF__
   hyper::test::specuseroverride
   hyper::test::imagevolume
   hyper::test::force_kill_container
+  hyper::test::container_logs_no_newline
 
   stop_hyperd
 }

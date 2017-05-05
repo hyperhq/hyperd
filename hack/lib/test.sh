@@ -217,3 +217,14 @@ hyper::test::force_kill_container() {
   sudo hyperctl rm $id
   test $res -eq 0
 }
+
+# regression test for #577
+hyper::test::container_logs_no_newline() {
+  echo "Container logs without newlines"
+  id=$(sudo hyperctl run -d busybox echo -n foobar | sed -ne "s/POD id is \(.*\)/\1/p")
+  sleep 3 # sleep a bit to let logger kick in
+  res=$(sudo hyperctl logs $id)
+  sudo hyperctl rm $id
+  echo logs result $res
+  test x$res = "xfoobar"
+}
