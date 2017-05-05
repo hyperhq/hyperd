@@ -92,10 +92,9 @@ func (cli *HyperClient) HyperCmdRun(args ...string) error {
 		if tty {
 			cli.monitorTtySize(p.Spec.Containers[0].ContainerID, "")
 			oldState, err := term.SetRawTerminal(cli.inFd)
-			if err != nil {
-				return err
+			if err == nil {
+				defer term.RestoreTerminal(cli.inFd, oldState)
 			}
-			defer term.RestoreTerminal(cli.inFd, oldState)
 		}
 		cname := spec.Containers[0].Name
 
