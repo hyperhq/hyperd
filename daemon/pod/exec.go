@@ -81,11 +81,7 @@ func (wc *waitClose) Close() error {
 
 type writeCloser struct {
 	io.Writer
-	closer io.Closer
-}
-
-func (wc *writeCloser) Close() error {
-	return wc.closer.Close()
+	io.Closer
 }
 
 func (p *XPod) StartExec(stdin io.ReadCloser, stdout io.WriteCloser, containerId, execId string) error {
