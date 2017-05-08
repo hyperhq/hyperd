@@ -267,8 +267,7 @@ func (c *Container) Remove() error {
 }
 
 // Container operations:
-
-func (c *Container) attach(stdin io.ReadCloser, stdout io.Writer, rsp chan<- error) error {
+func (c *Container) attach(stdin io.ReadCloser, stdout io.WriteCloser, rsp chan<- error) error {
 	if c.p.sandbox == nil || c.descript == nil {
 		err := fmt.Errorf("container not ready for attach")
 		c.Log(ERROR, err)
@@ -279,7 +278,7 @@ func (c *Container) attach(stdin io.ReadCloser, stdout io.Writer, rsp chan<- err
 	if stdout != nil {
 		if !c.hasTty() {
 			stderr = stdcopy.NewStdWriter(stdout, stdcopy.Stderr)
-			stdout = stdcopy.NewStdWriter(stdout, stdcopy.Stdout)
+			stdout = &writeCloser{stdcopy.NewStdWriter(stdout, stdcopy.Stdout), stdout}
 		}
 	}
 	detachKeys, _ := term.ToBytes(DetachKeys)
@@ -1019,7 +1018,7 @@ func (c *Container) startLogging() {
 
 	var (
 		stdout, stderr         io.Reader
-		stdoutStub, stderrStub io.Writer
+		stdoutStub, stderrStub io.WriteCloser
 		sources                = map[string]io.Reader{}
 	)
 
@@ -1291,7 +1290,7 @@ func (cs *ContainerStatus) IsStopped() bool {
 
 // AttachStreams connects streams to a TTY.
 // Used by exec too. Should this move somewhere else?
-func (c *Container) AttachStreams(openStdin, stdinOnce, tty bool, stdin io.ReadCloser, stdout io.Writer, stderr io.Writer, keys []byte) error {
+func (c *Container) AttachStreams(openStdin, stdinOnce, tty bool, stdin io.ReadCloser, stdout io.WriteCloser, stderr io.Writer, keys []byte) error {
 	var (
 		cStdout, cStderr io.ReadCloser
 		cStdin           io.WriteCloser
@@ -1369,6 +1368,9 @@ func (c *Container) AttachStreams(openStdin, stdinOnce, tty bool, stdin io.ReadC
 			stdin.Close()
 		}
 		streamPipe.Close()
+		if closer, ok := stream.(io.Closer); ok {
+			closer.Close()
+		}
 		c.Log(DEBUG, "attach: %s: end", name)
 		wg.Done()
 	}
