@@ -33,9 +33,10 @@ make %{?_smp_mflags}
 mkdir -p %{buildroot}%{_bindir}
 mkdir -p %{buildroot}%{_sysconfdir}
 mkdir -p %{buildroot}/lib/systemd/system/
-cp %{_builddir}/src/github.com/hyperhq/hyperd/{hyperctl,hyperd} %{buildroot}%{_bindir}
+cp %{_builddir}/src/github.com/hyperhq/hyperd/{hyperctl,hyperd,vmlogd} %{buildroot}%{_bindir}
 cp -a %{_builddir}/src/github.com/hyperhq/hyperd/package/dist/etc/hyper %{buildroot}%{_sysconfdir}
 cp -a %{_builddir}/src/github.com/hyperhq/hyperd/package/dist/lib/systemd/system/hyperd.service %{buildroot}/lib/systemd/system/hyperd.service
+cp -a %{_builddir}/src/github.com/hyperhq/hyperd/package/dist/lib/systemd/system/hyper-vmlogd.service %{buildroot}/lib/systemd/system/hyper-vmlogd.service
 
 %clean
 rm -rf %{buildroot}
@@ -44,6 +45,7 @@ rm -rf %{buildroot}
 %{_bindir}/*
 %{_sysconfdir}/*
 /lib/systemd/system/hyperd.service
+/lib/systemd/system/hyper-vmlogd.service
 
 %changelog
 * Mon May 8 2017 Hyper Dev Team <dev@hyper.sh> - 0.8.1-1

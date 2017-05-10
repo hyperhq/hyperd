@@ -27,11 +27,12 @@ override_dh_auto_install:
 	mkdir -p debian/hypercontainer/usr/bin
 	cp -aT hyperd debian/hypercontainer/usr/bin/hyperd
 	cp -aT hyperctl debian/hypercontainer/usr/bin/hyperctl
+	cp -aT vmlogd debian/hypercontainer/usr/bin/vmlogd
 	cp -r package/dist/* debian/hypercontainer/
 	echo "end install"
 
 override_dh_auto_clean:
-	rm -rf go hyperd hyperctl
+	rm -rf go hyperd hyperctl vmlogd
 
 override_dh_auto_test:
 
