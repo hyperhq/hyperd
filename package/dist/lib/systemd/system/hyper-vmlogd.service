@@ -1,0 +1,15 @@
+[Unit]
+Description=hyper-vmlogd
+Documentation=http://docs.hypercontainer.io
+After=network.target
+Requires=
+
+[Service]
+ExecStart=/usr/bin/vmlogd
+MountFlags=shared
+LimitNOFILE=1048576
+LimitNPROC=1048576
+LimitCORE=infinity
+
+[Install]
+WantedBy=multi-user.target

@@ -1,3 +1,9 @@
+hyperstart (0.8.1-1) xenial; urgency=low
+
+  * Release 0.8.1
+
+ -- Hyper Dev Team <dev@hyper.sh>  Mon, 08 May 2017 22:30:08 +0800
+
 hyperstart (0.8.0-1) xenial; urgency=low
 
   * Release 0.8.0
