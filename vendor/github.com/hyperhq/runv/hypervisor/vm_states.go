@@ -172,6 +172,7 @@ func streamCopy(tty *TtyIO, stdinPipe io.WriteCloser, stdoutPipe, stderrPipe io.
 	var wg sync.WaitGroup
 	// old way cleanup all(expect stdinPipe) no matter what kinds of fails, TODO: change it
 	var once sync.Once
+	// cleanup closes tty.Stdin and thus terminates the first go routine
 	cleanup := func() {
 		tty.Close()
 		// stdinPipe is directly closed in the first go routine
@@ -181,7 +182,6 @@ func streamCopy(tty *TtyIO, stdinPipe io.WriteCloser, stdoutPipe, stderrPipe io.
 		}
 	}
 	if tty.Stdin != nil {
-		wg.Add(1)
 		go func() {
 			_, err := io.Copy(stdinPipe, tty.Stdin)
 			stdinPipe.Close()
@@ -189,22 +189,25 @@ func streamCopy(tty *TtyIO, stdinPipe io.WriteCloser, stdoutPipe, stderrPipe io.
 				// we should not call cleanup when tty.Stdin reaches EOF
 				once.Do(cleanup)
 			}
-			wg.Done()
 		}()
 	}
 	if tty.Stdout != nil {
 		wg.Add(1)
 		go func() {
-			io.Copy(tty.Stdout, stdoutPipe)
-			once.Do(cleanup)
+			_, err := io.Copy(tty.Stdout, stdoutPipe)
+			if err != nil {
+				once.Do(cleanup)
+			}
 			wg.Done()
 		}()
 	}
 	if tty.Stderr != nil && stderrPipe != nil {
 		wg.Add(1)
 		go func() {
-			io.Copy(tty.Stderr, stderrPipe)
-			once.Do(cleanup)
+			_, err := io.Copy(tty.Stderr, stderrPipe)
+			if err != nil {
+				once.Do(cleanup)
+			}
 			wg.Done()
 		}()
 	}
