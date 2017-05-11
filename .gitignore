@@ -47,6 +47,7 @@ _testmain.go
 .idea
 /hyperctl
 /hyperd
+/vmlogd
 *.out
 *.pkg
 mac_installer/dist/opt/hyper/bin/hyperctl
