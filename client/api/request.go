@@ -70,7 +70,7 @@ func (cli *Client) httpRequest(method, path string, in io.Reader, headers map[st
 	if expectedPayload && in == nil {
 		in = bytes.NewReader([]byte{})
 	}
-	req, err := http.NewRequest(method, fmt.Sprintf("/v%s%s", utils.VERSION, path), in)
+	req, err := http.NewRequest(method, fmt.Sprintf("/v%s%s", utils.APIVERSION, path), in)
 	if err != nil {
 		return nil, "", -1, err
 	}
