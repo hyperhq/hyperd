@@ -1,0 +1,16 @@
+{
+	"id": "hyperd-nested",
+	"containers" : [{
+	    "name": "hyperd",
+	    "image": "hyperhq/hyperd:latest",
+	    "workdir": "/",
+	    "command": ["/bin/bash"]
+	}],
+	"resource": {
+	    "vcpu": 2,
+	    "memory": 2048
+	},
+	"files": [],
+	"volumes": [],
+	"tty": true
+}
