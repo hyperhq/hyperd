@@ -69,7 +69,7 @@ LIBVIRT_REQUIRED="1.2.2"
 AC_ARG_WITH([libvirt],
             [AS_HELP_STRING([--without-libvirt],
                             [run hyperd without libvirt])],
-            [with_libvirt=no],[with_libvirt=yes])
+            [],[with_libvirt=yes])
 
 if test "$with_libvirt" = yes; then
 	PKG_CHECK_MODULES([libvirt], [libvirt >= $LIBVIRT_REQUIRED], [], [with_libvirt=no])
@@ -80,7 +80,7 @@ AM_CONDITIONAL([WITH_LIBVIRT], [test "x$with_libvirt" == "xyes"])
 AC_ARG_WITH([xen],
             [AS_HELP_STRING([--without-xen],
                             [run hyperd without xen (libxl, need xen 4.5 or higher)])],
-            [with_xen=no],[with_xen=yes])
+            [],[with_xen=yes])
 
 if test "x$with_xen" != "xno" ; then
     # Checks for libxl
