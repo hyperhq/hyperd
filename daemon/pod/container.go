@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"syscall"
@@ -28,8 +29,11 @@ import (
 	"github.com/hyperhq/runv/lib/term"
 )
 
-var epocZero = time.Time{}
-var DetachKeys = "ctrl-p,ctrl-q"
+var (
+	epocZero   = time.Time{}
+	DetachKeys = "ctrl-p,ctrl-q"
+	conflictRE = regexp.MustCompile(`Conflict. (?:.)+ is already in use by container ([0-9a-z]+)`)
+)
 
 type ContainerState int32
 
@@ -496,7 +500,21 @@ func (c *Container) createByEngine() (*dockertypes.ContainerJSON, error) {
 	})
 
 	if err != nil {
-		return nil, err
+		// TODO fix all the conflict reason and remove this.
+		matches := conflictRE.FindStringSubmatch(err.Error())
+		if len(matches) != 2 {
+			return nil, err
+		}
+		id := matches[1]
+		c.Log(WARNING, "Find conflict ghost container %s with name %s, remove it", id, c.spec.Name)
+		c.p.factory.engine.ContainerRm(id, &dockertypes.ContainerRmConfig{})
+		ccs, err = c.p.factory.engine.ContainerCreate(dockertypes.ContainerCreateConfig{
+			Name:   c.spec.Name,
+			Config: config,
+		})
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	c.Log(INFO, "create container %s (w/: %s)", ccs.ID, ccs.Warnings)
