@@ -68,8 +68,8 @@ LIBVIRT_REQUIRED="1.2.2"
 
 AC_ARG_WITH([libvirt],
             [AS_HELP_STRING([--without-libvirt],
-                            [run hyperd with libvirt])],
-            [with_libvirt=no],[with_libvirt=yes])
+                            [run hyperd without libvirt])],
+            [],[with_libvirt=yes])
 
 if test "$with_libvirt" = yes; then
 	PKG_CHECK_MODULES([libvirt], [libvirt >= $LIBVIRT_REQUIRED], [], [with_libvirt=no])
@@ -79,8 +79,8 @@ AM_CONDITIONAL([WITH_LIBVIRT], [test "x$with_libvirt" == "xyes"])
 
 AC_ARG_WITH([xen],
             [AS_HELP_STRING([--without-xen],
-                            [run hyperd with xen (libxl, need xen 4.5 or higher)])],
-            [with_xen=no],[with_xen=yes])
+                            [run hyperd without xen (libxl, need xen 4.5 or higher)])],
+            [],[with_xen=yes])
 
 if test "x$with_xen" != "xno" ; then
     # Checks for libxl
@@ -96,9 +96,17 @@ fi
 
 AM_CONDITIONAL([WITH_XEN], [test "x$with_xen" == "xyes"])
 
-AC_CHECK_HEADERS([btrfs/ioctl.h, btrfs/ctree.h], [with_btrfs=yes], [with_btrfs=no])
+AC_ARG_WITH([btrfs],
+            [AS_HELP_STRING([--without-btrfs],
+                            [compile hyperd without btrfs support])],
+            [],[with_btrfs=yes])
+
+if test "x$with_btrfs" != "xno"; then
+    AC_CHECK_HEADERS([btrfs/ioctl.h, btrfs/ctree.h], [with_btrfs=yes], [with_btrfs=no])
+    AC_CHECK_HEADERS([btrfs/version.h], [with_btrfs_header_version=yes], [with_btrfs_header_version=no])
+fi
+
 AM_CONDITIONAL([WITH_BTRFS], [test "x$with_btrfs" == "xyes"])
-AC_CHECK_HEADERS([btrfs/version.h], [with_btrfs_header_version=yes], [with_btrfs_header_version=no])
 AM_CONDITIONAL([WITH_BTRFS_HEADER_VERSION], [test "x$with_btrfs_header_version" == "xyes"])
 
 AC_CONFIG_FILES([Makefile])
