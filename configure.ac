@@ -96,9 +96,17 @@ fi
 
 AM_CONDITIONAL([WITH_XEN], [test "x$with_xen" == "xyes"])
 
-AC_CHECK_HEADERS([btrfs/ioctl.h, btrfs/ctree.h], [with_btrfs=yes], [with_btrfs=no])
+AC_ARG_WITH([btrfs],
+            [AS_HELP_STRING([--without-btrfs],
+                            [compile hyperd without btrfs support])],
+            [],[with_btrfs=yes])
+
+if test "x$with_btrfs" != "xno"; then
+    AC_CHECK_HEADERS([btrfs/ioctl.h, btrfs/ctree.h], [with_btrfs=yes], [with_btrfs=no])
+    AC_CHECK_HEADERS([btrfs/version.h], [with_btrfs_header_version=yes], [with_btrfs_header_version=no])
+fi
+
 AM_CONDITIONAL([WITH_BTRFS], [test "x$with_btrfs" == "xyes"])
-AC_CHECK_HEADERS([btrfs/version.h], [with_btrfs_header_version=yes], [with_btrfs_header_version=no])
 AM_CONDITIONAL([WITH_BTRFS_HEADER_VERSION], [test "x$with_btrfs_header_version" == "xyes"])
 
 AC_CONFIG_FILES([Makefile])
