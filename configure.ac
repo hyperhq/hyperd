@@ -68,7 +68,7 @@ LIBVIRT_REQUIRED="1.2.2"
 
 AC_ARG_WITH([libvirt],
             [AS_HELP_STRING([--without-libvirt],
-                            [run hyperd with libvirt])],
+                            [run hyperd without libvirt])],
             [with_libvirt=no],[with_libvirt=yes])
 
 if test "$with_libvirt" = yes; then
@@ -79,7 +79,7 @@ AM_CONDITIONAL([WITH_LIBVIRT], [test "x$with_libvirt" == "xyes"])
 
 AC_ARG_WITH([xen],
             [AS_HELP_STRING([--without-xen],
-                            [run hyperd with xen (libxl, need xen 4.5 or higher)])],
+                            [run hyperd without xen (libxl, need xen 4.5 or higher)])],
             [with_xen=no],[with_xen=yes])
 
 if test "x$with_xen" != "xno" ; then
