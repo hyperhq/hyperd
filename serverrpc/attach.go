@@ -20,6 +20,7 @@ func (s *ServerRPC) Attach(stream types.PublicAPI_AttachServer) error {
 	or, ow := io.Pipe()
 
 	go func() {
+		defer ir.Close()
 		for {
 			cmd, err := stream.Recv()
 			if err == io.EOF {
