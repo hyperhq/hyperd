@@ -2,9 +2,9 @@ package hypervisor
 
 import (
 	"sync"
-
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/hyperhq/runv/api"
 )
@@ -104,6 +104,11 @@ func (dc *DiskContext) insert(result chan api.Result) {
 
 		dc.DeviceName = de.DeviceName
 		dc.ScsiAddr = de.ScsiAddr
+
+		// when device inserted into guest, it will show in sysfs before it is well
+		// initialized. As a work around, we add a short delay here to ensure it is
+		// ready for succeed ops.
+		time.Sleep(50 * time.Millisecond)
 
 		result <- api.NewResultBase(dc.Name, true, "")
 		dc.inserted()
