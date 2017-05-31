@@ -22,6 +22,7 @@ type CommonFlags struct {
 	Name          string   `long:"name" value-name:"\"\"" description:"Assign a name to the container"`
 	Workdir       string   `long:"workdir" value-name:"\"\"" default-mask:"-" description:"Working directory inside the container"`
 	Tty           bool     `short:"t" long:"tty" default-mask:"-" description:"the run command in tty, such as bash shell"`
+	ReadOnly      bool     `long:"read-only" default-mast:"-" description:"Create container with read-only rootfs"`
 	Cpu           int      `long:"cpu" default:"1" value-name:"1" default-mask:"-" description:"CPU number for the VM"`
 	Memory        int      `long:"memory" default:"128" value-name:"128" default-mask:"-" description:"Memory size (MB) for the VM"`
 	Env           []string `long:"env" value-name:"[]" default-mask:"-" description:"Set environment variables"`
@@ -59,7 +60,7 @@ func (cli *HyperClient) ParseCommonOptions(opts *CommonFlags, container bool, ar
 			return nil, fmt.Errorf("%s: this command requires a minimum of 1 argument, please provide the image.", os.Args[0])
 		}
 		specJson, err = cli.JsonFromCmdline(container, args, opts.Env, opts.Portmap, opts.LogDriver, opts.LogOpts,
-			opts.Name, opts.Workdir, opts.RestartPolicy, opts.Cpu, opts.Memory, opts.Tty, opts.Labels, opts.EntryPoint, opts.Volumes)
+			opts.Name, opts.Workdir, opts.RestartPolicy, opts.Cpu, opts.Memory, opts.Tty, opts.ReadOnly, opts.Labels, opts.EntryPoint, opts.Volumes)
 	}
 
 	if err != nil {
@@ -90,7 +91,7 @@ func (cli *HyperClient) JsonFromFile(filename string, container, yaml, k8s bool)
 }
 
 func (cli *HyperClient) JsonFromCmdline(container bool, cmdArgs, cmdEnvs, cmdPortmaps []string, cmdLogDriver string, cmdLogOpts []string,
-	cmdName, cmdWorkdir, cmdRestartPolicy string, cpu, memory int, tty bool, cmdLabels []string, entrypoint string, cmdVols []string) (string, error) {
+	cmdName, cmdWorkdir, cmdRestartPolicy string, cpu, memory int, tty, readonly bool, cmdLabels []string, entrypoint string, cmdVols []string) (string, error) {
 
 	var (
 		name       = cmdName
@@ -175,6 +176,7 @@ func (cli *HyperClient) JsonFromCmdline(container bool, cmdArgs, cmdEnvs, cmdPor
 		Files:         []*apitype.UserFileReference{},
 		RestartPolicy: cmdRestartPolicy,
 		Tty:           tty,
+		ReadOnly:      readonly,
 	}
 
 	var body interface{} = c

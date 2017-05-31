@@ -402,6 +402,7 @@ message UserContainer {
   string StopSignal                     = 17;
   repeated Ulimit ulimits               = 18;
   string logPath                        = 19;
+  bool readOnly                         = 20;
 }
 
 message UserResource {

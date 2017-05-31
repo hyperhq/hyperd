@@ -491,8 +491,9 @@ func (c *Container) createByEngine() (*dockertypes.ContainerJSON, error) {
 	}
 
 	ccs, err = c.p.factory.engine.ContainerCreate(dockertypes.ContainerCreateConfig{
-		Name:   c.spec.Name,
-		Config: config,
+		Name:       c.spec.Name,
+		Config:     config,
+		HostConfig: &container.HostConfig{ReadonlyRootfs: c.spec.ReadOnly},
 	})
 
 	if err != nil {
@@ -882,7 +883,7 @@ func (c *Container) addToSandbox() error {
 		}
 	}
 
-	root, err := c.p.factory.sd.PrepareContainer(c.descript.MountId, c.p.sandboxShareDir())
+	root, err := c.p.factory.sd.PrepareContainer(c.descript.MountId, c.p.sandboxShareDir(), c.spec.ReadOnly)
 	if err != nil {
 		c.Log(ERROR, "failed to prepare rootfs: %v", err)
 		return err
