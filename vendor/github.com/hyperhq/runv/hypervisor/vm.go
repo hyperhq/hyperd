@@ -58,7 +58,7 @@ func (vm *Vm) ReleaseResponseChan(ch chan *types.VmResponse) {
 	}
 }
 
-func (vm *Vm) Launch(b *BootConfig) (err error) {
+func (vm *Vm) launch(b *BootConfig) (err error) {
 	var (
 		vmEvent = make(chan VmEvent, 128)
 		Status  = make(chan *types.VmResponse, 128)
@@ -651,8 +651,24 @@ func (vm *Vm) Pause(pause bool) error {
 	defer ctx.pauseLock.Unlock()
 	if ctx.PauseState != pauseState {
 		/* FIXME: only support pause whole vm now */
+		if pause {
+			err = ctx.hyperstart.PauseSync()
+		}
+		if err != nil {
+			vm.Log(ERROR, "%s sandbox failed: %v", command, err)
+			return err
+		}
+
 		// should not change pause state inside ctx.DCtx.Pause!
 		err = ctx.DCtx.Pause(ctx, pause)
+		if err != nil {
+			vm.Log(ERROR, "%s sandbox failed: %v", command, err)
+			return err
+		}
+
+		if !pause {
+			err = ctx.hyperstart.Unpause()
+		}
 		if err != nil {
 			vm.Log(ERROR, "%s sandbox failed: %v", command, err)
 			return err
@@ -732,28 +748,19 @@ func GetVm(vmId string, b *BootConfig, waitStarted bool) (*Vm, error) {
 	}
 
 	vm := newVm(id, b.CPU, b.Memory)
-	if err := vm.Launch(b); err != nil {
+	if err := vm.launch(b); err != nil {
 		return nil, err
 	}
 
 	if waitStarted {
 		vm.Log(TRACE, "waiting for vm to start")
-		if err := <-vm.WaitResponse(func(response *types.VmResponse) (error, bool) {
-			if response.Code == types.E_FAILED {
-				vm.Log(ERROR, "VM start failed")
-				return fmt.Errorf("VM start failed"), true
-			}
-			if response.Code == types.E_VM_RUNNING {
-				vm.Log(TRACE, "VM started successfully")
-				return nil, true
-			}
-			vm.Log(ERROR, "VM never started")
-			return nil, false
-		}, -1); err != nil {
-			vm.Kill()
+		if _, err := vm.ctx.hyperstart.APIVersion(); err != nil {
+			vm.Log(ERROR, "VM start failed: %v", err)
+			return nil, fmt.Errorf("VM start failed: %v", err)
 		}
+		vm.Log(TRACE, "VM started successfully")
 	}
 
-	vm.Log(TRACE, "GetVm succeeded (not waiting for startup)")
+	vm.Log(TRACE, "GetVm succeeded")
 	return vm, nil
 }

@@ -281,6 +281,10 @@ func stateRunning(ctx *VmContext, ev VmEvent) {
 		ctx.Log(TRACE, "VM has exit, or not started at all (%d)", ev.Event())
 		ctx.reportVmShutdown()
 		ctx.Close()
+	case EVENT_VM_KILL:
+		ctx.Log(TRACE, "Got VM force killed message, go to cleaning up")
+		ctx.reportVmShutdown()
+		ctx.Close()
 	case EVENT_VM_TIMEOUT: // REFACTOR: we do not set timeout for prepare devices after the refactor, then we do not need wait this event any more
 		ctx.Log(ERROR, "REFACTOR: should be no time in running state at all")
 	case ERROR_INIT_FAIL: // VM connection Failure

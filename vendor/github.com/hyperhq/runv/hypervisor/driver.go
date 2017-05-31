@@ -13,7 +13,6 @@ import (
 type BootConfig struct {
 	CPU              int
 	Memory           int
-	HotAddCpuMem     bool
 	BootToBeTemplate bool
 	BootFromTemplate bool
 	EnableVsock      bool

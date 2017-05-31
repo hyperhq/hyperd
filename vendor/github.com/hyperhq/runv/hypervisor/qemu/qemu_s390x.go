@@ -26,13 +26,8 @@ func (qc *QemuContext) arguments(ctx *hypervisor.VmContext) []string {
 	qc.cpus = boot.CPU
 
 	var memParams, cpuParams string
-	if boot.HotAddCpuMem {
-		memParams = fmt.Sprintf("size=%d,slots=1,maxmem=%dM", boot.Memory, hypervisor.DefaultMaxMem) // TODO set maxmem to the total memory of the system
-		cpuParams = fmt.Sprintf("cpus=%d,maxcpus=%d", boot.CPU, hypervisor.DefaultMaxCpus)           // TODO set it to the cpus of the system
-	} else {
-		memParams = strconv.Itoa(boot.Memory)
-		cpuParams = strconv.Itoa(boot.CPU)
-	}
+	memParams = strconv.Itoa(boot.Memory)
+	cpuParams = strconv.Itoa(boot.CPU)
 
 	return []string{
 		"-machine", "s390-ccw-virtio,accel=kvm,usb=off", "-cpu", "host",

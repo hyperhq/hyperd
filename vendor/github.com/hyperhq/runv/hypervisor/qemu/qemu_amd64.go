@@ -5,7 +5,6 @@ package qemu
 import (
 	"fmt"
 	"os"
-	"strconv"
 
 	"github.com/golang/glog"
 	"github.com/hyperhq/runv/hypervisor"
@@ -28,15 +27,9 @@ func (qc *QemuContext) arguments(ctx *hypervisor.VmContext) []string {
 	qc.cpus = boot.CPU
 
 	var machineClass, memParams, cpuParams string
-	if boot.HotAddCpuMem || boot.BootToBeTemplate || boot.BootFromTemplate {
-		machineClass = "pc-i440fx-2.1"
-		memParams = fmt.Sprintf("size=%d,slots=1,maxmem=%dM", boot.Memory, hypervisor.DefaultMaxMem) // TODO set maxmem to the total memory of the system
-		cpuParams = fmt.Sprintf("cpus=%d,maxcpus=%d", boot.CPU, hypervisor.DefaultMaxCpus)           // TODO set it to the cpus of the system
-	} else {
-		machineClass = "pc-i440fx-2.0"
-		memParams = strconv.Itoa(boot.Memory)
-		cpuParams = strconv.Itoa(boot.CPU)
-	}
+	machineClass = "pc-i440fx-2.1"
+	memParams = fmt.Sprintf("size=%d,slots=1,maxmem=%dM", boot.Memory, hypervisor.DefaultMaxMem) // TODO set maxmem to the total memory of the system
+	cpuParams = fmt.Sprintf("cpus=%d,maxcpus=%d", boot.CPU, hypervisor.DefaultMaxCpus)           // TODO set it to the cpus of the system
 
 	cmdline := "console=ttyS0 panic=1 no_timer_check"
 	params := []string{
@@ -78,7 +71,7 @@ func (qc *QemuContext) arguments(ctx *hypervisor.VmContext) []string {
 		if boot.BootFromTemplate {
 			params = append(params, "-S", "-incoming", fmt.Sprintf("exec:cat %s", boot.DevicesStatePath))
 		}
-	} else if boot.HotAddCpuMem {
+	} else {
 		nodeConfig := fmt.Sprintf("node,nodeid=0,cpus=0-%d,mem=%d", hypervisor.DefaultMaxCpus-1, boot.Memory)
 		params = append(params, "-numa", nodeConfig)
 	}

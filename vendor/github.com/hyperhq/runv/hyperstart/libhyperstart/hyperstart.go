@@ -11,6 +11,9 @@ type Hyperstart interface {
 	Close()
 	LastStreamSeq() uint64
 
+	PauseSync() error
+	Unpause() error
+
 	APIVersion() (uint32, error)
 	NewContainer(c *hyperstartapi.Container) (io.WriteCloser, io.ReadCloser, io.ReadCloser, error)
 	RestoreContainer(c *hyperstartapi.Container) (io.WriteCloser, io.ReadCloser, io.ReadCloser, error)

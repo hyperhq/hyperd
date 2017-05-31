@@ -45,6 +45,7 @@ func (cc *ContainerContext) VmSpec() *hyperstartapi.Container {
 		Sysctl:        cc.Sysctl,
 		RestartPolicy: "never",
 		Initialize:    cc.Initialize,
+		ReadOnly:      cc.RootVolume.ReadOnly,
 	}
 
 	if cc.RootVolume.IsDir() {

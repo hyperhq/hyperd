@@ -305,6 +305,7 @@ func (pinfo *PersistInfo) vmContext(hub chan VmEvent, client chan *types.VmRespo
 					Format:       bInfo.Format,
 					Fstype:       bInfo.Fstype,
 					DockerVolume: bInfo.DockerVolume,
+					ReadOnly:     bInfo.ReadOnly,
 				},
 			},
 			fsmap:     pc.Fsmap,

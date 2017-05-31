@@ -1,7 +1,7 @@
 package json
 
 // when APIVERSION < 1000000, the version MUST be exactly matched on both sides
-const VERSION = 4243
+const VERSION = 4244
 
 const (
 	INIT_VERSION = iota // 0
