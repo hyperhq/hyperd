@@ -39,6 +39,7 @@ const (
 	S_CONTAINER_CREATED
 	S_CONTAINER_RUNNING
 	S_CONTAINER_STOPPING
+	S_CONTAINER_STOPPED
 )
 
 type ContainerStatus struct {
@@ -203,20 +204,18 @@ func (c *Container) InfoStatus() *apitypes.ContainerStatus {
 		s.Waiting.Reason = "Pending"
 		s.Phase = "pending"
 	case S_CONTAINER_CREATED:
-		if c.status.FinishedAt != epocZero {
-			s.Terminated.StartedAt = c.status.StartedAt.Format(time.RFC3339)
-			s.Terminated.FinishedAt = c.status.FinishedAt.Format(time.RFC3339)
-			s.Terminated.ExitCode = int32(c.status.ExitCode)
-			if c.status.ExitCode != 0 || c.status.Killed {
-				s.Terminated.Reason = "Failed"
-				s.Phase = "failed"
-			} else {
-				s.Terminated.Reason = "Succeeded"
-				s.Phase = "succeeded"
-			}
+		s.Waiting.Reason = "Pending"
+		s.Phase = "pending"
+	case S_CONTAINER_STOPPED:
+		s.Terminated.StartedAt = c.status.StartedAt.Format(time.RFC3339)
+		s.Terminated.FinishedAt = c.status.FinishedAt.Format(time.RFC3339)
+		s.Terminated.ExitCode = int32(c.status.ExitCode)
+		if c.status.ExitCode != 0 || c.status.Killed {
+			s.Terminated.Reason = "Failed"
+			s.Phase = "failed"
 		} else {
-			s.Waiting.Reason = "Pending"
-			s.Phase = "pending"
+			s.Terminated.Reason = "Succeeded"
+			s.Phase = "succeeded"
 		}
 	case S_CONTAINER_RUNNING, S_CONTAINER_STOPPING:
 		s.Phase = "running"
@@ -316,7 +315,7 @@ func (c *Container) IsRunning() bool {
 
 func (c *Container) IsStopped() bool {
 	c.status.RLock()
-	stopped := c.status.State == S_CONTAINER_CREATED
+	stopped := c.status.State == S_CONTAINER_STOPPED
 	c.status.RUnlock()
 
 	return stopped
@@ -330,22 +329,19 @@ func (c *Container) BriefStatus() (s *apitypes.ContainerListResult) {
 		PodID:         c.p.Id(),
 	}
 	switch c.status.State {
-	case S_CONTAINER_NONE, S_CONTAINER_CREATING:
+	case S_CONTAINER_NONE, S_CONTAINER_CREATING, S_CONTAINER_CREATED:
 		s.Status = "pending"
 	case S_CONTAINER_RUNNING, S_CONTAINER_STOPPING:
 		s.Status = "running"
-	case S_CONTAINER_CREATED:
-		s.Status = "pending"
-		if !c.status.FinishedAt.Equal(epocZero) {
-			if c.status.ExitCode == 0 {
-				s.Status = "succeeded"
-			} else {
-				s.Status = "failed"
-			}
+	case S_CONTAINER_STOPPED:
+		if c.status.ExitCode == 0 {
+			s.Status = "succeeded"
+		} else {
+			s.Status = "failed"
 		}
 	default:
 	}
-	c.status.RUnlock()
+	defer c.status.RUnlock()
 	return s
 }
 
@@ -1216,7 +1212,7 @@ func (cs *ContainerStatus) Start() error {
 
 	if cs.State == S_CONTAINER_RUNNING {
 		return errors.ErrContainerAlreadyRunning
-	} else if cs.State != S_CONTAINER_CREATED {
+	} else if cs.State != S_CONTAINER_CREATED && cs.State != S_CONTAINER_STOPPED {
 		return fmt.Errorf("only CREATED container could be set to running, current: %d", cs.State)
 	}
 
@@ -1264,7 +1260,7 @@ func (cs *ContainerStatus) Stopped(t time.Time, exitCode int) bool {
 		cs.ExitCode = exitCode
 		result = true
 	}
-	cs.State = S_CONTAINER_CREATED
+	cs.State = S_CONTAINER_STOPPED
 	cs.stateChanged.Broadcast()
 	cs.Unlock()
 	return result
@@ -1285,7 +1281,7 @@ func (cs *ContainerStatus) IsStopped() bool {
 	cs.RLock()
 	defer cs.RUnlock()
 
-	return cs.State == S_CONTAINER_CREATED
+	return cs.State == S_CONTAINER_STOPPED
 }
 
 // AttachStreams connects streams to a TTY.
