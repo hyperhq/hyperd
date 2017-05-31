@@ -228,3 +228,17 @@ hyper::test::container_logs_no_newline() {
   echo logs result $res
   test x$res = "xfoobar"
 }
+
+hyper::test::container_readonly_rootfs_and_volume() {
+  echo "Container rootfs and volume readonly test"
+  id=$(sudo hyperctl run -p ${HYPER_ROOT}/hack/pods/readonly-rootfs.pod | sed -ne 's/POD id is \(.*\)/\1/p')
+  sudo hyperctl exec -t $id mount
+  res1=$(sudo hyperctl exec $id touch /foobar || true)
+  echo res1 test result is ${res1}
+  res2=$(sudo hyperctl exec $id touch /tmp/foobar || true)
+  echo res2 test result is ${res2}
+  res1=$(echo res1 test result is ${res1} | grep 'Read-only file system' > /dev/null 2>&1; echo $?)
+  res2=$(echo res2 test result is ${res2} | grep 'Read-only file system' > /dev/null 2>&1; echo $?)
+  sudo hyperctl rm $id
+  test $res1 -eq 0 -a $res2 -eq 0
+}

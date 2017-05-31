@@ -1,0 +1,18 @@
+{
+        "containers" : [{
+            "name": "busybox-readonly",
+            "image": "busybox",
+            "command": ["/bin/sh"],
+            "readonly": true,
+            "volumes": [{
+                "volume": "tmp",
+                "path": "/tmp",
+                "readOnly": true
+             }]
+        }],
+        "volumes": [{
+            "name": "tmp",
+            "source": "",
+            "format": ""
+        }]
+}
