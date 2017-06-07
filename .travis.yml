@@ -19,7 +19,7 @@ before_install:
   - wget https://s3-us-west-1.amazonaws.com/hypercontainer-download/qemu-hyper/qemu-hyper_2.4.1-1_amd64.deb && sudo dpkg -i --force-all qemu-hyper_2.4.1-1_amd64.deb
   - cd `mktemp -d`
   - mkdir -p ${GOPATH}/src/github.com/hyperhq
-  - wget ftp://sources.redhat.com/pub/lvm2/LVM2.2.02.131.tgz
+  - wget http://mirrors.kernel.org/sourceware/lvm2/LVM2.2.02.131.tgz
   - tar xf LVM2.2.02.131.tgz
   - cd LVM2.2.02.131
   - ./configure > /dev/null && make device-mapper > /dev/null && sudo make install > /dev/null
