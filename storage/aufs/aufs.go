@@ -87,7 +87,7 @@ func aufsMount(ro []string, rw, target, mountLabel string) (err error) {
 
 	offset := 54
 	if useDirperm() {
-		offset += len("dirperm1")
+		offset += len(",dirperm1")
 	}
 	b := make([]byte, syscall.Getpagesize()-len(mountLabel)-offset) // room for xino & mountLabel
 	bp := copy(b, fmt.Sprintf("br:%s=rw", rw))
@@ -107,6 +107,7 @@ func aufsMount(ro []string, rw, target, mountLabel string) (err error) {
 			} else {
 				data := utils.FormatMountLabel(fmt.Sprintf("append%s", layer), mountLabel)
 				if err = syscall.Mount("none", target, "aufs", MsRemount, data); err != nil {
+					glog.Errorf("error mounting aufs data(%s): %s", data, err.Error())
 					return
 				}
 			}
@@ -119,6 +120,7 @@ func aufsMount(ro []string, rw, target, mountLabel string) (err error) {
 			}
 			data := utils.FormatMountLabel(fmt.Sprintf("%s,%s", string(b[:bp]), opts), mountLabel)
 			if err = syscall.Mount("none", target, "aufs", 0, data); err != nil {
+				glog.Errorf("error first mounting aufs data(%d): %s", len(data), err.Error())
 				return
 			}
 			firstMount = false
