@@ -12,8 +12,9 @@ import (
 	"github.com/hyperhq/hyperd/utils"
 )
 
-func MountContainerToSharedDir(containerId, rootDir, sharedDir, mountLabel string) (string, error) {
+func MountContainerToSharedDir(containerId, rootDir, sharedDir, mountLabel string, readonly bool) (string, error) {
 	var (
+		params     string
 		mountPoint = path.Join(sharedDir, containerId, "rootfs")
 		upperDir   = path.Join(rootDir, containerId, "upper")
 		workDir    = path.Join(rootDir, containerId, "work")
@@ -30,7 +31,12 @@ func MountContainerToSharedDir(containerId, rootDir, sharedDir, mountLabel strin
 	}
 	lowerDir := path.Join(rootDir, string(lowerId), "root")
 
-	params := fmt.Sprintf("lowerdir=%s,upperdir=%s,workdir=%s", lowerDir, upperDir, workDir)
+	if readonly {
+		// "upperdir=" and "workdir=" may be omitted. In that case the overlay will be read-only.
+		params = fmt.Sprintf("lowerdir=%s:%s", lowerDir, upperDir)
+	} else {
+		params = fmt.Sprintf("lowerdir=%s,upperdir=%s,workdir=%s", lowerDir, upperDir, workDir)
+	}
 	if err := syscall.Mount("overlay", mountPoint, "overlay", 0, utils.FormatMountLabel(params, mountLabel)); err != nil {
 		return "", fmt.Errorf("error creating overlay mount to %s: %v", mountPoint, err)
 	}

@@ -287,7 +287,7 @@ func (*AufsStorage) Init() error { return nil }
 func (*AufsStorage) CleanUp() error { return nil }
 
 func (a *AufsStorage) PrepareContainer(mountId, sharedDir string, readonly bool) (*runv.VolumeDescription, error) {
-	_, err := aufs.MountContainerToSharedDir(mountId, a.RootPath(), sharedDir, "")
+	_, err := aufs.MountContainerToSharedDir(mountId, a.RootPath(), sharedDir, "", readonly)
 	if err != nil {
 		glog.Error("got error when mount container to share dir ", err.Error())
 		return nil, err
@@ -310,7 +310,7 @@ func (a *AufsStorage) CleanupContainer(id, sharedDir string) error {
 }
 
 func (a *AufsStorage) InjectFile(src io.Reader, containerId, target, baseDir string, perm, uid, gid int) error {
-	_, err := aufs.MountContainerToSharedDir(containerId, a.RootPath(), baseDir, "")
+	_, err := aufs.MountContainerToSharedDir(containerId, a.RootPath(), baseDir, "", false)
 	if err != nil {
 		glog.Error("got error when mount container to share dir ", err.Error())
 		return err
@@ -359,7 +359,7 @@ func (*OverlayFsStorage) Init() error { return nil }
 func (*OverlayFsStorage) CleanUp() error { return nil }
 
 func (o *OverlayFsStorage) PrepareContainer(mountId, sharedDir string, readonly bool) (*runv.VolumeDescription, error) {
-	_, err := overlay.MountContainerToSharedDir(mountId, o.RootPath(), sharedDir, "")
+	_, err := overlay.MountContainerToSharedDir(mountId, o.RootPath(), sharedDir, "", readonly)
 	if err != nil {
 		glog.Error("got error when mount container to share dir ", err.Error())
 		return nil, err
@@ -382,7 +382,7 @@ func (o *OverlayFsStorage) CleanupContainer(id, sharedDir string) error {
 }
 
 func (o *OverlayFsStorage) InjectFile(src io.Reader, mountId, target, baseDir string, perm, uid, gid int) error {
-	_, err := overlay.MountContainerToSharedDir(mountId, o.RootPath(), baseDir, "")
+	_, err := overlay.MountContainerToSharedDir(mountId, o.RootPath(), baseDir, "", false)
 	if err != nil {
 		glog.Error("got error when mount container to share dir ", err.Error())
 		return err
