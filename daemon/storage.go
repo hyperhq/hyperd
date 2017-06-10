@@ -446,6 +446,12 @@ func (s *BtrfsStorage) PrepareContainer(containerId, sharedDir string, readonly 
 	if err := syscall.Mount(btrfsRootfs, mountPoint, "bind", syscall.MS_BIND, ""); err != nil {
 		return nil, fmt.Errorf("failed to mount %s to %s: %v", btrfsRootfs, mountPoint, err)
 	}
+	if readonly {
+		if err := syscall.Mount(btrfsRootfs, mountPoint, "bind", syscall.MS_BIND|syscall.MS_REMOUNT|syscall.MS_RDONLY, ""); err != nil {
+			syscall.Unmount(mountPoint, syscall.MNT_DETACH)
+			return nil, fmt.Errorf("failed to mount %s to %s readonly: %v", btrfsRootfs, mountPoint, err)
+		}
+	}
 
 	containerPath := "/" + containerId
 	vol := &runv.VolumeDescription{
