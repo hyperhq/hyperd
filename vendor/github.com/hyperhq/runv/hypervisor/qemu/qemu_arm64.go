@@ -39,13 +39,8 @@ func (qc *QemuContext) arguments(ctx *hypervisor.VmContext) []string {
 	}
 
 	var memParams, cpuParams string
-	if boot.HotAddCpuMem {
-		memParams = fmt.Sprintf("size=%d,slots=1,maxmem=%dM", boot.Memory, hypervisor.DefaultMaxMem)
-		cpuParams = fmt.Sprintf("cpus=%d,maxcpus=%d", boot.CPU, hypervisor.DefaultMaxCpus)
-	} else {
-		memParams = strconv.Itoa(boot.Memory)
-		cpuParams = strconv.Itoa(boot.CPU)
-	}
+	memParams = fmt.Sprintf("size=%d,slots=1,maxmem=%dM", boot.Memory, hypervisor.DefaultMaxMem)
+	cpuParams = fmt.Sprintf("cpus=%d,maxcpus=%d", boot.CPU, hypervisor.DefaultMaxCpus)
 
 	gic_version3 := false
 	if f, err := os.Open("/proc/cpuinfo"); err == nil {

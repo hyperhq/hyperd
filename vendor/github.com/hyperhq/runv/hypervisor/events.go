@@ -50,10 +50,7 @@ type VolumeUnmounted struct {
 }
 
 type BlockdevInsertedEvent struct {
-	Name       string
-	SourceType string //image or volume
 	DeviceName string
-	ScsiId     int
 	ScsiAddr   string // pass scsi addr to hyperstart
 }
 

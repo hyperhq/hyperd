@@ -2,7 +2,7 @@
 
 package overlay
 
-func MountContainerToSharedDir(containerId, rootDir, sharedDir, mountLabel string) (string, error) {
+func MountContainerToSharedDir(containerId, rootDir, sharedDir, mountLabel string, readonly bool) (string, error) {
 	return "", nil
 }
 

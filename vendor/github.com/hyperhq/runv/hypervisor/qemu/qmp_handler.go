@@ -133,7 +133,7 @@ func qmpFail(err string, respond func(err error)) *QmpFinish {
 	}
 }
 
-func qmpReceiver(qmp chan QmpInteraction, wait chan int, decoder *json.Decoder) {
+func qmpReceiver(qmp chan QmpInteraction, wait chan<- int, decoder *json.Decoder) {
 	glog.V(3).Info("Begin receive QMP message")
 	for {
 		rsp := &QmpResponse{}
@@ -279,7 +279,7 @@ func qmpHandler(ctx *hypervisor.VmContext) {
 
 	go qmpInitializer(ctx)
 
-	qc := ctx.DCtx.(*QemuContext)
+	qc := qemuContext(ctx)
 	timer := time.AfterFunc(10*time.Second, func() {
 		glog.Warning("Initializer Timeout.")
 		qc.qmp <- &QmpTimeout{}
@@ -335,6 +335,7 @@ func qmpHandler(ctx *hypervisor.VmContext) {
 			ctx.Hub <- &hypervisor.Interrupted{Reason: msg.(*QmpInternalError).cause}
 		case QMP_QUIT:
 			handler = nil
+			conn.Close()
 		}
 	}
 

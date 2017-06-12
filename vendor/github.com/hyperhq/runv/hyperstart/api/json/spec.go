@@ -73,6 +73,7 @@ type Container struct {
 	Process       *Process            `json:"process"`
 	RestartPolicy string              `json:"restartPolicy"`
 	Initialize    bool                `json:"initialize"`
+	ReadOnly      bool                `json:"readOnly"`
 	Ports         []Port              `json:"ports,omitempty"` //deprecated
 }
 

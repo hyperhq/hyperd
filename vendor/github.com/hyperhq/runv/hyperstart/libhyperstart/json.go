@@ -47,6 +47,10 @@ type jsonBasedHyperstart struct {
 	streamChan    chan *hyperstartapi.TtyMessage
 }
 
+// hyperstartPauseSync and hyperstartUnpause are private here and large enough
+const hyperstartPauseSync = 1 << 31
+const hyperstartUnpause = hyperstartPauseSync + 1
+
 type hyperstartCmd struct {
 	Code    uint32
 	Message interface{}
@@ -56,7 +60,7 @@ type hyperstartCmd struct {
 	result chan<- error
 }
 
-func NewJsonBasedHyperstart(id, ctlSock, streamSock string, lastStreamSeq uint64, waitReady bool) Hyperstart {
+func NewJsonBasedHyperstart(id, ctlSock, streamSock string, lastStreamSeq uint64, waitReady, paused bool) Hyperstart {
 	h := &jsonBasedHyperstart{
 		logPrefix:     fmt.Sprintf("SB[%s] ", id),
 		procs:         make(map[pKey]*pState),
@@ -66,7 +70,7 @@ func NewJsonBasedHyperstart(id, ctlSock, streamSock string, lastStreamSeq uint64
 		streamChan:    make(chan *hyperstartapi.TtyMessage, 128),
 	}
 	go handleStreamSock(h, streamSock)
-	go handleCtlSock(h, ctlSock, waitReady)
+	go handleCtlSock(h, ctlSock, waitReady, paused)
 	return h
 }
 
@@ -155,7 +159,7 @@ func readVmMessage(conn io.Reader) (*hyperstartapi.DecodedMessage, error) {
 	}, nil
 }
 
-func handleCtlSock(h *jsonBasedHyperstart, ctlSock string, waitReady bool) error {
+func handleCtlSock(h *jsonBasedHyperstart, ctlSock string, waitReady, paused bool) error {
 	conn, err := utils.SocketConnect(ctlSock)
 	if err != nil {
 		h.Log(ERROR, "Cannot connect to ctl socket %s: %v", ctlSock, err)
@@ -179,8 +183,12 @@ func handleCtlSock(h *jsonBasedHyperstart, ctlSock string, waitReady bool) error
 		}
 	}
 
-	go handleMsgToHyperstart(h, conn)
+	go handleMsgToHyperstart(h, conn, paused)
 	go handleMsgFromHyperstart(h, conn)
+
+	if paused {
+		return nil
+	}
 
 	h.vmAPIVersion, err = h.APIVersion()
 	h.Log(TRACE, "hyperstart API version:%d, VM hyperstart API version: %d\n", hyperstartapi.VERSION, h.vmAPIVersion)
@@ -224,13 +232,14 @@ func (h *jsonBasedHyperstart) hyperstartCommand(code uint32, msg interface{}) er
 	return err
 }
 
-func handleMsgToHyperstart(h *jsonBasedHyperstart, conn io.WriteCloser) {
+func handleMsgToHyperstart(h *jsonBasedHyperstart, conn io.WriteCloser, paused bool) {
 	looping := true
 	cmds := []*hyperstartCmd{}
 
 	var data []byte
 	var index int = 0
 	var got int = 0
+	var pausing *hyperstartCmd
 
 	for looping {
 		cmd, ok := <-h.ctlChan
@@ -253,6 +262,10 @@ func handleMsgToHyperstart(h *jsonBasedHyperstart, conn io.WriteCloser) {
 					cmds[0].result <- fmt.Errorf("Error: %s", string(cmd.retMsg))
 				}
 				cmds = cmds[1:]
+				if pausing != nil && len(cmds) == 0 {
+					pausing.result <- nil
+					pausing = nil
+				}
 			} else {
 				h.Log(ERROR, "got ack but no command in queue")
 			}
@@ -267,7 +280,25 @@ func handleMsgToHyperstart(h *jsonBasedHyperstart, conn io.WriteCloser) {
 					index = 0
 					got = 0
 				}
+			} else if cmd.Code == hyperstartPauseSync {
+				paused = true
+				pausing = cmd
+				if len(cmds) == 0 {
+					pausing.result <- nil
+					pausing = nil
+				}
+			} else if cmd.Code == hyperstartUnpause {
+				paused = false
+				if pausing != nil {
+					pausing.result <- nil
+					pausing = nil
+				}
+				cmd.result <- nil
 			} else {
+				if paused {
+					cmd.result <- fmt.Errorf("the vm is pausing/paused")
+					continue
+				}
 				var message []byte
 				if message1, ok := cmd.Message.([]byte); ok {
 					message = message1
@@ -575,6 +606,24 @@ func (h *jsonBasedHyperstart) APIVersion() (uint32, error) {
 		return 0, fmt.Errorf("unexpected version string: %v\n", retMsg)
 	}
 	return binary.BigEndian.Uint32(retMsg[:4]), nil
+}
+
+func (h *jsonBasedHyperstart) PauseSync() error {
+	return h.hyperstartCommand(hyperstartPauseSync, nil)
+}
+
+func (h *jsonBasedHyperstart) Unpause() error {
+	err := h.hyperstartCommand(hyperstartUnpause, nil)
+
+	if h.vmAPIVersion == 0 && err == nil {
+		h.vmAPIVersion, err = h.APIVersion()
+		h.Log(TRACE, "hyperstart API version:%d, VM hyperstart API version: %d\n", hyperstartapi.VERSION, h.vmAPIVersion)
+		if err != nil {
+			h.Close()
+		}
+	}
+
+	return err
 }
 
 func (h *jsonBasedHyperstart) WriteFile(container, path string, data []byte) error {

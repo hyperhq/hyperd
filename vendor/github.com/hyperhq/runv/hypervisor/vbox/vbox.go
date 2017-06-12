@@ -279,10 +279,7 @@ func (vc *VBoxContext) AddDisk(ctx *hypervisor.VmContext, sourceType string, blo
 	}
 	devName := scsiId2Name(id)
 	callback := &hypervisor.BlockdevInsertedEvent{
-		Name:       name,
-		SourceType: sourceType,
 		DeviceName: devName,
-		ScsiId:     id,
 	}
 
 	glog.V(1).Infof("Disk %s (%s) add succeeded", name, filename)
@@ -461,10 +458,7 @@ func (vc *VBoxContext) LazyAddDisk(ctx *hypervisor.VmContext, name, sourceType, 
 	}
 	devName := scsiId2Name(id)
 	callback := &hypervisor.BlockdevInsertedEvent{
-		Name:       name,
-		SourceType: sourceType,
 		DeviceName: devName,
-		ScsiId:     id,
 	}
 	vc.mediums = append(vc.mediums, medium)
 	vc.callbacks = append(vc.callbacks, callback)

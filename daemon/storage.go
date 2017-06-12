@@ -33,7 +33,7 @@ type Storage interface {
 	Init() error
 	CleanUp() error
 
-	PrepareContainer(mountId, sharedDir string) (*runv.VolumeDescription, error)
+	PrepareContainer(mountId, sharedDir string, readonly bool) (*runv.VolumeDescription, error)
 	CleanupContainer(id, sharedDir string) error
 	InjectFile(src io.Reader, containerId, target, baseDir string, perm, uid, gid int) error
 	CreateVolume(podId string, spec *apitypes.UserVolume) error
@@ -121,7 +121,7 @@ func (dms *DevMapperStorage) CleanUp() error {
 	return dm.DMCleanup(dms.DmPoolData)
 }
 
-func (dms *DevMapperStorage) PrepareContainer(mountId, sharedDir string) (*runv.VolumeDescription, error) {
+func (dms *DevMapperStorage) PrepareContainer(mountId, sharedDir string, readonly bool) (*runv.VolumeDescription, error) {
 	if err := dm.CreateNewDevice(mountId, dms.DevPrefix, dms.RootPath()); err != nil {
 		return nil, err
 	}
@@ -136,10 +136,11 @@ func (dms *DevMapperStorage) PrepareContainer(mountId, sharedDir string) (*runv.
 	}
 
 	vol := &runv.VolumeDescription{
-		Name:   devFullName,
-		Source: devFullName,
-		Fstype: fstype,
-		Format: "raw",
+		Name:     devFullName,
+		Source:   devFullName,
+		Fstype:   fstype,
+		Format:   "raw",
+		ReadOnly: readonly,
 	}
 
 	return vol, nil
@@ -285,8 +286,8 @@ func (*AufsStorage) Init() error { return nil }
 
 func (*AufsStorage) CleanUp() error { return nil }
 
-func (a *AufsStorage) PrepareContainer(mountId, sharedDir string) (*runv.VolumeDescription, error) {
-	_, err := aufs.MountContainerToSharedDir(mountId, a.RootPath(), sharedDir, "")
+func (a *AufsStorage) PrepareContainer(mountId, sharedDir string, readonly bool) (*runv.VolumeDescription, error) {
+	_, err := aufs.MountContainerToSharedDir(mountId, a.RootPath(), sharedDir, "", readonly)
 	if err != nil {
 		glog.Error("got error when mount container to share dir ", err.Error())
 		return nil, err
@@ -294,10 +295,11 @@ func (a *AufsStorage) PrepareContainer(mountId, sharedDir string) (*runv.VolumeD
 
 	containerPath := "/" + mountId
 	vol := &runv.VolumeDescription{
-		Name:   containerPath,
-		Source: containerPath,
-		Fstype: "dir",
-		Format: "vfs",
+		Name:     containerPath,
+		Source:   containerPath,
+		Fstype:   "dir",
+		Format:   "vfs",
+		ReadOnly: readonly,
 	}
 
 	return vol, nil
@@ -308,7 +310,7 @@ func (a *AufsStorage) CleanupContainer(id, sharedDir string) error {
 }
 
 func (a *AufsStorage) InjectFile(src io.Reader, containerId, target, baseDir string, perm, uid, gid int) error {
-	_, err := aufs.MountContainerToSharedDir(containerId, a.RootPath(), baseDir, "")
+	_, err := aufs.MountContainerToSharedDir(containerId, a.RootPath(), baseDir, "", false)
 	if err != nil {
 		glog.Error("got error when mount container to share dir ", err.Error())
 		return err
@@ -356,8 +358,8 @@ func (*OverlayFsStorage) Init() error { return nil }
 
 func (*OverlayFsStorage) CleanUp() error { return nil }
 
-func (o *OverlayFsStorage) PrepareContainer(mountId, sharedDir string) (*runv.VolumeDescription, error) {
-	_, err := overlay.MountContainerToSharedDir(mountId, o.RootPath(), sharedDir, "")
+func (o *OverlayFsStorage) PrepareContainer(mountId, sharedDir string, readonly bool) (*runv.VolumeDescription, error) {
+	_, err := overlay.MountContainerToSharedDir(mountId, o.RootPath(), sharedDir, "", readonly)
 	if err != nil {
 		glog.Error("got error when mount container to share dir ", err.Error())
 		return nil, err
@@ -365,10 +367,11 @@ func (o *OverlayFsStorage) PrepareContainer(mountId, sharedDir string) (*runv.Vo
 
 	containerPath := "/" + mountId
 	vol := &runv.VolumeDescription{
-		Name:   containerPath,
-		Source: containerPath,
-		Fstype: "dir",
-		Format: "vfs",
+		Name:     containerPath,
+		Source:   containerPath,
+		Fstype:   "dir",
+		Format:   "vfs",
+		ReadOnly: readonly,
 	}
 
 	return vol, nil
@@ -379,7 +382,7 @@ func (o *OverlayFsStorage) CleanupContainer(id, sharedDir string) error {
 }
 
 func (o *OverlayFsStorage) InjectFile(src io.Reader, mountId, target, baseDir string, perm, uid, gid int) error {
-	_, err := overlay.MountContainerToSharedDir(mountId, o.RootPath(), baseDir, "")
+	_, err := overlay.MountContainerToSharedDir(mountId, o.RootPath(), baseDir, "", false)
 	if err != nil {
 		glog.Error("got error when mount container to share dir ", err.Error())
 		return err
@@ -431,7 +434,7 @@ func (*BtrfsStorage) Init() error { return nil }
 
 func (*BtrfsStorage) CleanUp() error { return nil }
 
-func (s *BtrfsStorage) PrepareContainer(containerId, sharedDir string) (*runv.VolumeDescription, error) {
+func (s *BtrfsStorage) PrepareContainer(containerId, sharedDir string, readonly bool) (*runv.VolumeDescription, error) {
 	btrfsRootfs := s.subvolumesDirID(containerId)
 	mountPoint := filepath.Join(sharedDir, containerId, "rootfs")
 
@@ -443,13 +446,20 @@ func (s *BtrfsStorage) PrepareContainer(containerId, sharedDir string) (*runv.Vo
 	if err := syscall.Mount(btrfsRootfs, mountPoint, "bind", syscall.MS_BIND, ""); err != nil {
 		return nil, fmt.Errorf("failed to mount %s to %s: %v", btrfsRootfs, mountPoint, err)
 	}
+	if readonly {
+		if err := syscall.Mount(btrfsRootfs, mountPoint, "bind", syscall.MS_BIND|syscall.MS_REMOUNT|syscall.MS_RDONLY, ""); err != nil {
+			syscall.Unmount(mountPoint, syscall.MNT_DETACH)
+			return nil, fmt.Errorf("failed to mount %s to %s readonly: %v", btrfsRootfs, mountPoint, err)
+		}
+	}
 
 	containerPath := "/" + containerId
 	vol := &runv.VolumeDescription{
-		Name:   containerPath,
-		Source: containerPath,
-		Fstype: "dir",
-		Format: "vfs",
+		Name:     containerPath,
+		Source:   containerPath,
+		Fstype:   "dir",
+		Format:   "vfs",
+		ReadOnly: readonly,
 	}
 
 	return vol, nil
@@ -506,14 +516,15 @@ func (s *RawBlockStorage) Init() error {
 
 func (*RawBlockStorage) CleanUp() error { return nil }
 
-func (s *RawBlockStorage) PrepareContainer(containerId, sharedDir string) (*runv.VolumeDescription, error) {
+func (s *RawBlockStorage) PrepareContainer(containerId, sharedDir string, readonly bool) (*runv.VolumeDescription, error) {
 	devFullName := filepath.Join(s.RootPath(), "blocks", containerId)
 
 	vol := &runv.VolumeDescription{
-		Name:   devFullName,
-		Source: devFullName,
-		Fstype: "xfs",
-		Format: "raw",
+		Name:     devFullName,
+		Source:   devFullName,
+		Fstype:   "xfs",
+		Format:   "raw",
+		ReadOnly: readonly,
 	}
 
 	return vol, nil
@@ -569,7 +580,7 @@ func (*VBoxStorage) Init() error { return nil }
 
 func (*VBoxStorage) CleanUp() error { return nil }
 
-func (v *VBoxStorage) PrepareContainer(mountId, sharedDir string) (*runv.VolumeDescription, error) {
+func (v *VBoxStorage) PrepareContainer(mountId, sharedDir string, readonly bool) (*runv.VolumeDescription, error) {
 	devFullName, err := vbox.MountContainerToSharedDir(mountId, v.RootPath(), "")
 	if err != nil {
 		glog.Error("got error when mount container to share dir ", err.Error())
@@ -577,10 +588,11 @@ func (v *VBoxStorage) PrepareContainer(mountId, sharedDir string) (*runv.VolumeD
 	}
 
 	vol := &runv.VolumeDescription{
-		Name:   devFullName,
-		Source: devFullName,
-		Fstype: "ext4",
-		Format: "vdi",
+		Name:     devFullName,
+		Source:   devFullName,
+		Fstype:   "ext4",
+		Format:   "vdi",
+		ReadOnly: readonly,
 	}
 
 	return vol, nil

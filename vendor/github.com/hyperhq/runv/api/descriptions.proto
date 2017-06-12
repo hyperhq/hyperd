@@ -47,6 +47,7 @@ message VolumeDescription {
     string fstype = 4; //"xfs", "ext4" etc. for block dev, or "dir" for dir path
     VolumeOption options = 8;
     bool dockerVolume = 9;
+    bool readOnly = 10;
 }
 
 message InterfaceDescription {
@@ -57,6 +58,7 @@ message InterfaceDescription {
     string mac = 5;
     string gw = 6;
     string tapName = 7;
+    string options = 8;
 }
 
 message PortDescription {

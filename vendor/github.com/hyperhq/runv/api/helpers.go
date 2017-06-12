@@ -61,10 +61,11 @@ func ContainerDescriptionFromOCF(id string, s *specs.Spec) *ContainerDescription
 	container.Sysctl["vm.overcommit_memory"] = "1"
 
 	rootfs := &VolumeDescription{
-		Name:   id,
-		Source: id,
-		Fstype: "dir",
-		Format: "vfs",
+		Name:     id,
+		Source:   id,
+		Fstype:   "dir",
+		Format:   "vfs",
+		ReadOnly: s.Root.Readonly,
 	}
 	container.RootVolume = rootfs
 

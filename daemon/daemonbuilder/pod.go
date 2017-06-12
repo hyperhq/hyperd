@@ -218,7 +218,7 @@ func (d Docker) ContainerCreate(params types.ContainerCreateConfig) (types.Conta
 	podId := fmt.Sprintf("buildpod-%s", utils.RandStr(10, "alpha"))
 	// Hack here, container created by ADD/COPY only has Config
 	if params.HostConfig != nil {
-		spec, err = MakeBasicPod(podId, params.Config)
+		spec, err = MakeBasicPod(podId, params.Config, params.HostConfig)
 	} else {
 		spec, err = MakeCopyPod(podId, params.Config)
 	}
@@ -273,14 +273,14 @@ func MakeCopyPod(podId string, config *containertypes.Config) (*apitypes.UserPod
 	fmt.Fprintf(copyshell, "#!/bin/sh\n")
 	copyshell.Close()
 
-	return MakePod(podId, tempSrcDir, shellDir, config, []string{"/bin/sh", "/tmp/shell/exec-copy.sh"}, []string{})
+	return MakePod(podId, tempSrcDir, shellDir, config, []string{"/bin/sh", "/tmp/shell/exec-copy.sh"}, []string{}, false)
 }
 
-func MakeBasicPod(podId string, config *containertypes.Config) (*apitypes.UserPod, error) {
-	return MakePod(podId, "", "", config, config.Cmd.Slice(), config.Entrypoint.Slice())
+func MakeBasicPod(podId string, config *containertypes.Config, hostConfig *containertypes.HostConfig) (*apitypes.UserPod, error) {
+	return MakePod(podId, "", "", config, config.Cmd.Slice(), config.Entrypoint.Slice(), hostConfig.ReadonlyRootfs)
 }
 
-func MakePod(podId, src, shellDir string, config *containertypes.Config, cmds, entrys []string) (*apitypes.UserPod, error) {
+func MakePod(podId, src, shellDir string, config *containertypes.Config, cmds, entrys []string, readonlyRoot bool) (*apitypes.UserPod, error) {
 	if config.Image == "" {
 		return nil, fmt.Errorf("image can not be null")
 	}
@@ -326,6 +326,7 @@ func MakePod(podId, src, shellDir string, config *containertypes.Config, cmds, e
 		Workdir:       config.WorkingDir,
 		Entrypoint:    entrys,
 		Tty:           config.Tty,
+		ReadOnly:      readonlyRoot,
 		Ports:         []*apitypes.UserContainerPort{},
 		Envs:          env,
 		Volumes:       cVols,

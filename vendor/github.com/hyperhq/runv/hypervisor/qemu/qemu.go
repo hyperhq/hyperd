@@ -191,6 +191,7 @@ func (qc *QemuContext) Stats(ctx *hypervisor.VmContext) (*types.PodStats, error)
 }
 
 func (qc *QemuContext) Close() {
+	qc.qmp <- &QmpQuit{}
 	qc.wdt <- "quit"
 	<-qc.waitQmp
 	qc.qemuLogFile.Close()
@@ -222,10 +223,10 @@ func (qc *QemuContext) Pause(ctx *hypervisor.VmContext, pause bool) error {
 }
 
 func (qc *QemuContext) AddDisk(ctx *hypervisor.VmContext, sourceType string, blockInfo *hypervisor.DiskDescriptor, result chan<- hypervisor.VmEvent) {
-	name := blockInfo.Name
 	filename := blockInfo.Filename
 	format := blockInfo.Format
 	id := blockInfo.ScsiId
+	readonly := blockInfo.ReadOnly
 
 	if format == "rbd" {
 		if blockInfo.Options != nil {
@@ -247,7 +248,7 @@ func (qc *QemuContext) AddDisk(ctx *hypervisor.VmContext, sourceType string, blo
 		}
 	}
 
-	newDiskAddSession(ctx, qc, name, sourceType, filename, format, id, result)
+	newDiskAddSession(ctx, qc, filename, format, id, readonly, result)
 }
 
 func (qc *QemuContext) RemoveDisk(ctx *hypervisor.VmContext, blockInfo *hypervisor.DiskDescriptor, callback hypervisor.VmEvent, result chan<- hypervisor.VmEvent) {
