@@ -100,6 +100,7 @@ func NewDaemon(cfg *apitypes.HyperConfig) (*Daemon, error) {
 	if err := os.MkdirAll(realRoot, 0755); err != nil && !os.IsExist(err) {
 		return nil, err
 	}
+	StorageOptions = cfg.StorageOptions
 
 	var (
 		db_file = fmt.Sprintf("%s/hyper.db", realRoot)
