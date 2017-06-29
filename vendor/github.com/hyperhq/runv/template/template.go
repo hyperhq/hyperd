@@ -26,16 +26,26 @@ import (
 type TemplateVmConfig struct {
 	StatePath string `json:"statepath"`
 	Driver    string `json:"driver"`
-	Cpu       int    `json:"cpu"`
-	Memory    int    `json:"memory"`
-	Kernel    string `json:"kernel"`
-	Initrd    string `json:"initrd"`
+	Config    hypervisor.BootConfig
 }
 
-func CreateTemplateVM(statePath, vmName string, cpu, mem int, kernel, initrd string, vsock bool) (t *TemplateVmConfig, err error) {
+func CreateTemplateVM(statePath, vmName string, b hypervisor.BootConfig) (t *TemplateVmConfig, err error) {
+	if b.BootToBeTemplate || b.BootFromTemplate || b.MemoryPath != "" || b.DevicesStatePath != "" {
+		return nil, fmt.Errorf("Error boot config for template")
+	}
+	b.MemoryPath = statePath + "/memory"
+	b.DevicesStatePath = statePath + "/state"
+
+	config := &TemplateVmConfig{
+		StatePath: statePath,
+		Driver:    hypervisor.HDriver.Name(),
+		Config:    b,
+	}
+	config.Config.BootFromTemplate = true
+
 	defer func() {
 		if err != nil {
-			(&TemplateVmConfig{StatePath: statePath}).Destroy()
+			config.Destroy()
 		}
 	}()
 
@@ -45,7 +55,7 @@ func CreateTemplateVM(statePath, vmName string, cpu, mem int, kernel, initrd str
 		return nil, err
 	}
 	flags := uintptr(syscall.MS_NOSUID | syscall.MS_NODEV)
-	opts := fmt.Sprintf("size=%dM", mem+8)
+	opts := fmt.Sprintf("size=%dM", b.Memory+8)
 	if err = syscall.Mount("tmpfs", statePath, "tmpfs", flags, opts); err != nil {
 		glog.Infof("mount template state path failed: %v", err)
 		return nil, err
@@ -58,18 +68,8 @@ func CreateTemplateVM(statePath, vmName string, cpu, mem int, kernel, initrd str
 	}
 
 	// launch vm
-	b := &hypervisor.BootConfig{
-		CPU:              cpu,
-		Memory:           mem,
-		BootToBeTemplate: true,
-		BootFromTemplate: false,
-		EnableVsock:      vsock,
-		MemoryPath:       statePath + "/memory",
-		DevicesStatePath: statePath + "/state",
-		Kernel:           kernel,
-		Initrd:           initrd,
-	}
-	vm, err := hypervisor.GetVm(vmName, b, true)
+	b.BootToBeTemplate = true
+	vm, err := hypervisor.GetVm(vmName, &b, true)
 	if err != nil {
 		return nil, err
 	}
@@ -89,15 +89,6 @@ func CreateTemplateVM(statePath, vmName string, cpu, mem int, kernel, initrd str
 	// so we wait here. We should fix it in the qemu driver side.
 	time.Sleep(1 * time.Second)
 
-	config := &TemplateVmConfig{
-		StatePath: statePath,
-		Driver:    hypervisor.HDriver.Name(),
-		Cpu:       cpu,
-		Memory:    mem,
-		Kernel:    kernel,
-		Initrd:    initrd,
-	}
-
 	configData, err := json.MarshalIndent(config, "", "\t")
 	if err != nil {
 		glog.V(1).Infof("%s\n", err.Error())
@@ -114,16 +105,8 @@ func CreateTemplateVM(statePath, vmName string, cpu, mem int, kernel, initrd str
 }
 
 func (t *TemplateVmConfig) BootConfigFromTemplate() *hypervisor.BootConfig {
-	return &hypervisor.BootConfig{
-		CPU:              t.Cpu,
-		Memory:           t.Memory,
-		BootToBeTemplate: false,
-		BootFromTemplate: true,
-		MemoryPath:       t.StatePath + "/memory",
-		DevicesStatePath: t.StatePath + "/state",
-		Kernel:           t.Kernel,
-		Initrd:           t.Initrd,
-	}
+	b := t.Config
+	return &b
 }
 
 // boot vm from template, the returned vm is paused

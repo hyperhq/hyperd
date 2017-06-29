@@ -24,8 +24,6 @@ type InitFailedEvent struct {
 	Reason string
 }
 
-type InitConnectedEvent struct{}
-
 type ShutdownCommand struct {
 	Wait bool
 }
@@ -129,7 +127,6 @@ func (qe *VmStartFailEvent) Event() int      { return ERROR_VM_START_FAILED }
 func (qe *VmExit) Event() int                { return EVENT_VM_EXIT }
 func (qe *VmKilledEvent) Event() int         { return EVENT_VM_KILL }
 func (qe *VmTimeout) Event() int             { return EVENT_VM_TIMEOUT }
-func (qe *InitConnectedEvent) Event() int    { return EVENT_INIT_CONNECTED }
 func (qe *VolumeUnmounted) Event() int       { return EVENT_BLOCK_EJECTED }
 func (qe *BlockdevInsertedEvent) Event() int { return EVENT_BLOCK_INSERTED }
 func (qe *InterfaceCreated) Event() int      { return EVENT_INTERFACE_ADD }

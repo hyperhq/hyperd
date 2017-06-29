@@ -17,7 +17,7 @@ type templateFactory struct {
 	s *template.TemplateVmConfig
 }
 
-func New(templateRoot string, cpu, mem int, kernel, initrd string, vsock bool) base.Factory {
+func New(templateRoot string, b hypervisor.BootConfig) base.Factory {
 	var vmName string
 
 	for {
@@ -26,11 +26,11 @@ func New(templateRoot string, cpu, mem int, kernel, initrd string, vsock bool) b
 			break
 		}
 	}
-	s, err := template.CreateTemplateVM(filepath.Join(templateRoot, vmName), vmName, cpu, mem, kernel, initrd, vsock)
+	s, err := template.CreateTemplateVM(filepath.Join(templateRoot, vmName), vmName, b)
 	if err != nil {
 		glog.Errorf("failed to create template factory: %v", err)
 		glog.V(3).Infof("use direct factory instead")
-		return direct.New(cpu, mem, kernel, initrd, vsock)
+		return direct.New(b)
 	}
 	return &templateFactory{s: s}
 }

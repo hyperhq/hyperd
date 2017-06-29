@@ -31,15 +31,15 @@ func (ctx *VmContext) loop() {
 	ctx.Log(DEBUG, "main event loop exiting")
 }
 
-func (ctx *VmContext) watchHyperstart(sendReadyEvent bool) {
+func (ctx *VmContext) watchHyperstart() {
+	next := time.NewTimer(10 * time.Second)
 	timeout := time.AfterFunc(60*time.Second, func() {
-		if ctx.PauseState == PauseStateUnpaused {
-			ctx.Log(ERROR, "watch hyperstart timeout")
-			ctx.Hub <- &InitFailedEvent{Reason: "watch hyperstart timeout"}
-			ctx.hyperstart.Close()
-		}
+		ctx.Log(ERROR, "watch hyperstart timeout")
+		ctx.Hub <- &InitFailedEvent{Reason: "watch hyperstart timeout"}
+		ctx.hyperstart.Close()
 	})
-	ctx.Log(DEBUG, "watch hyperstart, send ready: %v", sendReadyEvent)
+	ctx.Log(DEBUG, "watch hyperstart")
+loop:
 	for {
 		ctx.Log(TRACE, "issue VERSION request for keep-alive test")
 		_, err := ctx.hyperstart.APIVersion()
@@ -52,13 +52,15 @@ func (ctx *VmContext) watchHyperstart(sendReadyEvent bool) {
 		if !timeout.Stop() {
 			<-timeout.C
 		}
-		if sendReadyEvent {
-			ctx.Hub <- &InitConnectedEvent{}
-			sendReadyEvent = false
+		select {
+		case <-ctx.cancelWatchHyperstart:
+			break loop
+		case <-next.C:
 		}
-		time.Sleep(10 * time.Second)
+		next.Reset(10 * time.Second)
 		timeout.Reset(60 * time.Second)
 	}
+	next.Stop()
 	timeout.Stop()
 }
 
@@ -70,10 +72,9 @@ func (ctx *VmContext) Launch() {
 		ctx.Log(TRACE, "boot from template")
 		ctx.PauseState = PauseStatePaused
 		ctx.hyperstart = libhyperstart.NewJsonBasedHyperstart(ctx.Id, ctx.ctlSockAddr(), ctx.ttySockAddr(), 1, false, true)
-		ctx.Hub <- &InitConnectedEvent{}
 	} else {
 		ctx.hyperstart = libhyperstart.NewJsonBasedHyperstart(ctx.Id, ctx.ctlSockAddr(), ctx.ttySockAddr(), 1, true, false)
-		go ctx.watchHyperstart(true)
+		go ctx.watchHyperstart()
 	}
 	if ctx.LogLevel(DEBUG) {
 		go watchVmConsole(ctx)
@@ -112,12 +113,9 @@ func VmAssociate(vmId string, hub chan VmEvent, client chan *types.VmResponse, p
 
 	context.Become(stateRunning, StateRunning)
 
-	//for _, c := range context.vmSpec.Containers {
-	//	context.ptys.ptyConnect(true, c.Process.Terminal, c.Process.Stdio, c.Process.Stderr, nil)
-	//	context.ptys.startStdin(c.Process.Stdio, c.Process.Terminal)
-	//}
-
-	go context.watchHyperstart(false)
+	if !paused {
+		go context.watchHyperstart()
+	}
 	go context.loop()
 	return context, nil
 }

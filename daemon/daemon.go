@@ -213,7 +213,12 @@ func (daemon *Daemon) initRunV(c *apitypes.HyperConfig) error {
 
 	daemon.Hypervisor = c.Driver
 	glog.Infof("The hypervisor's driver is %s", c.Driver)
-	daemon.Factory = factory.NewFromPolicy(c.Kernel, c.Initrd, c.EnableVsock, c.VmFactoryPolicy)
+	bootConfig := hypervisor.BootConfig{
+		Kernel:      c.Kernel,
+		Initrd:      c.Initrd,
+		EnableVsock: c.EnableVsock,
+	}
+	daemon.Factory = factory.NewFromPolicy(bootConfig, c.VmFactoryPolicy)
 
 	return nil
 }
