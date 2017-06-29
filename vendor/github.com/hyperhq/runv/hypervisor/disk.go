@@ -20,6 +20,8 @@ type DiskDescriptor struct {
 	DockerVolume bool
 	ReadOnly     bool
 	Options      map[string]string
+	Dax          bool
+	PmemId       int
 }
 
 func (d *DiskDescriptor) IsDir() bool {
@@ -67,6 +69,8 @@ func NewDiskContext(ctx *VmContext, vol *api.VolumeDescription) *DiskContext {
 			"bytespersec": strconv.Itoa(int(vol.Options.BytesPerSec)),
 			"iops":        strconv.Itoa(int(vol.Options.Iops)),
 		}
+	} else if vol.Options != nil && vol.Options.DaxBlock {
+		dc.DiskDescriptor.Dax = true
 	}
 	return dc
 }
@@ -80,7 +84,11 @@ func (dc *DiskContext) insert(result chan api.Result) {
 		return
 	}
 
-	dc.ScsiId = dc.sandbox.nextScsiId()
+	if dc.Dax {
+		dc.PmemId = dc.sandbox.nextPmemId()
+	} else {
+		dc.ScsiId = dc.sandbox.nextScsiId()
+	}
 	usage := "volume"
 	if dc.isRootVol {
 		usage = "image"

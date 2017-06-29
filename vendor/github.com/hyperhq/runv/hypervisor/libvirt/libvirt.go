@@ -442,7 +442,7 @@ func (lc *LibvirtContext) domainXml(ctx *hypervisor.VmContext) (string, error) {
 
 	dom.OS.Supported = "yes"
 	dom.OS.Type.Arch = "x86_64"
-	dom.OS.Type.Machine = "pc-i440fx-2.1"
+	dom.OS.Type.Machine = "pc-i440fx-2.1,nvdimm"
 	dom.OS.Type.Content = "hvm"
 
 	dom.SecLabel.Type = "none"
@@ -913,6 +913,33 @@ func (lc *LibvirtContext) AddDisk(ctx *hypervisor.VmContext, sourceType string, 
 		glog.Error("Cannot find domain")
 		result <- &hypervisor.DeviceFailed{
 			Session: nil,
+		}
+		return
+	}
+
+	if blockInfo.Dax {
+		// get the size
+		fi, e := os.Stat(blockInfo.Filename)
+		if e != nil {
+			result <- &hypervisor.DeviceFailed{}
+			return
+		}
+		size := fi.Size()
+		// compose hmp
+		hmp := fmt.Sprintf("object_add memory-backend-file,id=mem%d,share=on,mem-path=%s,size=%d", blockInfo.PmemId, blockInfo.Filename, size)
+		err := exec.Command("virsh", "-c", LibvirtdAddress, "qemu-monitor-command", ctx.Id, "--hmp", hmp).Run()
+		if err != nil {
+			result <- &hypervisor.DeviceFailed{}
+			return
+		}
+		hmp = fmt.Sprintf("device_add nvdimm,id=nvdimm%d,memdev=mem%d", blockInfo.PmemId, blockInfo.PmemId)
+		err = exec.Command("virsh", "-c", LibvirtdAddress, "qemu-monitor-command", ctx.Id, "--hmp", hmp).Run()
+		if err != nil {
+			result <- &hypervisor.DeviceFailed{}
+			return
+		}
+		result <- &hypervisor.BlockdevInsertedEvent{
+			DeviceName: "pmem" + strconv.Itoa(blockInfo.PmemId),
 		}
 		return
 	}
