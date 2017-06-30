@@ -16,15 +16,8 @@ func (f Factory) GetVm(cpu, mem int) (*hypervisor.Vm, error) {
 	// check if match the base
 	config := f.Config()
 	if config.CPU > cpu || config.Memory > mem {
-		// also strip unrelated option from @config
-		boot := &hypervisor.BootConfig{
-			CPU:         cpu,
-			Memory:      mem,
-			Kernel:      config.Kernel,
-			Initrd:      config.Initrd,
-			EnableVsock: config.EnableVsock,
-		}
-		return hypervisor.GetVm("", boot, false)
+		boot := *config
+		return Dummy(boot).GetVm(cpu, mem)
 	}
 
 	vm, err := f.GetBaseVm()
@@ -59,3 +52,13 @@ func (f Factory) GetVm(cpu, mem int) (*hypervisor.Vm, error) {
 	}
 	return vm, err
 }
+
+type Dummy hypervisor.BootConfig
+
+func (f Dummy) GetVm(cpu, mem int) (*hypervisor.Vm, error) {
+	config := hypervisor.BootConfig(f)
+	config.CPU = cpu
+	config.Memory = mem
+	return hypervisor.GetVm("", &config, false)
+}
+func (f Dummy) CloseFactory() {}

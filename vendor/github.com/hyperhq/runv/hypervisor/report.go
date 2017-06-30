@@ -4,17 +4,6 @@ import (
 	"github.com/hyperhq/runv/hypervisor/types"
 )
 
-// reportVmRun() send report to daemon, notify about that:
-//    1. Vm has been running.
-//    2. Init is ready for accepting commands
-func (ctx *VmContext) reportVmRun() {
-	ctx.client <- &types.VmResponse{
-		VmId:  ctx.Id,
-		Code:  types.E_VM_RUNNING,
-		Cause: "Vm runs",
-	}
-}
-
 // reportVmShutdown() send report to daemon, notify about that:
 //    1. Vm has been shutdown
 func (ctx *VmContext) reportVmShutdown() {

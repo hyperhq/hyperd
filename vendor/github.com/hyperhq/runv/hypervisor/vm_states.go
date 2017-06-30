@@ -274,9 +274,6 @@ func stateRunning(ctx *VmContext, ev VmEvent) {
 		ctx.Log(TRACE, "pod is running, got release command, let VM fly")
 		ctx.Become(nil, StateNone)
 		ctx.reportSuccess("", nil)
-	case EVENT_INIT_CONNECTED:
-		ctx.Log(TRACE, "hyperstart is ready to accept vm commands")
-		ctx.reportVmRun()
 	case EVENT_VM_EXIT, ERROR_VM_START_FAILED:
 		ctx.Log(TRACE, "VM has exit, or not started at all (%d)", ev.Event())
 		ctx.reportVmShutdown()

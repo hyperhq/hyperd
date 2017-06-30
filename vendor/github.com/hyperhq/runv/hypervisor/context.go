@@ -33,8 +33,6 @@ type VmContext struct {
 	PauseState int
 	Boot       *BootConfig
 
-	vmHyperstartAPIVersion uint32
-
 	// Communication Context
 	Hub    chan VmEvent
 	client chan *types.VmResponse
@@ -67,6 +65,8 @@ type VmContext struct {
 	handler stateHandler
 	current string
 	timer   *time.Timer
+
+	cancelWatchHyperstart chan struct{}
 
 	logPrefix string
 
@@ -147,6 +147,8 @@ func InitContext(id string, hub chan VmEvent, client chan *types.VmResponse, dc 
 		networks:        NewNetworkContext(),
 		vmExec:          make(map[string]*hyperstartapi.ExecCommand),
 		logPrefix:       fmt.Sprintf("SB[%s] ", id),
+
+		cancelWatchHyperstart: make(chan struct{}),
 	}
 	ctx.networks.sandbox = ctx
 
@@ -241,10 +243,14 @@ func (ctx *VmContext) Close() {
 		ctx.Log(INFO, "VmContext Close()")
 		ctx.lock.Lock()
 		defer ctx.lock.Unlock()
+		select {
+		case ctx.cancelWatchHyperstart <- struct{}{}:
+		default:
+		}
+		ctx.hyperstart.Close()
 		ctx.unsetTimeout()
 		ctx.networks.close()
 		ctx.DCtx.Close()
-		ctx.hyperstart.Close()
 		close(ctx.client)
 		os.Remove(ctx.ShareDir)
 		ctx.handler = nil

@@ -17,7 +17,8 @@ func (f Factory) GetVm(cpu, mem int) (*hypervisor.Vm, error) {
 			return single.New(b).GetVm(cpu, mem)
 		}
 	}
-	return single.New(f[0]).GetVm(cpu, mem)
+	boot := *f[0].Config()
+	return single.Dummy(boot).GetVm(cpu, mem)
 }
 
 func (f Factory) CloseFactory() {

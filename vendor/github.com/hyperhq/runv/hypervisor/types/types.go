@@ -2,7 +2,6 @@ package types
 
 const (
 	E_OK = iota
-	E_VM_RUNNING
 	E_VM_SHUTDOWN
 	E_POD_RUNNING
 	E_BAD_REQUEST
