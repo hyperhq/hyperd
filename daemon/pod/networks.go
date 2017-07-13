@@ -68,7 +68,7 @@ func (inf *Interface) prepare() error {
 		Ip:      inf.spec.Ip,
 		Mac:     inf.spec.Mac,
 		Gw:      inf.spec.Gateway,
-		TapName: inf.spec.Tap,
+		TapName: inf.spec.Ifname,
 	}
 
 	return nil
