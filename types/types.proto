@@ -437,7 +437,7 @@ message UserInterface {
   string ifname = 3;
   string mac    = 4;
   string gateway  = 5;
-  string tap    = 6;
+  string tap    = 6;//discarded
 }
 
 message UserServiceBackend {
