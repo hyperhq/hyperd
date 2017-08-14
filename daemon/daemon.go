@@ -18,10 +18,12 @@ import (
 	"github.com/docker/docker/registry"
 	dockerutils "github.com/docker/docker/utils"
 	"github.com/golang/glog"
+	"github.com/hyperhq/hyperd/networking/portmapping"
 	"github.com/hyperhq/hyperd/utils"
 	"github.com/hyperhq/runv/driverloader"
 	"github.com/hyperhq/runv/factory"
 	"github.com/hyperhq/runv/hypervisor"
+	"github.com/hyperhq/runv/hypervisor/network"
 )
 
 var (
@@ -224,9 +226,17 @@ func (daemon *Daemon) initRunV(c *apitypes.HyperConfig) error {
 }
 
 func (daemon *Daemon) initNetworks(c *apitypes.HyperConfig) error {
-	if err := hypervisor.InitNetwork(c.Bridge, c.BridgeIP, c.DisableIptables); err != nil {
+	if err := hypervisor.InitNetwork(c.Bridge, c.BridgeIP, true); err != nil {
 		glog.Errorf("InitNetwork failed, %s", err.Error())
 		return err
+	}
+	addr, err := network.GetIfaceAddr(network.BridgeIface)
+	if err != nil {
+		glog.Errorf("failed to get address of the configured bridge: %v", err)
+		return err
+	}
+	if err := portmapping.Setup(network.BridgeIface, addr, c.DisableIptables); err != nil {
+		glog.Errorf("Setup portmapping failed: %v", err)
 	}
 	return nil
 }
