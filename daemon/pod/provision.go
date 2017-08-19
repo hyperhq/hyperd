@@ -309,7 +309,6 @@ func (p *XPod) setPodInitStatus(initSuccess bool) {
 			p.status = S_POD_RUNNING
 		}
 	} else {
-		p.statusLock.Lock()
 		if p.sandbox != nil {
 			go p.sandbox.Shutdown()
 		}
