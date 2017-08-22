@@ -324,14 +324,14 @@ func (p *XPod) reserveNames(containers []*apitypes.UserContainer) error {
 		err  error
 		done = make([]*apitypes.UserContainer, 0, len(containers))
 	)
+	if err = p.factory.registry.ReservePod(p); err != nil {
+		return err
+	}
 	defer func() {
 		if err != nil {
 			p.releaseNames(done)
 		}
 	}()
-	if err = p.factory.registry.ReservePod(p); err != nil {
-		return err
-	}
 	for _, c := range containers {
 		if err = p.factory.registry.ReserveContainer(c.Id, c.Name, p.Id()); err != nil {
 			p.Log(ERROR, err)
