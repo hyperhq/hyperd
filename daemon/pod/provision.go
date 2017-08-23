@@ -269,6 +269,9 @@ func (p *XPod) createSandbox(spec *apitypes.UserPod) error {
 
 	go p.waitVMStop()
 	err = sandbox.InitSandbox(config)
+	if err != nil {
+		go sandbox.Shutdown()
+	}
 	p.Log(INFO, "sandbox init result: %#v", err)
 	p.setPodInitStatus(err == nil)
 	return err
@@ -309,10 +312,6 @@ func (p *XPod) setPodInitStatus(initSuccess bool) {
 			p.status = S_POD_RUNNING
 		}
 	} else {
-		p.statusLock.Lock()
-		if p.sandbox != nil {
-			go p.sandbox.Shutdown()
-		}
 		p.status = S_POD_STOPPING
 	}
 	p.initCond.Broadcast()
