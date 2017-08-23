@@ -10,11 +10,11 @@ import (
 	"github.com/hyperhq/runv/hypervisor"
 )
 
-func newNetworkAddSession(ctx *hypervisor.VmContext, qc *QemuContext, id string, fd uint64, device, mac string, index, addr int, result chan<- hypervisor.VmEvent) {
+func newNetworkAddSession(ctx *hypervisor.VmContext, qc *QemuContext, id string, fd int, device, mac string, index, addr int, result chan<- hypervisor.VmEvent) {
 	busAddr := fmt.Sprintf("0x%x", addr)
 	commands := make([]*QmpCommand, 3)
-	scm := syscall.UnixRights(int(fd))
-	glog.V(1).Infof("send net to qemu at %d", int(fd))
+	scm := syscall.UnixRights(fd)
+	glog.V(1).Infof("send net to qemu at %d", fd)
 	commands[0] = &QmpCommand{
 		Execute: "getfd",
 		Arguments: map[string]interface{}{

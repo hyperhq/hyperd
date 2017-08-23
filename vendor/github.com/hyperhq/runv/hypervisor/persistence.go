@@ -12,7 +12,14 @@ import (
 	"github.com/hyperhq/runv/lib/utils"
 )
 
-const CURRENT_PERSIST_VERSION = 20170224
+const CURRENT_PERSIST_VERSION = 20170611
+
+type VmHwStatus struct {
+	PciAddr  int    //next available pci addr for pci hotplug
+	ScsiId   int    //next available scsi id for scsi hotplug
+	AttachId uint64 //next available attachId for attached tty
+	GuestCid uint32 //vsock guest cid
+}
 
 type PersistVolumeInfo struct {
 	Name         string
@@ -31,13 +38,18 @@ type PersistNetworkInfo struct {
 	Id         string
 	Index      int
 	PciAddr    int
+	HostDevice string
 	DeviceName string
+	NewName    string
 	IpAddr     string
+	Mac        string
+	Mtu        uint64
 }
 
 type PersistInfo struct {
 	PersistVersion int
 	Id             string
+	Paused         bool
 	DriverInfo     map[string]interface{}
 	VmSpec         *hyperstartapi.Pod
 	HwStat         *VmHwStatus
@@ -68,6 +80,7 @@ func (ctx *VmContext) dump() (*PersistInfo, error) {
 	info := &PersistInfo{
 		PersistVersion: CURRENT_PERSIST_VERSION,
 		Id:             ctx.Id,
+		Paused:         ctx.PauseState == PauseStatePaused,
 		DriverInfo:     dr,
 		VmSpec:         ctx.networks.sandboxInfo(),
 		HwStat:         ctx.dumpHwInfo(),
@@ -99,6 +112,7 @@ func (ctx *VmContext) dump() (*PersistInfo, error) {
 			Id:         nic.Id,
 			Index:      nic.Index,
 			PciAddr:    nic.PCIAddr,
+			HostDevice: nic.HostDevice,
 			DeviceName: nic.DeviceName,
 			IpAddr:     nic.IpAddr,
 		}
@@ -110,8 +124,12 @@ func (ctx *VmContext) dump() (*PersistInfo, error) {
 			Id:         nic.Id,
 			Index:      nic.Index,
 			PciAddr:    nic.PCIAddr,
+			HostDevice: nic.HostDevice,
 			DeviceName: nic.DeviceName,
+			NewName:    nic.NewName,
 			IpAddr:     nic.IpAddr,
+			Mac:        nic.MacAddr,
+			Mtu:        nic.Mtu,
 		}
 		nid++
 	}
@@ -197,8 +215,12 @@ func (nc *NetworkContext) load(pinfo *PersistInfo) {
 			Id:         pi.Id,
 			Index:      pi.Index,
 			PCIAddr:    pi.PciAddr,
+			HostDevice: pi.HostDevice,
 			DeviceName: pi.DeviceName,
+			NewName:    pi.NewName,
 			IpAddr:     pi.IpAddr,
+			Mtu:        pi.Mtu,
+			MacAddr:    pi.Mac,
 		}
 		// if empty, may be old data, generate one for compatibility.
 		if ifc.Id == "" {
@@ -216,6 +238,7 @@ func (nc *NetworkContext) load(pinfo *PersistInfo) {
 
 func vmDeserialize(s []byte) (*PersistInfo, error) {
 	info := &PersistInfo{}
+	// TODO: REMOVE THIS
 	err := json.Unmarshal(s, info)
 	return info, err
 }
@@ -225,7 +248,7 @@ func (pinfo *PersistInfo) serialize() ([]byte, error) {
 }
 
 func (pinfo *PersistInfo) vmContext(hub chan VmEvent, client chan *types.VmResponse) (*VmContext, error) {
-	oldVersion := pinfo.PersistVersion < CURRENT_PERSIST_VERSION
+	oldVersion := pinfo.PersistVersion < 20170224
 
 	dc, err := HDriver.LoadContext(pinfo.DriverInfo)
 	if err != nil {
@@ -236,6 +259,10 @@ func (pinfo *PersistInfo) vmContext(hub chan VmEvent, client chan *types.VmRespo
 	ctx, err := InitContext(pinfo.Id, hub, client, dc, &BootConfig{})
 	if err != nil {
 		return nil, err
+	}
+
+	if pinfo.Paused {
+		ctx.PauseState = PauseStatePaused
 	}
 
 	err = ctx.loadHwStatus(pinfo)
