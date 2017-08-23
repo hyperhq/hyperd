@@ -31,6 +31,9 @@ func (pl *PodList) Get(id string) (*XPod, bool) {
 }
 
 func (pl *PodList) ReserveContainerID(id, pod string) error {
+	pl.mu.Lock()
+	defer pl.mu.Unlock()
+
 	if pn, ok := pl.containers[id]; ok && pn != pod {
 		return fmt.Errorf("the container id %s has already taken by pod %s", id, pn)
 	}
@@ -39,6 +42,9 @@ func (pl *PodList) ReserveContainerID(id, pod string) error {
 }
 
 func (pl *PodList) ReserveContainerName(name, pod string) error {
+	pl.mu.Lock()
+	defer pl.mu.Unlock()
+
 	if pn, ok := pl.containerNames[name]; ok && pn != pod {
 		return fmt.Errorf("the container name %s has already taken by pod %s", name, pn)
 	}

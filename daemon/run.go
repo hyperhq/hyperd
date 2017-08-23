@@ -23,10 +23,6 @@ func (daemon *Daemon) CreatePod(podId string, podSpec *apitypes.UserPod) (*pod.X
 		podSpec.Id = podId
 	}
 
-	if _, ok := daemon.PodList.Get(podSpec.Id); ok {
-		return nil, fmt.Errorf("pod %s already exist", podSpec.Id)
-	}
-
 	if err := podSpec.Validate(); err != nil {
 		return nil, err
 	}

@@ -533,24 +533,11 @@ func (p *XPod) RenameContainer(cid, name string) error {
 		return err
 	}
 	old := c.SpecName()
-	err = p.factory.registry.ReserveContainerName(name, p.Id())
-	if err != nil {
-		c.Log(ERROR, "failed to reserve new name during rename: %v", err)
-		return err
-	}
-	defer func() {
-		if err != nil {
-			p.factory.registry.ReleaseContainerName(name)
-		}
-	}()
-
 	err = c.rename(name)
 	if err != nil {
 		c.Log(ERROR, "failed to rename container: %v", err)
 		return err
 	}
-
 	p.Log(INFO, "rename container from %s to %s", old, name)
-	p.factory.registry.ReleaseContainerName(old)
 	return nil
 }
