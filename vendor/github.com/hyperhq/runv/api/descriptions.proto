@@ -2,6 +2,9 @@ syntax = "proto3";
 
 package api;
 
+// To generate description.pb.go, run:
+// $ protoc --go_out=plugins=grpc:. descriptions.proto
+
 message SandboxConfig {
     string hostname = 1;
     repeated string dns = 2;
@@ -52,13 +55,15 @@ message VolumeDescription {
 
 message InterfaceDescription {
     string id = 1;
-    bool lo = 2;
-    string bridge = 3;
-    string ip = 4;
-    string mac = 5;
-    string gw = 6;
-    string tapName = 7;
-    string options = 8;
+    string name = 2;
+    bool lo = 3;
+    string bridge = 4;
+    string ip = 5;
+    string mac = 6;
+    uint64 mtu = 7;
+    string gw = 8;
+    string tapName = 9;
+    string options = 10;
 }
 
 message PortDescription {

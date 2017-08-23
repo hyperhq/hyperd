@@ -9,6 +9,9 @@ import (
 	"time"
 
 	"github.com/hyperhq/hypercontainer-utils/hlog"
+	hyperstartapi "github.com/hyperhq/runv/hyperstart/api/json"
+	"github.com/hyperhq/runv/hyperstart/libhyperstart"
+	"github.com/hyperhq/runv/hypervisor/network"
 	"github.com/hyperhq/runv/hypervisor/types"
 )
 
@@ -40,9 +43,12 @@ func (ctx *VmContext) newContainer(id string) error {
 	if ok {
 		ctx.Log(TRACE, "start sending INIT_NEWCONTAINER")
 		var err error
-		c.stdinPipe, c.stdoutPipe, c.stderrPipe, err = ctx.hyperstart.NewContainer(c.VmSpec())
-		if err == nil && c.tty != nil {
-			go streamCopy(c.tty, c.stdinPipe, c.stdoutPipe, c.stderrPipe)
+		err = ctx.hyperstart.NewContainer(c.VmSpec())
+		if err == nil {
+			c.stdinPipe, c.stdoutPipe, c.stderrPipe = libhyperstart.StdioPipe(ctx.hyperstart, id, "init")
+			if c.tty != nil {
+				go streamCopy(c.tty, c.stdinPipe, c.stdoutPipe, c.stderrPipe)
+			}
 		}
 		ctx.Log(TRACE, "sent INIT_NEWCONTAINER")
 		go func() {
@@ -80,7 +86,7 @@ func (ctx *VmContext) restoreContainer(id string) (alive bool, err error) {
 		return false, fmt.Errorf("try to associate a container not exist in sandbox")
 	}
 	// FIXME do we need filter some error type? error=stopped isn't always true.
-	c.stdinPipe, c.stdoutPipe, c.stderrPipe, err = ctx.hyperstart.RestoreContainer(c.VmSpec())
+	err = ctx.hyperstart.RestoreContainer(c.VmSpec())
 	if err != nil {
 		ctx.Log(ERROR, "restore conatiner failed in hyperstart, mark as stopped: %v", err)
 		if strings.Contains(err.Error(), "hyperstart closed") {
@@ -106,12 +112,93 @@ func (ctx *VmContext) restoreContainer(id string) (alive bool, err error) {
 	return true, nil
 }
 
-func (ctx *VmContext) updateInterface(id string) error {
+func (ctx *VmContext) hyperstartAddInterface(id string) error {
 	if inf := ctx.networks.getInterface(id); inf == nil {
 		return fmt.Errorf("can't find interface whose ID is %s", id)
 	} else {
-		return ctx.hyperstart.UpdateInterface(inf.DeviceName, inf.IpAddr, inf.NetMask)
+		addrs := []hyperstartapi.IpAddress{}
+		ipAddrs := strings.Split(inf.IpAddr, ",")
+		for _, addr := range ipAddrs {
+			ip, mask, err := network.IpParser(addr)
+			if err != nil {
+				return err
+			}
+			// size, _ := mask.Size()
+			// addrs = append(addrs, hyperstartapi.IpAddress{ip.String(), fmt.Sprintf("%d", size)})
+			maskStr := fmt.Sprintf("%d.%d.%d.%d", mask[0], mask[1], mask[2], mask[3])
+			addrs = append(addrs, hyperstartapi.IpAddress{ip.String(), maskStr})
+		}
+		if err := ctx.hyperstart.UpdateInterface(libhyperstart.AddInf, inf.DeviceName, inf.NewName, addrs, inf.Mtu); err != nil {
+			return err
+		}
+
 	}
+	return nil
+}
+
+func (ctx *VmContext) hyperstartDeleteInterface(id string) error {
+	if inf := ctx.networks.getInterface(id); inf == nil {
+		return fmt.Errorf("can't find interface whose ID is %s", id)
+	} else {
+		// using new name as device name
+		return ctx.hyperstart.UpdateInterface(libhyperstart.DelInf, inf.NewName, "", nil, 0)
+	}
+}
+
+func (ctx *VmContext) hyperstartUpdateInterface(id string, addresses string, mtu uint64) error {
+	var (
+		addIP, delIP []hyperstartapi.IpAddress
+	)
+	inf := ctx.networks.getInterface(id)
+	if inf == nil {
+		return fmt.Errorf("can't find interface whose ID is %s", id)
+	}
+
+	if addresses != "" {
+		addrs := strings.Split(addresses, ",")
+		// TODO: currently if an IP address start with a '-',
+		// we treat it as deleting an IP which is not very elegant.
+		// Try to add one new field and function to handle this! @weizhang555
+		for _, addr := range addrs {
+			var del bool
+			if addr[0] == '-' {
+				del = true
+				addr = addr[1:]
+			}
+			ip, mask, err := network.IpParser(addr)
+			if err != nil {
+				return err
+			}
+			// size, _ := mask.Size()
+			// addrs = append(addrs, hyperstartapi.IpAddress{ip.String(), fmt.Sprintf("%d", size)})
+			maskStr := fmt.Sprintf("%d.%d.%d.%d", mask[0], mask[1], mask[2], mask[3])
+
+			if del {
+				delIP = append(delIP, hyperstartapi.IpAddress{ip.String(), maskStr})
+			} else {
+				addIP = append(addIP, hyperstartapi.IpAddress{ip.String(), maskStr})
+			}
+		}
+	}
+
+	if len(addIP) != 0 {
+		if err := ctx.hyperstart.UpdateInterface(libhyperstart.AddIP, inf.NewName, "", addIP, 0); err != nil {
+			return err
+		}
+	}
+
+	if len(delIP) != 0 {
+		if err := ctx.hyperstart.UpdateInterface(libhyperstart.DelIP, inf.NewName, "", delIP, 0); err != nil {
+			return err
+		}
+	}
+
+	if mtu > 0 {
+		if err := ctx.hyperstart.UpdateInterface(libhyperstart.SetMtu, inf.NewName, "", nil, mtu); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // TODO remove attachCmd and move streamCopy to hyperd
@@ -168,18 +255,13 @@ func (tty *TtyIO) Close() {
 }
 
 // TODO move this logic to hyperd
-func streamCopy(tty *TtyIO, stdinPipe io.WriteCloser, stdoutPipe, stderrPipe io.ReadCloser) {
+func streamCopy(tty *TtyIO, stdinPipe io.WriteCloser, stdoutPipe, stderrPipe io.Reader) {
 	var wg sync.WaitGroup
 	// old way cleanup all(expect stdinPipe) no matter what kinds of fails, TODO: change it
 	var once sync.Once
 	// cleanup closes tty.Stdin and thus terminates the first go routine
 	cleanup := func() {
 		tty.Close()
-		// stdinPipe is directly closed in the first go routine
-		stdoutPipe.Close()
-		if stderrPipe != nil {
-			stderrPipe.Close()
-		}
 	}
 	if tty.Stdin != nil {
 		go func() {
@@ -216,6 +298,7 @@ func streamCopy(tty *TtyIO, stdinPipe io.WriteCloser, stdoutPipe, stderrPipe io.
 }
 
 func (ctx *VmContext) startPod() error {
+	ctx.Log(INFO, "startPod: %#v", ctx.networks.sandboxInfo())
 	err := ctx.hyperstart.StartSandbox(ctx.networks.sandboxInfo())
 	if err == nil {
 		ctx.Log(INFO, "pod start successfully")
@@ -235,8 +318,8 @@ func (ctx *VmContext) shutdownVM() {
 		ctx.Log(DEBUG, "POD destroyed")
 		ctx.poweroffVM(false, "")
 	} else {
-		ctx.Log(WARNING, "Destroy pod failed")
-		ctx.poweroffVM(true, "Destroy pod failed")
+		ctx.Log(WARNING, "Destroy pod failed: %#v", err)
+		ctx.poweroffVM(true, fmt.Sprintf("Destroy pod failed: %#v", err))
 		ctx.Close()
 	}
 }

@@ -448,7 +448,7 @@ func (lc *LibvirtContext) domainXml(ctx *hypervisor.VmContext) (string, error) {
 	dom.SecLabel.Type = "none"
 
 	dom.CPU.Mode = "host-passthrough"
-	cmdline := "console=ttyS0 panic=1 no_timer_check"
+	cmdline := "console=ttyS0 panic=1 no_timer_check iommu=off"
 	if _, err := os.Stat("/dev/kvm"); os.IsNotExist(err) {
 		dom.Type = "qemu"
 		dom.CPU.Mode = "host-model"

@@ -2,7 +2,6 @@ package hypervisor
 
 import (
 	"errors"
-	"os"
 
 	"github.com/hyperhq/runv/api"
 	"github.com/hyperhq/runv/hypervisor/network"
@@ -16,6 +15,7 @@ type BootConfig struct {
 	BootToBeTemplate bool
 	BootFromTemplate bool
 	EnableVsock      bool
+	EnableVhostUser  bool
 	MemoryPath       string
 	DevicesStatePath string
 	Kernel           string
@@ -33,11 +33,11 @@ type BootConfig struct {
 
 type HostNicInfo struct {
 	Id      string
-	Fd      uint64
 	Device  string
 	Mac     string
 	Bridge  string
 	Gateway string
+	Options string
 }
 
 type GuestNicInfo struct {
@@ -53,12 +53,14 @@ type HypervisorDriver interface {
 
 	LoadContext(persisted map[string]interface{}) (DriverContext, error)
 
-	BuildinNetwork() bool
-
-	InitNetwork(bIface, bIP string, disableIptables bool) error
-
 	SupportLazyMode() bool
 	SupportVmSocket() bool
+}
+
+type BuildinNetworkDriver interface {
+	HypervisorDriver
+
+	InitNetwork(bIface, bIP string, disableIptables bool) error
 }
 
 var HDriver HypervisorDriver
@@ -85,13 +87,15 @@ type DriverContext interface {
 
 	Pause(ctx *VmContext, pause bool) error
 
-	ConfigureNetwork(vmId, requestedIP string, config *api.InterfaceDescription) (*network.Settings, error)
-	AllocateNetwork(vmId, requestedIP string) (*network.Settings, error)
-	ReleaseNetwork(vmId, releasedIP string, file *os.File) error
-
 	Stats(ctx *VmContext) (*types.PodStats, error)
 
 	Close()
+}
+
+type ConsoleDriverContext interface {
+	DriverContext
+
+	ConnectConsole(console chan<- string) error
 }
 
 type LazyDriverContext interface {
@@ -167,15 +171,11 @@ func (ec *EmptyContext) Pause(ctx *VmContext, pause bool) error { return nil }
 
 func (ec *EmptyContext) BuildinNetwork() bool { return false }
 
-func (ec *EmptyContext) ConfigureNetwork(vmId, requestedIP string, config *api.InterfaceDescription) (*network.Settings, error) {
+func (ec *EmptyContext) ConfigureNetwork(config *api.InterfaceDescription) (*network.Settings, error) {
 	return nil, nil
 }
 
-func (ec *EmptyContext) AllocateNetwork(vmId, requestedIP string) (*network.Settings, error) {
-	return nil, nil
-}
-
-func (ec *EmptyContext) ReleaseNetwork(vmId, releasedIP string, file *os.File) error {
+func (ec *EmptyContext) ReleaseNetwork(releasedIP string) error {
 	return nil
 }
 
