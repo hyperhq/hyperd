@@ -1,3 +1,5 @@
+// +build linux
+
 package qemu
 
 import (
@@ -258,11 +260,45 @@ func (qc *QemuContext) RemoveDisk(ctx *hypervisor.VmContext, blockInfo *hypervis
 }
 
 func (qc *QemuContext) AddNic(ctx *hypervisor.VmContext, host *hypervisor.HostNicInfo, guest *hypervisor.GuestNicInfo, result chan<- hypervisor.VmEvent) {
-	newNetworkAddSession(ctx, qc, host.Id, host.Fd, guest.Device, host.Mac, guest.Index, guest.Busaddr, result)
+	var (
+		fd       int = -1
+		err      error
+		waitChan chan hypervisor.VmEvent = make(chan hypervisor.VmEvent, 1)
+	)
+
+	if ctx.Boot.EnableVhostUser {
+		err = GetVhostUserPort(host.Device, host.Bridge, ctx.HomeDir, host.Options)
+	} else {
+		fd, err = GetTapFd(host.Device, host.Bridge, host.Options)
+	}
+
+	if err != nil {
+		glog.Errorf("fail to create nic for sandbox: %v, %v", ctx.Id, err)
+		result <- &hypervisor.DeviceFailed{
+			Session: nil,
+		}
+		return
+	}
+
+	go func() {
+		// close tap file if necessary
+		ev, ok := <-waitChan
+		if !ok {
+			syscall.Close(fd)
+			close(result)
+		} else {
+			if _, ok := ev.(*hypervisor.DeviceFailed); ok {
+				syscall.Close(fd)
+			}
+			result <- ev
+		}
+	}()
+	newNetworkAddSession(ctx, qc, fd, host, guest, waitChan)
 }
 
 func (qc *QemuContext) RemoveNic(ctx *hypervisor.VmContext, n *hypervisor.InterfaceCreated, callback hypervisor.VmEvent, result chan<- hypervisor.VmEvent) {
-	newNetworkDelSession(ctx, qc, n.DeviceName, callback, result)
+	syscall.Close(n.TapFd)
+	newNetworkDelSession(ctx, qc, n.NewName, callback, result)
 }
 
 func (qc *QemuContext) SetCpus(ctx *hypervisor.VmContext, cpus int) error {

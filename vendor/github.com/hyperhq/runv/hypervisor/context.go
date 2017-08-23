@@ -15,13 +15,6 @@ import (
 	"github.com/hyperhq/runv/lib/utils"
 )
 
-type VmHwStatus struct {
-	PciAddr  int    //next available pci addr for pci hotplug
-	ScsiId   int    //next available scsi id for scsi hotplug
-	AttachId uint64 //next available attachId for attached tty
-	GuestCid uint32 //vsock guest cid
-}
-
 const (
 	PauseStateUnpaused = iota
 	PauseStatePaused
@@ -58,15 +51,14 @@ type VmContext struct {
 	containers map[string]*ContainerContext
 	networks   *NetworkContext
 
-	// internal states
-	vmExec map[string]*hyperstartapi.ExecCommand
-
 	// Internal Helper
 	handler stateHandler
 	current string
 	timer   *time.Timer
 
 	cancelWatchHyperstart chan struct{}
+
+	sockConnected chan bool
 
 	logPrefix string
 
@@ -125,29 +117,28 @@ func InitContext(id string, hub chan VmEvent, client chan *types.VmResponse, dc 
 	}
 
 	ctx = &VmContext{
-		Id:              id,
-		Boot:            boot,
-		PauseState:      PauseStateUnpaused,
-		pciAddr:         PciAddrFrom,
-		scsiId:          0,
-		GuestCid:        cid,
-		Hub:             hub,
-		client:          client,
-		DCtx:            dc,
-		HomeDir:         homeDir,
-		HyperSockName:   hyperSockName,
-		TtySockName:     ttySockName,
-		ConsoleSockName: consoleSockName,
-		ShareDir:        shareDir,
-		timer:           nil,
-		handler:         stateRunning,
-		current:         StateRunning,
-		volumes:         make(map[string]*DiskContext),
-		containers:      make(map[string]*ContainerContext),
-		networks:        NewNetworkContext(),
-		vmExec:          make(map[string]*hyperstartapi.ExecCommand),
-		logPrefix:       fmt.Sprintf("SB[%s] ", id),
-
+		Id:                    id,
+		Boot:                  boot,
+		PauseState:            PauseStateUnpaused,
+		pciAddr:               PciAddrFrom,
+		scsiId:                0,
+		GuestCid:              cid,
+		Hub:                   hub,
+		client:                client,
+		DCtx:                  dc,
+		HomeDir:               homeDir,
+		HyperSockName:         hyperSockName,
+		TtySockName:           ttySockName,
+		ConsoleSockName:       consoleSockName,
+		ShareDir:              shareDir,
+		timer:                 nil,
+		handler:               stateRunning,
+		current:               StateRunning,
+		volumes:               make(map[string]*DiskContext),
+		containers:            make(map[string]*ContainerContext),
+		networks:              NewNetworkContext(),
+		logPrefix:             fmt.Sprintf("SB[%s] ", id),
+		sockConnected:         make(chan bool),
 		cancelWatchHyperstart: make(chan struct{}),
 	}
 	ctx.networks.sandbox = ctx
@@ -201,41 +192,6 @@ func (ctx *VmContext) NextPciAddr() int {
 	ctx.pciAddr++
 	ctx.idLock.Unlock()
 	return addr
-}
-
-func (ctx *VmContext) LookupExecBySession(session uint64) string {
-	ctx.lock.RLock()
-	defer ctx.lock.RUnlock()
-
-	for id, exec := range ctx.vmExec {
-		if exec.Process.Stdio == session {
-			ctx.Log(DEBUG, "found exec %s whose session is %v", id, session)
-			return id
-		}
-	}
-
-	return ""
-}
-
-func (ctx *VmContext) DeleteExec(id string) {
-	ctx.lock.Lock()
-	defer ctx.lock.Unlock()
-
-	delete(ctx.vmExec, id)
-}
-
-func (ctx *VmContext) LookupBySession(session uint64) string {
-	ctx.lock.RLock()
-	defer ctx.lock.RUnlock()
-
-	for id, c := range ctx.containers {
-		if c.process.Stdio == session {
-			ctx.Log(DEBUG, "found container %s whose session is %v", c.Id, session)
-			return id
-		}
-	}
-	ctx.Log(DEBUG, "can not found container whose session is %s", session)
-	return ""
 }
 
 func (ctx *VmContext) Close() {
@@ -314,6 +270,24 @@ func (ctx *VmContext) RemoveInterface(id string, result chan api.Result) {
 	}
 
 	ctx.networks.removeInterface(id, result)
+}
+
+func (ctx *VmContext) UpdateInterface(inf *api.InterfaceDescription) error {
+	ctx.lock.Lock()
+	defer ctx.lock.Unlock()
+
+	if ctx.current != StateRunning {
+		ctx.Log(DEBUG, "update interface %s during %v", inf.Name, ctx.current)
+		return fmt.Errorf("pod not running")
+	}
+
+	return ctx.networks.updateInterface(inf)
+}
+
+func (ctx *VmContext) AllInterfaces() []*InterfaceCreated {
+	ctx.lock.Lock()
+	defer ctx.lock.Unlock()
+	return ctx.networks.allInterfaces()
 }
 
 func (ctx *VmContext) validateContainer(c *api.ContainerDescription) error {
@@ -429,6 +403,17 @@ func (ctx *VmContext) RemoveContainer(id string, result chan<- api.Result) {
 	ctx.Log(INFO, "remove container %s", id)
 	delete(ctx.containers, id)
 	cc.root.remove(result)
+}
+
+func (ctx *VmContext) containerList() []string {
+	ctx.lock.Lock()
+	defer ctx.lock.Unlock()
+
+	list := []string{}
+	for c := range ctx.containers {
+		list = append(list, c)
+	}
+	return list
 }
 
 func (ctx *VmContext) AddVolume(vol *api.VolumeDescription, result chan api.Result) {
