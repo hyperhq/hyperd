@@ -29,7 +29,7 @@ Initrd=/var/lib/hyper/hyper-initrd.img
 # Boot CDROOM for "vbox" hypervisor (for mac only)
 # Vbox=/opt/hyper/static/iso/hyper-vbox-boot.iso
 
-# Storage driver for hyperd, valid value includes devicemapper, overlay, and aufs
+# Storage driver for hyperd, valid value includes rawblock, devicemapper, overlay, and aufs
 # StorageDriver=overlay
 
 # Bridge device for hyperd, default is hyper0
