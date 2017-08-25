@@ -1,6 +1,8 @@
 package daemon
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -182,9 +184,14 @@ func (dms *DevMapperStorage) getPersistedId(podId, volName string) (int, error) 
 func (dms *DevMapperStorage) CreateVolume(podId string, spec *apitypes.UserVolume) error {
 	var err error
 
-	deviceName := fmt.Sprintf("%s-%s-%s", dms.VolPoolName, podId, spec.Name)
+	// kernel dm has limitation of 128 bytes on device name length
+	// include/uapi/linux/dm-ioctl.h#L16
+	// #define DM_NAME_LEN 128
+	// Use sha256 so it is fixed 64 bytes
+	chksum := sha256.Sum256([]byte(podId + spec.Name))
+	deviceName := fmt.Sprintf("%s-%s", dms.VolPoolName, hex.EncodeToString(chksum[:sha256.Size]))
 	dev_id, _ := dms.getPersistedId(podId, deviceName)
-	glog.Infof("DeviceID is %d", dev_id)
+	glog.Infof("DeviceID is %d for %s of pod %s container %s", dev_id, deviceName, podId, spec.Name)
 
 	restore := dev_id > 0
 
