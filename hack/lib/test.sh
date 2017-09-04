@@ -121,7 +121,7 @@ hyper::test::service() {
 
 hyper::test::nfs_volume() {
   echo "create nfs volume server"
-  server=$(sudo hyperctl run -d hyperhq/nfs-server-tester | sed -ne "s/POD id is \(.*\)/\1/p")
+  server=$(sudo hyperctl run --memory 256 -d hyperhq/nfs-server-tester | sed -ne "s/POD id is \(.*\)/\1/p")
   ip=$(sudo hyperctl exec $server ip addr |sed -ne "s|.* \(.*\)/24.*|\1|p")
   sleep 10 # nfs-server-tester takes a bit long to init in hykins
   echo "create nfs volume client"
