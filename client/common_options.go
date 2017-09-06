@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/docker/docker/pkg/namesgenerator"
@@ -98,7 +97,7 @@ func (cli *HyperClient) JsonFromCmdline(container bool, cmdArgs, cmdEnvs, cmdPor
 		image      = cmdArgs[0]
 		command    = []string{}
 		env        = []*apitype.EnvironmentVar{}
-		ports      = []*apitype.UserContainerPort{}
+		ports      = []*apitype.PortMapping{}
 		logOpts    = make(map[string]string)
 		labels     = make(map[string]string)
 		volumesRef = []*apitype.UserVolumeReference{}
@@ -170,7 +169,6 @@ func (cli *HyperClient) JsonFromCmdline(container bool, cmdArgs, cmdEnvs, cmdPor
 		Command:       command,
 		Workdir:       cmdWorkdir,
 		Entrypoint:    entrypoints,
-		Ports:         ports,
 		Envs:          env,
 		Volumes:       volumesRef,
 		Files:         []*apitype.UserFileReference{},
@@ -190,6 +188,7 @@ func (cli *HyperClient) JsonFromCmdline(container bool, cmdArgs, cmdEnvs, cmdPor
 				Type:   cmdLogDriver,
 				Config: logOpts,
 			},
+			Portmappings: ports,
 		}
 		body = userPod
 	}
@@ -265,13 +264,11 @@ func parseVolume(volStr string) (*apitype.UserVolume, *apitype.UserVolumeReferen
 	return &vol, &volRef, nil
 }
 
-func parsePortMapping(portmap string) (*apitype.UserContainerPort, error) {
+func parsePortMapping(portmap string) (*apitype.PortMapping, error) {
 
 	var (
-		port  = apitype.UserContainerPort{}
-		proto string
-		hPort string
-		cPort string
+		tmp   *apitype.PortMapping
+		port  *apitype.PortMapping
 		err   error
 	)
 
@@ -279,31 +276,24 @@ func parsePortMapping(portmap string) (*apitype.UserContainerPort, error) {
 	if len(fields) < 2 {
 		return nil, fmt.Errorf("flag needs host port and container port: --publish")
 	} else if len(fields) == 2 {
-		proto = "tcp"
-		hPort = fields[0]
-		cPort = fields[1]
-	} else {
-		proto = fields[0]
-		if proto != "tcp" && proto != "udp" {
-			return nil, fmt.Errorf("flag needs protocol(tcp or udp): --publish")
+		tmp = &apitype.PortMapping{
+			Protocol:      "tcp",
+			ContainerPort: fields[1],
+			HostPort:      fields[0],
 		}
-		hPort = fields[1]
-		cPort = fields[2]
+	} else {
+		tmp = &apitype.PortMapping{
+			Protocol:      fields[0],
+			ContainerPort: fields[2],
+			HostPort:      fields[1],
+		}
 	}
 
-	port.Protocol = proto
-	hp, err := strconv.Atoi(hPort)
-	port.HostPort = int32(hp)
+	port, err = tmp.Formalize()
 	if err != nil {
-		return nil, fmt.Errorf("flag needs host port and container port: --publish: %v", err)
+		return nil, err
 	}
-	cp, err := strconv.Atoi(cPort)
-	port.ContainerPort = int32(cp)
-	if err != nil {
-		return nil, fmt.Errorf("flag needs host port and container port: --publish: %v", err)
-	}
-
-	return &port, nil
+	return port, nil
 }
 
 func imageToName(image string) string {

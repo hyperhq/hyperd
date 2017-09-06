@@ -226,6 +226,14 @@ func (pm *PortMapping) SameDestWith(other *PortMapping) bool {
 	return pm.Protocol == other.Protocol && pm.ContainerPort == other.ContainerPort
 }
 
+func (pm *PortMapping) Formalize() (*PortMapping, error) {
+	f, err := readPortMapping(pm)
+	if err != nil {
+		return nil, err
+	}
+	return f.toSpec(), nil
+}
+
 func (pm *_PortMapping) toSpec() *PortMapping {
 	return &PortMapping{
 		ContainerPort: pm.container.String(),
