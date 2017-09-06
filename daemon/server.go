@@ -12,6 +12,7 @@ import (
 	"github.com/docker/engine-api/types"
 	"github.com/golang/glog"
 	"github.com/hyperhq/hyperd/engine"
+	"github.com/hyperhq/hyperd/errors"
 	"github.com/hyperhq/hyperd/lib/sysinfo"
 	"github.com/hyperhq/hyperd/libmoby/distribution"
 	apitypes "github.com/hyperhq/hyperd/types"
@@ -295,6 +296,60 @@ func (daemon *Daemon) CmdCleanPod(podId string) (*engine.Env, error) {
 	v.Set("Cause", cause)
 
 	return v, nil
+}
+
+// pod level port mappings API
+func (daemon *Daemon) CmdListPortMappings(podId string) (*engine.Env, error) {
+	p, ok := daemon.PodList.Get(podId)
+	if !ok {
+		return nil, errors.ErrPodNotFound.WithArgs(podId)
+	}
+
+	pms := p.ListPortMappings()
+	v := &engine.Env{}
+	v.SetJson("PortMappings", pms)
+
+	return v, nil
+}
+
+func (daemon *Daemon) CmdAddPortMappings(podId string, req []byte) (*engine.Env, error) {
+	p, ok := daemon.PodList.Get(podId)
+	if !ok {
+		return nil, errors.ErrPodNotFound.WithArgs(podId)
+	}
+
+	var pms []*apitypes.PortMapping
+	err := json.Unmarshal(req, &pms)
+	if err != nil {
+		return nil, errors.ErrBadJsonFormat.WithArgs(err)
+	}
+
+	err = p.AddPortMapping(pms)
+	if err != nil {
+		return nil, err
+	}
+
+	return &engine.Env{}, nil
+}
+
+func (daemon *Daemon) CmdDeletePortMappings(podId string, req []byte) (*engine.Env, error) {
+	p, ok := daemon.PodList.Get(podId)
+	if !ok {
+		return nil, errors.ErrPodNotFound.WithArgs(podId)
+	}
+
+	var pms []*apitypes.PortMapping
+	err := json.Unmarshal(req, &pms)
+	if err != nil {
+		return nil, errors.ErrBadJsonFormat.WithArgs(err)
+	}
+
+	err = p.RemovePortMappingByDest(pms)
+	if err != nil {
+		return nil, err
+	}
+
+	return &engine.Env{}, nil
 }
 
 func (daemon *Daemon) CmdImageDelete(name string, force, prune bool) ([]*apitypes.ImageDelete, error) {

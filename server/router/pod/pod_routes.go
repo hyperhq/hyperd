@@ -197,3 +197,36 @@ func (p *podRouter) deletePod(ctx context.Context, w http.ResponseWriter, r *htt
 
 	return env.WriteJSON(w, http.StatusOK)
 }
+
+// port mappings
+func (p *podRouter) getPortMappings(ctx context.Context, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+	env, err := p.backend.CmdListPortMappings(vars["id"])
+	if err != nil {
+		return err
+	}
+
+	return env.WriteJSON(w, http.StatusOK)
+}
+
+func (p *podRouter) putPortMappings(ctx context.Context, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+	pms, _ := ioutil.ReadAll(r.Body)
+	switch vars["action"] {
+	case "add":
+		_, err := p.backend.CmdAddPortMappings(vars["id"], pms)
+		if err != nil {
+			return err
+		}
+		w.WriteHeader(http.StatusNoContent)
+	case "delete":
+		_, err := p.backend.CmdDeletePortMappings(vars["id"], pms)
+		if err != nil {
+			return err
+		}
+		w.WriteHeader(http.StatusNoContent)
+	default:
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("Only add or delete operation are permitted"))
+		return nil
+	}
+	return nil
+}
