@@ -147,6 +147,7 @@ It has these top-level messages:
 	PersistContainer
 	PersistVolume
 	PersistInterface
+	PersistPortmappings
 */
 package types
 

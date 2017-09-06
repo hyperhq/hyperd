@@ -81,6 +81,13 @@ func (p *XPod) AddPortMapping(spec []*apitypes.PortMapping) error {
 	copy(all[len(spec):], p.portMappings)
 	p.portMappings = all
 
+	err = p.savePortMapping()
+	if err != nil {
+		p.Log(WARNING, "failed to persist new portmapping rules")
+		// ignore the error
+		err = nil
+	}
+
 	return nil
 }
 
@@ -126,6 +133,14 @@ func (p *XPod) removePortMapping(tbr []*apitypes.PortMapping, eq portMappingComp
 	if err != nil {
 		p.Log(ERROR, "failed to clean up rules: %v", err)
 		return err
+	}
+
+	p.portMappings = other
+	err = p.savePortMapping()
+	if err != nil {
+		p.Log(WARNING, "failed to persist removed portmapping rules")
+		// ignore the error
+		err = nil
 	}
 
 	return err
