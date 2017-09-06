@@ -307,7 +307,7 @@ func (daemon *Daemon) CmdListPortMappings(podId string) (*engine.Env, error) {
 
 	pms := p.ListPortMappings()
 	v := &engine.Env{}
-	v.SetJson("PortMappings", pms)
+	v.SetJson("portMappings", pms)
 
 	return v, nil
 }
