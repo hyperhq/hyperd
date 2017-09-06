@@ -22,8 +22,55 @@ type PortRange struct {
 
 type PortMapping struct {
 	Protocol  string
-	ToPorts   PortRange
-	FromPorts PortRange
+	ToPorts   *PortRange
+	FromPorts *PortRange
+}
+
+// NewPortRange generate a port range from string r. the r should be a decimal number or
+// in format begin-end, where begin and end are both decimal number. And the port range should
+// be 0-65535, i.e. 16-bit unsigned int
+// It returns PortRange pointer for valid input, otherwise return error
+func NewPortRange(r string) (*PortRange, error) {
+	segs := strings.SplitN(r, "-", 2)
+	b, err := strconv.ParseUint(segs[0], 10, 16)
+	if err != nil {
+		return nil, err
+	}
+	e := b
+	if len(segs) > 1 {
+		e, err = strconv.ParseUint(segs[1], 10, 16)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &PortRange{
+		Begin: int(b),
+		End:   int(e),
+	}
+}
+
+// NewPortMapping generate a PortMapping from three strings: proto (tcp or udp, default is tcp),
+// and from/to port (single port or a range, see NewPortRange)
+func NewPortMapping(proto, from, to string) (*PortMapping, error) {
+	if proto == "" {
+		proto = "tcp"
+	}
+	if proto != "tcp" && proto != "udp" {
+		return nil, fmt.Errorf("unsupported protocol %s", proto)
+	}
+	f, err := NewPortRange(from)
+	if err != nil {
+		return nil, err
+	}
+	t, err := NewPortRange(to)
+	if err != nil {
+		return nil, err
+	}
+	return &PortMapping{
+		Protocol:  proto,
+		ToPorts:   t,
+		FromPorts: f,
+	}, nil
 }
 
 func generateIptablesArgs(containerip string, m *PortMapping) ([]string, []string, error) {
