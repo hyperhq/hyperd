@@ -208,6 +208,24 @@ func readPortMapping(pm *PortMapping) (*_PortMapping, error) {
 	}, nil
 }
 
+func (pm *PortMapping) EqualTo(other *PortMapping) bool {
+	if other == nil && pm == nil {
+		return true
+	} else if other == nil || pm == nil {
+		return false
+	}
+	return pm.Protocol == other.Protocol && pm.ContainerPort == other.ContainerPort && pm.HostPort == other.ContainerPort
+}
+
+func (pm *PortMapping) SameDestWith(other *PortMapping) bool {
+	if other == nil && pm == nil {
+		return true
+	} else if other == nil || pm == nil {
+		return false
+	}
+	return pm.Protocol == other.Protocol && pm.ContainerPort == other.ContainerPort
+}
+
 func (pm *_PortMapping) toSpec() *PortMapping {
 	return &PortMapping{
 		ContainerPort: pm.container.String(),

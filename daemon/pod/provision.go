@@ -8,6 +8,7 @@ import (
 
 	"github.com/hyperhq/hypercontainer-utils/hlog"
 	"github.com/hyperhq/hyperd/errors"
+	"github.com/hyperhq/hyperd/networking/portmapping"
 	apitypes "github.com/hyperhq/hyperd/types"
 	"github.com/hyperhq/hyperd/utils"
 	runv "github.com/hyperhq/runv/api"
@@ -384,7 +385,6 @@ func (p *XPod) initResources(spec *apitypes.UserPod, allowCreate bool) error {
 	}
 
 	p.services = newServices(p, spec.Services)
-	p.portMappings = spec.Portmappings
 
 	return nil
 }
@@ -419,12 +419,23 @@ func (p *XPod) prepareResources() error {
 		if err = inf.prepare(); err != nil {
 			return err
 		}
+		if p.containerIP == "" {
+			p.containerIP = inf.descript.Ip
+		}
 	}
+
+	err = p.initPortMapping()
+	if err != nil {
+		p.Log(ERROR, "failed to initial setup port mappings: %v", err)
+		return err
+	}
+	// if insert any other operations here, add rollback code for the
+	// port mapping operation
 
 	return nil
 }
 
-// addResourcesToSandbox() add resources to sandbox parallelly, it issues
+// addResourcesToSandbox() add resources to sandbox in parallel, it issues
 // runV API parallelly to send the NIC, Vols, and Containers to sandbox
 func (p *XPod) addResourcesToSandbox() error {
 	p.resourceLock.Lock()
