@@ -267,9 +267,9 @@ func parseVolume(volStr string) (*apitype.UserVolume, *apitype.UserVolumeReferen
 func parsePortMapping(portmap string) (*apitype.PortMapping, error) {
 
 	var (
-		tmp   *apitype.PortMapping
-		port  *apitype.PortMapping
-		err   error
+		tmp  *apitype.PortMapping
+		port *apitype.PortMapping
+		err  error
 	)
 
 	fields := strings.Split(portmap, ":")

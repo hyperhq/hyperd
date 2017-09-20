@@ -326,9 +326,9 @@ func (p *XPod) removePodMetaFromDB() error {
 }
 
 func (p *XPod) savePortMapping() error {
-	pm := &types.PersistPortmappings {
-		Pod: p.Id(),
-		ContainerIP: p.containerIP,
+	pm := &types.PersistPortmappings{
+		Pod:          p.Id(),
+		ContainerIP:  p.containerIP,
 		PortMappings: p.portMappings,
 	}
 	return saveMessage(p.factory.db, fmt.Sprintf(PMAP_KEY_FMT, p.Id()), pm, p, "port mappings")

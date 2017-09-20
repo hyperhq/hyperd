@@ -12,7 +12,7 @@ import (
 
 func (cli *HyperClient) HyperCmdPorts(args ...string) error {
 	var opts struct {
-		Portmap       []string `short:"p" long:"publish" value-name:"[]" default-mask:"-" description:"Publish a container's port to the host, format: -p|--publish [tcp/udp:]hostPort:containerPort (only valid for add and delete)"`
+		Portmap []string `short:"p" long:"publish" value-name:"[]" default-mask:"-" description:"Publish a container's port to the host, format: -p|--publish [tcp/udp:]hostPort:containerPort (only valid for add and delete)"`
 	}
 	var parser = gflag.NewParser(&opts, gflag.Default|gflag.IgnoreUnknown|gflag.PassAfterNonOption)
 	if len(args) == 0 {

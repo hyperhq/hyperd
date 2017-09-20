@@ -8,7 +8,6 @@ import (
 
 	"github.com/hyperhq/hypercontainer-utils/hlog"
 	"github.com/hyperhq/hyperd/errors"
-	"github.com/hyperhq/hyperd/networking/portmapping"
 	apitypes "github.com/hyperhq/hyperd/types"
 	"github.com/hyperhq/hyperd/utils"
 	runv "github.com/hyperhq/runv/api"

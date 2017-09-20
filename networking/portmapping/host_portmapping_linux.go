@@ -46,7 +46,7 @@ func NewPortRange(r string) (*PortRange, error) {
 	return &PortRange{
 		Begin: int(b),
 		End:   int(e),
-	}
+	}, nil
 }
 
 // NewPortMapping generate a PortMapping from three strings: proto (tcp or udp, default is tcp),

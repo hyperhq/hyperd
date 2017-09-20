@@ -29,7 +29,7 @@ func (p *XPod) initPortMapping() error {
 		pms, err := translatePortMapping(p.portMappings)
 		if err != nil {
 			hlog.Log(ERROR, err)
-			return nil, err
+			return err
 		}
 		err = portmapping.SetupPortMaps(p.containerIP, pms)
 		if err != nil {
@@ -42,7 +42,12 @@ func (p *XPod) initPortMapping() error {
 
 func (p *XPod) flushPortMapping() error {
 	if p.containerIP != "" && len(p.portMappings) > 0 {
-		err := portmapping.ReleasePortMaps(p.containerIP, p.portMappings)
+		pms, err := translatePortMapping(p.portMappings)
+		if err != nil {
+			hlog.Log(ERROR, err)
+			return err
+		}
+		err = portmapping.ReleasePortMaps(p.containerIP, pms)
 		if err != nil {
 			p.Log(ERROR, "release port mappings failed: %v", err)
 			return err
