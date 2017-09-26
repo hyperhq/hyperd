@@ -1,0 +1,18 @@
+{
+        "id": "port-mapping-test",
+        "containers" : [{
+            "name": "pmtest",
+            "image": "busybox:latest",
+			"command": ["/bin/nc", "-l", "-p", "1300"]
+        }],
+        "resource": {
+            "vcpu": 1,
+            "memory": 128
+        },
+        "portmappings": [{
+			"containerport": "1300-1310",
+			"hostport": "3000-3010",
+			"protocol": "tcp"
+		}]
+}
+

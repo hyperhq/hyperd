@@ -17,7 +17,7 @@
         "volumes": [{
             "name": "resolv.conf",
             "source": "/etc/resolv.conf",
-            "driver": "vfs"
+            "format": "vfs"
         }],
         "tty": true
 }
