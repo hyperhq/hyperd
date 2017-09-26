@@ -250,7 +250,7 @@ func (pm *_PortMapping) notDetermined() bool {
 	return !pm.container.isRange() && pm.host.isRange()
 }
 
-func mergePorts(pms []*_PortMapping) ([]*_PortMapping, error) {
+func mergeContinuousPorts(pms []*_PortMapping) ([]*_PortMapping, error) {
 	var (
 		results = []*_PortMapping{}
 		occupy  = map[int]bool{}
@@ -362,18 +362,6 @@ func (p *UserPod) MergePortmappings() error {
 		} else if port.protocol == "udp" {
 			udpPorts = append(udpPorts, port)
 		}
-	}
-
-	hlog.Log(hlog.TRACE, "TCP ports to be merged: %v", tcpPorts)
-	tcpPorts, err = mergePorts(tcpPorts)
-	if err != nil {
-		return err
-	}
-
-	hlog.Log(hlog.TRACE, "UDP ports to be merged: %v", udpPorts)
-	udpPorts, err = mergePorts(udpPorts)
-	if err != nil {
-		return err
 	}
 
 	pms := []*PortMapping{}

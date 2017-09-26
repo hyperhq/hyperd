@@ -32,7 +32,7 @@ func NewRouter(b Backend) router.Router {
 		local.NewPostRoute("/pod/pause", r.postPodPause),
 		local.NewPostRoute("/pod/unpause", r.postPodUnpause),
 		// PUT
-		local.NewPostRoute("/pod/{id}/portmappings/{action}", r.putPortMappings),
+		local.NewPutRoute("/pod/{id}/portmappings/{action}", r.putPortMappings),
 		// DELETE
 		local.NewDeleteRoute("/pod", r.deletePod),
 	}

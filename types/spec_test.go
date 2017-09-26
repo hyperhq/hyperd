@@ -217,7 +217,7 @@ func TestMergePorts(t *testing.T) {
 
 	t.Log("> testing empty port mapping list")
 	pms = []*_PortMapping{}
-	res, err = mergePorts(pms)
+	res, err = mergeContinuousPorts(pms)
 	if err != nil {
 		t.Fatalf("failed with emport pm list: %v", err)
 	}
@@ -241,7 +241,7 @@ func TestMergePorts(t *testing.T) {
 		},
 	}
 	t.Logf("---[debug] input items %v", pms)
-	res, err = mergePorts(pms)
+	res, err = mergeContinuousPorts(pms)
 	if err != nil {
 		t.Fatalf("error with normal pm list: %v", err)
 	}
@@ -266,7 +266,7 @@ func TestMergePorts(t *testing.T) {
 		},
 	}
 	t.Logf("---[debug] input items %v", pms)
-	res, err = mergePorts(pms)
+	res, err = mergeContinuousPorts(pms)
 	if err != nil {
 		t.Fatalf("error with normal pm list: %v", err)
 	}
@@ -290,7 +290,7 @@ func TestMergePorts(t *testing.T) {
 		},
 	}
 	t.Logf("---[debug] input items %v", pms)
-	res, err = mergePorts(pms)
+	res, err = mergeContinuousPorts(pms)
 	if err != nil {
 		t.Fatalf("error with normal pm list: %v", err)
 	}
@@ -315,7 +315,7 @@ func TestMergePorts(t *testing.T) {
 		},
 	}
 	t.Logf("---[debug] input items %v", pms)
-	res, err = mergePorts(pms)
+	res, err = mergeContinuousPorts(pms)
 	if err == nil {
 		t.Fatalf("failed with overlapped pm list: %v", res)
 	}
@@ -336,7 +336,7 @@ func TestMergePorts(t *testing.T) {
 		},
 	}
 	t.Logf("---[debug] input items %v", pms)
-	res, err = mergePorts(pms)
+	res, err = mergeContinuousPorts(pms)
 	if err == nil {
 		t.Fatalf("failed with overlapped pm list: %v", res)
 	}
@@ -357,7 +357,7 @@ func TestMergePorts(t *testing.T) {
 		},
 	}
 	t.Logf("---[debug] input items %v", pms)
-	res, err = mergePorts(pms)
+	res, err = mergeContinuousPorts(pms)
 	if err == nil {
 		t.Fatalf("failed with overlapped pm list: %v", res)
 	}
@@ -379,7 +379,7 @@ func TestMergePorts(t *testing.T) {
 		},
 	}
 	t.Logf("---[debug] input items %v", pms)
-	res, err = mergePorts(pms)
+	res, err = mergeContinuousPorts(pms)
 	if err != nil {
 		t.Fatalf("error with random pm list: %v", err)
 	}
@@ -403,7 +403,7 @@ func TestMergePorts(t *testing.T) {
 		},
 	}
 	t.Logf("---[debug] input items %v", pms)
-	res, err = mergePorts(pms)
+	res, err = mergeContinuousPorts(pms)
 	if err == nil {
 		t.Fatalf("didn't found collision in random pm list: %v", res)
 	}
@@ -428,7 +428,7 @@ func TestMergePorts(t *testing.T) {
 		},
 	}
 	t.Logf("---[debug] input items %v", pms)
-	res, err = mergePorts(pms)
+	res, err = mergeContinuousPorts(pms)
 	if err != nil {
 		t.Logf("got an error with random pm list: %v", err)
 		t.Log("it's acceptable to fail in this case")

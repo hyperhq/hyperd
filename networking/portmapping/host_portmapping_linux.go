@@ -78,6 +78,7 @@ func generateIptablesArgs(containerip string, m *PortMapping) ([]string, []strin
 		proto string
 		from  string
 		to    string
+		dport string
 	)
 
 	if strings.EqualFold(m.Protocol, "udp") {
@@ -90,16 +91,18 @@ func generateIptablesArgs(containerip string, m *PortMapping) ([]string, []strin
 		from = strconv.Itoa(m.FromPorts.Begin)
 		m.FromPorts.End = m.FromPorts.Begin
 	} else if m.FromPorts.End > m.FromPorts.Begin {
-		from = fmt.Sprintf("%d:%d", m.FromPorts, m.FromPorts.End)
+		from = fmt.Sprintf("%d:%d", m.FromPorts.Begin, m.FromPorts.End)
 	} else {
 		return []string{}, []string{}, fmt.Errorf("invalid from port range %d-%d", m.FromPorts.Begin, m.FromPorts.End)
 	}
 
 	if m.ToPorts.End == 0 || m.ToPorts.End == m.ToPorts.Begin {
-		to = net.JoinHostPort(containerip, strconv.Itoa(m.ToPorts.Begin))
+		dport = strconv.Itoa(m.ToPorts.Begin)
+		to = net.JoinHostPort(containerip, dport)
 		m.ToPorts.End = m.ToPorts.Begin
 	} else if m.ToPorts.End > m.ToPorts.Begin {
-		to = net.JoinHostPort(containerip, fmt.Sprintf("%d-%d", m.ToPorts, m.ToPorts.End))
+		dport = fmt.Sprintf("%d:%d", m.ToPorts.Begin, m.ToPorts.End)
+		to = net.JoinHostPort(containerip, fmt.Sprintf("%d-%d", m.ToPorts.Begin, m.ToPorts.End))
 	} else {
 		return []string{}, []string{}, fmt.Errorf("invalid to port range %d-%d", m.ToPorts.Begin, m.ToPorts.End)
 	}
@@ -112,9 +115,19 @@ func generateIptablesArgs(containerip string, m *PortMapping) ([]string, []strin
 	}
 
 	natArgs := []string{"-p", proto, "-m", proto, "--dport", from, "-j", "DNAT", "--to-destination", to}
-	filterArgs := []string{"-d", containerip, "-p", proto, "-m", proto, "--dport", to, "-j", "ACCEPT"}
+	filterArgs := []string{"-d", containerip, "-p", proto, "-m", proto, "--dport", dport, "-j", "ACCEPT"}
 
 	return natArgs, filterArgs, nil
+}
+
+func parseRawResultOnHyper(output []byte, err error) error {
+	if err != nil {
+		return err
+	} else if len(output) != 0 {
+		return &iptables.ChainError{Chain: "HYPER", Output: output}
+
+	}
+	return nil
 }
 
 func SetupPortMaps(containerip string, maps []*PortMapping) error {
@@ -122,32 +135,54 @@ func SetupPortMaps(containerip string, maps []*PortMapping) error {
 		return nil
 	}
 
+	var (
+		revert      bool
+		revertRules = [][]string{}
+	)
+	defer func() {
+		if revert {
+			hlog.Log(hlog.WARNING, "revert portmapping rules...")
+			for _, r := range revertRules {
+				hlog.Log(hlog.INFO, "revert rule: %v", r)
+				err := parseRawResultOnHyper(iptables.Raw(r...))
+				if err != nil {
+					hlog.Log(hlog.ERROR, "failed to revert rule: %v", err)
+					err = nil //just ignore
+				}
+			}
+		}
+	}()
+
 	for _, m := range maps {
 
 		natArgs, filterArgs, err := generateIptablesArgs(containerip, m)
 		if err != nil {
+			revert = true
 			return err
 		}
 
 		//check if this rule has already existed
 		if iptables.PortMapExists("HYPER", natArgs) {
-			return nil
+			continue
 		}
 
 		if iptables.PortMapUsed("HYPER", m.Protocol, m.FromPorts.Begin, m.FromPorts.End) {
+			revert = true
 			return fmt.Errorf("Host port %v has aleady been used", m.FromPorts)
 		}
 
-		err = iptables.OperatePortMap(iptables.Insert, "HYPER", natArgs)
+		err = parseRawResultOnHyper(iptables.Raw(append([]string{"-t", "nat", "-I", "HYPER"}, natArgs...)...))
 		if err != nil {
-			return err
+			revert = true
+			return fmt.Errorf("Unable to setup NAT rule in HYPER chain: %s", err)
 		}
+		revertRules = append(revertRules, append([]string{"-t", "nat", "-D", "HYPER"}, natArgs...))
 
-		if output, err := iptables.Raw(append([]string{"-I", "HYPER"}, filterArgs...)...); err != nil {
-			return fmt.Errorf("Unable to setup forward rule in HYPER chain: %s", err)
-		} else if len(output) != 0 {
-			return &iptables.ChainError{Chain: "HYPER", Output: output}
+		if err = parseRawResultOnHyper(iptables.Raw(append([]string{"-I", "HYPER"}, filterArgs...)...)); err != nil {
+			revert = true
+			return fmt.Errorf("Unable to setup FILTER rule in HYPER chain: %s", err)
 		}
+		revertRules = append(revertRules, append([]string{"-D", "HYPER"}, filterArgs...))
 
 		i := m.FromPorts.Begin
 		j := m.ToPorts.Begin
@@ -163,6 +198,7 @@ func SetupPortMaps(containerip string, maps []*PortMapping) error {
 
 		for i <= m.FromPorts.End {
 			if err = PortMapper.AllocateMap(m.Protocol, i, containerip, j); err != nil {
+				revert = true
 				return err
 			}
 			i++
@@ -178,6 +214,7 @@ func ReleasePortMaps(containerip string, maps []*PortMapping) error {
 		return nil
 	}
 
+release_loop:
 	for _, m := range maps {
 		if !strings.EqualFold(m.Protocol, "udp") {
 			m.Protocol = "tcp"
@@ -191,7 +228,7 @@ func ReleasePortMaps(containerip string, maps []*PortMapping) error {
 		for i := m.FromPorts.Begin; i <= m.FromPorts.End; i++ {
 			err := PortMapper.ReleaseMap(m.Protocol, i)
 			if err != nil {
-				continue
+				continue release_loop
 			}
 		}
 
