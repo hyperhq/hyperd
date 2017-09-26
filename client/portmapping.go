@@ -15,12 +15,14 @@ func (cli *HyperClient) HyperCmdPorts(args ...string) error {
 		Portmap []string `short:"p" long:"publish" value-name:"[]" default-mask:"-" description:"Publish a container's port to the host, format: -p|--publish [tcp/udp:]hostPort:containerPort (only valid for add and delete)"`
 	}
 	var parser = gflag.NewParser(&opts, gflag.Default|gflag.IgnoreUnknown|gflag.PassAfterNonOption)
+	parser.Usage = "ports ls|add|delete [OPTIONS] POD\n\nList or modify port mapping rules of a Pod\n"
+
 	if len(args) == 0 {
-		return errors.New("ports command support the follows subcommands: ls|add|delete")
+		parser.WriteHelp(cli.err)
+		return nil
 	}
 	cmd := args[0]
 
-	parser.Usage = "ports ls\nports add|delete [OPTIONS] POD\n\nList or modify port mapping rules of a Pod"
 	args, err := parser.ParseArgs(args[1:])
 	if err != nil {
 		if !strings.Contains(err.Error(), "Usage") {
@@ -30,14 +32,13 @@ func (cli *HyperClient) HyperCmdPorts(args ...string) error {
 		}
 	}
 
-	if len(args) != 1 {
-		return errors.New("need a Pod Id as command parameter")
-	}
-
 	var modFunc func(string, []*types.PortMapping) error
 
 	switch cmd {
 	case "ls":
+		if len(args) != 1 {
+			return errors.New("need a Pod Id as command parameter")
+		}
 		pms, err := cli.client.ListPortMappings(args[0])
 		if err != nil {
 			return err
@@ -54,10 +55,13 @@ func (cli *HyperClient) HyperCmdPorts(args ...string) error {
 	case "delete":
 		modFunc = cli.client.DeletePortMappings
 	default:
-		return errors.New("ports command support the follows subcommands: ls|add|delete")
-
+		parser.WriteHelp(cli.err)
+		return nil
 	}
 
+	if len(args) != 1 {
+		return errors.New("need a Pod Id as command parameter")
+	}
 	if len(opts.Portmap) == 0 {
 		return errors.New("no rules to be add or delete")
 	}
