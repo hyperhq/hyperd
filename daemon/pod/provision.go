@@ -86,19 +86,20 @@ func newXPod(factory *PodFactory, spec *apitypes.UserPod) (*XPod, error) {
 	factory.hosts = HostsCreator(spec.Id)
 	factory.logCreator = initLogCreator(factory, spec)
 	p := &XPod{
-		name:         spec.Id,
-		logPrefix:    fmt.Sprintf("Pod[%s] ", spec.Id),
-		globalSpec:   spec.CloneGlobalPart(),
-		containers:   make(map[string]*Container),
-		volumes:      make(map[string]*Volume),
-		interfaces:   make(map[string]*Interface),
-		portMappings: spec.Portmappings,
-		labels:       spec.Labels,
-		execs:        make(map[string]*Exec),
-		resourceLock: &sync.Mutex{},
-		statusLock:   &sync.RWMutex{},
-		stoppedChan:  make(chan bool, 1),
-		factory:      factory,
+		name:          spec.Id,
+		logPrefix:     fmt.Sprintf("Pod[%s] ", spec.Id),
+		globalSpec:    spec.CloneGlobalPart(),
+		containers:    make(map[string]*Container),
+		volumes:       make(map[string]*Volume),
+		interfaces:    make(map[string]*Interface),
+		portMappings:  spec.Portmappings,
+		labels:        spec.Labels,
+		prestartExecs: [][]string{},
+		execs:         make(map[string]*Exec),
+		resourceLock:  &sync.Mutex{},
+		statusLock:    &sync.RWMutex{},
+		stoppedChan:   make(chan bool, 1),
+		factory:       factory,
 	}
 	p.initCond = sync.NewCond(p.statusLock.RLocker())
 	return p, nil
@@ -483,6 +484,15 @@ func (p *XPod) addResourcesToSandbox() error {
 func (p *XPod) startAll() error {
 	p.Log(INFO, "start all containers")
 	future := utils.NewFutureSet()
+
+	for _, pre := range p.prestartExecs {
+		p.Log(DEBUG, "run prestart exec %v", pre)
+		_, stderr, err := p.sandbox.HyperstartExecSync(pre, nil)
+		if err != nil {
+			p.Log(ERROR, "failed to execute prestart command %v: %v [ %s", pre, err, string(stderr))
+			return err
+		}
+	}
 
 	for ic, c := range p.containers {
 		future.Add(ic, c.start)

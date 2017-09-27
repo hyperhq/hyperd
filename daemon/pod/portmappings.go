@@ -31,10 +31,19 @@ func (p *XPod) initPortMapping() error {
 			hlog.Log(ERROR, err)
 			return err
 		}
-		err = portmapping.SetupPortMaps(p.containerIP, pms)
+		var extPrefix []string
+		if p.globalSpec.PortmappingWhiteLists != nil &&
+			len(p.globalSpec.PortmappingWhiteLists.InternalNetworks) > 0 &&
+			len(p.globalSpec.PortmappingWhiteLists.ExternalNetworks) > 0 {
+			extPrefix = p.globalSpec.PortmappingWhiteLists.ExternalNetworks
+		}
+		preExec, err := portmapping.SetupPortMaps(p.containerIP, extPrefix, pms)
 		if err != nil {
 			p.Log(ERROR, "failed to setup port mappings: %v", err)
 			return err
+		}
+		if len(preExec) > 0 {
+			p.prestartExecs = append(p.prestartExecs, preExec...)
 		}
 	}
 	return nil
@@ -47,7 +56,7 @@ func (p *XPod) flushPortMapping() error {
 			hlog.Log(ERROR, err)
 			return err
 		}
-		err = portmapping.ReleasePortMaps(p.containerIP, pms)
+		_, err = portmapping.ReleasePortMaps(p.containerIP, nil, pms)
 		if err != nil {
 			p.Log(ERROR, "release port mappings failed: %v", err)
 			return err
@@ -75,10 +84,28 @@ func (p *XPod) AddPortMapping(spec []*apitypes.PortMapping) error {
 		p.Log(ERROR, "failed to generate port mapping rules: %v", err)
 		return err
 	}
-	err = portmapping.SetupPortMaps(p.containerIP, pms)
+	var extPrefix []string
+	if p.globalSpec.PortmappingWhiteLists != nil &&
+		len(p.globalSpec.PortmappingWhiteLists.InternalNetworks) > 0 &&
+		len(p.globalSpec.PortmappingWhiteLists.ExternalNetworks) > 0 {
+		extPrefix = p.globalSpec.PortmappingWhiteLists.ExternalNetworks
+	}
+	preExec, err := portmapping.SetupPortMaps(p.containerIP, extPrefix, pms)
 	if err != nil {
 		p.Log(ERROR, "failed to apply port mapping rules: %v", err)
 		return err
+	}
+	if len(preExec) > 0 {
+		p.prestartExecs = append(p.prestartExecs, preExec...)
+		if p.sandbox != nil {
+			for _, ex := range preExec {
+				_, stderr, err := p.sandbox.HyperstartExecSync(ex, nil)
+				if err != nil {
+					p.Log(ERROR, "failed to setup inSandbox mapping: %v [ %s", err, string(stderr))
+					return err
+				}
+			}
+		}
 	}
 
 	all := make([]*apitypes.PortMapping, len(p.portMappings)+len(spec))
@@ -134,10 +161,28 @@ func (p *XPod) removePortMapping(tbr []*apitypes.PortMapping, eq portMappingComp
 		return err
 	}
 
-	err = portmapping.ReleasePortMaps(p.containerIP, act)
+	var extPrefix []string
+	if p.globalSpec.PortmappingWhiteLists != nil &&
+		len(p.globalSpec.PortmappingWhiteLists.InternalNetworks) > 0 &&
+		len(p.globalSpec.PortmappingWhiteLists.ExternalNetworks) > 0 {
+		extPrefix = p.globalSpec.PortmappingWhiteLists.ExternalNetworks
+	}
+	postExec, err := portmapping.ReleasePortMaps(p.containerIP, extPrefix, act)
 	if err != nil {
 		p.Log(ERROR, "failed to clean up rules: %v", err)
 		return err
+	}
+	if len(postExec) > 0 {
+		// don't need to release prestartExec here, it is not persistent
+		if p.sandbox != nil {
+			for _, ex := range postExec {
+				_, stderr, err := p.sandbox.HyperstartExecSync(ex, nil)
+				if err != nil {
+					p.Log(ERROR, "failed to setup inSandbox mapping: %v [ %s", err, string(stderr))
+					return err
+				}
+			}
+		}
 	}
 
 	p.portMappings = other

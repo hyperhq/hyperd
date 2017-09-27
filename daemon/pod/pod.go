@@ -63,6 +63,8 @@ type XPod struct {
 	labels       map[string]string
 	resourceLock *sync.Mutex
 
+	prestartExecs [][]string
+
 	sandbox *hypervisor.Vm
 	factory *PodFactory
 

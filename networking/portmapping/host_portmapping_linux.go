@@ -130,11 +130,7 @@ func parseRawResultOnHyper(output []byte, err error) error {
 	return nil
 }
 
-func SetupPortMaps(containerip string, maps []*PortMapping) error {
-	if disableIptables || len(maps) == 0 {
-		return nil
-	}
-
+func setupIptablesPortMaps(containerip string, maps []*PortMapping) error {
 	var (
 		revert      bool
 		revertRules = [][]string{}
@@ -209,10 +205,7 @@ func SetupPortMaps(containerip string, maps []*PortMapping) error {
 	return nil
 }
 
-func ReleasePortMaps(containerip string, maps []*PortMapping) error {
-	if disableIptables || len(maps) == 0 {
-		return nil
-	}
+func releaseIptablesPortMaps(containerip string, maps []*PortMapping) error {
 
 release_loop:
 	for _, m := range maps {
