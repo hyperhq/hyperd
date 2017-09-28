@@ -15,6 +15,18 @@ var (
 		HTTPStatusCode: http.StatusInternalServerError,
 	})
 
+	ErrPodNotFound = errcode.Register(errGroup, errcode.ErrorDescriptor{
+		Value:          "HYPER_POD_NOT_FOUND",
+		Message:        "Pod %s not found",
+		HTTPStatusCode: http.StatusNotFound,
+	})
+
+	ErrBadJsonFormat = errcode.Register(errGroup, errcode.ErrorDescriptor{
+		Value:          "HYPER_BAD_JSON_FORMAT",
+		Message:        "failed to parse json: %v",
+		HTTPStatusCode: http.StatusBadRequest,
+	})
+
 	ErrSandboxNotExist = errcode.Register(errGroup, errcode.ErrorDescriptor{
 		Value:          "HYPER_SANDBOX_NOT_EXIST",
 		Message:        "sandbox does not exist",

@@ -47,3 +47,9 @@ message PersistInterface {
     UserInterface spec = 11;
     api.InterfaceDescription descript = 12;
 }
+
+message PersistPortmappings {
+    string pod =1 ;
+    string containerIP = 2;
+    repeated PortMapping portMappings = 11;
+}

@@ -726,6 +726,21 @@ message ServiceUpdateRequest {
 
 message ServiceUpdateResponse {}
 
+message PortMappingListRequest {
+  string podID = 1;
+}
+
+message PortMappingListResponse {
+  repeated PortMapping portMappings = 1;
+}
+
+message PortMappingModifyRequest {
+  string podID = 1;
+  repeated PortMapping portMappings = 2;
+}
+
+message PortMappingModifyResponse {}
+
 message PodStopRequest {
   string podID = 1;
 }
@@ -870,6 +885,13 @@ service PublicAPI {
     rpc ServiceDelete(ServiceDelRequest) returns (ServiceDelResponse){}
     // ServiceUpdate updates an existing service of a pod
     rpc ServiceUpdate(ServiceUpdateRequest) returns (ServiceUpdateResponse){}
+
+    // PortMappingList get a list of PortMappings
+    rpc PortMappingList(PortMappingListRequest) returns (PortMappingListResponse) {}
+    // PortMappingAdd add a list of PortMapping rules to a Pod
+    rpc PortMappingAdd(PortMappingModifyRequest) returns (PortMappingModifyResponse) {}
+    // PortMappingDel remove a list of PortMapping rules from a Pod
+    rpc PortMappingDel(PortMappingModifyRequest) returns (PortMappingModifyResponse) {}
 
     // ImagePull pulls a image from registry
     rpc ImagePull(ImagePullRequest) returns (stream ImagePullResponse) {}

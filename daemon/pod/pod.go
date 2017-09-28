@@ -58,9 +58,12 @@ type XPod struct {
 	volumes      map[string]*Volume
 	interfaces   map[string]*Interface
 	services     *Services
+	containerIP  string // only for doing portMapping
 	portMappings []*apitypes.PortMapping
 	labels       map[string]string
 	resourceLock *sync.Mutex
+
+	prestartExecs [][]string
 
 	sandbox *hypervisor.Vm
 	factory *PodFactory

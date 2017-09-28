@@ -21,6 +21,9 @@ import (
 /// PM-{Pod.Id()}: Pod level metadata that could be changed
 ///         |`- services: service list
 ///          `- labels
+/// PP-{Pod.Id()}: Port Mapping rules
+///         |`- containerIp: container IP for portmapping operations
+///          `- portMappings: rules
 /// CX-{Container.Id()} Container Persistent Info
 /// VX-{Pod.ID()}-{Volume.Name()} Volume Persist Info
 /// IF-{Pod.ID()}-{Inf.Id()}
@@ -30,7 +33,8 @@ const (
 	LAYOUT_KEY_FMT    = "PL-%s"
 	SB_KEY_FMT        = "SB-%s"
 	PS_KEY_FMT        = "PS-%s"
-	PM_KEY_FMT        = "PM-%s"
+	PMETA_KEY_FMT     = "PM-%s"
+	PMAP_KEY_FMT      = "PP-%s"
 	CX_KEY_FMT        = "CX-%s"
 	VX_KEY_FMT        = "VX-%s-%s"
 	IF_KEY_FMT        = "IF-%s-%s"
@@ -131,6 +135,11 @@ func LoadXPod(factory *PodFactory, layout *types.PersistPodLayout) (*XPod, error
 		return nil, err
 	}
 
+	err = p.loadPortMapping()
+	if err != nil {
+		return nil, err
+	}
+
 	//associate containers
 	if p.status == S_POD_RUNNING {
 		for _, c := range p.containers {
@@ -160,6 +169,10 @@ func (p *XPod) savePod() error {
 	}
 
 	if err := p.savePodMeta(); err != nil {
+		return err
+	}
+
+	if err := p.savePortMapping(); err != nil {
 		return err
 	}
 
@@ -218,6 +231,10 @@ func (p *XPod) removeFromDB() (err error) {
 	}
 
 	if err = p.removePodMetaFromDB(); err != nil {
+		return err
+	}
+
+	if err = p.removePortMappingFromDB(); err != nil {
 		return err
 	}
 
@@ -286,12 +303,12 @@ func (p *XPod) savePodMeta() error {
 	if p.info != nil {
 		meta.CreatedAt = p.info.CreatedAt
 	}
-	return saveMessage(p.factory.db, fmt.Sprintf(PM_KEY_FMT, p.Id()), meta, p, "pod meta")
+	return saveMessage(p.factory.db, fmt.Sprintf(PMETA_KEY_FMT, p.Id()), meta, p, "pod meta")
 }
 
 func (p *XPod) loadPodMeta() error {
 	var meta types.PersistPodMeta
-	err := loadMessage(p.factory.db, fmt.Sprintf(PM_KEY_FMT, p.Id()), &meta, p, "pod meta")
+	err := loadMessage(p.factory.db, fmt.Sprintf(PMETA_KEY_FMT, p.Id()), &meta, p, "pod meta")
 	if err != nil {
 		return err
 	}
@@ -305,7 +322,31 @@ func (p *XPod) loadPodMeta() error {
 }
 
 func (p *XPod) removePodMetaFromDB() error {
-	return removeMessage(p.factory.db, fmt.Sprintf(PM_KEY_FMT, p.Id()), p, "pod meta")
+	return removeMessage(p.factory.db, fmt.Sprintf(PMETA_KEY_FMT, p.Id()), p, "pod meta")
+}
+
+func (p *XPod) savePortMapping() error {
+	pm := &types.PersistPortmappings{
+		Pod:          p.Id(),
+		ContainerIP:  p.containerIP,
+		PortMappings: p.portMappings,
+	}
+	return saveMessage(p.factory.db, fmt.Sprintf(PMAP_KEY_FMT, p.Id()), pm, p, "port mappings")
+}
+
+func (p *XPod) loadPortMapping() error {
+	var pm types.PersistPortmappings
+	err := loadMessage(p.factory.db, fmt.Sprintf(PMAP_KEY_FMT, p.Id()), &pm, p, "port mappings")
+	if err != nil {
+		return err
+	}
+	p.containerIP = pm.ContainerIP
+	p.portMappings = pm.PortMappings
+	return nil
+}
+
+func (p *XPod) removePortMappingFromDB() error {
+	return removeMessage(p.factory.db, fmt.Sprintf(PMAP_KEY_FMT, p.Id()), p, "port mappings")
 }
 
 func (c *Container) saveContainer() error {

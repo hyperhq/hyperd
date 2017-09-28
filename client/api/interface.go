@@ -39,6 +39,11 @@ type APIInterface interface {
 	UnpausePod(podId string) error
 	KillPod(pod string, sig int) error
 
+	// PortMapping APIs
+	ListPortMappings(podId string) ([]*types.PortMapping, error)
+	AddPortMappings(podId string, pms []*types.PortMapping) error
+	DeletePortMappings(podId string, pms []*types.PortMapping) error
+
 	Build(name string, hasBody bool, body io.Reader) (io.ReadCloser, string, error)
 	Commit(container, repo, author, message string, changes []string, pause bool) (string, error)
 	Load(body io.Reader, name string, refs map[string]string) (io.ReadCloser, string, error)

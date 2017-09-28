@@ -26,7 +26,7 @@ if ON_DARWIN
 SUBDIRS=mac_installer
 endif
 
-VERSION_PARAM=-ldflags "-X github.com/hyperhq/hyperd/utils.VERSION=$(VERSION) -X github.com/hyperhq/hyperd/utils.GITCOMMIT=`git describe`"
+VERSION_PARAM=-ldflags "-X github.com/hyperhq/hyperd/utils.VERSION=$(VERSION) -X github.com/hyperhq/hyperd/utils.GITCOMMIT=`git describe --dirty --always --tags 2> /dev/null || true`"
 
 all-local: build-hyperd build-hyperctl build-vmlogd
 clean-local:

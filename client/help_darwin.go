@@ -22,6 +22,7 @@ Command:
   login                  Register or log in to a Docker registry server
   logout                 Log out from a Docker registry server
   pause                  Pause a running pod
+  ports                  Show or modify port mapping rules
   pull                   Pull an image from a Docker registry server
   push                   Push an image or a repository to a Docker registry server
   rm                     Remove one or more pods or containers

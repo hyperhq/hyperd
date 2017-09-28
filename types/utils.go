@@ -2,10 +2,12 @@ package types
 
 import (
 	"fmt"
-	"github.com/hyperhq/hyperd/utils"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/hyperhq/hypercontainer-utils/hlog"
+	"github.com/hyperhq/hyperd/utils"
 )
 
 func (p *UserPod) LookupContainer(idOrName string) *UserContainer {
@@ -135,25 +137,25 @@ func readPortRange(p string) (*_PortRange, error) {
 		return &_PortRange{1025, 65535}, nil
 	} else if strings.Contains(p, "-") {
 		parts := strings.SplitN(p, "-", 2)
-		start, err := strconv.Atoi(parts[0])
+		start, err := strconv.ParseUint(parts[0], 10, 16)
 		if err != nil {
 			return nil, err
 		}
-		end, err := strconv.Atoi(parts[1])
+		end, err := strconv.ParseUint(parts[1], 10, 16)
 		if err != nil {
 			return nil, err
 		}
 		if end < start {
 			return nil, fmt.Errorf("max %d is smaller than min %d", end, start)
 		}
-		return &_PortRange{start, end}, nil
+		return &_PortRange{int(start), int(end)}, nil
 	}
 
-	start, err := strconv.Atoi(p)
+	start, err := strconv.ParseUint(p, 10, 16)
 	if err != nil {
 		return nil, err
 	}
-	return &_PortRange{start, start}, nil
+	return &_PortRange{int(start), int(start)}, nil
 }
 
 func (pr *_PortRange) isRange() bool {
@@ -164,7 +166,7 @@ func (pr *_PortRange) count() int {
 	return pr.end - pr.start + 1
 }
 
-func (pr *_PortRange) toString() string {
+func (pr *_PortRange) String() string {
 	if pr.isRange() {
 		return fmt.Sprintf("%d-%d", pr.start, pr.end)
 	}
@@ -177,7 +179,17 @@ type _PortMapping struct {
 	protocol  string
 }
 
+func (pm *_PortMapping) String() string {
+	return strings.Join([]string{pm.protocol, pm.host.String(), pm.container.String()}, ":")
+}
+
 func readPortMapping(pm *PortMapping) (*_PortMapping, error) {
+	proto := "tcp"
+	if pm.Protocol == "udp" {
+		proto = "udp"
+	} else if pm.Protocol != "tcp" && pm.Protocol != "" {
+		return nil, fmt.Errorf("unrecongnized protocol %s", pm.Protocol)
+	}
 	h, err := readPortRange(pm.HostPort)
 	if err != nil {
 		return nil, err
@@ -187,19 +199,45 @@ func readPortMapping(pm *PortMapping) (*_PortMapping, error) {
 		return nil, err
 	}
 	if c.isRange() && c.count() != h.count() {
-		return nil, fmt.Errorf("port range mismatch: %d vs %d", h.toString(), c.toString())
+		return nil, fmt.Errorf("port range mismatch: %d vs %d", h.String(), c.String())
 	}
 	return &_PortMapping{
 		host:      h,
 		container: c,
-		protocol:  pm.Protocol,
+		protocol:  proto,
 	}, nil
+}
+
+func (pm *PortMapping) EqualTo(other *PortMapping) bool {
+	if other == nil && pm == nil {
+		return true
+	} else if other == nil || pm == nil {
+		return false
+	}
+	return pm.Protocol == other.Protocol && pm.ContainerPort == other.ContainerPort && pm.HostPort == other.ContainerPort
+}
+
+func (pm *PortMapping) SameDestWith(other *PortMapping) bool {
+	if other == nil && pm == nil {
+		return true
+	} else if other == nil || pm == nil {
+		return false
+	}
+	return pm.Protocol == other.Protocol && pm.ContainerPort == other.ContainerPort
+}
+
+func (pm *PortMapping) Formalize() (*PortMapping, error) {
+	f, err := readPortMapping(pm)
+	if err != nil {
+		return nil, err
+	}
+	return f.toSpec(), nil
 }
 
 func (pm *_PortMapping) toSpec() *PortMapping {
 	return &PortMapping{
-		ContainerPort: pm.container.toString(),
-		HostPort:      pm.host.toString(),
+		ContainerPort: pm.container.String(),
+		HostPort:      pm.host.String(),
 		Protocol:      pm.protocol,
 	}
 }
@@ -212,7 +250,7 @@ func (pm *_PortMapping) notDetermined() bool {
 	return !pm.container.isRange() && pm.host.isRange()
 }
 
-func mergePorts(pms []*_PortMapping) ([]*_PortMapping, error) {
+func mergeContinuousPorts(pms []*_PortMapping) ([]*_PortMapping, error) {
 	var (
 		results = []*_PortMapping{}
 		occupy  = map[int]bool{}
@@ -244,6 +282,23 @@ func mergePorts(pms []*_PortMapping) ([]*_PortMapping, error) {
 		tbm = append(tbm, pm.host.start)
 	}
 
+	for _, pm := range remains {
+		for p := pm.host.start; p <= pm.host.end; p++ {
+			if occupy[p] {
+				continue
+			}
+			pm.host.start = p
+			pm.host.end = p
+			occupy[p] = true
+			singles[p] = pm
+			tbm = append(tbm, p)
+			break
+		}
+		if pm.notDetermined() {
+			return nil, fmt.Errorf("cannot allocate port for %s", pm.host.String())
+		}
+	}
+
 	sort.Ints(tbm)
 	var last *_PortMapping
 	for _, p := range tbm {
@@ -264,23 +319,26 @@ func mergePorts(pms []*_PortMapping) ([]*_PortMapping, error) {
 		results = append(results, last)
 	}
 
-	for _, pm := range remains {
-		for p := pm.host.start; p <= pm.host.end; p++ {
-			if occupy[p] {
-				continue
-			}
-			pm.host.start = p
-			pm.host.end = p
-			occupy[p] = true
-			results = append(results, pm)
-			break
-		}
-		if pm.notDetermined() {
-			return nil, fmt.Errorf("cannot allocate port for %s", pm.host.toString())
-		}
-	}
-
 	return results, nil
+}
+
+func (p *UserPod) migrateContainerPorts() error {
+	if p.Portmappings == nil {
+		p.Portmappings = []*PortMapping{}
+	}
+	for _, c := range p.Containers {
+		if len(c.Ports) == 0 {
+			continue
+		}
+		pms, err := c.ToPodPortmappings(false)
+		if err != nil {
+			hlog.Log(hlog.ERROR, "failed to convert container port to pod scope: %v", err)
+			return err
+		}
+		p.Portmappings = append(p.Portmappings, pms...)
+		c.Ports = nil
+	}
+	return nil
 }
 
 func (p *UserPod) MergePortmappings() error {
@@ -290,29 +348,20 @@ func (p *UserPod) MergePortmappings() error {
 		err      error
 	)
 
+	if err = p.migrateContainerPorts(); err != nil {
+		return err
+	}
+
 	for _, pm := range p.Portmappings {
 		port, err := readPortMapping(pm)
 		if err != nil {
 			return err
 		}
-		if pm.Protocol == "tcp" {
+		if port.protocol == "tcp" {
 			tcpPorts = append(tcpPorts, port)
-		} else if pm.Protocol == "udp" {
+		} else if port.protocol == "udp" {
 			udpPorts = append(udpPorts, port)
-		} else {
-			err := fmt.Errorf("unrecognized protocol %s", pm.Protocol)
-			return err
 		}
-	}
-
-	tcpPorts, err = mergePorts(tcpPorts)
-	if err != nil {
-		return err
-	}
-
-	udpPorts, err = mergePorts(udpPorts)
-	if err != nil {
-		return err
 	}
 
 	pms := []*PortMapping{}

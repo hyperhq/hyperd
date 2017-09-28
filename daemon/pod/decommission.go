@@ -549,11 +549,13 @@ func (p *XPod) cleanup() {
 	if err != nil {
 		// even if error, we set the vm to be stopped
 		p.Log(ERROR, "pod stopping failed, failed to decommit the resources: %v", err)
+		err = nil
 	}
 
 	err = p.removeSandboxFromDB()
 	if err != nil {
 		p.Log(ERROR, "pod stopping failed, failed to remove sandbox persist data: %v", err)
+		err = nil
 	}
 
 	p.Log(DEBUG, "tag pod as stopped")
@@ -572,6 +574,12 @@ func (p *XPod) cleanup() {
 
 func (p *XPod) decommissionResources() (err error) {
 	p.Log(DEBUG, "umount all containers and volumes, release IP addresses")
+
+	err = p.flushPortMapping()
+	if err != nil {
+		p.Log(WARNING, "(ignored) flush port mappings failed: %v", err)
+		err = nil
+	}
 
 	for _, c := range p.containers {
 		ec := c.umountRootVol()

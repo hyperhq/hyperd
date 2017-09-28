@@ -86,19 +86,20 @@ func newXPod(factory *PodFactory, spec *apitypes.UserPod) (*XPod, error) {
 	factory.hosts = HostsCreator(spec.Id)
 	factory.logCreator = initLogCreator(factory, spec)
 	p := &XPod{
-		name:         spec.Id,
-		logPrefix:    fmt.Sprintf("Pod[%s] ", spec.Id),
-		globalSpec:   spec.CloneGlobalPart(),
-		containers:   make(map[string]*Container),
-		volumes:      make(map[string]*Volume),
-		interfaces:   make(map[string]*Interface),
-		portMappings: spec.Portmappings,
-		labels:       spec.Labels,
-		execs:        make(map[string]*Exec),
-		resourceLock: &sync.Mutex{},
-		statusLock:   &sync.RWMutex{},
-		stoppedChan:  make(chan bool, 1),
-		factory:      factory,
+		name:          spec.Id,
+		logPrefix:     fmt.Sprintf("Pod[%s] ", spec.Id),
+		globalSpec:    spec.CloneGlobalPart(),
+		containers:    make(map[string]*Container),
+		volumes:       make(map[string]*Volume),
+		interfaces:    make(map[string]*Interface),
+		portMappings:  spec.Portmappings,
+		labels:        spec.Labels,
+		prestartExecs: [][]string{},
+		execs:         make(map[string]*Exec),
+		resourceLock:  &sync.Mutex{},
+		statusLock:    &sync.RWMutex{},
+		stoppedChan:   make(chan bool, 1),
+		factory:       factory,
 	}
 	p.initCond = sync.NewCond(p.statusLock.RLocker())
 	return p, nil
@@ -383,7 +384,6 @@ func (p *XPod) initResources(spec *apitypes.UserPod, allowCreate bool) error {
 	}
 
 	p.services = newServices(p, spec.Services)
-	p.portMappings = spec.Portmappings
 
 	return nil
 }
@@ -418,12 +418,23 @@ func (p *XPod) prepareResources() error {
 		if err = inf.prepare(); err != nil {
 			return err
 		}
+		if p.containerIP == "" {
+			p.containerIP = inf.descript.Ip
+		}
 	}
+
+	err = p.initPortMapping()
+	if err != nil {
+		p.Log(ERROR, "failed to initial setup port mappings: %v", err)
+		return err
+	}
+	// if insert any other operations here, add rollback code for the
+	// port mapping operation
 
 	return nil
 }
 
-// addResourcesToSandbox() add resources to sandbox parallelly, it issues
+// addResourcesToSandbox() add resources to sandbox in parallel, it issues
 // runV API parallelly to send the NIC, Vols, and Containers to sandbox
 func (p *XPod) addResourcesToSandbox() error {
 	p.resourceLock.Lock()
@@ -472,6 +483,15 @@ func (p *XPod) addResourcesToSandbox() error {
 func (p *XPod) startAll() error {
 	p.Log(INFO, "start all containers")
 	future := utils.NewFutureSet()
+
+	for _, pre := range p.prestartExecs {
+		p.Log(DEBUG, "run prestart exec %v", pre)
+		_, stderr, err := p.sandbox.HyperstartExecSync(pre, nil)
+		if err != nil {
+			p.Log(ERROR, "failed to execute prestart command %v: %v [ %s", pre, err, string(stderr))
+			return err
+		}
+	}
 
 	for ic, c := range p.containers {
 		future.Add(ic, c.start)

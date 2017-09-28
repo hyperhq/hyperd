@@ -21,6 +21,7 @@ func NewRouter(b Backend) router.Router {
 		// GET
 		local.NewGetRoute("/pod/info", r.getPodInfo),
 		local.NewGetRoute("/pod/stats", r.getPodStats),
+		local.NewGetRoute("/pod/{id}/portmappings", r.getPortMappings),
 		local.NewGetRoute("/list", r.getList),
 		// POST
 		local.NewPostRoute("/pod/create", r.postPodCreate),
@@ -31,6 +32,7 @@ func NewRouter(b Backend) router.Router {
 		local.NewPostRoute("/pod/pause", r.postPodPause),
 		local.NewPostRoute("/pod/unpause", r.postPodUnpause),
 		// PUT
+		local.NewPutRoute("/pod/{id}/portmappings/{action}", r.putPortMappings),
 		// DELETE
 		local.NewDeleteRoute("/pod", r.deletePod),
 	}
