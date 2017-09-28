@@ -18,6 +18,7 @@ import (
 type VmHwStatus struct {
 	PciAddr  int    //next available pci addr for pci hotplug
 	ScsiId   int    //next available scsi id for scsi hotplug
+	PmemId   int    //next available pmem id for nvdimm hotplug
 	AttachId uint64 //next available attachId for attached tty
 	GuestCid uint32 //vsock guest cid
 }
@@ -48,6 +49,7 @@ type VmContext struct {
 
 	pciAddr int //next available pci addr for pci hotplug
 	scsiId  int //next available scsi id for scsi hotplug
+	pmemId  int //next available pmem id for nvdimm hotplug
 
 	//	InterfaceCount int
 
@@ -185,6 +187,14 @@ func (ctx *VmContext) unsetTimeout() {
 		ctx.timer.Stop()
 		ctx.timer = nil
 	}
+}
+
+func (ctx *VmContext) nextPmemId() int {
+	ctx.idLock.Lock()
+	id := ctx.pmemId
+	ctx.pmemId++
+	ctx.idLock.Unlock()
+	return id
 }
 
 func (ctx *VmContext) nextScsiId() int {

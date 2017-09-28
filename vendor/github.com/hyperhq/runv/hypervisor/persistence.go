@@ -136,6 +136,7 @@ func (ctx *VmContext) dumpHwInfo() *VmHwStatus {
 	return &VmHwStatus{
 		PciAddr:  ctx.pciAddr,
 		ScsiId:   ctx.scsiId,
+		PmemId:   ctx.pmemId,
 		AttachId: ctx.hyperstart.LastStreamSeq(),
 		GuestCid: ctx.GuestCid,
 	}
@@ -144,6 +145,7 @@ func (ctx *VmContext) dumpHwInfo() *VmHwStatus {
 func (ctx *VmContext) loadHwStatus(pinfo *PersistInfo) error {
 	ctx.pciAddr = pinfo.HwStat.PciAddr
 	ctx.scsiId = pinfo.HwStat.ScsiId
+	ctx.pmemId = pinfo.HwStat.PmemId
 	ctx.GuestCid = pinfo.HwStat.GuestCid
 	if ctx.GuestCid != 0 {
 		if !VsockCidManager.MarkCidInuse(ctx.GuestCid) {

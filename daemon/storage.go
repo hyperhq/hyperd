@@ -42,6 +42,8 @@ type Storage interface {
 	RemoveVolume(podId string, record []byte) error
 }
 
+var StorageOptions string
+
 var StorageDrivers map[string]func(*dockertypes.Info, *daemondb.DaemonDB) (Storage, error) = map[string]func(*dockertypes.Info, *daemondb.DaemonDB) (Storage, error){
 	"devicemapper": DMFactory,
 	"aufs":         AufsFactory,
@@ -532,6 +534,9 @@ func (s *RawBlockStorage) PrepareContainer(containerId, sharedDir string, readon
 		Fstype:   "xfs",
 		Format:   "raw",
 		ReadOnly: readonly,
+	}
+	if StorageOptions == "daxblock" {
+		vol.Options = &runv.VolumeOption{DaxBlock: true}
 	}
 
 	return vol, nil

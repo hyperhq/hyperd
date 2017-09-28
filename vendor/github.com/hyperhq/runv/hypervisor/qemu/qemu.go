@@ -248,7 +248,63 @@ func (qc *QemuContext) AddDisk(ctx *hypervisor.VmContext, sourceType string, blo
 		}
 	}
 
-	newDiskAddSession(ctx, qc, filename, format, id, readonly, result)
+	commands := make([]*QmpCommand, 2)
+	devName := scsiId2Name(id)
+	if !blockInfo.Dax {
+		hmp := "drive_add dummy file=" + filename + ",if=none,id=" + "drive" + strconv.Itoa(id) + ",format=" + format + ",cache=writeback"
+		if readonly {
+			hmp += ",readonly"
+		}
+		commands[0] = &QmpCommand{
+			Execute: "human-monitor-command",
+			Arguments: map[string]interface{}{
+				"command-line": hmp,
+			},
+		}
+		commands[1] = &QmpCommand{
+			Execute: "device_add",
+			Arguments: map[string]interface{}{
+				"driver": "scsi-hd", "bus": "scsi0.0", "scsi-id": strconv.Itoa(id),
+				"drive": "drive" + strconv.Itoa(id), "id": "scsi-disk" + strconv.Itoa(id),
+			},
+		}
+	} else {
+		// compose qmp commands
+		// hmp: object_add memory-backend-file,id=mem2,share=on,mem-path=/path/to/dax.img,size=10G
+		// hmp: device_add nvdimm,id=nvdimm2,memdev=mem2
+		hmp := "object_add memory-backend-file,id=mem" + strconv.Itoa(blockInfo.PmemId) + ",mem-path=" + filename
+		if readonly {
+			hmp += ",share=off"
+		} else {
+			hmp += ",share=on"
+		}
+		// get the size
+		fi, e := os.Stat(filename)
+		if e != nil {
+			result <- &hypervisor.DeviceFailed{}
+			return
+		}
+		hmp += ",size=" + strconv.FormatInt(fi.Size(), 10)
+		commands[0] = &QmpCommand{
+			Execute: "human-monitor-command",
+			Arguments: map[string]interface{}{
+				"command-line": hmp,
+			},
+		}
+		commands[1] = &QmpCommand{
+			Execute: "device_add",
+			Arguments: map[string]interface{}{
+				"driver": "nvdimm", "memdev": "mem" + strconv.Itoa(blockInfo.PmemId), "id": "nvdimm" + strconv.Itoa(blockInfo.PmemId),
+			},
+		}
+		devName = "pmem" + strconv.Itoa(blockInfo.PmemId)
+	}
+	qc.qmp <- &QmpSession{
+		commands: commands,
+		respond: defaultRespond(result, &hypervisor.BlockdevInsertedEvent{
+			DeviceName: devName,
+		}),
+	}
 }
 
 func (qc *QemuContext) RemoveDisk(ctx *hypervisor.VmContext, blockInfo *hypervisor.DiskDescriptor, callback hypervisor.VmEvent, result chan<- hypervisor.VmEvent) {

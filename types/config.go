@@ -17,6 +17,7 @@ type HyperConfig struct {
 	Host            string
 	GRPCHost        string
 	StorageDriver   string
+	StorageOptions  string
 	VmFactoryPolicy string
 	Driver          string
 	Kernel          string
@@ -55,6 +56,7 @@ func NewHyperConfig(config string) *HyperConfig {
 	}
 
 	c.StorageDriver, _ = cfg.GetValue(goconfig.DEFAULT_SECTION, "StorageDriver")
+	c.StorageOptions, _ = cfg.GetValue(goconfig.DEFAULT_SECTION, "StorageOptions")
 	c.Kernel, _ = cfg.GetValue(goconfig.DEFAULT_SECTION, "Kernel")
 	c.Initrd, _ = cfg.GetValue(goconfig.DEFAULT_SECTION, "Initrd")
 	c.Bridge, _ = cfg.GetValue(goconfig.DEFAULT_SECTION, "Bridge")
