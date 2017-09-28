@@ -1,6 +1,6 @@
 Summary:            Hyperstart is the initrd for hyper VM
 Name:               hyperstart
-Version:            0.8.1
+Version:            1.0.0
 Release:            1%{?dist}
 License:            Apache License, Version 2.0
 Group:              System Environment/Base
@@ -37,6 +37,8 @@ rm -rf %{buildroot}
 %{_sharedstatedir}/*
 
 %changelog
+* Thu Sep 28 2017 Hyper Dev Team <dev@hyper.sh> - 1.0.0-1
+- update source to 1.0.0
 * Mon May 8 2017 Hyper Dev Team <dev@hyper.sh> - 0.8.1-1
 - update source to 0.8.1
 * Mon Mar 20 2017 Hyper Dev Team <dev@hyper.sh> - 0.8.0-1
