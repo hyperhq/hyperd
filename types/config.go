@@ -35,7 +35,7 @@ func NewHyperConfig(config string) *HyperConfig {
 	if config == "" {
 		config = "/etc/hyper/config"
 	}
-	hlog.Log(hlog.INFO, "config file: ", config)
+	hlog.Log(hlog.INFO, "config file: %v", config)
 
 	c := &HyperConfig{
 		ConfigFile: config,

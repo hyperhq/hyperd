@@ -1,3 +1,5 @@
+// +build linux
+
 package qemu
 
 import (
@@ -67,7 +69,7 @@ func (f *QemuLogFile) Watch() {
 			break
 		}
 		if err != nil {
-			glog.Errorf("read log file %s failed: %v", f.Name, err)
+			glog.Infof("read log file %s failed: %v", f.Name, err)
 			return
 		}
 		if len(log) != 0 {

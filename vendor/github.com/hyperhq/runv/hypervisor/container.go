@@ -23,8 +23,8 @@ type ContainerContext struct {
 	// TODO move streamCopy() to hyperd and remove all these tty and pipes
 	tty        *TtyIO
 	stdinPipe  io.WriteCloser
-	stdoutPipe io.ReadCloser
-	stderrPipe io.ReadCloser
+	stdoutPipe io.Reader
+	stderrPipe io.Reader
 
 	logPrefix string
 }
