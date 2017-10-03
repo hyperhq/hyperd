@@ -15,6 +15,7 @@ import (
 	"github.com/hyperhq/hypercontainer-utils/hlog"
 	"github.com/hyperhq/runv/api"
 	hyperstartapi "github.com/hyperhq/runv/hyperstart/api/json"
+	"github.com/hyperhq/runv/hyperstart/libhyperstart"
 	"github.com/hyperhq/runv/hypervisor/types"
 	"github.com/hyperhq/runv/lib/utils"
 )
@@ -315,10 +316,17 @@ func (vm *Vm) AddNic(info *api.InterfaceDescription) error {
 	if vm.ctx.LogLevel(TRACE) {
 		vm.Log(TRACE, "finial vmSpec.Interface is %#v", vm.ctx.networks.getInterface(info.Id))
 	}
-	return vm.ctx.updateInterface(info.Id)
+	return vm.ctx.hyperstartAddInterface(info.Id)
+}
+
+func (vm *Vm) AllNics() []*InterfaceCreated {
+	return vm.ctx.AllInterfaces()
 }
 
 func (vm *Vm) DeleteNic(id string) error {
+	if err := vm.ctx.hyperstartDeleteInterface(id); err != nil {
+		return err
+	}
 	client := make(chan api.Result, 1)
 	vm.ctx.RemoveInterface(id, client)
 
@@ -330,12 +338,15 @@ func (vm *Vm) DeleteNic(id string) error {
 	if !ev.IsSuccess() {
 		return fmt.Errorf("remove device failed")
 	}
+
 	return nil
 }
 
-// TODO: deprecated api, it will be removed after the hyper.git updated
-func (vm *Vm) AddCpu(totalCpu int) error {
-	return vm.SetCpus(totalCpu)
+func (vm *Vm) UpdateNic(inf *api.InterfaceDescription) error {
+	if err := vm.ctx.hyperstartUpdateInterface(inf.Id, inf.Ip, inf.Mtu); err != nil {
+		return err
+	}
+	return vm.ctx.UpdateInterface(inf)
 }
 
 func (vm *Vm) SetCpus(cpus int) error {
@@ -498,7 +509,7 @@ func (vm *Vm) AddProcess(process *api.Process, tty *TtyIO) error {
 		}
 	}
 
-	stdinPipe, stdoutPipe, stderrPipe, err := vm.ctx.hyperstart.AddProcess(process.Container, &hyperstartapi.Process{
+	err := vm.ctx.hyperstart.AddProcess(process.Container, &hyperstartapi.Process{
 		Id:       process.Id,
 		Terminal: process.Terminal,
 		Args:     process.Args,
@@ -511,11 +522,14 @@ func (vm *Vm) AddProcess(process *api.Process, tty *TtyIO) error {
 	if err != nil {
 		return fmt.Errorf("exec command %v failed: %v", process.Args, err)
 	}
+	if tty == nil {
+		return nil
+	}
 
-	go streamCopy(tty, stdinPipe, stdoutPipe, stderrPipe)
+	inPipe, outPipe, errPipe := libhyperstart.StdioPipe(vm.ctx.hyperstart, process.Container, process.Id)
+	go streamCopy(tty, inPipe, outPipe, errPipe)
 	go func() {
 		status := vm.ctx.hyperstart.WaitProcess(process.Container, process.Id)
-		vm.ctx.DeleteExec(process.Id)
 		vm.ctx.reportProcessFinished(types.E_EXEC_FINISHED, &types.ProcessFinished{
 			Id: process.Id, Code: uint8(status), Ack: make(chan bool, 1),
 		})
@@ -633,6 +647,14 @@ func (vm *Vm) Stats() *types.PodStats {
 	return stats
 }
 
+func (vm *Vm) ContainerList() []string {
+	if !vm.ctx.IsRunning() {
+		vm.ctx.Log(WARNING, "could not get container list from non-running pod")
+		return nil
+	}
+	return vm.ctx.containerList()
+}
+
 func (vm *Vm) Pause(pause bool) error {
 	ctx := vm.ctx
 	if !vm.ctx.IsRunning() {
@@ -706,7 +728,7 @@ func (vm *Vm) GetIPAddrs() []string {
 		return ips
 	}
 
-	res := vm.ctx.networks.getIpAddrs()
+	res := vm.ctx.networks.getIPAddrs()
 	ips = append(ips, res...)
 
 	return ips

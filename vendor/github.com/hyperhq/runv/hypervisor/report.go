@@ -52,6 +52,13 @@ func (ctx *VmContext) reportUnexpectedRequest(ev VmEvent, state string) {
 // reportVmFault send report to daemon, notify about that:
 //   1. vm op failed due to some reason described in `cause`
 func (ctx *VmContext) reportVmFault(cause string) {
+	defer func() {
+		err := recover()
+		if err != nil {
+			ctx.Log(WARNING, "panic during send vm fault message to channel")
+		}
+	}()
+
 	ctx.client <- &types.VmResponse{
 		VmId:  ctx.Id,
 		Code:  types.E_FAILED,

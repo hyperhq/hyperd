@@ -1,0 +1,163 @@
+syntax = "proto3";
+
+package grpc;
+
+import "google/protobuf/empty.proto";
+
+// To generate hyperstart.pb.go, run:
+// $ protoc --go_out=plugins=grpc:. hyperstart.proto
+
+// unstable
+service HyperstartService {
+	// execution
+	rpc AddContainer(AddContainerRequest) returns (google.protobuf.Empty);
+	rpc AddProcess(AddProcessRequest) returns (google.protobuf.Empty);
+	rpc SignalProcess(SignalProcessRequest) returns (google.protobuf.Empty);
+	rpc WaitProcess(WaitProcessRequest) returns (WaitProcessResponse); // wait & reap like waitpid(2)
+
+	// stdio
+	rpc WriteStdin(WriteStreamRequest) returns (WriteStreamResponse);
+	rpc ReadStdout(ReadStreamRequest) returns (ReadStreamResponse);
+	rpc ReadStderr(ReadStreamRequest) returns (ReadStreamResponse);
+	rpc CloseStdin(CloseStdinRequest) returns (google.protobuf.Empty);
+	rpc TtyWinResize(TtyWinResizeRequest) returns (google.protobuf.Empty);
+
+	// misc (TODO: some rpcs can be replaced by hyperstart-exec)
+	rpc StartSandbox(StartSandboxRequest) returns (google.protobuf.Empty);
+	rpc DestroySandbox(DestroySandboxRequest) returns (google.protobuf.Empty);
+	rpc UpdateInterface(UpdateInterfaceRequest) returns (google.protobuf.Empty);
+	rpc AddRoute(AddRouteRequest) returns (google.protobuf.Empty);
+	rpc OnlineCPUMem(OnlineCPUMemRequest) returns (google.protobuf.Empty);
+}
+
+message AddContainerRequest {
+	Container container = 1;
+	Process init = 2;
+}
+
+message AddProcessRequest {
+	string container = 1;
+	Process process = 2;
+}
+
+message SignalProcessRequest {
+	string container = 1;
+	string process = 2;
+	uint32 signal = 3;
+}
+
+message WaitProcessRequest {
+	string container = 1;
+	string process = 2;
+}
+
+message WaitProcessResponse {
+	int32 status = 1;
+}
+
+message WriteStreamRequest {
+	string container = 1;
+	string process = 2;
+	bytes data = 3;
+}
+
+message WriteStreamResponse {
+	uint32 len = 1;
+}
+
+message ReadStreamRequest {
+	string container = 1;
+	string process = 2;
+	uint32 len = 3;
+}
+
+message ReadStreamResponse {
+	bytes data = 1;
+}
+
+message CloseStdinRequest {
+	string container = 1;
+	string process = 2;
+}
+
+message TtyWinResizeRequest {
+	string container = 1;
+	string process = 2;
+	uint32 row = 3;
+	uint32 column = 4;
+}
+
+message StartSandboxRequest {
+	string hostname = 1;
+	repeated string dns = 2;
+}
+
+message DestroySandboxRequest {
+}
+
+message IpAddress {
+	string address = 1;
+	string mask = 2;
+}
+
+message UpdateInterfaceRequest {
+	uint64 type	=1;
+	string device = 2;
+	string newName = 3;
+	repeated IpAddress ipAddresses = 4;
+	uint64 mtu = 5;
+}
+
+message AddRouteRequest {
+	repeated Route routes = 1;
+}
+
+message OnlineCPUMemRequest {
+}
+
+message Container {
+	string id = 1;
+	repeated Mount mounts = 2;
+	map<string, string> sysctl = 3;
+}
+
+// @dest   the path inside the container expect when it starts with "tmp:/"
+// @source the path inside the container expect when it starts with "vm:/dev/" or "tmp:/"
+//         the path which starts with "vm:/dev/" refers the guest vm's "/dev",
+//         especially, "vm:/dev/hostfs/" refers to the shared filesystem.
+//         "tmp:/" is a temporary directory which is used for temporary mounts.
+// message Mount (APIs about rootfs/mounts/volumes) would be changed very devastatingly
+message Mount {
+	string dest = 1;
+	string source = 2;
+	string type = 3;
+	repeated string options = 4;
+}
+
+message Process {
+	string id = 1;
+	repeated string args = 2;
+	map<string, string> envs = 3;
+	User user = 4;
+	string workdir = 5;
+	bool terminal = 6;
+	repeated Rlimit rlimits = 7;
+}
+
+message User {
+	string uid = 1;
+	string gid = 2;
+	repeated string additionalGids = 3;
+}
+
+message Rlimit {
+	string type = 1;
+	uint64 hard = 2;
+	uint64 soft = 3;
+}
+
+message Route {
+	string dest = 1;
+	string gateway = 2;
+	string device = 3;
+}

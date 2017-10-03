@@ -2,7 +2,6 @@ package portmapping
 
 import (
 	"fmt"
-	"net"
 	"os"
 	"os/exec"
 
@@ -16,7 +15,7 @@ var (
 )
 
 //setup environment for iptables and IP forwarding
-func Setup(bIface string, addr net.Addr, disable bool) error {
+func Setup(bIface, addr string, disable bool) error {
 	var err error
 
 	disableIptables = disable
@@ -37,13 +36,13 @@ func Setup(bIface string, addr net.Addr, disable bool) error {
 	return nil
 }
 
-func setupIPTables(addr net.Addr) error {
+func setupIPTables(addr string) error {
 	if disableIptables {
 		return nil
 	}
 
 	// Enable NAT
-	natArgs := []string{"-s", addr.String(), "!", "-o", bridgeIface, "-j", "MASQUERADE"}
+	natArgs := []string{"-s", addr, "!", "-o", bridgeIface, "-j", "MASQUERADE"}
 
 	if !iptables.Exists(iptables.Nat, "POSTROUTING", natArgs...) {
 		if output, err := iptables.Raw(append([]string{
