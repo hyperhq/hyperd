@@ -13,6 +13,9 @@ source "${HYPER_ROOT}/hack/lib/init.sh"
 function cleanup()
 {
   stop_hyperd
+  echo "====== disk usage ======"
+  df -h
+  echo "========================"
   rm -rf "${HYPER_TEMP}"
 
   hyper::log::status "Clean up complete"
