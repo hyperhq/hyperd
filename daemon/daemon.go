@@ -133,7 +133,7 @@ func NewDaemon(cfg *apitypes.HyperConfig) (*Daemon, error) {
 		return nil, err
 	}
 	daemon.Storage = stor
-	daemon.Storage.Init()
+	daemon.Storage.Init(cfg)
 
 	err = daemon.initRunV(cfg)
 	if err != nil {
