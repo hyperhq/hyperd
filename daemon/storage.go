@@ -32,7 +32,7 @@ type Storage interface {
 	Type() string
 	RootPath() string
 
-	Init() error
+	Init(c *apitypes.HyperConfig) error
 	CleanUp() error
 
 	PrepareContainer(mountId, sharedDir string, readonly bool) (*runv.VolumeDescription, error)
@@ -103,14 +103,18 @@ func (dms *DevMapperStorage) RootPath() string {
 	return dms.rootPath
 }
 
-func (dms *DevMapperStorage) Init() error {
+func (dms *DevMapperStorage) Init(c *apitypes.HyperConfig) error {
+	size := storage.DEFAULT_DM_POOL_SIZE
+	if c.StorageBaseSize > 0 {
+		size = c.StorageBaseSize
+	}
 	dmPool := dm.DeviceMapper{
 		Datafile:         filepath.Join(utils.HYPER_ROOT, "lib") + "/data",
 		Metadatafile:     filepath.Join(utils.HYPER_ROOT, "lib") + "/metadata",
 		DataLoopFile:     storage.DEFAULT_DM_DATA_LOOP,
 		MetadataLoopFile: storage.DEFAULT_DM_META_LOOP,
 		PoolName:         dms.VolPoolName,
-		Size:             storage.DEFAULT_DM_POOL_SIZE,
+		Size:             size,
 	}
 	dms.DmPoolData = &dmPool
 	rand.Seed(time.Now().UnixNano())
@@ -289,7 +293,7 @@ func (a *AufsStorage) RootPath() string {
 	return a.rootPath
 }
 
-func (*AufsStorage) Init() error { return nil }
+func (*AufsStorage) Init(c *apitypes.HyperConfig) error { return nil }
 
 func (*AufsStorage) CleanUp() error { return nil }
 
@@ -361,7 +365,7 @@ func (o *OverlayFsStorage) RootPath() string {
 	return o.rootPath
 }
 
-func (*OverlayFsStorage) Init() error { return nil }
+func (*OverlayFsStorage) Init(c *apitypes.HyperConfig) error { return nil }
 
 func (*OverlayFsStorage) CleanUp() error { return nil }
 
@@ -437,7 +441,7 @@ func (s *BtrfsStorage) subvolumesDirID(id string) string {
 	return filepath.Join(s.RootPath(), "subvolumes", id)
 }
 
-func (*BtrfsStorage) Init() error { return nil }
+func (*BtrfsStorage) Init(c *apitypes.HyperConfig) error { return nil }
 
 func (*BtrfsStorage) CleanUp() error { return nil }
 
@@ -514,7 +518,7 @@ func (s *RawBlockStorage) RootPath() string {
 	return s.rootPath
 }
 
-func (s *RawBlockStorage) Init() error {
+func (s *RawBlockStorage) Init(c *apitypes.HyperConfig) error {
 	if err := os.MkdirAll(filepath.Join(s.RootPath(), "volumes"), 0700); err != nil {
 		return err
 	}
@@ -583,7 +587,7 @@ func (v *VBoxStorage) RootPath() string {
 	return v.rootPath
 }
 
-func (*VBoxStorage) Init() error { return nil }
+func (*VBoxStorage) Init(c *apitypes.HyperConfig) error { return nil }
 
 func (*VBoxStorage) CleanUp() error { return nil }
 
