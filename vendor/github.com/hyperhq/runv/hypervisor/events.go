@@ -1,9 +1,5 @@
 package hypervisor
 
-import (
-	"os"
-)
-
 type VmEvent interface {
 	Event() int
 }
@@ -53,16 +49,17 @@ type BlockdevInsertedEvent struct {
 }
 
 type InterfaceCreated struct {
-	Id         string //user specified in (ref api.InterfaceDescription: a user identifier of interface, user may use this to specify a nic, normally you can use IPAddr as an Id, however, in some driver (probably vbox?), user may not specify the IPAddr.)
+	Id         string //user specified in (ref api.InterfaceDescription: a user identifier of interface, user may use this to specify a nic, normally you can use IPAddr as an Id.)
 	Index      int
 	PCIAddr    int
-	Fd         *os.File
+	TapFd      int
 	Bridge     string
 	HostDevice string
 	DeviceName string
 	MacAddr    string
 	IpAddr     string
-	NetMask    string
+	NewName    string
+	Mtu        uint64
 	RouteTable []*RouteRule
 }
 
@@ -77,6 +74,7 @@ type NetDevInsertedEvent struct {
 	Index      int
 	DeviceName string
 	Address    int
+	TapFd      int
 }
 
 func (ne *NetDevInsertedEvent) ResultId() string {

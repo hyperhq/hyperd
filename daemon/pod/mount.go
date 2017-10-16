@@ -74,5 +74,10 @@ func UmountExistingVolume(fstype, target, sharedDir string) error {
 	if !path.IsAbs(target) {
 		return nil
 	}
-	return dm.UnmapVolume(target)
+
+	f, err := os.Stat(target)
+	if err == nil && (f.Mode()&os.ModeDevice) != 0 {
+		return dm.UnmapVolume(target)
+	}
+	return nil
 }

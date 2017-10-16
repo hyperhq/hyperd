@@ -60,7 +60,7 @@ type hyperstartCmd struct {
 	result chan<- error
 }
 
-func NewJsonBasedHyperstart(id, ctlSock, streamSock string, lastStreamSeq uint64, waitReady, paused bool) Hyperstart {
+func NewJsonBasedHyperstart(id, ctlSock, streamSock string, lastStreamSeq uint64, waitReady, paused bool) (Hyperstart, error) {
 	h := &jsonBasedHyperstart{
 		logPrefix:     fmt.Sprintf("SB[%s] ", id),
 		procs:         make(map[pKey]*pState),
@@ -71,7 +71,7 @@ func NewJsonBasedHyperstart(id, ctlSock, streamSock string, lastStreamSeq uint64
 	}
 	go handleStreamSock(h, streamSock)
 	go handleCtlSock(h, ctlSock, waitReady, paused)
-	return h
+	return h, nil
 }
 
 func (h *jsonBasedHyperstart) LogLevel(level hlog.LogLevel) bool {
@@ -646,12 +646,86 @@ func (h *jsonBasedHyperstart) AddRoute(r []hyperstartapi.Route) error {
 	return h.hyperstartCommand(hyperstartapi.INIT_SETUPROUTE, hyperstartapi.Routes{Routes: r})
 }
 
-func (h *jsonBasedHyperstart) UpdateInterface(dev, ip, mask string) error {
-	return h.hyperstartCommand(hyperstartapi.INIT_SETUPINTERFACE, hyperstartapi.NetworkInf{
-		Device:    dev,
-		IpAddress: ip,
-		NetMask:   mask,
-	})
+func (h *jsonBasedHyperstart) UpdateInterface(t InfUpdateType, dev, newName string, ipAddresses []hyperstartapi.IpAddress, mtu uint64) error {
+	inf := hyperstartapi.NetworkInf{
+		Device:      dev,
+		IpAddresses: []hyperstartapi.IpAddress{},
+	}
+	switch t {
+	case AddInf:
+		inf.NewName = newName
+		inf.Mtu = mtu
+		inf.IpAddresses = ipAddresses
+		if err := h.hyperstartCommand(hyperstartapi.INIT_SETUPINTERFACE, inf); err != nil {
+			return fmt.Errorf("json: failed to send <add interface> command to hyperstart: %v", err)
+		}
+	case DelInf:
+		if err := h.hyperstartCommand(hyperstartapi.INIT_DELETEINTERFACE, inf); err != nil {
+			return fmt.Errorf("json: failed to send <delete interface> command to hyperstart. inf: %#v, error: %v", inf, err)
+		}
+	case AddIP:
+		inf.IpAddresses = ipAddresses
+		if err := h.hyperstartCommand(hyperstartapi.INIT_SETUPINTERFACE, inf); err != nil {
+			return fmt.Errorf("json: failed to send <add ip> command to hyperstart: %v", err)
+		}
+	case DelIP:
+		// TODO: add new interface to handle hyperstart delete interface @weizhang555
+	case SetMtu:
+		if mtu > 0 {
+			inf.Mtu = mtu
+			if err := h.hyperstartCommand(hyperstartapi.INIT_SETUPINTERFACE, inf); err != nil {
+				return fmt.Errorf("json: failed to send <SetMtu> command to hyperstart: %v", err)
+			}
+		}
+	}
+	return nil
+}
+
+func (h *jsonBasedHyperstart) WriteStdin(container, process string, data []byte) (int, error) {
+	h.RLock()
+	p, ok := h.procs[pKey{c: container, p: process}]
+	h.RUnlock()
+	if !ok {
+		h.Log(ERROR, "cannot find process: %s, %s", container, process)
+		return 0, fmt.Errorf("cannot find process: %s, %s", container, process)
+	}
+	return p.stdinPipe.Write(data)
+}
+
+func (h *jsonBasedHyperstart) ReadStdout(container, process string, data []byte) (int, error) {
+	h.RLock()
+	p, ok := h.procs[pKey{c: container, p: process}]
+	h.RUnlock()
+	if !ok {
+		h.Log(ERROR, "cannot find process: %s, %s", container, process)
+		return 0, fmt.Errorf("cannot find process: %s, %s", container, process)
+	}
+	return p.stdoutPipe.Read(data)
+}
+
+func (h *jsonBasedHyperstart) ReadStderr(container, process string, data []byte) (int, error) {
+	h.RLock()
+	p, ok := h.procs[pKey{c: container, p: process}]
+	h.RUnlock()
+	if !ok {
+		h.Log(ERROR, "cannot find process: %s, %s", container, process)
+		return 0, fmt.Errorf("cannot find process: %s, %s", container, process)
+	}
+	if p.stderrSeq == 0 {
+		return 0, io.EOF
+	}
+	return p.stderrPipe.Read(data)
+}
+
+func (h *jsonBasedHyperstart) CloseStdin(container, process string) error {
+	h.RLock()
+	p, ok := h.procs[pKey{c: container, p: process}]
+	h.RUnlock()
+	if !ok {
+		h.Log(ERROR, "cannot find process: %s, %s", container, process)
+		return fmt.Errorf("cannot find process: %s, %s", container, process)
+	}
+	return p.stdinPipe.Close()
 }
 
 func (h *jsonBasedHyperstart) TtyWinResize4242(container, process string, row, col uint16) error {
@@ -699,16 +773,16 @@ func (h *jsonBasedHyperstart) setupProcessIo(ps *pState, terminal bool) {
 	if ps.stdioSeq == 0 {
 		ps.stdioSeq = h.allocStreamSeq()
 	}
-	stdoutPipe, stdout := io.Pipe() // TODO: make StreamOut nonblockable
-	ps.stdoutPipe = stdoutPipe
-	h.streamOuts[ps.stdioSeq] = streamOut{WriteCloser: stdout, ps: ps}
+	outPipe := utils.NewBytesPipe()
+	ps.stdoutPipe = outPipe
+	h.streamOuts[ps.stdioSeq] = streamOut{WriteCloser: outPipe, ps: ps}
 	if !terminal {
 		if ps.stderrSeq == 0 {
 			ps.stderrSeq = h.allocStreamSeq()
 		}
-		stderrPipe, stderr := io.Pipe()
-		ps.stderrPipe = stderrPipe
-		h.streamOuts[ps.stderrSeq] = streamOut{WriteCloser: stderr, ps: ps}
+		errPipe := utils.NewBytesPipe()
+		ps.stderrPipe = errPipe
+		h.streamOuts[ps.stderrSeq] = streamOut{WriteCloser: errPipe, ps: ps}
 	}
 	ps.stdinPipe = streamIn{streamSeq: ps.stdioSeq, h: h}
 }
@@ -728,11 +802,11 @@ func (h *jsonBasedHyperstart) removeProcess(container, process string) {
 	}
 }
 
-func (h *jsonBasedHyperstart) NewContainer(c *hyperstartapi.Container) (io.WriteCloser, io.ReadCloser, io.ReadCloser, error) {
+func (h *jsonBasedHyperstart) NewContainer(c *hyperstartapi.Container) error {
 	h.Lock()
 	if _, existed := h.procs[pKey{c: c.Id, p: c.Process.Id}]; existed {
 		h.Unlock()
-		return nil, nil, nil, fmt.Errorf("process id conflicts, the process of the id %s already exists", c.Process.Id)
+		return fmt.Errorf("process id conflicts, the process of the id %s already exists", c.Process.Id)
 	}
 	ps := &pState{}
 	h.setupProcessIo(ps, c.Process.Terminal)
@@ -745,22 +819,22 @@ func (h *jsonBasedHyperstart) NewContainer(c *hyperstartapi.Container) (io.Write
 	err := h.hyperstartCommand(hyperstartapi.INIT_NEWCONTAINER, c)
 	if err != nil {
 		h.removeProcess(c.Id, c.Process.Id)
-		return nil, nil, nil, err
+		return err
 	}
-	return &ps.stdinPipe, ps.stdoutPipe, ps.stderrPipe, err
+	return err
 }
 
-func (h *jsonBasedHyperstart) RestoreContainer(c *hyperstartapi.Container) (io.WriteCloser, io.ReadCloser, io.ReadCloser, error) {
+func (h *jsonBasedHyperstart) RestoreContainer(c *hyperstartapi.Container) error {
 	h.Lock()
 	if _, existed := h.procs[pKey{c: c.Id, p: c.Process.Id}]; existed {
 		h.Unlock()
-		return nil, nil, nil, fmt.Errorf("process id conflicts, the process of the id %s already exists", c.Process.Id)
+		return fmt.Errorf("process id conflicts, the process of the id %s already exists", c.Process.Id)
 	}
 	h.Unlock()
 	// Send SIGCONT signal to init to test whether it's alive.
 	err := h.SignalProcess(c.Id, "init", syscall.SIGCONT)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("container not exist or already stopped: %v", err)
+		return fmt.Errorf("container not exist or already stopped: %v", err)
 	}
 	// restore procs/streamOuts map
 	ps := &pState{
@@ -772,14 +846,14 @@ func (h *jsonBasedHyperstart) RestoreContainer(c *hyperstartapi.Container) (io.W
 	h.procs[pKey{c: c.Id, p: c.Process.Id}] = ps
 	h.Unlock()
 
-	return &ps.stdinPipe, ps.stdoutPipe, ps.stderrPipe, nil
+	return nil
 }
 
-func (h *jsonBasedHyperstart) AddProcess(container string, p *hyperstartapi.Process) (io.WriteCloser, io.ReadCloser, io.ReadCloser, error) {
+func (h *jsonBasedHyperstart) AddProcess(container string, p *hyperstartapi.Process) error {
 	h.Lock()
 	if _, existed := h.procs[pKey{c: container, p: p.Id}]; existed {
 		h.Unlock()
-		return nil, nil, nil, fmt.Errorf("process id conflicts, the process of the id %s already exists", p.Id)
+		return fmt.Errorf("process id conflicts, the process of the id %s already exists", p.Id)
 	}
 	ps := &pState{}
 	h.setupProcessIo(ps, p.Terminal)
@@ -794,9 +868,9 @@ func (h *jsonBasedHyperstart) AddProcess(container string, p *hyperstartapi.Proc
 	})
 	if err != nil {
 		h.removeProcess(container, p.Id)
-		return nil, nil, nil, err
+		return err
 	}
-	return &ps.stdinPipe, ps.stdoutPipe, ps.stderrPipe, err
+	return err
 }
 
 func (h *jsonBasedHyperstart) SignalProcess(container, process string, signal syscall.Signal) error {

@@ -9,7 +9,13 @@ import (
 
 	"github.com/hyperhq/hyperd/daemon/daemondb"
 	"github.com/hyperhq/hyperd/daemon/pod"
+	"github.com/hyperhq/hyperd/networking/portmapping"
 	apitypes "github.com/hyperhq/hyperd/types"
+	"github.com/hyperhq/hyperd/utils"
+	"github.com/hyperhq/runv/driverloader"
+	"github.com/hyperhq/runv/factory"
+	"github.com/hyperhq/runv/hypervisor"
+	"github.com/hyperhq/runv/hypervisor/network"
 
 	docker "github.com/docker/docker/daemon"
 	"github.com/docker/docker/daemon/logger/jsonfilelog"
@@ -18,12 +24,7 @@ import (
 	"github.com/docker/docker/registry"
 	dockerutils "github.com/docker/docker/utils"
 	"github.com/golang/glog"
-	"github.com/hyperhq/hyperd/networking/portmapping"
-	"github.com/hyperhq/hyperd/utils"
-	"github.com/hyperhq/runv/driverloader"
-	"github.com/hyperhq/runv/factory"
-	"github.com/hyperhq/runv/hypervisor"
-	"github.com/hyperhq/runv/hypervisor/network"
+	"github.com/vishvananda/netlink"
 )
 
 var (
@@ -230,12 +231,22 @@ func (daemon *Daemon) initNetworks(c *apitypes.HyperConfig) error {
 		glog.Errorf("InitNetwork failed, %s", err.Error())
 		return err
 	}
-	addr, err := network.GetIfaceAddr(network.BridgeIface)
+	brlink, err := netlink.LinkByName(network.BridgeIface)
 	if err != nil {
-		glog.Errorf("failed to get address of the configured bridge: %v", err)
+		glog.Errorf("failed to get link of the configured bridge (%s): %v", network.BridgeIface, err)
 		return err
 	}
-	if err := portmapping.Setup(network.BridgeIface, addr, c.DisableIptables); err != nil {
+	addrs, err := netlink.AddrList(brlink, netlink.FAMILY_V4)
+	if err != nil {
+		glog.Errorf("failed to get ip address of the configured bridge (%s): %v", network.BridgeIface, err)
+		return err
+	}
+	if len(addrs) == 0 {
+		err = fmt.Errorf("configured bridge (%s) has no IPv4 addresses")
+		glog.Error(err)
+		return err
+	}
+	if err := portmapping.Setup(network.BridgeIface, fmt.Sprintf("%s", addrs[0].IPNet), c.DisableIptables); err != nil {
 		glog.Errorf("Setup portmapping failed: %v", err)
 	}
 	return nil
