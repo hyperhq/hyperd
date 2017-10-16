@@ -109,12 +109,14 @@ fi
 AM_CONDITIONAL([WITH_BTRFS], [test "x$with_btrfs" == "xyes"])
 AM_CONDITIONAL([WITH_BTRFS_HEADER_VERSION], [test "x$with_btrfs_header_version" == "xyes"])
 
-AC_CONFIG_FILES([Makefile])
-case $build_os in
-	darwin*)
-		AC_CONFIG_FILES([mac_installer/Makefile])
-		;;
-esac
+AM_EXTRA_RECURSIVE_TARGETS([hyperd hyperctl vmlogd])
+AC_CONFIG_FILES([
+	Makefile
+	cmd/Makefile
+	cmd/hyperd/Makefile
+	cmd/hyperctl/Makefile
+	cmd/vmlogd/Makefile
+])
 
 AC_OUTPUT
 

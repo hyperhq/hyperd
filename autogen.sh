@@ -13,7 +13,7 @@ die()
 	exit 1
 }
 
-test -f hyperd.go || die "You must run this script in the top-level hyper directory."
+test -f configure.ac || die "You must run this script in the top-level hyper directory."
 
 aclocal --version < /dev/null > /dev/null 2>&1 || die "You must have aclocal installed to generate the hyper."
 autoconf --version < /dev/null > /dev/null 2>&1 || die "You must have autoconf installed to generate the hyper."

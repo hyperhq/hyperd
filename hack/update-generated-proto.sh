@@ -15,7 +15,7 @@ fi
 
 HYPER_ROOT=$(dirname "${BASH_SOURCE}")/..
 PROTO_ROOT=${HYPER_ROOT}/types
-export PATH=${HYPER_ROOT}/cmds/protoc-gen-gogo:$PATH
+export PATH=${HYPER_ROOT}/cmd/protoc-gen-gogo:$PATH
 
 function cleanup {
 	rm -f ${PROTO_ROOT}/types.pb.go.bak
