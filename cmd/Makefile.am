@@ -1,0 +1,2 @@
+SUBDIRS=hyperd hyperctl vmlogd
+

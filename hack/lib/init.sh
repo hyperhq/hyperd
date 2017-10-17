@@ -14,6 +14,10 @@ PATH="${HYPER_OUTPUT_HOSTBIN}":$PATH
 shopt -s expand_aliases
 alias sudo='sudo env PATH=$PATH'
 
+cp "${HYPER_ROOT}/cmd/hyperd/hyperd" "${HYPER_OUTPUT_HOSTBIN}/"
+cp "${HYPER_ROOT}/cmd/hyperctl/hyperctl" "${HYPER_OUTPUT_HOSTBIN}/"
+cp "${HYPER_ROOT}/cmd/vmlogd/vmlogd" "${HYPER_OUTPUT_HOSTBIN}/"
+
 source "${HYPER_ROOT}/hack/lib/util.sh"
 source "${HYPER_ROOT}/hack/lib/logging.sh"
 

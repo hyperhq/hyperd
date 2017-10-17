@@ -68,4 +68,8 @@ package/fedora/rpm/SRPMS/*
 package/fedora/fedora-rpm.pod
 
 # binaries
-cmds/protoc-gen-gogo/protoc-gen-gogo
+cmd/protoc-gen-gogo/protoc-gen-gogo
+cmd/hyperd/hyperd
+cmd/hyperctl/hyperctl
+cmd/vmlogd/vmlogd
+
