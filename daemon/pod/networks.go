@@ -9,8 +9,6 @@ import (
 	"github.com/hyperhq/runv/hypervisor/network"
 )
 
-const DEFAULT_INTERFACE_NAME = "eth-default"
-
 type Interface struct {
 	p *XPod
 
@@ -19,9 +17,6 @@ type Interface struct {
 }
 
 func newInterface(p *XPod, spec *apitypes.UserInterface) *Interface {
-	if spec.Ifname == "" {
-		spec.Ifname = DEFAULT_INTERFACE_NAME
-	}
 	return &Interface{p: p, spec: spec}
 }
 
@@ -51,20 +46,17 @@ func (inf *Interface) prepare() error {
 			return err
 		}
 		inf.descript = &runv.InterfaceDescription{
-			Id:     inf.spec.Ifname,
-			Name:   inf.spec.Ifname,
-			Lo:     false,
-			Bridge: setting.Bridge,
-			Ip:     setting.IPAddress,
-			Mac:    setting.Mac,
-			Gw:     setting.Gateway,
+			Lo:      false,
+			Bridge:  setting.Bridge,
+			Ip:      setting.IPAddress,
+			Mac:     setting.Mac,
+			Gw:      setting.Gateway,
+			TapName: inf.spec.Ifname,
 		}
 		return nil
 	}
 
 	inf.descript = &runv.InterfaceDescription{
-		Id:      inf.spec.Ifname,
-		Name:    inf.spec.Ifname,
 		Lo:      false,
 		Bridge:  inf.spec.Bridge,
 		Ip:      inf.spec.Ip,
