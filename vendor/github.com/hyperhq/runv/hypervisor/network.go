@@ -312,7 +312,9 @@ func (nc *NetworkContext) configureInterface(index, pciAddr int, name string, in
 	if inf.TapName == "" {
 		inf.TapName = network.NicName(nc.sandbox.Id, index)
 	}
-
+	if inf.Name == "" {
+		inf.Name = name
+	}
 	settings, err := network.Configure(inf)
 	if err != nil {
 		nc.sandbox.Log(ERROR, "interface creating failed: %v", err.Error())
