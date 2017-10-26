@@ -14,7 +14,10 @@ hyper::hyperstart::build() {
 
   KERNEL_PATH="${HYPER_TEMP}/hyperstart/build/kernel"
   if [ ! -f ${KERNEL_PATH} ]; then
-    return 1
+    KERNEL_PATH="${HYPER_TEMP}/hyperstart/build/arch/x86_64/kernel"
+    if [ ! -f ${KERNEL_PATH} ]; then
+      return 1
+    fi
   fi
   INITRD_PATH="${HYPER_TEMP}/hyperstart/build/hyper-initrd.img"
   if [ ! -f ${INITRD_PATH} ]; then
