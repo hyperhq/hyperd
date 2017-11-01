@@ -12,7 +12,7 @@ Vcs-Git: git://github.com/hyperhq/hyperd.git
 Vcs-Browser: https://github.com/hyperhq/hyperd
 
 Package: hypercontainer
-Architecture: amd64
+Architecture: amd64 arm64
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: HyperContainer - Virtualized Container Runtime
  Hyper is a VM based docker engine, it start container image in
