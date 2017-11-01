@@ -25,9 +25,9 @@ override_dh_auto_build:
 override_dh_auto_install:
 	echo "begin install"
 	mkdir -p debian/hypercontainer/usr/bin
-	cp -aT hyperd debian/hypercontainer/usr/bin/hyperd
-	cp -aT hyperctl debian/hypercontainer/usr/bin/hyperctl
-	cp -aT vmlogd debian/hypercontainer/usr/bin/vmlogd
+	cp -aT cmd/hyperd/hyperd debian/hypercontainer/usr/bin/hyperd
+	cp -aT cmd/hyperctl/hyperctl debian/hypercontainer/usr/bin/hyperctl
+	cp -aT cmd/vmlogd/vmlogd debian/hypercontainer/usr/bin/vmlogd
 	cp -r package/dist/* debian/hypercontainer/
 	echo "end install"
 
