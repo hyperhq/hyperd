@@ -27,7 +27,7 @@ make %{?_smp_mflags}
 
 %install
 mkdir -p %{buildroot}%{_sharedstatedir}/hyper
-cp %{_builddir}/src/github.com/hyperhq/hyperstart/build/kernel %{buildroot}%{_sharedstatedir}/hyper/
+cp %{_builddir}/src/github.com/hyperhq/hyperstart/build/arch/`uname -m`/kernel %{buildroot}%{_sharedstatedir}/hyper/
 cp %{_builddir}/src/github.com/hyperhq/hyperstart/build/hyper-initrd.img %{buildroot}%{_sharedstatedir}/hyper/
 
 %clean
