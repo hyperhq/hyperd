@@ -10,7 +10,7 @@ Vcs-Git: git://github.com/hyperhq/hyperstart.git
 Vcs-Browser: https://github.com/hyperhq/hyperstart
 
 Package: hyperstart
-Architecture: amd64
+Architecture: amd64 arm64
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: The init Task for HyperContainer
  Hyperstart is the initrd for hyper VM, hyperstart 
