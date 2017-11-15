@@ -5,10 +5,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/docker/docker/daemon/graphdriver"
 	"github.com/docker/docker/pkg/idtools"
+	"github.com/docker/docker/pkg/parsers"
+	"github.com/docker/go-units"
 	"github.com/golang/glog"
 	"github.com/opencontainers/runc/libcontainer/label"
 	//"github.com/docker/docker/pkg/mount"
@@ -88,12 +91,31 @@ func Init(home string, options []string, uidMaps, gidMaps []idtools.IDMap) (grap
 		return nil, err
 	}
 
+	var blockSize = uint64(10 * 1024 * 1024 * 1024)
+	for _, option := range options {
+		key, val, err := parsers.ParseKeyValueOpt(option)
+		if err != nil {
+			return nil, err
+		}
+		key = strings.ToLower(key)
+		switch key {
+		case "rawblock.basesize":
+			size, err := units.RAMInBytes(val)
+			if err != nil {
+				return nil, err
+			}
+			blockSize = uint64(size)
+		default:
+			return nil, fmt.Errorf("rawblock: Unknown option %s\n", key)
+		}
+	}
+
 	d := &Driver{
 		home:      home,
 		backingFs: backingFs,
 		cow:       cow,
 		blockFs:   blockFs,
-		blockSize: 10, // TODO: make it configurable
+		blockSize: blockSize,
 		uid:       rootUID,
 		gid:       rootGID,
 		active:    map[string]int{},
@@ -111,7 +133,7 @@ func (d *Driver) Status() [][2]string {
 		{"Backing Filesystem", d.backingFs},
 		{"Support Copy-On-Write", fmt.Sprintf("%v", d.cow)},
 		{"Block Filesystem", d.blockFs},
-		{"Block Size", fmt.Sprintf("%dGB", d.blockSize)},
+		{"Block Size", fmt.Sprintf("%s", units.HumanSize(float64(d.blockSize)))},
 	}
 }
 
@@ -131,7 +153,7 @@ func (d *Driver) Create(id, parent, mountLabel string) error {
 		return err
 	}
 	if parent == "" {
-		return CreateBlock(d.block(id), d.blockFs, mountLabel, d.blockSize*1024*1024*1024)
+		return CreateBlock(d.block(id), d.blockFs, mountLabel, d.blockSize)
 	}
 	if out, err := exec.Command("cp", "-a", "--reflink=auto", d.block(parent), d.block(id)).CombinedOutput(); err != nil {
 		return fmt.Errorf("Failed to reflink:%v:%s", err, string(out))

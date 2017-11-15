@@ -506,6 +506,7 @@ func (s *BtrfsStorage) RemoveVolume(podId string, record []byte) error {
 
 type RawBlockStorage struct {
 	rootPath string
+	size     int64
 }
 
 func RawBlockFactory(_ *dockertypes.Info, _ *daemondb.DaemonDB) (Storage, error) {
@@ -524,9 +525,21 @@ func (s *RawBlockStorage) RootPath() string {
 }
 
 func (s *RawBlockStorage) Init(c *apitypes.HyperConfig) error {
-	if err := os.MkdirAll(filepath.Join(s.RootPath(), "volumes"), 0700); err != nil {
+	err := os.MkdirAll(filepath.Join(s.RootPath(), "volumes"), 0700)
+	if err != nil {
 		return err
 	}
+
+	size := int64(storage.DEFAULT_DM_VOL_SIZE)
+	if c.StorageBaseSize != "" {
+		size, err = units.RAMInBytes(c.StorageBaseSize)
+		if err != nil {
+			return err
+		}
+	}
+
+	s.size = size
+
 	return nil
 }
 
@@ -560,7 +573,7 @@ func (s *RawBlockStorage) InjectFile(src io.Reader, mountId, target, baseDir str
 
 func (s *RawBlockStorage) CreateVolume(podId string, spec *apitypes.UserVolume) error {
 	block := filepath.Join(s.RootPath(), "volumes", fmt.Sprintf("%s-%s", podId, spec.Name))
-	if err := rawblock.CreateBlock(block, "xfs", "", uint64(storage.DEFAULT_DM_VOL_SIZE)); err != nil {
+	if err := rawblock.CreateBlock(block, "xfs", "", uint64(s.size)); err != nil {
 		return err
 	}
 	spec.Source = block

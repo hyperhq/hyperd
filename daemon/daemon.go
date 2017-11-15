@@ -172,8 +172,12 @@ func InitDockerCfg(mirrors []string, insecureRegistries []string, graphdriver, b
 	dockerCfg.GraphDriver = graphdriver
 	dockerCfg.Root = root
 	dockerCfg.TrustKeyPath = path.Join(root, "keys")
-	if graphdriver == "devicemapper" && basesize != "" {
-		dockerCfg.GraphOptions = append(dockerCfg.GraphOptions, fmt.Sprintf("dm.basesize=%s", basesize))
+	if basesize != "" {
+		if graphdriver == "devicemapper" {
+			dockerCfg.GraphOptions = append(dockerCfg.GraphOptions, fmt.Sprintf("dm.basesize=%s", basesize))
+		} else if graphdriver == "rawblock" {
+			dockerCfg.GraphOptions = append(dockerCfg.GraphOptions, fmt.Sprintf("rawblock.basesize=%s", basesize))
+		}
 	}
 
 	// disable docker network
