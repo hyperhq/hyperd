@@ -30,6 +30,8 @@ Initrd=/var/lib/hyper/hyper-initrd.img
 
 # Storage driver for hyperd, valid value includes rawblock, devicemapper, overlay, and aufs
 # StorageDriver=overlay
+# StorageBaseSize only valid for devicemapper and rawblock
+# StorageBaseSize=10GB
 
 # Bridge device for hyperd, default is hyper0
 # Bridge=
