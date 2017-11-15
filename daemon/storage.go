@@ -210,7 +210,7 @@ func (dms *DevMapperStorage) CreateVolume(podId string, spec *apitypes.UserVolum
 		}
 		dev_id_str := strconv.Itoa(dev_id)
 
-		err = dm.CreateVolume(dms.VolPoolName, deviceName, dev_id_str, storage.DEFAULT_VOL_MKFS, storage.DEFAULT_DM_VOL_SIZE, restore)
+		err = dm.CreateVolume(dms.VolPoolName, deviceName, dev_id_str, storage.DEFAULT_VOL_MKFS, dms.DmPoolData.Size, restore)
 		if err != nil && !restore && strings.Contains(err.Error(), "failed: File exists") {
 			glog.V(1).Infof("retry for dev_id #%d creating collision: %v", dev_id, err)
 			continue
