@@ -159,7 +159,7 @@ var (
 func presentInHelp(usage string) string { return usage }
 func absentFromHelp(string) string      { return "" }
 
-func InitDockerCfg(mirrors []string, insecureRegistries []string, graphdriver, root string) {
+func InitDockerCfg(mirrors []string, insecureRegistries []string, graphdriver, basesize, root string) {
 	if dockerCfg.LogConfig.Config == nil {
 		dockerCfg.LogConfig.Config = make(map[string]string)
 	}
@@ -172,6 +172,9 @@ func InitDockerCfg(mirrors []string, insecureRegistries []string, graphdriver, r
 	dockerCfg.GraphDriver = graphdriver
 	dockerCfg.Root = root
 	dockerCfg.TrustKeyPath = path.Join(root, "keys")
+	if graphdriver == "devicemapper" && basesize != "" {
+		dockerCfg.GraphOptions = append(dockerCfg.GraphOptions, fmt.Sprintf("dm.basesize=%s", basesize))
+	}
 
 	// disable docker network
 	flags.Set("-bridge", "none")

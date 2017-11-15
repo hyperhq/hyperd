@@ -15,6 +15,7 @@ import (
 	"time"
 
 	dockertypes "github.com/docker/engine-api/types"
+	"github.com/docker/go-units"
 	"github.com/golang/glog"
 	"github.com/hyperhq/hyperd/daemon/daemondb"
 	"github.com/hyperhq/hyperd/storage"
@@ -105,8 +106,12 @@ func (dms *DevMapperStorage) RootPath() string {
 
 func (dms *DevMapperStorage) Init(c *apitypes.HyperConfig) error {
 	size := storage.DEFAULT_DM_POOL_SIZE
-	if c.StorageBaseSize > 0 {
-		size = c.StorageBaseSize
+	if c.StorageBaseSize != "" {
+		nsize, err := units.RAMInBytes(c.StorageBaseSize)
+		if err != nil {
+			return err
+		}
+		size = int(nsize)
 	}
 	dmPool := dm.DeviceMapper{
 		Datafile:         filepath.Join(utils.HYPER_ROOT, "lib") + "/data",
