@@ -111,7 +111,7 @@ func mainDaemon(opt *Options) {
 		}
 	}
 
-	daemon.InitDockerCfg(strings.Split(opt.Mirrors, ","), strings.Split(opt.InsecureRegistries, ","), c.StorageDriver, c.Root)
+	daemon.InitDockerCfg(strings.Split(opt.Mirrors, ","), strings.Split(opt.InsecureRegistries, ","), c.StorageDriver, c.StorageBaseSize, c.Root)
 	d, err := daemon.NewDaemon(c)
 	if err != nil {
 		glog.Errorf("The hyperd create failed, %s", err.Error())

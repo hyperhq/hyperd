@@ -15,6 +15,7 @@ import (
 	"time"
 
 	dockertypes "github.com/docker/engine-api/types"
+	"github.com/docker/go-units"
 	"github.com/golang/glog"
 	"github.com/hyperhq/hyperd/daemon/daemondb"
 	"github.com/hyperhq/hyperd/storage"
@@ -105,8 +106,12 @@ func (dms *DevMapperStorage) RootPath() string {
 
 func (dms *DevMapperStorage) Init(c *apitypes.HyperConfig) error {
 	size := storage.DEFAULT_DM_POOL_SIZE
-	if c.StorageBaseSize > 0 {
-		size = c.StorageBaseSize
+	if c.StorageBaseSize != "" {
+		nsize, err := units.RAMInBytes(c.StorageBaseSize)
+		if err != nil {
+			return err
+		}
+		size = int(nsize)
 	}
 	dmPool := dm.DeviceMapper{
 		Datafile:         filepath.Join(utils.HYPER_ROOT, "lib") + "/data",
@@ -205,7 +210,7 @@ func (dms *DevMapperStorage) CreateVolume(podId string, spec *apitypes.UserVolum
 		}
 		dev_id_str := strconv.Itoa(dev_id)
 
-		err = dm.CreateVolume(dms.VolPoolName, deviceName, dev_id_str, storage.DEFAULT_VOL_MKFS, storage.DEFAULT_DM_VOL_SIZE, restore)
+		err = dm.CreateVolume(dms.VolPoolName, deviceName, dev_id_str, storage.DEFAULT_VOL_MKFS, dms.DmPoolData.Size, restore)
 		if err != nil && !restore && strings.Contains(err.Error(), "failed: File exists") {
 			glog.V(1).Infof("retry for dev_id #%d creating collision: %v", dev_id, err)
 			continue
@@ -501,6 +506,7 @@ func (s *BtrfsStorage) RemoveVolume(podId string, record []byte) error {
 
 type RawBlockStorage struct {
 	rootPath string
+	size     int64
 }
 
 func RawBlockFactory(_ *dockertypes.Info, _ *daemondb.DaemonDB) (Storage, error) {
@@ -519,9 +525,21 @@ func (s *RawBlockStorage) RootPath() string {
 }
 
 func (s *RawBlockStorage) Init(c *apitypes.HyperConfig) error {
-	if err := os.MkdirAll(filepath.Join(s.RootPath(), "volumes"), 0700); err != nil {
+	err := os.MkdirAll(filepath.Join(s.RootPath(), "volumes"), 0700)
+	if err != nil {
 		return err
 	}
+
+	size := int64(storage.DEFAULT_DM_VOL_SIZE)
+	if c.StorageBaseSize != "" {
+		size, err = units.RAMInBytes(c.StorageBaseSize)
+		if err != nil {
+			return err
+		}
+	}
+
+	s.size = size
+
 	return nil
 }
 
@@ -555,7 +573,7 @@ func (s *RawBlockStorage) InjectFile(src io.Reader, mountId, target, baseDir str
 
 func (s *RawBlockStorage) CreateVolume(podId string, spec *apitypes.UserVolume) error {
 	block := filepath.Join(s.RootPath(), "volumes", fmt.Sprintf("%s-%s", podId, spec.Name))
-	if err := rawblock.CreateBlock(block, "xfs", "", uint64(storage.DEFAULT_DM_VOL_SIZE)); err != nil {
+	if err := rawblock.CreateBlock(block, "xfs", "", uint64(s.size)); err != nil {
 		return err
 	}
 	spec.Source = block
