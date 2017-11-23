@@ -22,6 +22,15 @@ func (pod *UserPod) Validate() error {
 		"nas":   true,
 	}
 
+	var volume_caches = map[string]bool{
+		"off":          true,
+		"none":         true,
+		"directsync":   true,
+		"writeback":    true,
+		"unsafe":       true,
+		"writethrough": true,
+	}
+
 	hostnameLen := len(pod.Hostname)
 	if hostnameLen > 63 {
 		return fmt.Errorf("Hostname exceeds the maximum length 63, len: %d", hostnameLen)
@@ -105,6 +114,16 @@ func (pod *UserPod) Validate() error {
 
 		if _, ok := volume_drivers[v.Format]; !ok {
 			return fmt.Errorf("in volume %d, volume does not support driver %s.", idx, v.Format)
+		}
+	}
+
+	for idx, v := range pod.Volumes {
+		if v.Cache == "" {
+			continue
+		}
+
+		if _, ok := volume_caches[v.Cache]; !ok {
+			return fmt.Errorf("in volume %d, volume does not support cache %s.", idx, v.Cache)
 		}
 	}
 
