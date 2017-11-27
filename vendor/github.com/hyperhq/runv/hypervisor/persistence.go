@@ -26,6 +26,7 @@ type PersistVolumeInfo struct {
 	Filename     string
 	Format       string
 	Fstype       string
+	Cache        string
 	DeviceName   string
 	ScsiId       int
 	ContainerIds []string
@@ -178,6 +179,7 @@ func (blk *DiskDescriptor) dump() *PersistVolumeInfo {
 		Filename:   blk.Filename,
 		Format:     blk.Format,
 		Fstype:     blk.Fstype,
+		Cache:      blk.Cache,
 		DeviceName: blk.DeviceName,
 		ScsiId:     blk.ScsiId,
 	}
@@ -189,6 +191,7 @@ func (vol *PersistVolumeInfo) blockInfo() *DiskDescriptor {
 		Filename:   vol.Filename,
 		Format:     vol.Format,
 		Fstype:     vol.Fstype,
+		Cache:      vol.Cache,
 		DeviceName: vol.DeviceName,
 		ScsiId:     vol.ScsiId,
 	}
@@ -331,6 +334,7 @@ func (pinfo *PersistInfo) vmContext(hub chan VmEvent, client chan *types.VmRespo
 					Source:       bInfo.Filename,
 					Format:       bInfo.Format,
 					Fstype:       bInfo.Fstype,
+					Cache:        bInfo.Cache,
 					DockerVolume: bInfo.DockerVolume,
 					ReadOnly:     bInfo.ReadOnly,
 				},

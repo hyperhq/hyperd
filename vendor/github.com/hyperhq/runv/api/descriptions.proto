@@ -48,6 +48,7 @@ message VolumeDescription {
     string source = 2;
     string format = 3; //"raw" (or "qcow2" later) for volume, "vfs" for dir path
     string fstype = 4; //"xfs", "ext4" etc. for block dev, or "dir" for dir path
+    string cache = 5;
     VolumeOption options = 8;
     bool dockerVolume = 9;
     bool readOnly = 10;

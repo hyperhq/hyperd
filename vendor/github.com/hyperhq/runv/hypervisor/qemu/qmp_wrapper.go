@@ -35,8 +35,8 @@ func defaultRespond(result chan<- hypervisor.VmEvent, callback hypervisor.VmEven
 	}
 }
 
-func newDiskAddSession(ctx *hypervisor.VmContext, qc *QemuContext, filename, format string, id int, readonly bool, result chan<- hypervisor.VmEvent) {
-	args := "drive_add dummy file=" + filename + ",if=none,id=" + "drive" + strconv.Itoa(id) + ",format=" + format + ",cache=writeback"
+func newDiskAddSession(ctx *hypervisor.VmContext, qc *QemuContext, filename, format string, id int, readonly bool, cache string, result chan<- hypervisor.VmEvent) {
+	args := "drive_add dummy file=" + filename + ",if=none,id=" + "drive" + strconv.Itoa(id) + ",format=" + format + ",cache=" + cache
 	if readonly {
 		args += ",readonly"
 	}

@@ -26,6 +26,7 @@ import (
 	runv "github.com/hyperhq/runv/api"
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/lib/term"
+	"github.com/hyperhq/hyperd/storage"
 )
 
 var epocZero = time.Time{}
@@ -887,6 +888,12 @@ func (c *Container) addToSandbox() error {
 	if err != nil {
 		c.Log(ERROR, "failed to prepare rootfs: %v", err)
 		return err
+	}
+	if root.Format != "vfs" && root.Format != "nas" {
+		root.Cache = c.spec.Cache
+		if root.Cache == "" {
+			root.Cache = storage.DEFAULT_VOL_CACHE
+		}
 	}
 	c.descript.RootVolume = root
 

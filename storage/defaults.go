@@ -8,4 +8,5 @@ const (
 	DEFAULT_DM_VOL_SIZE  int    = 2 * 1024 * 1024 * 1024
 	DEFAULT_VOL_FS              = "ext4"
 	DEFAULT_VOL_MKFS            = "mkfs.ext4"
+	DEFAULT_VOL_CACHE           = "writeback"
 )
