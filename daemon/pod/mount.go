@@ -39,6 +39,7 @@ func ProbeExistingVolume(v *apitypes.UserVolume, sharedDir string) (*runv.Volume
 		Source: v.Source,
 		Format: v.Format,
 		Fstype: v.Fstype,
+		Cache:  v.Cache,
 	}
 
 	if v.Option != nil {
@@ -62,6 +63,10 @@ func ProbeExistingVolume(v *apitypes.UserVolume, sharedDir string) (*runv.Volume
 			vol.Fstype = storage.DEFAULT_VOL_FS
 			err = nil
 		}
+	}
+
+	if vol.Cache == "" && v.Format != "vfs" && v.Format != "nas" {
+		vol.Cache = storage.DEFAULT_VOL_CACHE
 	}
 
 	return vol, nil
