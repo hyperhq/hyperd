@@ -4,6 +4,12 @@ else
 XEN_BUILD_TAG=
 endif
 
+if WITH_XEN490
+XEN490_BUILD_TAG=with_xen490
+else
+XEN490_BUILD_TAG=
+endif
+
 if WITH_LIBVIRT
 LIBVIRT_BUILD_TAG=with_libvirt
 else
@@ -20,7 +26,7 @@ else
 BTRFS_BUILD_TAG=exclude_graphdriver_btrfs
 endif
 
-HYPER_BULD_TAGS=$(XEN_BUILD_TAG) $(LIBVIRT_BUILD_TAG) $(BTRFS_BUILD_TAG) libdm_no_deferred_remove
+HYPER_BULD_TAGS=$(XEN_BUILD_TAG) $(XEN490_BUILD_TAG) $(LIBVIRT_BUILD_TAG) $(BTRFS_BUILD_TAG) libdm_no_deferred_remove
 
 all-local: build-hyperd
 clean-local:

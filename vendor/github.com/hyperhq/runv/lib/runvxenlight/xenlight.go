@@ -1,3 +1,5 @@
+// +build linux,with_xen490
+
 /*
  * Copyright (C) 2016 George W. Dunlap, Citrix Systems UK Ltd
  *

@@ -1,4 +1,4 @@
-// +build linux,with_xen
+// +build linux,with_xen490
 
 /*
  *
@@ -54,6 +54,8 @@ static int runvxl_domain_create_new(libxl_ctx *ctx, runvxl_domain_config *config
     libxl_domain_config_init(&d_config);
 
     d_config.num_p9s = 1;
+#ifndef LIBXL_HAVE_P9S
+//this flag is introduce since tag 4.10.0-rc1, introduce a field rename
     d_config.p9 = malloc(sizeof(libxl_device_p9));
     if (d_config.p9 == NULL) {
         return -1;
@@ -61,6 +63,16 @@ static int runvxl_domain_create_new(libxl_ctx *ctx, runvxl_domain_config *config
     d_config.p9->tag = config->p9_tag;
     d_config.p9->path = config->p9_path;
     d_config.p9->security_model = "none";
+#else //LIBXL_HAVE_P9S
+    d_config.p9s = malloc(sizeof(libxl_device_p9));
+    if (d_config.p9s == NULL) {
+        return -1;
+    }
+    d_config.p9s->tag = config->p9_tag;
+    d_config.p9s->path = config->p9_path;
+    d_config.p9s->security_model = "none";
+#endif //LIBXL_HAVE_P9S
+
 
     d_config.num_channels = 2;
     d_config.channels = malloc(sizeof(libxl_device_channel) * 2);

@@ -90,11 +90,23 @@ if test "x$with_xen" != "xno" ; then
     fi
 fi
 
+XEN_REQUIRED="4.5.0"
+XENPV_REQUIRED="4.9.0"
+
+if test "$with_xen" = yes; then
+    PKG_CHECK_MODULES([xen_4_5], [xenlight >= $XEN_REQUIRED], [with_xen=yes], [with_xen=no])
+    PKG_CHECK_MODULES([xen_4_9], [xenlight >= $XENPV_REQUIRED], [with_xen490=yes], [with_xen490=no])
+fi
+
 if test "x$with_xen" != "xno" ; then
     AC_DEFINE_UNQUOTED([WITH_XEN], 1, [run hyperd with xen])
 fi
+if test "$with_xen490" = yes ; then
+	AC_DEFINE_UNQUOTED([WITH_XEN490], 1, [run hyperd with xen 4.9 or above])
+fi
 
 AM_CONDITIONAL([WITH_XEN], [test "x$with_xen" == "xyes"])
+AM_CONDITIONAL([WITH_XEN490], [test "x$with_xen490" == "xyes"])
 
 AC_ARG_WITH([btrfs],
             [AS_HELP_STRING([--without-btrfs],

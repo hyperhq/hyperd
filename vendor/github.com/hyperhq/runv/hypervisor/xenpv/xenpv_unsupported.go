@@ -1,4 +1,4 @@
-// +build !with_xen
+// +build !with_xen490
 
 package xenpv
 
