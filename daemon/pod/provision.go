@@ -3,6 +3,7 @@ package pod
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -419,7 +420,8 @@ func (p *XPod) prepareResources() error {
 			return err
 		}
 		if p.containerIP == "" {
-			p.containerIP = inf.descript.Ip
+			fields := strings.SplitN(inf.descript.Ip, "/", 2)
+			p.containerIP = fields[0]
 		}
 	}
 

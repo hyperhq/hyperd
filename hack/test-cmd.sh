@@ -199,6 +199,7 @@ __EOF__
   hyper::test::force_kill_container
   hyper::test::container_logs_no_newline
   hyper::test::container_readonly_rootfs_and_volume
+  hyper::test::portmapping
 
   stop_hyperd
 }

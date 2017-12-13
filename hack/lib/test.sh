@@ -242,3 +242,25 @@ hyper::test::container_readonly_rootfs_and_volume() {
   sudo hyperctl rm $id
   test $res1 -eq 0 -a $res2 -eq 0
 }
+
+hyper::test::portmapping() {
+  echo "Container portmapping test"
+  ipaddr=$(ip addr show hyper0 |sed -ne 's/.*inet \([.0-9]\{7,15\}\)\/[0-9]\{1,2\} .*/\1/p')
+  echo "hyper0 address is $ipaddr"
+  started=
+  while read output; do
+    response=$(echo "$output" |tr -d "[:space:]")
+    echo "got $response"
+    if [ "x$started" == "x" ]; then
+      started=$response
+      sleep 3
+      nc $ipaddr 3000 <<END
+ok
+END
+    elif [ "x$response" = "xok" ]; then
+      return 0
+    else
+      return 1
+    fi
+  done < <(sudo hyperctl run -t --rm --publish 3000:1300 busybox:latest sh -c 'echo "start" ; nc -l -p 1300')
+}

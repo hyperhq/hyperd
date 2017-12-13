@@ -16,7 +16,7 @@ env:
 
 before_install:
   - sudo apt-get update -qq
-  - sudo apt-get install -y -qq autoconf automake pkg-config libdevmapper-dev libsqlite3-dev libvirt-dev libvirt-bin aufs-tools wget libaio1 libpixman-1-0
+  - sudo apt-get install -y -qq autoconf automake pkg-config libdevmapper-dev libsqlite3-dev libvirt-dev libvirt-bin aufs-tools wget libaio1 libpixman-1-0 netcat
   - wget https://s3-us-west-1.amazonaws.com/hypercontainer-download/qemu-hyper/qemu-hyper_2.4.1-1_amd64.deb && sudo dpkg -i --force-all qemu-hyper_2.4.1-1_amd64.deb
   - cd `mktemp -d`
   - mkdir -p ${GOPATH}/src/github.com/hyperhq
