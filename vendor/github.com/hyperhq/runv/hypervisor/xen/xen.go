@@ -255,7 +255,7 @@ func (xc *XenContext) AddNic(ctx *hypervisor.VmContext, host *hypervisor.HostNic
 		glog.V(1).Infof("add network for %d - ip: %s, br: %s, gw: %s, dev: %s, hw: %s", xc.domId, guest.Ipaddr,
 			host.Bridge, host.Bridge, dev, hw.String())
 
-		res := HyperxlNicAdd(xc.driver.Ctx, (uint32)(xc.domId), guest.Ipaddr[0], host.Bridge, host.Bridge, dev, []byte(hw))
+		res := HyperxlNicAdd(xc.driver.Ctx, (uint32)(xc.domId), guest.Ipaddr, host.Bridge, host.Bridge, dev, []byte(hw))
 		if res != 0 {
 			glog.V(1).Infof("nic %s insert succeeded [faked] ", guest.Device)
 			result <- callback
