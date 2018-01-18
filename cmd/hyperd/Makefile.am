@@ -36,4 +36,4 @@ install-exec-local:
 
 hyperd-local: build-hyperd
 build-hyperd:
-	go build -tags "static_build $(HYPER_BULD_TAGS)" $(VERSION_PARAM) hyperd.go
+	go build -gcflags="$(GO_GCFLAGS)" -tags "static_build $(HYPER_BULD_TAGS)" $(VERSION_PARAM) hyperd.go
