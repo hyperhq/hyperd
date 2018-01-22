@@ -6,4 +6,4 @@ install-exec-local:
 
 hyperctl-local: build-hyperctl
 build-hyperctl:
-	go build $(VERSION_PARAM) hyperctl.go
+	go build -gcflags="$(GO_GCFLAGS)" $(VERSION_PARAM) hyperctl.go

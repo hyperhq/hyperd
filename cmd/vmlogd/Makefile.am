@@ -6,4 +6,4 @@ install-exec-local:
 
 vmlogd-local: build-vmlogd
 build-vmlogd:
-	go build $(VERSION_PARAM) vmlogd.go
+	go build -gcflags="$(GO_GCFLAGS)" $(VERSION_PARAM) vmlogd.go
