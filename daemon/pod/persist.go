@@ -492,7 +492,7 @@ func saveMessage(db *daemondb.DaemonDB, key string, message proto.Message, owner
 func loadMessage(db *daemondb.DaemonDB, key string, message proto.Message, owner hlog.LogOwner, op string) error {
 	v, err := db.Get([]byte(key))
 	if err != nil {
-		hlog.HLog(ERROR, owner, 2, "failed to load %s: %v", op, err)
+		hlog.HLog(ERROR, owner, 2, "failed to load %s: %v key: %s", op, err, key)
 		return err
 	}
 	err = proto.Unmarshal(v, message)
