@@ -2,7 +2,7 @@
         "id": "test-container-force-killing",
         "containers" : [{
             "name": "busybox-with-tty",
-            "image": "busybox",
+            "image": "hyperhq/busybox",
             "command": ["/bin/sh"]
         }],
         "resource": {

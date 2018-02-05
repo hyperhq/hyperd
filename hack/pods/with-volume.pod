@@ -2,7 +2,7 @@
 	"id": "test-container-volume",
 	"containers" : [{
 	    "name": "c1",
-	    "image": "busybox",
+	    "image": "hyperhq/busybox",
             "command": ["/bin/sh", "-c", "grep -q 'hello, world' /mnt/with-volume-test-1 && df | grep -q '/var/log' && echo 'container 1 OK' ; sleep 5"],
             "volumes": [{
                 "volume": "log",
@@ -16,7 +16,7 @@
 	},
 	{
 	    "name": "c2",
-	    "image": "busybox",
+	    "image": "hyperhq/busybox",
 	    "workdir": "/",
 	    "command": ["/bin/sh", "-c", "echo 'container-2 OK' > /mnt/with-volume-test-2"],
             "volumes": [{

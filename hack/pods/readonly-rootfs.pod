@@ -1,7 +1,7 @@
 {
         "containers" : [{
             "name": "busybox-readonly",
-            "image": "busybox",
+            "image": "hyperhq/busybox",
             "command": ["/bin/sh"],
             "readonly": true,
             "volumes": [{
