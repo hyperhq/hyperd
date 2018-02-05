@@ -160,14 +160,14 @@ __EOF__
   # Image management   #
   ######################
 
-  hyper::test::check_image busybox || hyper::test::pull_image busybox
-  hyper::test::check_image busybox
+  hyper::test::check_image "hyperhq/busybox" || hyper::test::pull_image "hyperhq/busybox"
+  hyper::test::check_image "hyperhq/busybox"
 
-  hyper::test::remove_image busybox
-  ! hyper::test::check_image busybox
+  hyper::test::remove_image "hyperhq/busybox"
+  ! hyper::test::check_image "hyperhq/busybox"
 
-  hyper::test::pull_image busybox
-  hyper::test::check_image busybox
+  hyper::test::pull_image "hyperhq/busybox"
+  hyper::test::check_image "hyperhq/busybox"
 
   hyper::test::pull_image "haproxy:1.5"
   hyper::test::check_image "haproxy" "1.5"

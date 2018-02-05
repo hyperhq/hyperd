@@ -2,7 +2,7 @@
         "id": "test-remove-container-with-volume",
         "containers" : [{
             "name": "container-with-volume",
-            "image": "busybox",
+            "image": "hyperhq/busybox",
             "volumes": [{
                 "volume": "tmp",
                 "path": "/mnt",

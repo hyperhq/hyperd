@@ -3,7 +3,7 @@
 	"hostname": "/myname",
 	"containers" : [{
 	    "name": "file-tester",
-	    "image": "busybox:latest",
+	    "image": "hyperhq/busybox:latest",
 	    "workdir": "/",
 	    "command": ["hostname"]
 	}],

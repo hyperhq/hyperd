@@ -1,7 +1,7 @@
 {
             "containers": [
                 {
-                    "image": "busybox:latest",
+                    "image": "hyperhq/busybox:latest",
                     "name": "service",
                     "command": ["/bin/sh", "-c", "ps aux"]
                 }

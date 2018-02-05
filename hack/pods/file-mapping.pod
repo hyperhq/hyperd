@@ -2,7 +2,7 @@
         "id": "test-file-mapping",
         "containers" : [{
             "name": "mapping",
-            "image": "busybox",
+            "image": "hyperhq/busybox",
             "command": ["/bin/sh", "-c", "md5sum /root/resolv.conf"],
             "volumes": [{
                 "volume": "resolv.conf",

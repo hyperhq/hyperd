@@ -84,13 +84,13 @@ func (s *TestSuite) TestGetContainerLogs(c *C) {
 }
 
 func (s *TestSuite) TestPostAttach(c *C) {
-	err := s.client.PullImage("busybox", "latest", nil)
+	err := s.client.PullImage("hyperhq/busybox", "latest", nil)
 	c.Assert(err, IsNil)
 
 	spec := types.UserPod{
 		Containers: []*types.UserContainer{
 			{
-				Image: "busybox",
+				Image: "hyperhq/busybox",
 			},
 		},
 	}
@@ -132,7 +132,7 @@ func (s *TestSuite) TestCreateAndStartPod(c *C) {
 		Id: "busybox",
 		Containers: []*types.UserContainer{
 			{
-				Image: "busybox",
+				Image: "hyperhq/busybox",
 			},
 		},
 	}
@@ -168,7 +168,7 @@ func (s *TestSuite) TestCreateAndStartPod(c *C) {
 }
 
 func (s *TestSuite) TestCreateContainer(c *C) {
-	err := s.client.PullImage("busybox", "latest", nil)
+	err := s.client.PullImage("hyperhq/busybox", "latest", nil)
 	c.Assert(err, IsNil)
 
 	spec := types.UserPod{}
@@ -177,7 +177,7 @@ func (s *TestSuite) TestCreateContainer(c *C) {
 	c.Logf("Pod created: %s", pod)
 
 	container, err := s.client.CreateContainer(pod, &types.UserContainer{
-		Image: "busybox",
+		Image: "hyperhq/busybox",
 	})
 	c.Assert(err, IsNil)
 	c.Logf("Container created: %s", container)
@@ -191,7 +191,7 @@ func (s *TestSuite) TestCreateContainer(c *C) {
 }
 
 func (s *TestSuite) TestRenameContainer(c *C) {
-	err := s.client.PullImage("busybox", "latest", nil)
+	err := s.client.PullImage("hyperhq/busybox", "latest", nil)
 	c.Assert(err, IsNil)
 
 	spec := types.UserPod{}
@@ -200,7 +200,7 @@ func (s *TestSuite) TestRenameContainer(c *C) {
 	c.Logf("Pod created: %s", pod)
 
 	container, err := s.client.CreateContainer(pod, &types.UserContainer{
-		Image: "busybox",
+		Image: "hyperhq/busybox",
 	})
 	c.Assert(err, IsNil)
 	c.Logf("Container created: %s", container)
@@ -259,11 +259,11 @@ func (s *TestSuite) TestAddListDeleteService(c *C) {
 	spec := types.UserPod{
 		Containers: []*types.UserContainer{
 			{
-				Image:   "busybox",
+				Image:   "hyperhq/busybox",
 				Command: []string{"sleep", "10000"},
 			},
 			{
-				Image:   "busybox",
+				Image:   "hyperhq/busybox",
 				Command: []string{"sleep", "10000"},
 			},
 		},
@@ -358,7 +358,7 @@ func (s *TestSuite) TestStartAndStopPod(c *C) {
 		Id: "busybox",
 		Containers: []*types.UserContainer{
 			{
-				Image: "busybox",
+				Image: "hyperhq/busybox",
 			},
 		},
 	}
@@ -391,7 +391,7 @@ func (s *TestSuite) TestSetPodLabels(c *C) {
 		Id: "busybox",
 		Containers: []*types.UserContainer{
 			{
-				Image: "busybox",
+				Image: "hyperhq/busybox",
 			},
 		},
 	}
@@ -419,7 +419,7 @@ func (s *TestSuite) TestPauseAndUnpausePod(c *C) {
 		Id: "busybox",
 		Containers: []*types.UserContainer{
 			{
-				Image: "busybox",
+				Image: "hyperhq/busybox",
 			},
 		},
 	}
@@ -466,7 +466,7 @@ func (s *TestSuite) TestGetPodStats(c *C) {
 		Id: "busybox",
 		Containers: []*types.UserContainer{
 			{
-				Image: "busybox",
+				Image: "hyperhq/busybox",
 			},
 		},
 	}
@@ -509,7 +509,7 @@ func (s *TestSuite) TestSendContainerSignal(c *C) {
 		c.Assert(err, IsNil)
 	}()
 
-	container, err := s.client.CreateContainer(pod, &types.UserContainer{Image: "busybox"})
+	container, err := s.client.CreateContainer(pod, &types.UserContainer{Image: "hyperhq/busybox"})
 	c.Assert(err, IsNil)
 	c.Logf("Container created: %s", container)
 
@@ -540,7 +540,7 @@ func (s *TestSuite) TestSendExecSignal(c *C) {
 		Containers: []*types.UserContainer{
 			{
 				Name:  cName,
-				Image: "busybox",
+				Image: "hyperhq/busybox",
 			},
 		},
 	}
@@ -600,7 +600,7 @@ func (s *TestSuite) TestTTYResize(c *C) {
 		Containers: []*types.UserContainer{
 			{
 				Name:  cName,
-				Image: "busybox",
+				Image: "hyperhq/busybox",
 				Tty:   true,
 			},
 		},

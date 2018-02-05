@@ -28,14 +28,14 @@ hyper::test::remove_image() {
 
 hyper::test::exitcode() {
   echo "Pod exit code test"
-  res=$(sudo hyperctl run --rm busybox sh -c "exit 17" > /dev/null 2>&1 ; echo $?)
+  res=$(sudo hyperctl run --rm hyperhq/busybox sh -c "exit 17" > /dev/null 2>&1 ; echo $?)
   echo "should return 17, return: $res"
   test $res -eq 17
 }
 
 hyper::test::exec() {
   echo "Pod exec and exit code test"
-  id=$(sudo hyperctl run -d busybox /bin/sh | sed -ne "s/POD id is \(.*\)/\1/p")
+  id=$(sudo hyperctl run -d hyperhq/busybox /bin/sh | sed -ne "s/POD id is \(.*\)/\1/p")
   echo "test pod ID is $id"
   res=$(sudo hyperctl exec $id sh -c "exit 37" > /dev/null 2>&1 ; echo $?)
   echo "should return 37, return: $res"
@@ -147,7 +147,7 @@ hyper::test::integration() {
 
 hyper::test::execvm() {
   echo "Pod execvm echo test"
-  id=$(sudo hyperctl run -d busybox /bin/sh | sed -ne "s/POD id is \(.*\)/\1/p")
+  id=$(sudo hyperctl run -d hyperhq/busybox /bin/sh | sed -ne "s/POD id is \(.*\)/\1/p")
   echo "test pod ID is $id"
   res=$(sudo hyperctl exec -m $id /sbin/busybox sh -c "echo aaa")
   echo "should return aaa, actual: $res"
@@ -221,7 +221,7 @@ hyper::test::force_kill_container() {
 # regression test for #577
 hyper::test::container_logs_no_newline() {
   echo "Container logs without newlines"
-  id=$(sudo hyperctl run -d busybox echo -n foobar | sed -ne "s/POD id is \(.*\)/\1/p")
+  id=$(sudo hyperctl run -d hyperhq/busybox echo -n foobar | sed -ne "s/POD id is \(.*\)/\1/p")
   sleep 3 # sleep a bit to let logger kick in
   res=$(sudo hyperctl logs $id)
   sudo hyperctl rm $id
@@ -262,5 +262,5 @@ END
     else
       return 1
     fi
-  done < <(sudo hyperctl run -t --rm --publish 3000:1300 busybox:latest sh -c 'echo "start" ; nc -l -p 1300')
+  done < <(sudo hyperctl run -t --rm --publish 3000:1300 hyperhq/busybox:latest sh -c 'echo "start" ; nc -l -p 1300')
 }
