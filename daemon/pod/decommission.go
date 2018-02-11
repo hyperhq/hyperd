@@ -382,6 +382,13 @@ func (p *XPod) doStopPod(graceful int) error {
 		return nil
 	}
 
+	for cid, c := range p.containers {
+		err = c.removeFromSandbox()
+		if err != nil {
+			c.Log(ERROR, "failed to remove %s from sandbox", cid)
+		}
+	}
+
 	p.Log(INFO, "stop container success, shutdown sandbox")
 	result := p.sandbox.Shutdown()
 	if result.IsSuccess() {
