@@ -47,6 +47,11 @@ func GetTapFd(device, bridge, options string) (int, error) {
 		tapFile.Close()
 		return -1, fmt.Errorf("create tap device failed\n")
 	}
+	_, _, errno = syscall.Syscall(syscall.SYS_IOCTL, tapFile.Fd(), uintptr(syscall.TUNSETPERSIST), 0)
+	if errno != 0 {
+		tapFile.Close()
+		return -1, fmt.Errorf("clear tap device persist flag failed\n")
+	}
 
 	err = network.UpAndAddToBridge(device, bridge, options)
 	if err != nil {
