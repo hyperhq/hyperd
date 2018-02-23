@@ -16,6 +16,8 @@ type Interface struct {
 	descript *runv.InterfaceDescription
 }
 
+const defaultInterfaceMtu = 1500
+
 func newInterface(p *XPod, spec *apitypes.UserInterface) *Interface {
 	return &Interface{p: p, spec: spec}
 }
@@ -37,6 +39,11 @@ func (inf *Interface) prepare() error {
 		err := fmt.Errorf("if configured a bridge, must specify the IP address")
 		inf.Log(ERROR, err)
 		return err
+	}
+
+	mtu := inf.spec.Mtu
+	if mtu == 0 {
+		mtu = defaultInterfaceMtu
 	}
 
 	if inf.spec.Ip == "" {
