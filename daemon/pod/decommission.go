@@ -356,6 +356,9 @@ func (p *XPod) protectedSandboxOperation(op sandboxOp, timeout time.Duration, co
 func (p *XPod) doStopPod(graceful int) error {
 	var err, ret error
 
+	p.resourceLock.Lock()
+	defer p.resourceLock.Unlock()
+
 	p.statusLock.Lock()
 	if p.status == S_POD_STOPPING {
 		err = fmt.Errorf("pod is stopping")
@@ -372,10 +375,6 @@ func (p *XPod) doStopPod(graceful int) error {
 	}
 
 	p.Log(INFO, "going to stop pod")
-
-	//lock all resource action of the pod, but don't block list/read query
-	p.resourceLock.Lock()
-	defer p.resourceLock.Unlock()
 
 	//whatever the result of stop container, go on shutdown vm
 	err = p.stopAllContainers(graceful)
