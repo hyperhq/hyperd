@@ -101,14 +101,19 @@ func (p *XPod) Name() string {
 	return p.name
 }
 
-// SandboxName() returns the id of the sandbox, the detail of sandbox should be wrapped inside XPod, this method is
-// used for list/display only.
-func (p *XPod) SandboxName() string {
+func (p *XPod) SandboxNameLocked() string {
 	var sbn = ""
-	p.statusLock.RLock()
 	if p.sandbox != nil {
 		sbn = p.sandbox.Id
 	}
+	return sbn
+}
+
+// SandboxName() returns the id of the sandbox, the detail of sandbox should be wrapped inside XPod, this method is
+// used for list/display only.
+func (p *XPod) SandboxName() string {
+	p.statusLock.RLock()
+	sbn := p.SandboxNameLocked()
 	p.statusLock.RUnlock()
 	return sbn
 }
@@ -171,7 +176,7 @@ func (p *XPod) BriefStatus() (s *apitypes.PodListResult) {
 	s = &apitypes.PodListResult{
 		PodID:     p.Id(),
 		PodName:   p.Name(),
-		VmID:      p.SandboxName(),
+		VmID:      p.SandboxNameLocked(),
 		CreatedAt: p.info.CreatedAt,
 		Labels:    p.labels,
 	}
@@ -207,7 +212,7 @@ func (p *XPod) SandboxBriefStatus() (s *apitypes.VMListResult) {
 	p.statusLock.RLock()
 	if p.sandbox != nil {
 		s = &apitypes.VMListResult{
-			VmID:  p.SandboxName(),
+			VmID:  p.SandboxNameLocked(),
 			PodID: p.Id(),
 		}
 		if p.status == S_POD_PAUSED {
