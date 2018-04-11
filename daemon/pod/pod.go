@@ -299,10 +299,11 @@ func (p *XPod) Stats() *runvtypes.PodStats {
 	p.resourceLock.Lock()
 	if p.sandbox == nil {
 		ch <- nil
+	} else {
+		go func(sb *hypervisor.Vm) {
+			ch <- sb.Stats()
+		}(p.sandbox)
 	}
-	go func(sb *hypervisor.Vm) {
-		ch <- sb.Stats()
-	}(p.sandbox)
 	p.resourceLock.Unlock()
 
 	return <-ch
