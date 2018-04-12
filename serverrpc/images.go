@@ -17,7 +17,7 @@ func (s *ServerRPC) ImageList(ctx context.Context, req *types.ImageListRequest) 
 
 	images, err := s.daemon.Daemon.Images(req.FilterArgs, req.Filter, req.All)
 	if err != nil {
-		glog.Errorf("ImageList error: %v", err)
+		glog.Errorf("ImageList failed %v with request %s", err, req.String())
 		return nil, err
 	}
 
@@ -34,6 +34,7 @@ func (s *ServerRPC) ImageList(ctx context.Context, req *types.ImageListRequest) 
 		})
 	}
 
+	glog.V(3).Infof("ImageList done with request %s", req.String())
 	return &types.ImageListResponse{
 		ImageList: result,
 	}, nil
@@ -88,6 +89,7 @@ func (s *ServerRPC) ImagePull(req *types.ImagePullRequest, stream types.PublicAP
 	pullResult = s.daemon.CmdImagePull(req.Image, req.Tag, authConfig, nil, w)
 	complete = true
 
+	glog.V(3).Infof("ImagePull done with request %s", req.String())
 	return pullResult
 }
 
@@ -126,7 +128,7 @@ func (s *ServerRPC) ImagePush(req *types.ImagePushRequest, stream types.PublicAP
 		}
 
 		if err != nil {
-			glog.Errorf("Read image push stream error: %v", err)
+			glog.Errorf("ImagePush read image push stream failed %v with request %s", err, req.String())
 			return err
 		}
 
@@ -135,6 +137,7 @@ func (s *ServerRPC) ImagePush(req *types.ImagePushRequest, stream types.PublicAP
 		}
 	}
 
+	glog.V(3).Infof("ImagePush done with request %s", req.String())
 	return pushResult
 }
 
@@ -144,10 +147,11 @@ func (s *ServerRPC) ImageRemove(ctx context.Context, req *types.ImageRemoveReque
 
 	resp, err := s.daemon.CmdImageDelete(req.Image, req.Force, req.Prune)
 	if err != nil {
-		glog.Errorf("DeleteImage failed: %v", err)
+		glog.Errorf("ImageDelete failed %v with request %s", err, req.String())
 		return nil, err
 	}
 
+	glog.V(3).Infof("ImageDelete done with request %s", req.String())
 	return &types.ImageRemoveResponse{
 		Images: resp,
 	}, nil

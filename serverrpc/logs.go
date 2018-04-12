@@ -18,6 +18,7 @@ func (s *ServerRPC) ContainerLogs(req *types.ContainerLogsRequest, stream types.
 	if req.Since != "" {
 		s, n, err := timetypes.ParseTimestamps(req.Since, 0)
 		if err != nil {
+			glog.Errorf("ContainerLogs failed %v with request %s", err, req.String())
 			return err
 		}
 		since = time.Unix(s, n)
@@ -43,7 +44,7 @@ func (s *ServerRPC) ContainerLogs(req *types.ContainerLogsRequest, stream types.
 	} else {
 		err := s.daemon.GetContainerLogs(req.Container, logsConfig)
 		if err != nil {
-			glog.Errorf("ContainerLogs error: %v", err)
+			glog.Errorf("ContainerLogs failed %v with request %s", err, req.String())
 			return err
 		}
 	}
@@ -56,7 +57,7 @@ func (s *ServerRPC) ContainerLogs(req *types.ContainerLogsRequest, stream types.
 				eof = true
 			}
 		} else if err != nil {
-			glog.Errorf("Read log stream error: %v", err)
+			glog.Errorf("ContainerLogs failed %v with request %s", err, req.String())
 			return err
 		}
 
@@ -70,5 +71,6 @@ func (s *ServerRPC) ContainerLogs(req *types.ContainerLogsRequest, stream types.
 		}
 	}
 
+	glog.V(3).Infof("ContainerLogs done with request %s", req.String())
 	return nil
 }

@@ -15,10 +15,11 @@ func (s *ServerRPC) PodCreate(ctx context.Context, req *types.PodCreateRequest) 
 
 	p, err := s.daemon.CreatePod(req.PodID, req.PodSpec)
 	if err != nil {
-		glog.Errorf("CreatePod failed: %v", err)
+		glog.Errorf("CreatePod failed %v with request %s", err, req.String())
 		return nil, err
 	}
 
+	glog.V(3).Infof("PodCreate done with request %s", req.String())
 	return &types.PodCreateResponse{
 		PodID: p.Id(),
 	}, nil
@@ -31,10 +32,11 @@ func (s *ServerRPC) PodStart(ctx context.Context, req *types.PodStartRequest) (*
 	err := s.daemon.StartPod(req.PodID)
 
 	if err != nil {
-		glog.Errorf("StartPod failed: %v", err)
+		glog.Errorf("PodStart failed %v with request %s", err, req.String())
 		return nil, err
 	}
 
+	glog.V(3).Infof("PodStart done with request %s", req.String())
 	return &types.PodStartResponse{}, nil
 }
 
@@ -43,15 +45,16 @@ func (s *ServerRPC) PodRemove(ctx context.Context, req *types.PodRemoveRequest) 
 	glog.V(3).Infof("PodRemove with request %s", req.String())
 
 	if req.PodID == "" {
-		return nil, fmt.Errorf("PodID is required for PodRemove")
+		return nil, fmt.Errorf("PodRemove failed PodID is required for PodRemove with request %s", req.String())
 	}
 
 	code, cause, err := s.daemon.RemovePod(req.PodID)
 	if err != nil {
-		glog.Errorf("CleanPod %s failed: %v", req.PodID, err)
+		glog.Errorf("PodRemove failed %v with request %s", err, req.String())
 		return nil, err
 	}
 
+	glog.V(3).Infof("PodRemove done with request %s", req.String())
 	return &types.PodRemoveResponse{
 		Cause: cause,
 		Code:  int32(code),
@@ -64,10 +67,11 @@ func (s *ServerRPC) PodStop(ctx context.Context, req *types.PodStopRequest) (*ty
 
 	code, cause, err := s.daemon.StopPod(req.PodID)
 	if err != nil {
-		glog.Errorf("StopPod %s failed: %v", req.PodID, err)
+		glog.Errorf("PodStop failed %v with request %s", err, req.String())
 		return nil, err
 	}
 
+	glog.V(3).Infof("PodStop done with request %s", req.String())
 	return &types.PodStopResponse{
 		Cause: cause,
 		Code:  int32(code),
@@ -80,10 +84,11 @@ func (s *ServerRPC) PodSignal(ctx context.Context, req *types.PodSignalRequest) 
 
 	err := s.daemon.KillPodContainers(req.PodID, "", req.Signal)
 	if err != nil {
-		glog.Errorf("KillPodContainers %s with signal %d failed: %v", req.PodID, req.Signal, err)
+		glog.Errorf("PodSignal failed %v with request %s", err, req.String())
 		return nil, err
 	}
 
+	glog.V(3).Infof("PodSignal done with request %s", req.String())
 	return &types.PodSignalResponse{}, nil
 }
 
@@ -93,10 +98,11 @@ func (s *ServerRPC) PodPause(ctx context.Context, req *types.PodPauseRequest) (*
 
 	err := s.daemon.PausePod(req.PodID)
 	if err != nil {
-		glog.Errorf("PausePod %s failed: %v", req.PodID, err)
+		glog.Errorf("PodPause failed %v with request %s", err, req.String())
 		return nil, err
 	}
 
+	glog.V(3).Infof("PodPause done with request %s", req.String())
 	return &types.PodPauseResponse{}, nil
 }
 
@@ -106,38 +112,41 @@ func (s *ServerRPC) PodUnpause(ctx context.Context, req *types.PodUnpauseRequest
 
 	err := s.daemon.UnpausePod(req.PodID)
 	if err != nil {
-		glog.Errorf("UnpausePod %s failed: %v", req.PodID, err)
+		glog.Errorf("UnpausePod failed %v with request %s", err, req.String())
 		return nil, err
 	}
 
+	glog.V(3).Infof("PodUnpause done with request %s", req.String())
 	return &types.PodUnpauseResponse{}, nil
 }
 
 // PodLabels sets the labels of Pod
 func (s *ServerRPC) SetPodLabels(c context.Context, req *types.PodLabelsRequest) (*types.PodLabelsResponse, error) {
-	glog.V(3).Infof("Set pod labels with request %v", req.String())
+	glog.V(3).Infof("SetPodLabels with request %s", req.String())
 
 	err := s.daemon.SetPodLabels(req.PodID, req.Override, req.Labels)
 	if err != nil {
-		glog.Errorf("PodLabels error: %v", err)
+		glog.Errorf("SetPodLabels failed %v with request %s", err, req.String())
 		return nil, err
 	}
 
+	glog.V(3).Infof("SetPodLabels done with request %s", req.String())
 	return &types.PodLabelsResponse{}, nil
 }
 
 // PodStats get stats (runvtypes.PodStats) of Pod
 func (s *ServerRPC) PodStats(c context.Context, req *types.PodStatsRequest) (*types.PodStatsResponse, error) {
-	glog.V(3).Infof("Get pod stats with request %v", req.String())
+	glog.V(3).Infof("PodStats with request %s", req.String())
 
 	statsObject, err := s.daemon.GetPodStats(req.PodID)
 	if err != nil {
-		glog.Errorf("PodStats error: %v", err)
+		glog.Errorf("PodStats failed %v with request %s", err, req.String())
 		return nil, err
 	}
 
 	stats := statsObject.(*runvtypes.PodStats)
 
+	glog.V(3).Infof("PodStats done with request %s", req.String())
 	return &types.PodStatsResponse{
 		PodStats: convertRunvStatsToGrpcTypes(stats),
 	}, nil

@@ -12,9 +12,11 @@ func (s *ServerRPC) ContainerCreate(ctx context.Context, req *types.ContainerCre
 
 	containerID, err := s.daemon.CreateContainerInPod(req.PodID, req.ContainerSpec)
 	if err != nil {
-		glog.Errorf("CreateContainerInPod failed: %v", err)
+		glog.Errorf("ContainerCreate failed %v with request %s: %v", err, req.String())
 		return nil, err
 	}
+
+	glog.V(3).Infof("ContainerCreate done with request %s", req.String())
 
 	return &types.ContainerCreateResponse{
 		ContainerID: containerID,
@@ -25,9 +27,10 @@ func (s *ServerRPC) ContainerStart(ctx context.Context, req *types.ContainerStar
 	glog.V(3).Info("ContainerStart with request %s", req.String())
 	err := s.daemon.StartContainer(req.ContainerId)
 	if err != nil {
-		glog.Errorf("ContainerStart failed: %v", err)
+		glog.Errorf("ContainerStart failed %v with request %s", err, req.String())
 		return nil, err
 	}
+	glog.V(3).Info("ContainerStart done with request %s", req.String())
 	return &types.ContainerStartResponse{}, nil
 }
 
@@ -37,9 +40,11 @@ func (s *ServerRPC) ContainerStop(c context.Context, req *types.ContainerStopReq
 
 	err := s.daemon.StopContainer(req.ContainerID, int(req.Timeout))
 	if err != nil {
-		glog.Errorf("ContainerStop error: %v", err)
+		glog.Errorf("ContainerStop failed %v with request %v", err, req.String())
 		return nil, err
 	}
+
+	glog.V(3).Infof("ContainerStop done with request %v", req.String())
 
 	return &types.ContainerStopResponse{}, nil
 }
@@ -50,9 +55,11 @@ func (s *ServerRPC) ContainerRename(c context.Context, req *types.ContainerRenam
 
 	err := s.daemon.ContainerRename(req.OldContainerName, req.NewContainerName)
 	if err != nil {
-		glog.Errorf("ContainerRename error: %v", err)
+		glog.Errorf("ContainerRename failed %v with request %v", err, req.String())
 		return nil, err
 	}
+
+	glog.V(3).Infof("ContainerRename done with request %v", req.String())
 
 	return &types.ContainerRenameResponse{}, nil
 }
@@ -61,9 +68,10 @@ func (s *ServerRPC) ContainerRemove(ctx context.Context, req *types.ContainerRem
 	glog.V(3).Info("ContainerRemove with request %s", req.String())
 	err := s.daemon.RemoveContainer(req.ContainerId)
 	if err != nil {
-		glog.Errorf("ContainerRemove failed: %v", err)
+		glog.Errorf("ContainerRemove failed %v with request %s", err, req.String())
 		return nil, err
 	}
+	glog.V(3).Info("ContainerRemove done with request %s", req.String())
 	return &types.ContainerRemoveResponse{}, nil
 }
 
@@ -73,9 +81,10 @@ func (s *ServerRPC) ContainerSignal(ctx context.Context, req *types.ContainerSig
 
 	err := s.daemon.KillPodContainers(req.PodID, req.ContainerID, req.Signal)
 	if err != nil {
-		glog.Errorf("Kill Container %s of Pod %s with signal %d failed: %v", req.ContainerID, req.PodID, req.Signal, err)
+		glog.Errorf("ContainerSignal failed %v done with request %s", err, req.String())
 		return nil, err
 	}
 
+	glog.V(3).Infof("ContainerSignal done with request %s", req.String())
 	return &types.ContainerSignalResponse{}, nil
 }
