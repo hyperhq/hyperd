@@ -293,17 +293,18 @@ func (p *XPod) ContainerInfo(cid string) (*apitypes.ContainerInfo, error) {
 }
 
 func (p *XPod) Stats() *runvtypes.PodStats {
-	//use channel, don't block in statusLock
+	//use channel, don't block in resourceLock
 	ch := make(chan *runvtypes.PodStats, 1)
 
-	p.statusLock.Lock()
+	p.resourceLock.Lock()
 	if p.sandbox == nil {
 		ch <- nil
+	} else {
+		go func(sb *hypervisor.Vm) {
+			ch <- sb.Stats()
+		}(p.sandbox)
 	}
-	go func(sb *hypervisor.Vm) {
-		ch <- sb.Stats()
-	}(p.sandbox)
-	p.statusLock.Unlock()
+	p.resourceLock.Unlock()
 
 	return <-ch
 }
