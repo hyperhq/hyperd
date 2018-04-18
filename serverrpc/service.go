@@ -12,10 +12,11 @@ func (s *ServerRPC) ServiceList(ctx context.Context, req *types.ServiceListReque
 
 	services, err := s.daemon.GetServices(req.PodID)
 	if err != nil {
-		glog.Errorf("ServiceList error: %v", err)
+		glog.Errorf("ServiceList failed %v with request %s", err, req.String())
 		return nil, err
 	}
 
+	glog.V(3).Infof("ServiceList done with request %s", req.String())
 	return &types.ServiceListResponse{
 		Services: services,
 	}, nil
@@ -27,9 +28,11 @@ func (s *ServerRPC) ServiceAdd(ctx context.Context, req *types.ServiceAddRequest
 
 	err := s.daemon.AddService(req.PodID, req.Services)
 	if err != nil {
-		glog.Errorf("ServiceAdd error: %v", err)
+		glog.Errorf("ServiceAdd failed %v with request %s", err, req.String())
 		return nil, err
 	}
+
+	glog.V(3).Infof("ServiceAdd done with request %s", req.String())
 	return &types.ServiceAddResponse{}, nil
 }
 
@@ -39,9 +42,11 @@ func (s *ServerRPC) ServiceDelete(ctx context.Context, req *types.ServiceDelRequ
 
 	err := s.daemon.DeleteService(req.PodID, req.Services)
 	if err != nil {
-		glog.Errorf("ServiceDelete error: %v", err)
+		glog.Errorf("ServiceDelete failed %v with request %s", err, req.String())
 		return nil, err
 	}
+
+	glog.V(3).Infof("ServiceDelete done with request %s", req.String())
 	return &types.ServiceDelResponse{}, nil
 }
 
@@ -51,8 +56,10 @@ func (s *ServerRPC) ServiceUpdate(ctx context.Context, req *types.ServiceUpdateR
 
 	err := s.daemon.UpdateService(req.PodID, req.Services)
 	if err != nil {
-		glog.Errorf("ServiceUpdate error: %v", err)
+		glog.Errorf("ServiceUpdate failed %v with request %s", err, req.String())
 		return nil, err
 	}
+
+	glog.V(3).Infof("ServiceUpdate done with request %s", req.String())
 	return &types.ServiceUpdateResponse{}, nil
 }

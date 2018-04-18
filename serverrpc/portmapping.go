@@ -14,10 +14,12 @@ func (s *ServerRPC) PortMappingList(ctx context.Context, req *types.PortMappingL
 
 	p, ok := s.daemon.PodList.Get(req.PodID)
 	if !ok {
-		s.Log(hlog.INFO, "PortMappingList: pod %s not found", req.PodID)
-		return nil, errors.New("Pod not found")
+		err := errors.New("Pod not found")
+		s.Log(hlog.ERROR, "PortMappingList failed %v with request %s", err, req.String())
+		return nil, err
 	}
 
+	s.Log(hlog.TRACE, "PortMappingList done with request %s", req.String())
 	return &types.PortMappingListResponse{
 		PortMappings: p.ListPortMappings(),
 	}, nil
@@ -29,15 +31,17 @@ func (s *ServerRPC) PortMappingAdd(ctx context.Context, req *types.PortMappingMo
 
 	p, ok := s.daemon.PodList.Get(req.PodID)
 	if !ok {
-		s.Log(hlog.INFO, "PortMappingAdd: pod %s not found", req.PodID)
-		return nil, errors.New("Pod not found")
+		err := errors.New("Pod not found")
+		s.Log(hlog.ERROR, "PortMappingAdd failed %v with request %s", err, req.String())
+		return nil, err
 	}
 
 	err := p.AddPortMapping(req.PortMappings)
 	if err != nil {
-		s.Log(hlog.ERROR, "failed to add port mappings: %v", err)
+		s.Log(hlog.ERROR, "PortMappingAdd failed %v with request %s", err, req.String())
 		return nil, err
 	}
+	s.Log(hlog.TRACE, "PortMappingAdd done with request %s", req.String())
 	return &types.PortMappingModifyResponse{}, nil
 }
 
@@ -47,14 +51,17 @@ func (s *ServerRPC) PortMappingDel(ctx context.Context, req *types.PortMappingMo
 
 	p, ok := s.daemon.PodList.Get(req.PodID)
 	if !ok {
-		s.Log(hlog.INFO, "PortMappingDel: pod %s not found", req.PodID)
-		return nil, errors.New("Pod not found")
+		err := errors.New("Pod not found")
+		s.Log(hlog.ERROR, "PortMappingDel failed %v with request %s", err, req.String())
+		return nil, err
 	}
 
 	err := p.RemovePortMappingByDest(req.PortMappings)
 	if err != nil {
-		s.Log(hlog.ERROR, "failed to add port mappings: %v", err)
+		s.Log(hlog.ERROR, "PortMappingDel failed %v with request %s", err, req.String())
 		return nil, err
 	}
+
+	s.Log(hlog.TRACE, "PortMappingDel done with request %s", req.String())
 	return &types.PortMappingModifyResponse{}, nil
 }
