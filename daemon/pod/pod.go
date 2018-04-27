@@ -334,33 +334,40 @@ func (p *XPod) initPodInfo() {
 }
 
 func (p *XPod) updatePodInfo() error {
-	p.statusLock.Lock()
-	defer p.statusLock.Unlock()
-
+	//Access resource with resourceLock
+	p.resourceLock.Lock()
 	var (
-		containers      = make([]*apitypes.Container, 0, len(p.containers))
 		volumes         = make([]*apitypes.PodVolume, 0, len(p.volumes))
+		containers      = make([]*Container, 0, len(p.containers))
+		containerInfo   = make([]*apitypes.Container, 0, len(p.containers))
 		containerStatus = make([]*apitypes.ContainerStatus, 0, len(p.containers))
 	)
-
-	p.info.Spec.Labels = p.labels
-
+	labels := p.labels
 	for _, v := range p.volumes {
 		volumes = append(volumes, v.Info())
 	}
+	for _, c := range p.containers {
+		containers = append(containers, c)
+	}
+	p.resourceLock.Unlock()
+
+	p.statusLock.Lock()
+	defer p.statusLock.Unlock()
+
+	p.info.Spec.Labels = labels
 	p.info.Spec.Volumes = volumes
 
 	succeeeded := "Succeeded"
-	for _, c := range p.containers {
+	for _, c := range containers {
 		ci := c.Info()
 		cs := c.InfoStatus()
-		containers = append(containers, ci)
+		containerInfo = append(containerInfo, ci)
 		containerStatus = append(containerStatus, cs)
 		if cs.Phase == "failed" {
 			succeeeded = "Failed"
 		}
 	}
-	p.info.Spec.Containers = containers
+	p.info.Spec.Containers = containerInfo
 	p.info.Status.ContainerStatus = containerStatus
 
 	switch p.status {
