@@ -43,7 +43,7 @@ func (qc *QemuContext) arguments(ctx *hypervisor.VmContext) []string {
 	return append(params,
 		"-kernel", boot.Kernel, "-initrd", boot.Initrd, "-append", "console=ttyAMA0 panic=1 iommu=no",
 		"-realtime", "mlock=off", "-no-user-config", "-nodefaults",
-		"-rtc", "base=utc,clock=vm,driftfix=slew", "-no-reboot", "-display", "none", "-boot", "strict=on",
+		"-rtc", "base=utc,clock=host,driftfix=slew", "-no-reboot", "-display", "none", "-boot", "strict=on",
 		"-m", memParams, "-smp", cpuParams,
 		"-device", "pci-bridge,chassis_nr=1,id=pci.0",
 		"-qmp", fmt.Sprintf("unix:%s,server,nowait", qc.qmpSockName), "-serial", fmt.Sprintf("unix:%s,server,nowait", ctx.ConsoleSockName),
