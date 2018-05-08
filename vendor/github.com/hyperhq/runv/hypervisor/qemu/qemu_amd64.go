@@ -58,7 +58,7 @@ func (qc *QemuContext) arguments(ctx *hypervisor.VmContext) []string {
 
 	params = append(params,
 		"-realtime", "mlock=off", "-no-user-config", "-nodefaults", "-no-hpet",
-		"-rtc", "base=utc,clock=vm,driftfix=slew", "-no-reboot", "-display", "none", "-boot", "strict=on",
+		"-rtc", "base=utc,clock=host,driftfix=slew", "-no-reboot", "-display", "none", "-boot", "strict=on",
 		"-m", memParams, "-smp", cpuParams)
 	if boot.EnableVhostUser {
 		//TODO: mount hugetlbfs on /dev/hugepages

@@ -502,7 +502,7 @@ func (lc *LibvirtContext) domainXml(ctx *hypervisor.VmContext) (string, error) {
 	dom.OnCrash = "destroy"
 
 	dom.Clock.Offset = "utc"
-	dom.Clock.Timer = append(dom.Clock.Timer, timer{Name: "rtc", Track: "guest", Tickpolicy: "catchup"})
+	dom.Clock.Timer = append(dom.Clock.Timer, timer{Name: "rtc", Track: "wall", Tickpolicy: "catchup"})
 
 	pcicontroller := controller{
 		Type:  "pci",

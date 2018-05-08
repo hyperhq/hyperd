@@ -249,6 +249,8 @@ func qmpCommander(handler chan QmpInteraction, conn *net.UnixConn, session *QmpS
 			res, ok := <-feedback
 			if !ok {
 				glog.V(3).Infof("QMP command result chan closed")
+				//we could not send back message through handler because it is closed
+				session.respond(errors.New("QMP command result chan closed"))
 				return
 			}
 			switch res.MessageType() {
@@ -262,6 +264,8 @@ func qmpCommander(handler chan QmpInteraction, conn *net.UnixConn, session *QmpS
 				time.Sleep(1000 * time.Millisecond)
 			case QMP_INTERNAL_ERROR:
 				glog.V(3).Info("QMP quit... commander quit... ")
+				//we could not send back message through handler because it is closed
+				session.respond(errors.New("QMP quit..."))
 				return
 			}
 		}
@@ -291,6 +295,8 @@ func qmpHandler(ctx *hypervisor.VmContext) {
 
 	buf := []*QmpSession{}
 	res := make(chan QmpInteraction, 128)
+	//close res channel, so that we could quit ongoing qmp session
+	defer close(res)
 
 	loop := func(msg QmpInteraction) {
 		switch msg.MessageType() {
@@ -335,6 +341,7 @@ func qmpHandler(ctx *hypervisor.VmContext) {
 			ctx.Hub <- &hypervisor.Interrupted{Reason: msg.(*QmpInternalError).cause}
 		case QMP_QUIT:
 			handler = nil
+			glog.Info("quit QMP by command QMP_QUIT")
 			conn.Close()
 		}
 	}
