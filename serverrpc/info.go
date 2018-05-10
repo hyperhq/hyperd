@@ -21,7 +21,7 @@ func (s *ServerRPC) PodInfo(c context.Context, req *types.PodInfoRequest) (*type
 		return nil, err
 	}
 
-	glog.V(3).Infof("PodInfo done with request %s", req.String())
+	glog.V(3).Infof("PodInfo done with request %s info %+v", req.String(), info)
 	return &types.PodInfoResponse{
 		PodInfo: info,
 	}, nil
@@ -37,7 +37,7 @@ func (s *ServerRPC) ContainerInfo(c context.Context, req *types.ContainerInfoReq
 		return nil, err
 	}
 
-	glog.V(3).Infof("ContainerInfo done with request %s", req.String())
+	glog.V(3).Infof("ContainerInfo done with request %s info %+v", req.String(), info)
 	return &types.ContainerInfoResponse{
 		ContainerInfo: info,
 	}, nil
