@@ -78,6 +78,10 @@ type XPod struct {
 	// on it too.
 	stoppedChan chan bool
 	initCond    *sync.Cond
+
+	//Protected by statusLock
+	snapVolumes    map[string]*apitypes.PodVolume
+	snapContainers map[string]*Container
 }
 
 // The Log infrastructure, to add pod name as prefix of the log message.
@@ -338,22 +342,22 @@ func (p *XPod) updatePodInfo() error {
 	defer p.statusLock.Unlock()
 
 	var (
-		containers      = make([]*apitypes.Container, 0, len(p.containers))
-		volumes         = make([]*apitypes.PodVolume, 0, len(p.volumes))
-		containerStatus = make([]*apitypes.ContainerStatus, 0, len(p.containers))
+		containers      = make([]*apitypes.Container, 0, len(p.snapContainers))
+		volumes         = make([]*apitypes.PodVolume, 0, len(p.snapVolumes))
+		containerStatus = make([]*apitypes.ContainerStatus, 0, len(p.snapContainers))
 	)
 
 	p.info.Spec.Labels = p.labels
 
-	for _, v := range p.volumes {
-		volumes = append(volumes, v.Info())
+	for _, v := range p.snapVolumes {
+		volumes = append(volumes, v)
 	}
 	p.info.Spec.Volumes = volumes
 
 	succeeeded := "Succeeded"
-	for _, c := range p.containers {
-		ci := c.Info()
-		cs := c.InfoStatus()
+	for _, c := range p.snapContainers {
+		ci := c.InfoLocked()
+		cs := c.InfoStatusLocked()
 		containers = append(containers, ci)
 		containerStatus = append(containerStatus, cs)
 		if cs.Phase == "failed" {
