@@ -7,12 +7,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/docker/docker/pkg/stdcopy"
+	//	"github.com/docker/docker/pkg/stdcopy"
 
 	"github.com/hyperhq/hypercontainer-utils/hlog"
 	"github.com/hyperhq/hyperd/utils"
-	"github.com/hyperhq/runv/api"
-	"github.com/hyperhq/runv/hypervisor"
+	//	"github.com/hyperhq/runv/api"
+	//	"github.com/hyperhq/runv/hypervisor"
+	vc "github.com/kata-containers/runtime/virtcontainers"
 )
 
 type Exec struct {
@@ -85,92 +86,96 @@ type writeCloser struct {
 }
 
 func (p *XPod) StartExec(stdin io.ReadCloser, stdout io.WriteCloser, containerId, execId string) error {
-	c, ok := p.containers[containerId]
-	if !ok {
-		err := fmt.Errorf("no container %s available for exec %s", containerId, execId)
-		p.Log(ERROR, err)
-		return err
-	}
-
-	p.statusLock.RLock()
-	es, ok := p.execs[execId]
-	p.statusLock.RUnlock()
-
-	if !ok {
-		err := fmt.Errorf("no exec %s exists for container %s", execId, containerId)
-		p.Log(ERROR, err)
-		return err
-	}
-
-	wReader := &waitClose{ReadCloser: stdin, wait: make(chan bool)}
-	tty := &hypervisor.TtyIO{
-		Stdin:  wReader,
-		Stdout: stdout,
-	}
-
-	if !es.Terminal && stdout != nil {
-		tty.Stderr = stdcopy.NewStdWriter(stdout, stdcopy.Stderr)
-		tty.Stdout = &writeCloser{stdcopy.NewStdWriter(stdout, stdcopy.Stdout), stdout}
-	}
-
-	var fin = true
-	for fin {
-		select {
-		case fin = <-es.finChan:
-			es.Log(DEBUG, "try to drain the sync chan")
-		default:
-			fin = false
-			es.Log(DEBUG, "the sync chan is empty")
-		}
-	}
-
-	go func(es *Exec) {
-		result := p.sandbox.WaitProcess(false, []string{execId}, -1)
-		if result == nil {
-			es.Log(ERROR, "can not wait exec")
-			return
-		}
-
-		r, ok := <-result
+	/*
+		c, ok := p.containers[containerId]
 		if !ok {
-			es.Log(ERROR, "waiting exec interrupted")
-			return
+			err := fmt.Errorf("no container %s available for exec %s", containerId, execId)
+			p.Log(ERROR, err)
+			return err
 		}
 
-		es.Log(DEBUG, "exec terminated at %v with code %d", r.FinishedAt, r.Code)
-		es.ExitCode = uint8(r.Code)
-		select {
-		case es.finChan <- true:
-			es.Log(DEBUG, "wake exec stopped chan")
-		default:
-			es.Log(WARNING, "exec already set as stopped")
+		p.statusLock.RLock()
+		es, ok := p.execs[execId]
+		p.statusLock.RUnlock()
+
+		if !ok {
+			err := fmt.Errorf("no exec %s exists for container %s", execId, containerId)
+			p.Log(ERROR, err)
+			return err
 		}
-	}(es)
 
-	var envs []string
-	for e, v := range c.descript.Envs {
-		envs = append(envs, fmt.Sprintf("%s=%s", e, v))
-	}
+		wReader := &waitClose{ReadCloser: stdin, wait: make(chan bool)}
+		tty := &hypervisor.TtyIO{
+			Stdin:  wReader,
+			Stdout: stdout,
+		}
 
-	process := &api.Process{
-		Container: es.Container,
-		Id:        es.Id,
-		Terminal:  es.Terminal,
-		Args:      es.Cmds,
-		Envs:      envs,
-		Workdir:   c.descript.Workdir,
-	}
+		if !es.Terminal && stdout != nil {
+			tty.Stderr = stdcopy.NewStdWriter(stdout, stdcopy.Stderr)
+			tty.Stdout = &writeCloser{stdcopy.NewStdWriter(stdout, stdcopy.Stdout), stdout}
+		}
 
-	if c.descript.UGI != nil {
-		process.User = c.descript.UGI.User
-		process.Group = c.descript.UGI.Group
-		process.AdditionalGroup = c.descript.UGI.AdditionalGroups
-	}
+		var fin = true
+		for fin {
+			select {
+			case fin = <-es.finChan:
+				es.Log(DEBUG, "try to drain the sync chan")
+			default:
+				fin = false
+				es.Log(DEBUG, "the sync chan is empty")
+			}
+		}
 
-	err := p.sandbox.AddProcess(process, tty)
+		go func(es *Exec) {
+			result := p.sandbox.WaitProcess(false, []string{execId}, -1)
+			if result == nil {
+				es.Log(ERROR, "can not wait exec")
+				return
+			}
 
-	<-wReader.wait
-	return err
+			r, ok := <-result
+
+			ret, err := p.sandbox.WaitProcess(containerId, execId)
+			if err != nil {
+				es.Log(ERROR, "waiting exec interrupted")
+				return
+			}
+
+			es.Log(DEBUG, "exec terminated at %v with code %d", time.Now(), int(ret))
+			es.ExitCode = uint8(ret)
+			select {
+			case es.finChan <- true:
+				es.Log(DEBUG, "wake exec stopped chan")
+			default:
+				es.Log(WARNING, "exec already set as stopped")
+			}
+		}(es)
+
+		var envs []string
+		for e, v := range c.descript.Envs {
+			envs = append(envs, fmt.Sprintf("%s=%s", e, v))
+		}
+
+		process := &api.Process{
+			Container: es.Container,
+			Id:        es.Id,
+			Terminal:  es.Terminal,
+			Args:      es.Cmds,
+			Envs:      envs,
+			Workdir:   c.descript.Workdir,
+		}
+
+		if c.descript.UGI != nil {
+			process.User = c.descript.UGI.User
+			process.Group = c.descript.UGI.Group
+			process.AdditionalGroup = c.descript.UGI.AdditionalGroups
+		}
+
+		err := p.sandbox.AddProcess(process, tty)
+
+		<-wReader.wait
+	*/
+	return nil
 }
 
 func (p *XPod) GetExecExitCode(containerId, execId string) (uint8, error) {
@@ -208,8 +213,8 @@ func (p *XPod) KillExec(execId string, sig int64) error {
 	}
 
 	return p.protectedSandboxOperation(
-		func(sb *hypervisor.Vm) error {
-			return sb.SignalProcess(es.Container, es.Id, syscall.Signal(sig))
+		func(sb *vc.Sandbox) error {
+			return sb.SignalProcess(es.Container, es.Id, syscall.Signal(sig), true)
 		},
 		time.Second*5,
 		fmt.Sprintf("Kill process %s with %d", es.Id, sig))
@@ -228,16 +233,20 @@ func (p *XPod) CleanupExecs() {
 }
 
 func (p *XPod) ExecVM(cmd string, stdin io.ReadCloser, stdout, stderr io.WriteCloser) (int, error) {
-	wReader := &waitClose{ReadCloser: stdin, wait: make(chan bool)}
-	tty := &hypervisor.TtyIO{
-		Stdin:  wReader,
-		Stdout: stdout,
-		Stderr: stderr,
-	}
-	res, err := p.sandbox.HyperstartExec(cmd, tty)
-	if err != nil {
-		return res, err
-	}
-	<-wReader.wait
-	return res, err
+	/*
+		wReader := &waitClose{ReadCloser: stdin, wait: make(chan bool)}
+		tty := &hypervisor.TtyIO{
+			Stdin:  wReader,
+			Stdout: stdout,
+			Stderr: stderr,
+		}
+
+		res, err := p.sandbox.HyperstartExec(cmd, tty)
+		if err != nil {
+			return res, err
+		}
+		<-wReader.wait
+	*/
+	//	return res, err
+	return 0, nil
 }
