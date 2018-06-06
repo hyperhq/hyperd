@@ -105,13 +105,14 @@ func (v *Volume) add() error {
 // the class.
 func (v *Volume) insert() error {
 	v.Log(DEBUG, "insert volume to sandbox")
-	r := v.p.sandbox.AddVolume(v.descript)
-	if !r.IsSuccess() {
-		err := fmt.Errorf("failed to insert: %s", r.Message())
-		v.Log(ERROR, err)
-		return err
-	}
-
+	/*
+		r := v.p.sandbox.AddVolume(v.descript)
+		if !r.IsSuccess() {
+			err := fmt.Errorf("failed to insert: %s", r.Message())
+			v.Log(ERROR, err)
+			return err
+		}
+	*/
 	v.Log(INFO, "volume inserted")
 	return nil
 }
@@ -131,24 +132,27 @@ func (v *Volume) removeFromSandbox() error {
 }
 
 func (v *Volume) tryRemoveFromSandbox() (bool, error) {
-	var (
-		removed bool
-		err     error
-	)
-	r := v.p.sandbox.RemoveVolume(v.spec.Name)
-	removed = r.IsSuccess()
-	if !removed && (r.Message() != "in use") {
-		err = fmt.Errorf("failed to remove vol from sandbox: %s", r.Message())
-		v.Log(ERROR, err)
-	}
+	/*	var (
+			removed bool
+			err     error
+		)
 
-	if removed {
-		v.Lock()
-		v.status = S_VOLUME_CREATED
-		v.Unlock()
-	}
-	v.Log(INFO, "volume remove from sandbox (removed: %v)", removed)
-	return removed, err
+		r := v.p.sandbox.RemoveVolume(v.spec.Name)
+		removed = r.IsSuccess()
+		if !removed && (r.Message() != "in use") {
+			err = fmt.Errorf("failed to remove vol from sandbox: %s", r.Message())
+			v.Log(ERROR, err)
+		}
+
+		if removed {
+			v.Lock()
+			v.status = S_VOLUME_CREATED
+			v.Unlock()
+		}
+		v.Log(INFO, "volume remove from sandbox (removed: %v)", removed)
+		return removed, err
+	*/
+	return true, nil
 }
 
 // mount() should only called by add(), and not expose to outside

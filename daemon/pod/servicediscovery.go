@@ -199,60 +199,64 @@ func (s *Services) commit(srvs []*apitypes.UserService, operation string) error 
 
 func (s *Services) commitToVm(patch []byte) error {
 	s.Log(TRACE, "commit IPVS service patch: \n%s", string(patch))
-
-	saveData, err := s.getFromVm()
-	if err != nil {
-		return err
-	}
-
-	clear := func() error {
-		cmd := []string{"ipvsadm", "-C"}
-		_, stderr, err := s.p.sandbox.HyperstartExecSync(cmd, nil)
+	/*
+		saveData, err := s.getFromVm()
 		if err != nil {
-			s.Log(ERROR, "clear ipvs rules failed: %v, %s", err, stderr)
 			return err
 		}
 
-		return nil
-	}
+		clear := func() error {
+			cmd := []string{"ipvsadm", "-C"}
+			_, stderr, err := s.p.sandbox.HyperstartExecSync(cmd, nil)
+			if err != nil {
+				s.Log(ERROR, "clear ipvs rules failed: %v, %s", err, stderr)
+				return err
+			}
 
-	apply := func(rules []byte) error {
-		cmd := []string{"ipvsadm", "-R"}
-		_, stderr, err := s.p.sandbox.HyperstartExecSync(cmd, rules)
-		if err != nil {
-			s.Log(ERROR, "apply ipvs rules failed: %v, %s", err, stderr)
+			return nil
+		}
+
+		apply := func(rules []byte) error {
+			cmd := []string{"ipvsadm", "-R"}
+			_, stderr, err := s.p.sandbox.HyperstartExecSync(cmd, rules)
+			if err != nil {
+				s.Log(ERROR, "apply ipvs rules failed: %v, %s", err, stderr)
+				return err
+			}
+
+			return nil
+		}
+
+		if err = apply(patch); err != nil {
+			// restore original ipvs services
+			err1 := clear()
+			if err1 != nil {
+				s.Log(ERROR, "restore original ipvs services failed in clear stage: %v", err1)
+				return err
+			}
+			err1 = apply(saveData)
+			if err1 != nil {
+				s.Log(ERROR, "restore original ipvs services failed in apply stage: %v", err1)
+			}
 			return err
 		}
-
-		return nil
-	}
-
-	if err = apply(patch); err != nil {
-		// restore original ipvs services
-		err1 := clear()
-		if err1 != nil {
-			s.Log(ERROR, "restore original ipvs services failed in clear stage: %v", err1)
-			return err
-		}
-		err1 = apply(saveData)
-		if err1 != nil {
-			s.Log(ERROR, "restore original ipvs services failed in apply stage: %v", err1)
-		}
-		return err
-	}
-
+	*/
 	return nil
 }
 
 func (s *Services) getFromVm() ([]byte, error) {
-	cmd := []string{"ipvsadm", "-Ln"}
-	stdout, stderr, err := s.p.sandbox.HyperstartExecSync(cmd, nil)
-	if err != nil {
-		s.Log(ERROR, "get ipvs service from vm failed: %v, %s", err, stderr)
-		return nil, err
-	}
+	/*	cmd := []string{"ipvsadm", "-Ln"}
 
-	return stdout, nil
+		stdout, stderr, err := s.p.sandbox.HyperstartExecSync(cmd, nil)
+		if err != nil {
+			s.Log(ERROR, "get ipvs service from vm failed: %v, %s", err, stderr)
+			return nil, err
+		}
+
+		return stdout, nil
+	*/
+	return nil, nil
+
 }
 
 func (s *Services) size() int {
