@@ -19,6 +19,7 @@ import (
 	"github.com/docker/engine-api/types/container"
 	"github.com/docker/engine-api/types/strslice"
 
+	"encoding/json"
 	"github.com/hyperhq/hypercontainer-utils/hlog"
 	"github.com/hyperhq/hyperd/errors"
 	apitypes "github.com/hyperhq/hyperd/types"
@@ -26,6 +27,9 @@ import (
 	runv "github.com/hyperhq/runv/api"
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/lib/term"
+	vc "github.com/kata-containers/runtime/virtcontainers"
+	vcAnnotations "github.com/kata-containers/runtime/virtcontainers/pkg/annotations"
+	"path"
 )
 
 var epocZero = time.Time{}
@@ -58,10 +62,11 @@ type ContainerStatus struct {
 type Container struct {
 	p *XPod
 
-	spec     *apitypes.UserContainer
-	descript *runv.ContainerDescription
-	status   *ContainerStatus
-	streams  *StreamConfig
+	spec       *apitypes.UserContainer
+	descript   *runv.ContainerDescription
+	contConfig *vc.ContainerConfig
+	status     *ContainerStatus
+	streams    *StreamConfig
 
 	logger    LogStatus
 	logPrefix string
@@ -255,7 +260,7 @@ func (c *Container) start() error {
 	go c.waitFinish(-1)
 
 	c.Log(INFO, "start container")
-	if err := c.p.sandbox.StartContainer(c.Id()); err != nil {
+	if _, err := c.p.sandbox.StartContainer(c.Id()); err != nil {
 		c.Log(ERROR, "failed to start container: %v", err)
 		return err
 	}
@@ -415,6 +420,13 @@ func (c *Container) init(allowCreate bool) error {
 
 	c.status.CreatedAt, _ = time.Parse(time.RFC3339Nano, cjson.Created)
 
+	contConfig, err := c.containerConfig(cjson)
+	if err != nil {
+		c.Log(ERROR, err)
+		return err
+	}
+	c.contConfig = contConfig
+
 	desc, err := c.describeContainer(cjson)
 	if err != nil {
 		c.Log(ERROR, err)
@@ -439,7 +451,6 @@ func (c *Container) init(allowCreate bool) error {
 	desc.Volumes = c.parseVolumes()
 	desc.Initialize = !loaded
 	c.descript = desc
-
 	return nil
 }
 
@@ -521,6 +532,86 @@ func (c *Container) createByEngine() (*dockertypes.ContainerJSON, error) {
 	c.spec.Id = ccs.ID
 	c.updateLogPrefix()
 	return rsp, nil
+}
+
+func (c *Container) cmdEnvs(envs []vc.EnvVar) []vc.EnvVar {
+	for _, env := range c.spec.Envs {
+		envs = append(envs,
+			vc.EnvVar{
+				Var:   env.Env,
+				Value: env.Value,
+			})
+	}
+	return envs
+}
+
+func newMount(m dockertypes.MountPoint) vc.Mount {
+	return vc.Mount{
+		Source:      m.Source,
+		Destination: m.Destination,
+	}
+}
+
+func containerMounts(cjson *dockertypes.ContainerJSON) []vc.Mount {
+	cMounts := cjson.Mounts
+
+	if cMounts == nil {
+		return []vc.Mount{}
+	}
+
+	var mnts []vc.Mount
+	for _, m := range cMounts {
+		mnts = append(mnts, newMount(m))
+	}
+
+	return mnts
+}
+
+func (c *Container) containerConfig(cjson *dockertypes.ContainerJSON) (*vc.ContainerConfig, error) {
+
+	c.Log(TRACE, "container info config %#v, Cmd %v, Args %v", cjson.Config, cjson.Config.Cmd.Slice(), cjson.Args)
+
+	if c.spec.Image == "" {
+		c.spec.Image = cjson.Config.Image
+	}
+	c.Log(INFO, "describe container")
+
+	mountId, err := GetMountIdByContainer(c.p.factory.sd.Type(), c.spec.Id)
+	if err != nil {
+		err = fmt.Errorf("Cannot find mountID for container %s : %s", c.spec.Id, err)
+		c.Log(ERROR, "Cannot find mountID for container %s", err)
+		return nil, err
+	}
+	c.Log(DEBUG, "mount id: %s", mountId)
+
+	cmd := vc.Cmd{
+		Args:         c.spec.Command,
+		Envs:         c.cmdEnvs([]vc.EnvVar{}),
+		WorkDir:      c.spec.Workdir,
+		User:         c.spec.User.Name,
+		PrimaryGroup: c.spec.User.Group,
+		Interactive:  c.spec.Tty,
+		Console:      "",
+		Detach:       !c.HasTty(),
+	}
+
+	cSpecJSON, err := json.Marshal(cjson)
+
+	containerConfig := &vc.ContainerConfig{
+		ID:             c.spec.Id,
+		RootFs:         path.Join(c.p.sandboxShareDir(), mountId, "rootfs"),
+		ReadonlyRootfs: c.spec.ReadOnly,
+		Cmd:            cmd,
+		Annotations: map[string]string{
+			vcAnnotations.ConfigJSONKey: string(cSpecJSON),
+			vcAnnotations.BundlePathKey: path.Join(c.p.sandboxShareDir(), mountId),
+		},
+		Mounts: containerMounts(cjson),
+	}
+
+	c.Log(TRACE, "Container Info is \n%#v", containerConfig)
+
+	return containerConfig, nil
 }
 
 func (c *Container) describeContainer(cjson *dockertypes.ContainerJSON) (*runv.ContainerDescription, error) {
@@ -908,9 +999,9 @@ func (c *Container) addToSandbox() error {
 	}
 
 	c.Log(DEBUG, "resources ready, insert container to sandbox")
-	r := c.p.sandbox.AddContainer(c.descript)
-	if !r.IsSuccess() {
-		err := fmt.Errorf("failed to add container to sandbox: %s", r.Message())
+	_, err = c.p.sandbox.CreateContainer(*(c.contConfig))
+	if err != nil {
+		err := fmt.Errorf("failed to add container to sandbox")
 		c.Log(ERROR, err)
 		c.status.UnexpectedStopped()
 		return err
@@ -920,6 +1011,7 @@ func (c *Container) addToSandbox() error {
 	return nil
 }
 
+/*
 func (c *Container) associateToSandbox() error {
 	c.Log(DEBUG, "try to associate container %s to sandbox", c.Id())
 	alive, err := c.p.sandbox.AssociateContainer(c.Id())
@@ -942,6 +1034,8 @@ func (c *Container) associateToSandbox() error {
 	return nil
 }
 
+*/
+
 // This method should be called when initialzing container or put into resource lock.
 func (c *Container) initStreams() error {
 	if c.streams != nil {
@@ -954,15 +1048,25 @@ func (c *Container) initStreams() error {
 	c.Log(TRACE, "init io streams")
 	c.streams = NewStreamConfig()
 	c.streams.NewInputPipes()
-	tty := &hypervisor.TtyIO{
+	tty := &TtyIO{
 		Stdin:  c.streams.Stdin(),
 		Stdout: c.streams.Stdout(),
 		Stderr: c.streams.Stderr(),
 	}
-	if err := c.p.sandbox.Attach(tty, c.Id()); err != nil {
+
+	stdin, stdout, stderr, err := c.p.sandbox.IOStream(c.Id(), c.Id())
+	if err != nil {
 		c.Log(ERROR, err)
 		return err
 	}
+
+	go streamCopy(tty, stdin, stdout, stderr)
+	/*
+		if err := c.p.sandbox.Attach(tty, c.Id()); err != nil {
+			c.Log(ERROR, err)
+			return err
+		}
+	*/
 	return nil
 }
 
@@ -1060,21 +1164,13 @@ func (c *Container) getLogger() logger.Logger {
 func (c *Container) waitFinish(timeout int) {
 	var firstStop bool
 
-	result := c.p.sandbox.WaitProcess(true, []string{c.Id()}, timeout)
-	if result == nil {
+	result, err := c.p.sandbox.WaitProcess(c.Id(), c.Id())
+	if err != nil {
 		c.Log(INFO, "wait container failed")
 		firstStop = c.status.UnexpectedStopped()
 	} else {
-		r, ok := <-result
-		if !ok {
-			if timeout < 0 {
-				c.Log(INFO, "container unexpected failed, chan broken")
-				firstStop = c.status.UnexpectedStopped()
-			}
-		} else {
-			c.Log(INFO, "container exited with code %v (at %v)", r.Code, r.FinishedAt)
-			firstStop = c.status.Stopped(r.FinishedAt, r.Code)
-		}
+		c.Log(INFO, "container exited with code %d", result)
+		firstStop = c.status.Stopped(time.Now(), int(result))
 	}
 
 	if firstStop {
@@ -1118,7 +1214,8 @@ func (c *Container) terminate(force bool) (err error) {
 	}
 	c.setKill()
 	c.Log(DEBUG, "stopping: killing container with %d", sig)
-	err = c.p.sandbox.KillContainer(c.Id(), sig)
+	//	err = c.p.sandbox.KillContainer(c.Id(), sig)
+	err = c.p.sandbox.SignalProcess(c.Id(), c.Id(), sig, true)
 	if err != nil {
 		c.Log(ERROR, "failed to kill container: %v", err)
 	}
@@ -1127,9 +1224,10 @@ func (c *Container) terminate(force bool) (err error) {
 }
 
 func (c *Container) removeFromSandbox() error {
-	r := c.p.sandbox.RemoveContainer(c.Id())
-	if !r.IsSuccess() {
-		err := fmt.Errorf("failed to remove container: %s", r.Message())
+	//	r := c.p.sandbox.RemoveContainer(c.Id())
+	_, err := c.p.sandbox.DeleteContainer(c.Id())
+	if err != nil {
+		//		err := fmt.Errorf("failed to remove container: %s", r.Message())
 		c.Log(ERROR, err)
 		return err
 	}

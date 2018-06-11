@@ -144,15 +144,16 @@ func LoadXPod(factory *PodFactory, layout *types.PersistPodLayout) (*XPod, error
 	if err != nil {
 		return nil, err
 	}
-
-	//associate containers
-	if p.status == S_POD_RUNNING {
-		for _, c := range p.containers {
-			if err = c.associateToSandbox(); err != nil {
-				return nil, err
+	/*
+		//associate containers
+		if p.status == S_POD_RUNNING {
+			for _, c := range p.containers {
+				if err = c.associateToSandbox(); err != nil {
+					return nil, err
+				}
 			}
 		}
-	}
+	*/
 
 	// don't need to reserve name again, because this is load
 	return p, nil
@@ -448,27 +449,30 @@ func (inf *Interface) removeFromDB() error {
 }
 
 func (p *XPod) saveSandbox() error {
-	var (
-		sb  types.SandboxPersistInfo
-		err error
-	)
-	stop_status := map[PodState]bool{
-		S_POD_NONE:     true,
-		S_POD_STOPPED:  true,
-		S_POD_STOPPING: true,
-		S_POD_ERROR:    true,
-	}
-	p.statusLock.RLock()
-	defer p.statusLock.RUnlock()
-	if !stop_status[p.status] {
-		sb.Id = p.sandbox.Id
-		sb.PersistInfo, err = p.sandbox.Dump()
-		if err != nil {
-			hlog.HLog(ERROR, p, 2, "failed to dump sandbox %s: %v", sb.Id, err)
-			return err
+	/*
+		var (
+			sb  types.SandboxPersistInfo
+			err error
+		)
+		stop_status := map[PodState]bool{
+			S_POD_NONE:     true,
+			S_POD_STOPPED:  true,
+			S_POD_STOPPING: true,
+			S_POD_ERROR:    true,
 		}
-		return saveMessage(p.factory.db, fmt.Sprintf(SB_KEY_FMT, p.Id()), &sb, p, "sandbox info")
-	}
+		p.statusLock.RLock()
+		defer p.statusLock.RUnlock()
+		if !stop_status[p.status] {
+			sb.Id = p.sandbox.ID()
+			sb.PersistInfo, err = p.sandbox.Dump()
+			if err != nil {
+				hlog.HLog(ERROR, p, 2, "failed to dump sandbox %s: %v", sb.Id, err)
+				return err
+			}
+			return saveMessage(p.factory.db, fmt.Sprintf(SB_KEY_FMT, p.Id()), &sb, p, "sandbox info")
+
+		}
+	*/
 	return nil
 }
 
