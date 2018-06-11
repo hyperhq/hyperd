@@ -178,6 +178,18 @@ func (qc *QemuContext) Shutdown(ctx *hypervisor.VmContext) {
 	qmpQemuQuit(ctx, qc)
 }
 
+func (qc *QemuContext) qmpSend(ctx *hypervisor.VmContext, s QmpInteraction) {
+	ctx.Rlock()
+	defer ctx.RUnlock()
+	if ctx.IsClosedLocked() {
+		glog.Errorf("Cannot send message to closed sandbox %s %+v", ctx.Id, s)
+	} else {
+		glog.V(3).Infof("Send message to sandbox %s start", ctx.Id)
+		qc.qmp <- s
+		glog.V(3).Infof("Send message to sandbox %s done", ctx.Id)
+	}
+}
+
 func (qc *QemuContext) Kill(ctx *hypervisor.VmContext) {
 	defer func() {
 		err := recover()
@@ -215,12 +227,12 @@ func (qc *QemuContext) Pause(ctx *hypervisor.VmContext, pause bool) error {
 	}
 
 	result := make(chan error, 1)
-	qc.qmp <- &QmpSession{
+	qc.qmpSend(ctx, &QmpSession{
 		commands: commands,
 		respond: func(err error) {
 			result <- err
 		},
-	}
+	})
 	return <-result
 }
 
@@ -321,7 +333,7 @@ func (qc *QemuContext) SetCpus(ctx *hypervisor.VmContext, cpus int) error {
 	}
 
 	result := make(chan error, 1)
-	qc.qmp <- &QmpSession{
+	qc.qmpSend(ctx, &QmpSession{
 		commands: commands,
 		respond: func(err error) {
 			if err == nil {
@@ -329,7 +341,7 @@ func (qc *QemuContext) SetCpus(ctx *hypervisor.VmContext, cpus int) error {
 			}
 			result <- err
 		},
-	}
+	})
 	return <-result
 }
 
@@ -352,10 +364,10 @@ func (qc *QemuContext) AddMem(ctx *hypervisor.VmContext, slot, size int) error {
 		},
 	}
 	result := make(chan error, 1)
-	qc.qmp <- &QmpSession{
+	qc.qmpSend(ctx, &QmpSession{
 		commands: commands,
 		respond:  func(err error) { result <- err },
-	}
+	})
 	return <-result
 }
 
@@ -385,10 +397,10 @@ func (qc *QemuContext) Save(ctx *hypervisor.VmContext, path string) error {
 
 	result := make(chan error, 1)
 	// TODO: use query-migrate to query until completed
-	qc.qmp <- &QmpSession{
+	qc.qmpSend(ctx, &QmpSession{
 		commands: commands,
 		respond:  func(err error) { result <- err },
-	}
+	})
 
 	return <-result
 }

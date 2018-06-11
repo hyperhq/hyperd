@@ -11,7 +11,13 @@ import (
 )
 
 func (ctx *VmContext) loop() {
-	for ctx.handler != nil {
+	for {
+		ctx.lock.Lock()
+		handler := ctx.handler
+		ctx.lock.Unlock()
+		if handler == nil {
+			break
+		}
 		ev, ok := <-ctx.Hub
 		if !ok {
 			ctx.Log(ERROR, "hub chan has already been closed")
@@ -21,7 +27,7 @@ func (ctx *VmContext) loop() {
 			continue
 		}
 		ctx.Log(TRACE, "main event loop got message %d(%s)", ev.Event(), EventString(ev.Event()))
-		ctx.handler(ctx, ev)
+		handler(ctx, ev)
 	}
 
 	// Unless the ctx.Hub channel is drained, processes sending operations can

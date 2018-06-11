@@ -59,6 +59,7 @@ func (f Dummy) GetVm(cpu, mem int) (*hypervisor.Vm, error) {
 	config := hypervisor.BootConfig(f)
 	config.CPU = cpu
 	config.Memory = mem
+	config.BootFromTemplate = false
 	return hypervisor.GetVm("", &config, false)
 }
 func (f Dummy) CloseFactory() {}
