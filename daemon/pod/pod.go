@@ -9,8 +9,8 @@ import (
 
 	"github.com/docker/docker/daemon/logger"
 	"github.com/hyperhq/hypercontainer-utils/hlog"
-	"github.com/hyperhq/hyperd/utils"
 	apitypes "github.com/hyperhq/hyperd/types"
+	"github.com/hyperhq/hyperd/utils"
 	vc "github.com/kata-containers/runtime/virtcontainers"
 )
 
