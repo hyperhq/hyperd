@@ -1,7 +1,7 @@
 # Logrus <img src="http://i.imgur.com/hTeVwmJ.png" width="40" height="40" alt=":walrus:" class="emoji" title=":walrus:"/>&nbsp;[![Build Status](https://travis-ci.org/Sirupsen/logrus.svg?branch=master)](https://travis-ci.org/Sirupsen/logrus)&nbsp;[![GoDoc](https://godoc.org/github.com/Sirupsen/logrus?status.svg)](https://godoc.org/github.com/Sirupsen/logrus)
 
 **Seeing weird case-sensitive problems?** See [this
-issue](https://github.com/sirupsen/logrus/issues/451#issuecomment-264332021).
+issue](https://github.com/Sirupsen/logrus/issues/451#issuecomment-264332021).
 This change has been reverted. I apologize for causing this. I greatly
 underestimated the impact this would have. Logrus strives for stability and
 backwards compatibility and failed to provide that.
@@ -347,9 +347,9 @@ The built-in logging formatters are:
     field to `true`.  To force no colored output even if there is a TTY  set the
     `DisableColors` field to `true`. For Windows, see
     [github.com/mattn/go-colorable](https://github.com/mattn/go-colorable).
-  * All options are listed in the [generated docs](https://godoc.org/github.com/sirupsen/logrus#TextFormatter).
+  * All options are listed in the [generated docs](https://godoc.org/github.com/Sirupsen/logrus#TextFormatter).
 * `logrus.JSONFormatter`. Logs fields as JSON.
-  * All options are listed in the [generated docs](https://godoc.org/github.com/sirupsen/logrus#JSONFormatter).
+  * All options are listed in the [generated docs](https://godoc.org/github.com/Sirupsen/logrus#JSONFormatter).
 
 Third party logging formatters:
 

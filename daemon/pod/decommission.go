@@ -10,10 +10,10 @@ import (
 	dockertypes "github.com/docker/engine-api/types"
 
 	"github.com/hyperhq/hyperd/utils"
-	"github.com/hyperhq/runv/hypervisor"
+	vc "github.com/kata-containers/runtime/virtcontainers"
 )
 
-type sandboxOp func(sb *hypervisor.Vm) error
+type sandboxOp func(sb *vc.Sandbox) error
 type stateValidator func(state PodState) bool
 
 func (p *XPod) DelayDeleteOn() bool {
@@ -37,9 +37,9 @@ func (p *XPod) Stop(graceful int) error {
 
 func (p *XPod) ForceQuit() {
 	err := p.protectedSandboxOperation(
-		func(sb *hypervisor.Vm) error {
-			sb.Kill()
-			return nil
+		func(sb *vc.Sandbox) error {
+			_, err := vc.StopSandbox(sb.ID())
+			return err
 		},
 		time.Second*5,
 		"kill pod")
@@ -118,8 +118,8 @@ func (p *XPod) Pause() error {
 	p.statusLock.Unlock()
 
 	err := p.protectedSandboxOperation(
-		func(sb *hypervisor.Vm) error {
-			return sb.Pause(true)
+		func(sb *vc.Sandbox) error {
+			return sb.Pause()
 		},
 		time.Second*5,
 		"pause pod")
@@ -148,8 +148,8 @@ func (p *XPod) UnPause() error {
 	p.statusLock.Unlock()
 
 	err := p.protectedSandboxOperation(
-		func(sb *hypervisor.Vm) error {
-			return sb.Pause(false)
+		func(sb *vc.Sandbox) error {
+			return sb.Pause()
 		},
 		time.Second*5,
 		"resume pod")
@@ -176,8 +176,8 @@ func (p *XPod) KillContainer(id string, sig int64) error {
 	}
 	c.setKill()
 	return p.protectedSandboxOperation(
-		func(sb *hypervisor.Vm) error {
-			return sb.KillContainer(id, syscall.Signal(sig))
+		func(sb *vc.Sandbox) error {
+			return vc.KillContainer(sb.ID(), id, syscall.Signal(sig), true)
 		},
 		time.Second*5,
 		fmt.Sprintf("Kill container %s with %d", id, sig))
@@ -307,7 +307,7 @@ func (p *XPod) RemoveContainer(id string) error {
 // protectedSandboxOperation() protect the hypervisor operations, which may
 // panic or hang too long time.
 func (p *XPod) protectedSandboxOperation(op sandboxOp, timeout time.Duration, comment string) error {
-	dangerousOp := func(sb *hypervisor.Vm, errChan chan<- error) {
+	dangerousOp := func(sb *vc.Sandbox, errChan chan<- error) {
 		defer func() {
 			err := recover()
 			if err != nil {
@@ -393,13 +393,13 @@ func (p *XPod) doStopPod(graceful int) error {
 	}
 
 	p.Log(INFO, "stop container success, shutdown sandbox")
-	result := p.sandbox.Shutdown()
-	if result.IsSuccess() {
+	_, err = vc.StopSandbox(p.sandbox.ID())
+	if err == nil {
 		p.Log(INFO, "pod is stopped")
 		return nil
 	}
 
-	err = fmt.Errorf("failed to shuting down: %s", result.Message())
+	err = fmt.Errorf("failed to shuting down: %s", err)
 	p.Log(ERROR, err)
 	return err
 }
@@ -448,13 +448,20 @@ func (p *XPod) stopContainers(cList []string, graceful int) error {
 		}
 		future.Add(c.Id(), func() error {
 			var toc <-chan time.Time
+			var retch = make(chan int32)
+
 			if int64(graceful) < 0 {
 				toc = make(chan time.Time)
 			} else {
 				toc = time.After(waitTime)
 			}
+
 			forceKill := graceful == 0
-			resChan := p.sandbox.WaitProcess(true, []string{c.Id()}, -1)
+			go func(retch chan int32, c *Container) {
+				ret, _ := p.sandbox.WaitProcess(c.Id(), c.Id())
+				retch <- ret
+			}(retch, c)
+
 			c.Log(DEBUG, "now, stop container")
 			err := c.terminate(forceKill)
 			// TODO filter container/process can't find error
@@ -464,20 +471,11 @@ func (p *XPod) stopContainers(cList []string, graceful int) error {
 					return err
 				}
 			}
-			if resChan == nil {
-				err := fmt.Errorf("cannot wait container %s", c.Id())
-				p.Log(ERROR, err)
-				return err
-			}
+
 			for {
 				select {
-				case ex, ok := <-resChan:
-					if !ok {
-						err := fmt.Errorf("chan broken while waiting container: %s", c.Id())
-						p.Log(WARNING, err)
-						return err
-					}
-					p.Log(DEBUG, "container %s stopped (%v)", ex.Id, ex.Code)
+				case ret := <-retch:
+					p.Log(DEBUG, "container %s stopped (%d)", c.Id(), ret)
 					return nil
 				case <-toc:
 					if forceKill {
@@ -493,6 +491,7 @@ func (p *XPod) stopContainers(cList []string, graceful int) error {
 				}
 			}
 			return nil
+
 		})
 	}
 
@@ -532,7 +531,8 @@ func (p *XPod) waitVMStop() {
 	}
 	p.statusLock.RUnlock()
 
-	_, _ = <-p.sandbox.WaitVm(-1)
+	monitor, _ := p.sandbox.Monitor()
+	_ = <-monitor
 	p.Log(INFO, "got vm exit event")
 	p.cleanup()
 }

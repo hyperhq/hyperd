@@ -76,11 +76,14 @@ func (inf *Interface) add() error {
 		inf.Log(ERROR, err)
 		return err
 	}
-	err := inf.p.sandbox.AddNic(inf.descript)
-	if err != nil {
-		inf.Log(ERROR, "failed to add NIC: %v", err)
-	}
-	return err
+	/*
+		err := inf.p.sandbox.AddNic(inf.descript)
+		if err != nil {
+			inf.Log(ERROR, "failed to add NIC: %v", err)
+		}
+		return err
+	*/
+	return nil
 }
 
 func (inf *Interface) cleanup() error {
