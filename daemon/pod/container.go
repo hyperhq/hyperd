@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 
+	"encoding/json"
 	"github.com/docker/docker/daemon/logger"
 	"github.com/docker/docker/daemon/logger/jsonfilelog"
 	"github.com/docker/docker/pkg/stdcopy"
@@ -18,8 +20,6 @@ import (
 	dockertypes "github.com/docker/engine-api/types"
 	"github.com/docker/engine-api/types/container"
 	"github.com/docker/engine-api/types/strslice"
-
-	"encoding/json"
 	"github.com/hyperhq/hypercontainer-utils/hlog"
 	"github.com/hyperhq/hyperd/errors"
 	apitypes "github.com/hyperhq/hyperd/types"
@@ -31,7 +31,6 @@ import (
 	vcAnnotations "github.com/kata-containers/runtime/virtcontainers/pkg/annotations"
 	"github.com/moby/oci"
 	"github.com/opencontainers/runtime-spec/specs-go"
-	"path"
 )
 
 var epocZero = time.Time{}
@@ -672,108 +671,6 @@ func (c *Container) containerConfig(cjson *dockertypes.ContainerJSON) (*vc.Conta
 
 	return containerConfig, nil
 }
-
-/*
-func (c *Container) describeContainer(cjson *dockertypes.ContainerJSON) (*runv.ContainerDescription, error) {
-
-	c.Log(TRACE, "container info config %#v, Cmd %v, Args %v", cjson.Config, cjson.Config.Cmd.Slice(), cjson.Args)
-
-	if c.spec.Image == "" {
-		c.spec.Image = cjson.Config.Image
-	}
-	c.Log(INFO, "describe container")
-
-	mountId, err := GetMountIdByContainer(c.p.factory.sd.Type(), c.spec.Id)
-	if err != nil {
-		err = fmt.Errorf("Cannot find mountID for container %s : %s", c.spec.Id, err)
-		c.Log(ERROR, "Cannot find mountID for container %s", err)
-		return nil, err
-	}
-	c.Log(DEBUG, "mount id: %s", mountId)
-
-	cdesc := &runv.ContainerDescription{
-		Id: c.spec.Id,
-
-		Name:  cjson.Name, // will have a "/"
-		Image: cjson.Image,
-
-		Labels: c.spec.Labels,
-		Tty:    c.spec.Tty,
-
-		RootVolume: &runv.VolumeDescription{},
-		MountId:    mountId,
-		RootPath:   "rootfs",
-
-		Envs:    make(map[string]string),
-		Workdir: cjson.Config.WorkingDir,
-		Path:    cjson.Path,
-		Args:    cjson.Args,
-		Rlimits: make([]*runv.Rlimit, 0, len(c.spec.Ulimits)),
-
-		StopSignal: strings.ToUpper(cjson.Config.StopSignal),
-	}
-
-	//make sure workdir has an initial val
-	if cdesc.Workdir == "" {
-		cdesc.Workdir = "/"
-	}
-
-	for _, l := range c.spec.Ulimits {
-		ltype := strings.ToLower(l.Name)
-		cdesc.Rlimits = append(cdesc.Rlimits, &runv.Rlimit{
-			Type: ltype,
-			Hard: l.Hard,
-			Soft: l.Soft,
-		})
-	}
-
-	if c.spec.StopSignal != "" {
-		cdesc.StopSignal = c.spec.StopSignal
-	}
-	if strings.HasPrefix(cdesc.StopSignal, "SIG") {
-		cdesc.StopSignal = cdesc.StopSignal[len("SIG"):]
-	}
-	if cdesc.StopSignal == "" {
-		cdesc.StopSignal = "TERM"
-	}
-
-	if c.spec.User != nil && c.spec.User.Name != "" {
-		cdesc.UGI = &runv.UserGroupInfo{
-			User:             c.spec.User.Name,
-			Group:            c.spec.User.Group,
-			AdditionalGroups: c.spec.User.AdditionalGroups,
-		}
-	} else if cjson.Config.User != "" {
-		users := strings.Split(cjson.Config.User, ":")
-		if len(users) > 2 {
-			return nil, fmt.Errorf("container %s invalid user group config: %s", cjson.Name, cjson.Config.User)
-		}
-		if len(users) == 2 {
-			cdesc.UGI = &runv.UserGroupInfo{
-				User:  users[0],
-				Group: users[1],
-			}
-		} else {
-			cdesc.UGI = &runv.UserGroupInfo{
-				User: cjson.Config.User,
-			}
-		}
-	}
-
-	for _, v := range cjson.Config.Env {
-		pair := strings.SplitN(v, "=", 2)
-		if len(pair) == 2 {
-			cdesc.Envs[pair[0]] = pair[1]
-		} else if len(pair) == 1 {
-			cdesc.Envs[pair[0]] = ""
-		}
-	}
-
-	c.Log(TRACE, "Container Info is \n%#v", cdesc)
-
-	return cdesc, nil
-}
-*/
 
 func (c *Container) parseVolumes() map[string]*runv.VolumeReference {
 	refs := make(map[string]*runv.VolumeReference)

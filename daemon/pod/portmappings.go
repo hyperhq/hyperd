@@ -1,7 +1,6 @@
 package pod
 
 import (
-	//	"fmt"
 	"github.com/hyperhq/hypercontainer-utils/hlog"
 	"github.com/hyperhq/hyperd/networking/portmapping"
 	apitypes "github.com/hyperhq/hyperd/types"

@@ -11,7 +11,6 @@ import (
 
 	"github.com/hyperhq/hyperd/utils"
 	vc "github.com/kata-containers/runtime/virtcontainers"
-	//	"github.com/hyperhq/runv/hypervisor"
 )
 
 type sandboxOp func(sb *vc.Sandbox) error
@@ -178,7 +177,6 @@ func (p *XPod) KillContainer(id string, sig int64) error {
 	c.setKill()
 	return p.protectedSandboxOperation(
 		func(sb *vc.Sandbox) error {
-			//			return sb.KillContainer(id, syscall.Signal(sig))
 			return vc.KillContainer(sb.ID(), id, syscall.Signal(sig), true)
 		},
 		time.Second*5,
@@ -459,8 +457,6 @@ func (p *XPod) stopContainers(cList []string, graceful int) error {
 			}
 
 			forceKill := graceful == 0
-			//
-			//
 			go func(retch chan int32, c *Container) {
 				ret, _ := p.sandbox.WaitProcess(c.Id(), c.Id())
 				retch <- ret
