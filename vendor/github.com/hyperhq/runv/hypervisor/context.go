@@ -235,6 +235,18 @@ func (ctx *VmContext) IsRunning() bool {
 	return running
 }
 
+func (ctx *VmContext) IsClosedLocked() bool {
+	return ctx.current == StateNone
+}
+
+func (ctx *VmContext) Rlock() {
+	ctx.lock.RLock()
+}
+
+func (ctx *VmContext) RUnlock() {
+	ctx.lock.RUnlock()
+}
+
 // User API
 func (ctx *VmContext) SetNetworkEnvironment(net *api.SandboxConfig) {
 	ctx.lock.Lock()
