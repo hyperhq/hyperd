@@ -8,13 +8,10 @@ import (
 	"time"
 
 	"github.com/docker/docker/daemon/logger"
-
 	"github.com/hyperhq/hypercontainer-utils/hlog"
-	apitypes "github.com/hyperhq/hyperd/types"
 	"github.com/hyperhq/hyperd/utils"
-	//	"github.com/hyperhq/runv/hypervisor"
+	apitypes "github.com/hyperhq/hyperd/types"
 	vc "github.com/kata-containers/runtime/virtcontainers"
-	//	runvtypes "github.com/hyperhq/runv/hypervisor/types"
 )
 
 const (
