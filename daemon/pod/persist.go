@@ -128,11 +128,6 @@ func LoadXPod(factory *PodFactory, layout *types.PersistPodLayout) (*XPod, error
 		for _, v := range p.volumes {
 			v.status = S_VOLUME_INSERTED
 		}
-		p.statusLock.Lock()
-		for index := range p.snapVolumes {
-			p.snapVolumes[index] = p.volumes[index].Info()
-		}
-		p.statusLock.Unlock()
 	}
 
 	err = p.loadPodMeta()
@@ -408,9 +403,6 @@ func (p *XPod) loadVolume(id string) error {
 	v.descript = vx.Descript
 	v.status = S_VOLUME_CREATED
 	p.volumes[v.spec.Name] = v
-	p.statusLock.Lock()
-	p.snapVolumes[v.spec.Name] = p.volumes[v.spec.Name].Info()
-	p.statusLock.Unlock()
 	return nil
 }
 

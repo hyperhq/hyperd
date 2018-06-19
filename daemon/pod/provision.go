@@ -101,7 +101,6 @@ func newXPod(factory *PodFactory, spec *apitypes.UserPod) (*XPod, error) {
 		statusLock:    &sync.RWMutex{},
 		stoppedChan:   make(chan bool, 1),
 		factory:       factory,
-		snapVolumes:   make(map[string]*apitypes.PodVolume),
 	}
 	p.initCond = sync.NewCond(p.statusLock.RLocker())
 	return p, nil
@@ -153,9 +152,6 @@ func (p *XPod) doContainerCreate(c *apitypes.UserContainer) (string, error) {
 			continue
 		}
 		p.volumes[vol.Name] = newVolume(p, vol)
-		p.statusLock.Lock()
-		p.snapVolumes[vol.Name] = p.volumes[vol.Name].Info()
-		p.statusLock.Unlock()
 		nvs = append(nvs, vol.Name)
 	}
 	pc.Log(TRACE, "volumes to be added: %v", nvs)
@@ -377,9 +373,6 @@ func (p *XPod) initResources(spec *apitypes.UserPod, allowCreate bool) error {
 				continue
 			}
 			p.volumes[vol.Name] = newVolume(p, vol)
-			p.statusLock.Lock()
-			p.snapVolumes[vol.Name] = p.volumes[vol.Name].Info()
-			p.statusLock.Unlock()
 		}
 	}
 

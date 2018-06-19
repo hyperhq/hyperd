@@ -78,9 +78,6 @@ type XPod struct {
 	// on it too.
 	stoppedChan chan bool
 	initCond    *sync.Cond
-
-	//Protected by statusLock
-	snapVolumes map[string]*apitypes.PodVolume
 }
 
 // The Log infrastructure, to add pod name as prefix of the log message.
@@ -347,14 +344,14 @@ func (p *XPod) updatePodInfo() error {
 
 	var (
 		containers      = make([]*apitypes.Container, 0, len(p.containers))
-		volumes         = make([]*apitypes.PodVolume, 0, len(p.snapVolumes))
+		volumes         = make([]*apitypes.PodVolume, 0, len(p.volumes))
 		containerStatus = make([]*apitypes.ContainerStatus, 0, len(p.containers))
 	)
 
 	p.info.Spec.Labels = p.labels
 
-	for _, v := range p.snapVolumes {
-		volumes = append(volumes, v)
+	for _, v := range p.volumes {
+		volumes = append(volumes, v.Info())
 	}
 	p.info.Spec.Volumes = volumes
 
