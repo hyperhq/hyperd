@@ -339,8 +339,8 @@ func (p *XPod) initPodInfo() {
 }
 
 func (p *XPod) updatePodInfo() error {
-	p.statusLock.Lock()
-	defer p.statusLock.Unlock()
+	p.statusLock.RLock()
+	defer p.statusLock.RUnlock()
 
 	var (
 		containers      = make([]*apitypes.Container, 0, len(p.containers))
