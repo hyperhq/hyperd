@@ -381,9 +381,6 @@ func (p *XPod) loadContainer(id string) error {
 		return err
 	}
 	p.containers[c.Id()] = c
-	p.statusLock.Lock()
-	p.snapContainers[c.Id()] = c
-	p.statusLock.Unlock()
 	return nil
 }
 
