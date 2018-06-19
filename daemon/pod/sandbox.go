@@ -93,7 +93,6 @@ func dissociateSandbox(sandbox *vc.Sandbox, retry int) error {
 	if err != nil {
 		hlog.Log(WARNING, "SB[%s] failed to release sandbox: %v", sandbox.ID(), err)
 		hlog.Log(INFO, "SB[%s] shutdown because of failed release", sandbox.ID())
-		sandbox.Delete()
 		_, err = vc.StopSandbox(sandbox.ID())
 		return err
 	}

@@ -449,7 +449,7 @@ func (inf *Interface) removeFromDB() error {
 }
 
 func (p *XPod) saveSandbox() error {
-	/*
+
 		var (
 			sb  types.SandboxPersistInfo
 			err error
@@ -464,7 +464,10 @@ func (p *XPod) saveSandbox() error {
 		defer p.statusLock.RUnlock()
 		if !stop_status[p.status] {
 			sb.Id = p.sandbox.ID()
-			sb.PersistInfo, err = p.sandbox.Dump()
+			/*By now the sandbox info had been managed by kata, thus there is no need
+			*to keep those info here.
+			*/
+			sb.PersistInfo = nil
 			if err != nil {
 				hlog.HLog(ERROR, p, 2, "failed to dump sandbox %s: %v", sb.Id, err)
 				return err
@@ -472,7 +475,7 @@ func (p *XPod) saveSandbox() error {
 			return saveMessage(p.factory.db, fmt.Sprintf(SB_KEY_FMT, p.Id()), &sb, p, "sandbox info")
 
 		}
-	*/
+
 	return nil
 }
 
