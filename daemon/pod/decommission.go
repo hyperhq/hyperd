@@ -177,7 +177,7 @@ func (p *XPod) KillContainer(id string, sig int64) error {
 	c.setKill()
 	return p.protectedSandboxOperation(
 		func(sb *vc.Sandbox) error {
-			return vc.KillContainer(sb.ID(), id, syscall.Signal(sig), true)
+			return sb.SignalProcess(id, id, syscall.Signal(sig), true)
 		},
 		time.Second*5,
 		fmt.Sprintf("Kill container %s with %d", id, sig))
@@ -531,9 +531,14 @@ func (p *XPod) waitVMStop() {
 	}
 	p.statusLock.RUnlock()
 
-	monitor, _ := p.sandbox.Monitor()
-	_ = <-monitor
-	p.Log(INFO, "got vm exit event")
+	monitor, err := p.sandbox.Monitor()
+	if err != nil {
+		p.Log(INFO, "cannot monitor the vm, %v", err)
+	} else {
+		_ = <-monitor
+		p.Log(INFO, "got vm exit event")
+	}
+
 	p.cleanup()
 }
 
