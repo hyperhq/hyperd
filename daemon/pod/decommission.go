@@ -275,7 +275,9 @@ func (p *XPod) RemoveContainer(id string) error {
 		return err
 	}
 	p.factory.registry.ReleaseContainer(id, c.SpecName())
+	p.statusLock.Lock()
 	delete(p.containers, id)
+	p.statusLock.Unlock()
 
 	//remove volumes from daemondb
 	for _, vName := range removedVols {

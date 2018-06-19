@@ -142,7 +142,9 @@ func (p *XPod) doContainerCreate(c *apitypes.UserContainer) (string, error) {
 		return "", err
 	}
 
+	p.statusLock.Lock()
 	p.containers[pc.Id()] = pc
+	p.statusLock.Unlock()
 
 	vols := pc.volumes()
 	nvs := make([]string, 0, len(vols))
@@ -151,7 +153,9 @@ func (p *XPod) doContainerCreate(c *apitypes.UserContainer) (string, error) {
 			pc.Log(TRACE, "volume %s has already been included, don't need to be inserted again", vol.Name)
 			continue
 		}
+		p.statusLock.Lock()
 		p.volumes[vol.Name] = newVolume(p, vol)
+		p.statusLock.Unlock()
 		nvs = append(nvs, vol.Name)
 	}
 	pc.Log(TRACE, "volumes to be added: %v", nvs)
@@ -365,14 +369,18 @@ func (p *XPod) initResources(spec *apitypes.UserPod, allowCreate bool) error {
 		if err != nil {
 			return err
 		}
+		p.statusLock.Lock()
 		p.containers[c.Id()] = c
+		p.statusLock.Unlock()
 
 		vols := c.volumes()
 		for _, vol := range vols {
 			if _, ok := p.volumes[vol.Name]; ok {
 				continue
 			}
+			p.statusLock.Lock()
 			p.volumes[vol.Name] = newVolume(p, vol)
+			p.statusLock.Unlock()
 		}
 	}
 

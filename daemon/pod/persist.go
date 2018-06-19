@@ -125,9 +125,11 @@ func LoadXPod(factory *PodFactory, layout *types.PersistPodLayout) (*XPod, error
 
 	// if sandbox is running, set all volume INSERTED
 	if p.status == S_POD_RUNNING {
+		p.statusLock.Lock()
 		for _, v := range p.volumes {
 			v.status = S_VOLUME_INSERTED
 		}
+		p.statusLock.Unlock()
 	}
 
 	err = p.loadPodMeta()
@@ -375,7 +377,9 @@ func (p *XPod) loadContainer(id string) error {
 		p.Log(ERROR, "failed to register name of container %s (%s) during load", c.Id(), c.SpecName(), err)
 		return err
 	}
+	p.statusLock.Lock()
 	p.containers[c.Id()] = c
+	p.statusLock.Unlock()
 	return nil
 }
 
@@ -402,7 +406,9 @@ func (p *XPod) loadVolume(id string) error {
 	v := newVolume(p, vx.Spec)
 	v.descript = vx.Descript
 	v.status = S_VOLUME_CREATED
+	p.statusLock.Lock()
 	p.volumes[v.spec.Name] = v
+	p.statusLock.Unlock()
 	return nil
 }
 
