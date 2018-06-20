@@ -535,10 +535,14 @@ func (p *XPod) waitVMStop() {
 	if err != nil {
 		p.Log(INFO, "cannot monitor the vm, %v", err)
 	} else {
-		_ = <-monitor
-		p.Log(INFO, "got vm exit event")
+		ret, ok := <-monitor
+		/*get the sandbox released notification, thus it doesn't need to do cleanup*/
+                if ! ok {
+                        p.Log(INFO, "got vm disassociate event")
+                        return
+                }
+		p.Log(INFO, "got vm exit event: %v", ret)
 	}
-
 	p.cleanup()
 }
 
