@@ -943,6 +943,32 @@ func (c *Container) addToSandbox() error {
 	return nil
 }
 
+func (c *Container) associateToSandbox() error {
+	c.Log(DEBUG, "try to associate container %s to sandbox", c.Id())
+
+	containerStatus, err := c.p.sandbox.StatusContainer(c.Id())
+	if err != nil {
+		c.Log(ERROR, err)
+		return err
+	}
+
+	switch containerStatus.State.State {
+	case vc.StateRunning:
+		c.status.State = S_CONTAINER_RUNNING
+		c.status.StartedAt = containerStatus.StartTime
+
+	default:
+		c.status.State = S_CONTAINER_CREATED
+		c.status.CreatedAt = time.Now()
+	}
+
+	go c.waitFinish(-1)
+
+	c.startLogging()
+
+	return nil
+}
+
 // This method should be called when initialzing container or put into resource lock.
 func (c *Container) initStreams() error {
 	if c.streams != nil {
