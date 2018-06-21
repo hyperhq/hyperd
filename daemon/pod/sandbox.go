@@ -72,7 +72,8 @@ func startSandbox(spec *apitypes.UserPod, kernel, initrd string) (sandbox *vc.Sa
 		ShimType:   defaultShim,
 		ShimConfig: vc.ShimConfig{},
 
-		SharePidNs: true,
+		//there is a bug in kata-agent, thus set it false temporarily
+		SharePidNs: false,
 
 		//		NetworkModel:  vc.CNMNetworkModel,
 		//		NetworkConfig: vc.NetworkConfig{},
