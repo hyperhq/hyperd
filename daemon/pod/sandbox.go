@@ -72,6 +72,8 @@ func startSandbox(spec *apitypes.UserPod, kernel, initrd string) (sandbox *vc.Sa
 		ShimType:   defaultShim,
 		ShimConfig: vc.ShimConfig{},
 
+		SharePidNs: true,
+
 		//		NetworkModel:  vc.CNMNetworkModel,
 		//		NetworkConfig: vc.NetworkConfig{},
 	}
