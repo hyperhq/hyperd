@@ -2152,6 +2152,10 @@
                         "path": "github.com/kata-containers/runtime/virtcontainers",
                         "revision": "fca7eb822d29380502f38296b71b6e969253c4ee"
                 }
+		{
+                        "path": "github.com/kata-containers/agent/protocols/grpc",
+                        "revision": "7de74f37cd1e015b2735e7f80d01289fa30d450d"
+                }
 	],
 	"rootPath": "github.com/hyperhq/hyperd"
 }
