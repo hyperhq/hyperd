@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 
 	criContainerdAnnotations "github.com/containerd/cri-containerd/pkg/annotations"
 	crioAnnotations "github.com/kubernetes-incubator/cri-o/pkg/annotations"
@@ -65,6 +66,9 @@ const (
 
 	// StateStopped represents a container that has been stopped.
 	StateStopped = "stopped"
+
+	// StatePaused represents a container that has been paused.
+	StatePaused = "paused"
 )
 
 // CompatOCIProcess is a structure inheriting from spec.Process defined
@@ -320,6 +324,14 @@ func containerCapabilities(s CompatOCISpec) (vc.LinuxCapabilities, error) {
 	return c, nil
 }
 
+// ContainerCapabilities return a LinuxCapabilities for virtcontainer
+func ContainerCapabilities(s CompatOCISpec) (vc.LinuxCapabilities, error) {
+	if s.Process == nil {
+		return vc.LinuxCapabilities{}, fmt.Errorf("ContainerCapabilities, Process is nil")
+	}
+	return containerCapabilities(s)
+}
+
 func networkConfig(ocispec CompatOCISpec, config RuntimeConfig) (vc.NetworkConfig, error) {
 	linux := ocispec.Linux
 	if linux == nil {
@@ -365,6 +377,11 @@ func ParseConfigJSON(bundlePath string) (CompatOCISpec, error) {
 	if err := json.Unmarshal(configByte, &ocispec); err != nil {
 		return CompatOCISpec{}, err
 	}
+	caps, err := ContainerCapabilities(ocispec)
+	if err != nil {
+		return CompatOCISpec{}, err
+	}
+	ocispec.Process.Capabilities = caps
 
 	return ocispec, nil
 }
@@ -465,6 +482,11 @@ func SandboxConfig(ocispec CompatOCISpec, runtime RuntimeConfig, bundlePath, cid
 		return vc.SandboxConfig{}, err
 	}
 
+	shmSize, err := getShmSize(containerConfig)
+	if err != nil {
+		return vc.SandboxConfig{}, err
+	}
+
 	networkConfig, err := networkConfig(ocispec, runtime)
 	if err != nil {
 		return vc.SandboxConfig{}, err
@@ -510,6 +532,8 @@ func SandboxConfig(ocispec CompatOCISpec, runtime RuntimeConfig, bundlePath, cid
 			vcAnnotations.ConfigJSONKey: string(ociSpecJSON),
 			vcAnnotations.BundlePathKey: bundlePath,
 		},
+
+		ShmSize: shmSize,
 	}
 
 	addAssetAnnotations(ocispec, &sandboxConfig)
@@ -554,9 +578,12 @@ func ContainerConfig(ocispec CompatOCISpec, bundlePath, cid, console string, det
 		return vc.ContainerConfig{}, err
 	}
 
-	cmd.Capabilities, err = containerCapabilities(ocispec)
-	if err != nil {
-		return vc.ContainerConfig{}, err
+	if ocispec.Process != nil {
+		caps, ok := ocispec.Process.Capabilities.(vc.LinuxCapabilities)
+		if !ok {
+			return vc.ContainerConfig{}, fmt.Errorf("Unexpected format for capabilities: %v", ocispec.Process.Capabilities)
+		}
+		cmd.Capabilities = caps
 	}
 
 	var resources vc.ContainerResources
@@ -591,6 +618,32 @@ func ContainerConfig(ocispec CompatOCISpec, bundlePath, cid, console string, det
 	return containerConfig, nil
 }
 
+func getShmSize(c vc.ContainerConfig) (uint64, error) {
+	var shmSize uint64
+
+	for _, m := range c.Mounts {
+		if m.Destination != "/dev/shm" {
+			continue
+		}
+
+		shmSize = vc.DefaultShmSize
+
+		if m.Type == "bind" && m.Source != "/dev/shm" {
+			var s syscall.Statfs_t
+
+			if err := syscall.Statfs(m.Source, &s); err != nil {
+				return 0, err
+			}
+			shmSize = uint64(s.Bsize) * s.Blocks
+		}
+		break
+	}
+
+	ociLog.Infof("shm-size detected: %d", shmSize)
+
+	return shmSize, nil
+}
+
 // StatusToOCIState translates a virtcontainers container status into an OCI state.
 func StatusToOCIState(status vc.ContainerStatus) spec.State {
 	return spec.State{
@@ -612,6 +665,8 @@ func StateToOCIState(state vc.State) string {
 		return StateRunning
 	case vc.StateStopped:
 		return StateStopped
+	case vc.StatePaused:
+		return StatePaused
 	default:
 		return ""
 	}

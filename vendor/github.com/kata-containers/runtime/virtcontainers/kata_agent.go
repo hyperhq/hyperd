@@ -42,12 +42,15 @@ var (
 	kataHostSharedDir     = "/run/kata-containers/shared/sandboxes/"
 	kataGuestSharedDir    = "/run/kata-containers/shared/containers/"
 	mountGuest9pTag       = "kataShared"
+	kataGuestSandboxDir   = "/run/kata-containers/sandbox/"
 	type9pFs              = "9p"
 	vsockSocketScheme     = "vsock"
 	kata9pDevType         = "9p"
 	kataBlkDevType        = "blk"
 	kataSCSIDevType       = "scsi"
 	sharedDir9pOptions    = []string{"trans=virtio,version=9p2000.L", "nodev"}
+	shmDir                = "shm"
+	kataEphemeralDevType  = "ephemeral"
 )
 
 // KataAgentConfig is a structure storing information needed
@@ -505,10 +508,27 @@ func (k *kataAgent) startSandbox(sandbox *Sandbox) error {
 		Options:    sharedDir9pOptions,
 	}
 
+	storages := []*grpc.Storage{sharedVolume}
+
+	if sandbox.shmSize > 0 {
+		path := filepath.Join(kataGuestSandboxDir, shmDir)
+		shmSizeOption := fmt.Sprintf("size=%d", sandbox.shmSize)
+
+		shmStorage := &grpc.Storage{
+			Driver:     kataEphemeralDevType,
+			MountPoint: path,
+			Source:     "shm",
+			Fstype:     "tmpfs",
+			Options:    []string{"noexec", "nosuid", "nodev", "mode=1777", shmSizeOption},
+		}
+
+		storages = append(storages, shmStorage)
+	}
+
 	req := &grpc.CreateSandboxRequest{
 		Hostname:     hostname,
-		Storages:     []*grpc.Storage{sharedVolume},
-		SandboxPidns: false,
+		Storages:     storages,
+		SandboxPidns: sandbox.sharePidNs,
 	}
 
 	_, err = k.sendReq(req)
@@ -527,6 +547,10 @@ func (k *kataAgent) stopSandbox(sandbox *Sandbox) error {
 	}
 
 	return k.proxy.stop(sandbox, k.state.ProxyPid)
+}
+
+func (k *kataAgent) cleanupSandbox(sandbox *Sandbox) error {
+	return os.RemoveAll(filepath.Join(kataHostSharedDir, sandbox.id))
 }
 
 func (k *kataAgent) replaceOCIMountSource(spec *specs.Spec, guestMounts []Mount) error {
@@ -612,13 +636,25 @@ func constraintGRPCSpec(grpcSpec *grpc.Spec) {
 		}
 	}
 	grpcSpec.Linux.Namespaces = tmpNamespaces
+}
 
-	// Handle /dev/shm mount
+func (k *kataAgent) handleShm(grpcSpec *grpc.Spec, sandbox *Sandbox) {
 	for idx, mnt := range grpcSpec.Mounts {
-		if mnt.Destination == "/dev/shm" {
+		if mnt.Destination != "/dev/shm" {
+			continue
+		}
+
+		if sandbox.shmSize > 0 {
+			grpcSpec.Mounts[idx].Type = "bind"
+			grpcSpec.Mounts[idx].Options = []string{"rbind"}
+			grpcSpec.Mounts[idx].Source = filepath.Join(kataGuestSandboxDir, shmDir)
+			k.Logger().WithField("shm-size", sandbox.shmSize).Info("Using sandbox shm")
+		} else {
+			sizeOption := fmt.Sprintf("size=%d", DefaultShmSize)
 			grpcSpec.Mounts[idx].Type = "tmpfs"
 			grpcSpec.Mounts[idx].Source = "shm"
-			grpcSpec.Mounts[idx].Options = []string{"noexec", "nosuid", "nodev", "mode=1777", "size=65536k"}
+			grpcSpec.Mounts[idx].Options = []string{"noexec", "nosuid", "nodev", "mode=1777", sizeOption}
+			k.Logger().WithField("shm-size", sizeOption).Info("Setting up a separate shm for container")
 		}
 	}
 }
@@ -777,16 +813,24 @@ func (k *kataAgent) createContainer(sandbox *Sandbox, c *Container) (p *Process,
 	// We need to give the OCI spec our absolute rootfs path in the guest.
 	grpcSpec.Root.Path = rootPath
 
+	sharedPidNs, err := k.handlePidNamespace(grpcSpec, sandbox)
+	if err != nil {
+		return nil, err
+	}
+
 	// We need to constraint the spec to make sure we're not passing
 	// irrelevant information to the agent.
 	constraintGRPCSpec(grpcSpec)
 
+	k.handleShm(grpcSpec, sandbox)
+
 	req := &grpc.CreateContainerRequest{
-		ContainerId: c.id,
-		ExecId:      c.id,
-		Storages:    ctrStorages,
-		Devices:     ctrDevices,
-		OCI:         grpcSpec,
+		ContainerId:  c.id,
+		ExecId:       c.id,
+		Storages:     ctrStorages,
+		Devices:      ctrDevices,
+		OCI:          grpcSpec,
+		SandboxPidns: sharedPidNs,
 	}
 
 	if _, err = k.sendReq(req); err != nil {
@@ -843,6 +887,52 @@ func (k *kataAgent) handleBlockVolumes(c *Container) []*grpc.Storage {
 	return volumeStorages
 }
 
+// handlePidNamespace checks if Pid namespace for a container needs to be shared with its sandbox
+// pid namespace. This function also modifies the grpc spec to remove the pid namespace
+// from the list of namespaces passed to the agent.
+func (k *kataAgent) handlePidNamespace(grpcSpec *grpc.Spec, sandbox *Sandbox) (bool, error) {
+	sharedPidNs := false
+	pidIndex := -1
+
+	for i, ns := range grpcSpec.Linux.Namespaces {
+		if ns.Type != string(specs.PIDNamespace) {
+			continue
+		}
+
+		pidIndex = i
+
+		if ns.Path == "" || sandbox.state.Pid == 0 {
+			break
+		}
+
+		pidNsPath := fmt.Sprintf("/proc/%d/ns/pid", sandbox.state.Pid)
+
+		//  Check if pid namespace path is the same as the sandbox
+		if ns.Path == pidNsPath {
+			sharedPidNs = true
+		} else {
+			ln, err := filepath.EvalSymlinks(ns.Path)
+			if err != nil {
+				return sharedPidNs, err
+			}
+
+			// We have arbitrary pid namespace path here.
+			if ln != pidNsPath {
+				return sharedPidNs, fmt.Errorf("Pid namespace path %s other than sandbox %s", ln, pidNsPath)
+			}
+			sharedPidNs = true
+		}
+
+		break
+	}
+
+	// Remove pid namespace.
+	if pidIndex >= 0 {
+		grpcSpec.Linux.Namespaces = append(grpcSpec.Linux.Namespaces[:pidIndex], grpcSpec.Linux.Namespaces[pidIndex+1:]...)
+	}
+	return sharedPidNs, nil
+}
+
 func (k *kataAgent) startContainer(sandbox *Sandbox, c *Container) error {
 	req := &grpc.StartContainerRequest{
 		ContainerId: c.id,
@@ -865,7 +955,14 @@ func (k *kataAgent) stopContainer(sandbox *Sandbox, c Container) error {
 		return err
 	}
 
-	return bindUnmountContainerRootfs(kataHostSharedDir, sandbox.id, c.id)
+	if err := bindUnmountContainerRootfs(kataHostSharedDir, sandbox.id, c.id); err != nil {
+		return err
+	}
+
+	// since rootfs is umounted it's safe to remove the dir now
+	rootPathParent := filepath.Join(kataHostSharedDir, sandbox.id, c.id)
+
+	return os.RemoveAll(rootPathParent)
 }
 
 func (k *kataAgent) signalProcess(c *Container, processID string, signal syscall.Signal, all bool) error {
@@ -928,6 +1025,24 @@ func (k *kataAgent) updateContainer(sandbox *Sandbox, c Container, resources spe
 	}
 
 	_, err = k.sendReq(req)
+	return err
+}
+
+func (k *kataAgent) pauseContainer(sandbox *Sandbox, c Container) error {
+	req := &grpc.PauseContainerRequest{
+		ContainerId: c.id,
+	}
+
+	_, err := k.sendReq(req)
+	return err
+}
+
+func (k *kataAgent) resumeContainer(sandbox *Sandbox, c Container) error {
+	req := &grpc.ResumeContainerRequest{
+		ContainerId: c.id,
+	}
+
+	_, err := k.sendReq(req)
 	return err
 }
 
@@ -1103,6 +1218,12 @@ func (k *kataAgent) installReqFunc(c *kataclient.AgentClient) {
 	}
 	k.reqHandlers["grpc.StatsContainerRequest"] = func(ctx context.Context, req interface{}, opts ...golangGrpc.CallOption) (interface{}, error) {
 		return k.client.StatsContainer(ctx, req.(*grpc.StatsContainerRequest), opts...)
+	}
+	k.reqHandlers["grpc.PauseContainerRequest"] = func(ctx context.Context, req interface{}, opts ...golangGrpc.CallOption) (interface{}, error) {
+		return k.client.PauseContainer(ctx, req.(*grpc.PauseContainerRequest), opts...)
+	}
+	k.reqHandlers["grpc.ResumeContainerRequest"] = func(ctx context.Context, req interface{}, opts ...golangGrpc.CallOption) (interface{}, error) {
+		return k.client.ResumeContainer(ctx, req.(*grpc.ResumeContainerRequest), opts...)
 	}
 }
 

@@ -152,6 +152,9 @@ type agent interface {
 	// stopSandbox will tell the agent to stop all containers related to the Sandbox.
 	stopSandbox(sandbox *Sandbox) error
 
+	// cleanup will clean the resources for sandbox
+	cleanupSandbox(sandbox *Sandbox) error
+
 	// createContainer will tell the agent to create a container related to a Sandbox.
 	createContainer(sandbox *Sandbox, c *Container) (*Process, error)
 
@@ -197,4 +200,10 @@ type agent interface {
 
 	// statsContainer will tell the agent to get stats from a container related to a Sandbox
 	statsContainer(sandbox *Sandbox, c Container) (*ContainerStats, error)
+
+	// pauseContainer will pause a container
+	pauseContainer(sandbox *Sandbox, c Container) error
+
+	// resumeContainer will resume a paused container
+	resumeContainer(sandbox *Sandbox, c Container) error
 }

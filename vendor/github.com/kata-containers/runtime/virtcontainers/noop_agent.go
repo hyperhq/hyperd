@@ -51,6 +51,11 @@ func (n *noopAgent) stopSandbox(sandbox *Sandbox) error {
 	return nil
 }
 
+// cleanup is the Noop agent clean up resource implementation. It does nothing.
+func (n *noopAgent) cleanupSandbox(sandbox *Sandbox) error {
+	return nil
+}
+
 // createContainer is the Noop agent Container creation implementation. It does nothing.
 func (n *noopAgent) createContainer(sandbox *Sandbox, c *Container) (*Process, error) {
 	return &Process{}, nil
@@ -124,4 +129,14 @@ func (n *noopAgent) readProcessStdout(c *Container, processID string, data []byt
 // readProcessStderr is the Noop agent process stderr reader. It does nothing.
 func (n *noopAgent) readProcessStderr(c *Container, processID string, data []byte) (int, error) {
 	return 0, nil
+}
+
+// pauseContainer is the Noop agent Container pause implementation. It does nothing.
+func (n *noopAgent) pauseContainer(sandbox *Sandbox, c Container) error {
+	return nil
+}
+
+// resumeContainer is the Noop agent Container resume implementation. It does nothing.
+func (n *noopAgent) resumeContainer(sandbox *Sandbox, c Container) error {
+	return nil
 }
