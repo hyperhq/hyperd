@@ -49,10 +49,11 @@ func (p *XPod) ForceQuit() {
 }
 
 func (p *XPod) Remove(force bool) error {
+	var err error
 
 	if p.IsRunning() {
 		if !force {
-			err := fmt.Errorf("pod is running, cannot be removed")
+			err = fmt.Errorf("pod is running, cannot be removed")
 			p.Log(ERROR, err)
 			return err
 		}
@@ -622,6 +623,11 @@ func (p *XPod) decommissionResources() (err error) {
 			err = ei
 			n.Log(ERROR, err)
 		}
+	}
+
+	err = p.sandbox.Delete()
+	if err != nil {
+		p.Log(ERROR, "remove sandbox failed: %v", err)
 	}
 
 	p.sandbox = nil
