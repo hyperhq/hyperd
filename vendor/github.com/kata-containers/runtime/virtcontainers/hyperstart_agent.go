@@ -340,8 +340,11 @@ func (h *hyper) exec(sandbox *Sandbox, c Container, cmd Cmd) (*Process, error) {
 	return process, nil
 }
 
-// startSandbox is the agent Sandbox starting implementation for hyperstart.
-func (h *hyper) startSandbox(sandbox *Sandbox) error {
+func (h *hyper) getProxy() proxy {
+	return h.proxy
+}
+
+func (h *hyper) startProxy(sandbox *Sandbox) error {
 	// Start the proxy here
 	pid, uri, err := h.proxy.start(sandbox, proxyParams{})
 	if err != nil {
@@ -356,6 +359,17 @@ func (h *hyper) startSandbox(sandbox *Sandbox) error {
 	}
 
 	h.Logger().WithField("proxy-pid", pid).Info("proxy started")
+
+	return nil
+}
+
+// startSandbox is the agent Sandbox starting implementation for hyperstart.
+func (h *hyper) startSandbox(sandbox *Sandbox) error {
+
+	err := h.startProxy(sandbox)
+	if err != nil {
+		return err
+	}
 
 	if err := h.register(); err != nil {
 		return err

@@ -6,6 +6,7 @@
 package virtcontainers
 
 import (
+	"errors"
 	"os"
 	"runtime"
 	"syscall"
@@ -110,7 +111,34 @@ func FetchSandbox(sandboxID string) (VCSandbox, error) {
 	defer unlockSandbox(lockFile)
 
 	// Fetch the sandbox from storage and create it.
-	return fetchSandbox(sandboxID)
+	sandbox, err := fetchSandbox(sandboxID)
+	if err != nil {
+		return nil, err
+	}
+
+	/* If the proxy is KataBuiltInProxyType type, it needs to restart the proxy to watch the
+	* guest console if it hadn't been watched.
+	 */
+	proxyType, err := sandbox.getProxyType()
+	if err != nil {
+		return nil, err
+	}
+
+	if proxyType == KataBuiltInProxyType {
+		if sandbox.agent == nil {
+			return nil, errors.New("Missing agent pointer")
+		}
+
+		proxy := sandbox.agent.getProxy()
+		if !proxy.consoleWatched() {
+			err := sandbox.agent.startProxy(sandbox)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	return sandbox, nil
 }
 
 // StartSandbox is the virtcontainers sandbox starting entry point.

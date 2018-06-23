@@ -17,6 +17,11 @@ import (
 type kataProxy struct {
 }
 
+// The kata proxy doesn't need to watch the vm console, thus return true always.
+func (p *kataProxy) consoleWatched() bool {
+	return true
+}
+
 // start is kataProxy start implementation for proxy interface.
 func (p *kataProxy) start(sandbox *Sandbox, params proxyParams) (int, string, error) {
 	if sandbox.agent == nil {

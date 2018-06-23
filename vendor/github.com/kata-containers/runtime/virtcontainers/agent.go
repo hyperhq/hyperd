@@ -140,6 +140,12 @@ type agent interface {
 	// disconnect will disconnect the connection to the agent
 	disconnect() error
 
+	// get the proxy
+	getProxy() proxy
+
+	// start the proxy
+	startProxy(sandbox *Sandbox) error
+
 	// createSandbox will tell the agent to perform necessary setup for a Sandbox.
 	createSandbox(sandbox *Sandbox) error
 

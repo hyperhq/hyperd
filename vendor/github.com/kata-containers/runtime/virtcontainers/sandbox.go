@@ -352,6 +352,14 @@ type SandboxConfig struct {
 	SharePidNs bool
 }
 
+func (sandbox *Sandbox) getProxyType() (ProxyType, error) {
+	if sandbox.config == nil {
+		return "", fmt.Errorf("Sandbox %s config pointer is nil", sandbox.ID())
+	}
+
+	return sandbox.config.ProxyType, nil
+}
+
 // valid checks that the sandbox configuration is valid.
 func (sandboxConfig *SandboxConfig) valid() bool {
 	if sandboxConfig.ID == "" {
