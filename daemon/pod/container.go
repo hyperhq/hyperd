@@ -135,7 +135,9 @@ func (c *Container) CreatedAt() time.Time {
 	return ct
 }
 
-func (c *Container) InfoLocked() *apitypes.Container {
+func (c *Container) Info() *apitypes.Container {
+	c.status.RLock()
+	defer c.status.RUnlock()
 	cinfo := &apitypes.Container{
 		Name:            c.RuntimeName(),
 		ContainerID:     c.Id(),
@@ -186,13 +188,9 @@ func (c *Container) InfoLocked() *apitypes.Container {
 	return cinfo
 }
 
-func (c *Container) Info() *apitypes.Container {
+func (c *Container) InfoStatus() *apitypes.ContainerStatus {
 	c.status.RLock()
 	defer c.status.RUnlock()
-	return c.InfoLocked()
-}
-
-func (c *Container) InfoStatusLocked() *apitypes.ContainerStatus {
 	s := &apitypes.ContainerStatus{
 		Name:        c.SpecName(),
 		ContainerID: c.Id(),
@@ -226,12 +224,6 @@ func (c *Container) InfoStatusLocked() *apitypes.ContainerStatus {
 	}
 	c.Log(DEBUG, "retrive info %#v from status %#v", s, c.status)
 	return s
-}
-
-func (c *Container) InfoStatus() *apitypes.ContainerStatus {
-	c.status.RLock()
-	defer c.status.RUnlock()
-	return c.InfoStatusLocked()
 }
 
 // Container life cycle operations:

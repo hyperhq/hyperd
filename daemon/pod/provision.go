@@ -87,22 +87,20 @@ func newXPod(factory *PodFactory, spec *apitypes.UserPod) (*XPod, error) {
 	factory.hosts = HostsCreator(spec.Id)
 	factory.logCreator = initLogCreator(factory, spec)
 	p := &XPod{
-		name:           spec.Id,
-		logPrefix:      fmt.Sprintf("Pod[%s] ", spec.Id),
-		globalSpec:     spec.CloneGlobalPart(),
-		containers:     make(map[string]*Container),
-		volumes:        make(map[string]*Volume),
-		interfaces:     make(map[string]*Interface),
-		portMappings:   spec.Portmappings,
-		labels:         spec.Labels,
-		prestartExecs:  [][]string{},
-		execs:          make(map[string]*Exec),
-		resourceLock:   &sync.Mutex{},
-		statusLock:     &sync.RWMutex{},
-		stoppedChan:    make(chan bool, 1),
-		factory:        factory,
-		snapVolumes:    make(map[string]*apitypes.PodVolume),
-		snapContainers: make(map[string]*Container),
+		name:          spec.Id,
+		logPrefix:     fmt.Sprintf("Pod[%s] ", spec.Id),
+		globalSpec:    spec.CloneGlobalPart(),
+		containers:    make(map[string]*Container),
+		volumes:       make(map[string]*Volume),
+		interfaces:    make(map[string]*Interface),
+		portMappings:  spec.Portmappings,
+		labels:        spec.Labels,
+		prestartExecs: [][]string{},
+		execs:         make(map[string]*Exec),
+		resourceLock:  &sync.Mutex{},
+		statusLock:    &sync.RWMutex{},
+		stoppedChan:   make(chan bool, 1),
+		factory:       factory,
 	}
 	p.initCond = sync.NewCond(p.statusLock.RLocker())
 	return p, nil
@@ -144,9 +142,8 @@ func (p *XPod) doContainerCreate(c *apitypes.UserContainer) (string, error) {
 		return "", err
 	}
 
-	p.containers[pc.Id()] = pc
 	p.statusLock.Lock()
-	p.snapContainers[pc.Id()] = pc
+	p.containers[pc.Id()] = pc
 	p.statusLock.Unlock()
 
 	vols := pc.volumes()
@@ -156,9 +153,8 @@ func (p *XPod) doContainerCreate(c *apitypes.UserContainer) (string, error) {
 			pc.Log(TRACE, "volume %s has already been included, don't need to be inserted again", vol.Name)
 			continue
 		}
-		p.volumes[vol.Name] = newVolume(p, vol)
 		p.statusLock.Lock()
-		p.snapVolumes[vol.Name] = p.volumes[vol.Name].Info()
+		p.volumes[vol.Name] = newVolume(p, vol)
 		p.statusLock.Unlock()
 		nvs = append(nvs, vol.Name)
 	}
@@ -373,9 +369,8 @@ func (p *XPod) initResources(spec *apitypes.UserPod, allowCreate bool) error {
 		if err != nil {
 			return err
 		}
-		p.containers[c.Id()] = c
 		p.statusLock.Lock()
-		p.snapContainers[c.Id()] = c
+		p.containers[c.Id()] = c
 		p.statusLock.Unlock()
 
 		vols := c.volumes()
@@ -383,9 +378,8 @@ func (p *XPod) initResources(spec *apitypes.UserPod, allowCreate bool) error {
 			if _, ok := p.volumes[vol.Name]; ok {
 				continue
 			}
-			p.volumes[vol.Name] = newVolume(p, vol)
 			p.statusLock.Lock()
-			p.snapVolumes[vol.Name] = p.volumes[vol.Name].Info()
+			p.volumes[vol.Name] = newVolume(p, vol)
 			p.statusLock.Unlock()
 		}
 	}
