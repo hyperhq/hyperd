@@ -356,10 +356,10 @@ func (p *XPod) removePortMappingFromDB() error {
 
 func (c *Container) saveContainer() error {
 	cx := &types.PersistContainer{
-		Id:         c.Id(),
-		Pod:        c.p.Id(),
-		Spec:       c.spec,
-		ContConfig: c.contConfig,
+		Id:   c.Id(),
+		Pod:  c.p.Id(),
+		Spec: c.spec,
+		//		ContConfig: c.contConfig,
 	}
 	return saveMessage(c.p.factory.db, fmt.Sprintf(CX_KEY_FMT, c.Id()), cx, c, "container info")
 }
