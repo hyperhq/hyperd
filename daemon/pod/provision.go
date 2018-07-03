@@ -274,7 +274,6 @@ func (p *XPod) createSandbox(spec *apitypes.UserPod) error {
 
 func (p *XPod) reconnectSandbox(sandboxId string, pinfo []byte) error {
 	var (
-		sandbox   *vc.Sandbox
 		vcsandbox vc.VCSandbox
 		err       error
 	)
@@ -283,18 +282,17 @@ func (p *XPod) reconnectSandbox(sandboxId string, pinfo []byte) error {
 		vcsandbox, err = vc.FetchSandbox(sandboxId)
 		if err != nil {
 			p.Log(ERROR, err)
-			sandbox = nil
+			vcsandbox = nil
 		}
 	}
 
-	sandbox, _ = vcsandbox.(*vc.Sandbox)
-	if sandbox == nil {
+	if vcsandbox == nil {
 		p.status = S_POD_STOPPED
 		return err
 	}
 
 	p.status = S_POD_RUNNING
-	p.sandbox = sandbox
+	p.sandbox = vcsandbox
 	go p.waitVMStop()
 	return nil
 }

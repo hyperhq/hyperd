@@ -23,7 +23,7 @@ const (
 	MaxVCPUs        = 4
 )
 
-func startSandbox(spec *apitypes.UserPod, kernel, initrd string) (sandbox *vc.Sandbox, err error) {
+func startSandbox(spec *apitypes.UserPod, kernel, initrd string) (sandbox vc.VCSandbox, err error) {
 	var (
 		DEFAULT_CPU = 1
 		DEFAULT_MEM = 128
@@ -79,15 +79,15 @@ func startSandbox(spec *apitypes.UserPod, kernel, initrd string) (sandbox *vc.Sa
 		//		NetworkConfig: vc.NetworkConfig{},
 	}
 	vcsandbox, err := vc.RunSandbox(sandboxConfig)
-	sandbox, _ = vcsandbox.(*vc.Sandbox)
 	if err != nil {
 		hlog.Log(ERROR, "failed to create a sandbox")
+		return nil, err
 	}
 
-	return sandbox, err
+	return vcsandbox, err
 }
 
-func dissociateSandbox(sandbox *vc.Sandbox, retry int) error {
+func dissociateSandbox(sandbox vc.VCSandbox, retry int) error {
 	if sandbox == nil {
 		return nil
 	}

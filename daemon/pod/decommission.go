@@ -13,7 +13,7 @@ import (
 	vc "github.com/kata-containers/runtime/virtcontainers"
 )
 
-type sandboxOp func(sb *vc.Sandbox) error
+type sandboxOp func(sb vc.VCSandbox) error
 type stateValidator func(state PodState) bool
 
 func (p *XPod) DelayDeleteOn() bool {
@@ -37,7 +37,7 @@ func (p *XPod) Stop(graceful int) error {
 
 func (p *XPod) ForceQuit() {
 	err := p.protectedSandboxOperation(
-		func(sb *vc.Sandbox) error {
+		func(sb vc.VCSandbox) error {
 			_, err := vc.StopSandbox(sb.ID())
 			return err
 		},
@@ -119,7 +119,7 @@ func (p *XPod) Pause() error {
 	p.statusLock.Unlock()
 
 	err := p.protectedSandboxOperation(
-		func(sb *vc.Sandbox) error {
+		func(sb vc.VCSandbox) error {
 			return sb.Pause()
 		},
 		time.Second*5,
@@ -149,7 +149,7 @@ func (p *XPod) UnPause() error {
 	p.statusLock.Unlock()
 
 	err := p.protectedSandboxOperation(
-		func(sb *vc.Sandbox) error {
+		func(sb vc.VCSandbox) error {
 			return sb.Pause()
 		},
 		time.Second*5,
@@ -177,7 +177,7 @@ func (p *XPod) KillContainer(id string, sig int64) error {
 	}
 	c.setKill()
 	return p.protectedSandboxOperation(
-		func(sb *vc.Sandbox) error {
+		func(sb vc.VCSandbox) error {
 			return sb.SignalProcess(id, id, syscall.Signal(sig), true)
 		},
 		time.Second*5,
@@ -308,7 +308,7 @@ func (p *XPod) RemoveContainer(id string) error {
 // protectedSandboxOperation() protect the hypervisor operations, which may
 // panic or hang too long time.
 func (p *XPod) protectedSandboxOperation(op sandboxOp, timeout time.Duration, comment string) error {
-	dangerousOp := func(sb *vc.Sandbox, errChan chan<- error) {
+	dangerousOp := func(sb vc.VCSandbox, errChan chan<- error) {
 		defer func() {
 			err := recover()
 			if err != nil {

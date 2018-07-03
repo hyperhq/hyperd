@@ -63,7 +63,7 @@ type XPod struct {
 
 	prestartExecs [][]string
 
-	sandbox *vc.Sandbox
+	sandbox vc.VCSandbox
 	factory *PodFactory
 
 	info       *apitypes.PodInfo
@@ -307,7 +307,7 @@ func (p *XPod) Stats() *vc.SandboxStatus {
 	if p.sandbox == nil {
 		ch <- nil
 	} else {
-		go func(sb *vc.Sandbox) {
+		go func(sb vc.VCSandbox) {
 			status = sb.Status()
 			ch <- &status
 		}(p.sandbox)

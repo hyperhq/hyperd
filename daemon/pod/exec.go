@@ -212,7 +212,7 @@ func (p *XPod) KillExec(execId string, sig int64) error {
 	}
 
 	return p.protectedSandboxOperation(
-		func(sb *vc.Sandbox) error {
+		func(sb vc.VCSandbox) error {
 			return sb.SignalProcess(es.Container, es.Id, syscall.Signal(sig), true)
 		},
 		time.Second*5,
