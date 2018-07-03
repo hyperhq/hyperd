@@ -1,5 +1,5 @@
 sudo: required
-dist: trusty
+dist: xenial
 
 language: go
 go_import_path: github.com/hyperhq/hyperd
@@ -16,7 +16,7 @@ env:
 
 before_install:
   - sudo apt-get update -qq
-  - sudo apt-get install -y -qq autoconf automake pkg-config libdevmapper-dev libsqlite3-dev libvirt-dev libvirt-bin aufs-tools wget libaio1 libpixman-1-0 netcat
+  - sudo apt-get install -y -qq autoconf automake pkg-config libdevmapper-dev libsqlite3-dev libvirt-dev libvirt-bin aufs-tools wget libaio1 libpixman-1-0 netcat realpath libelf-dev
   - wget https://s3-us-west-1.amazonaws.com/hypercontainer-download/qemu-hyper/qemu-hyper_2.4.1-1_amd64.deb && sudo dpkg -i --force-all qemu-hyper_2.4.1-1_amd64.deb
   - cd `mktemp -d`
   - mkdir -p ${GOPATH}/src/github.com/hyperhq
@@ -33,7 +33,10 @@ install:
   - hack/install-grpc.sh
   - hack/verify-gofmt.sh
   - hack/verify-generated-proto.sh
+  - sed -i 's/\(^.*defaultCPUModel.*=\)\(.*$\)/\1 \"core2duo\"/' vendor/github.com/kata-containers/runtime/virtcontainers/qemu_arch_base.go
+  - sed -i 's/accel=kvm/accel=tcg/' vendor/github.com/kata-containers/runtime/virtcontainers/qemu_amd64.go
   - ./autogen.sh && ./configure && make
 
 script:
+  - ./scripts/kata-env-setup.sh
   - cd ${TRAVIS_BUILD_DIR} && hack/test-cmd.sh
