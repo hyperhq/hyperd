@@ -86,7 +86,9 @@ func (ctx *VmContext) Launch() {
 		ctx.hyperstart, err = libhyperstart.NewHyperstart(ctx.Id, ctx.ctlSockAddr(), ctx.ttySockAddr(), 1, false, true)
 	} else {
 		ctx.hyperstart, err = libhyperstart.NewHyperstart(ctx.Id, ctx.ctlSockAddr(), ctx.ttySockAddr(), 1, true, false)
-		go ctx.watchHyperstart()
+		if ctx.GDBTCPPort == 0 {
+			go ctx.watchHyperstart()
+		}
 	}
 	if err != nil {
 		ctx.Log(ERROR, "failed to create hypervisor")

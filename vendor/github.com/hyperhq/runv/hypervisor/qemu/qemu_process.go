@@ -128,6 +128,10 @@ func launchQemu(qc *QemuContext, ctx *hypervisor.VmContext) {
 
 	args := qc.arguments(ctx)
 	args = append(args, "-daemonize", "-pidfile", qc.qemuPidFile, "-D", qc.qemuLogFile.Name)
+	if ctx.GDBTCPPort != 0 {
+		args = append(args, "-gdb", fmt.Sprintf("tcp::%d", ctx.GDBTCPPort))
+		glog.Infof("qemu GDB TCP port is %d", ctx.GDBTCPPort)
+	}
 	if ctx.Boot.EnableVsock && qc.driver.hasVsock && ctx.GuestCid > 0 {
 		addr := ctx.NextPciAddr()
 		vsockDev := fmt.Sprintf("vhost-vsock-pci,id=vsock0,bus=pci.0,addr=%x,guest-cid=%d", addr, ctx.GuestCid)
