@@ -227,6 +227,7 @@ func (daemon *Daemon) initRunV(c *apitypes.HyperConfig) error {
 		Kernel:      c.Kernel,
 		Initrd:      c.Initrd,
 		EnableVsock: c.EnableVsock,
+		GDBTCPPort:  c.GDBTCPPort,
 	}
 	daemon.Factory = factory.NewFromPolicy(bootConfig, c.VmFactoryPolicy)
 
