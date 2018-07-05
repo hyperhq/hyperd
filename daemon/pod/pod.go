@@ -70,12 +70,8 @@ type XPod struct {
 	status     PodState
 	execs      map[string]*Exec
 	statusLock *sync.RWMutex
-	// stoppedChan: When the sandbox is down and the pod is stopped, a bool will be put into this channel,
-	// if you want to do some op after the pod is clean stopped, just wait for this channel. And if an op
-	// got a value from this chan, it should put an element to it again, in case other procedure may wait
-	// on it too.
-	stoppedChan chan bool
-	initCond    *sync.Cond
+
+	initCond *sync.Cond
 
 	//Protected by statusLock
 	snapVolumes    map[string]*apitypes.PodVolume

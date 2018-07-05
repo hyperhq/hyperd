@@ -99,7 +99,6 @@ func newXPod(factory *PodFactory, spec *apitypes.UserPod) (*XPod, error) {
 		execs:          make(map[string]*Exec),
 		resourceLock:   &sync.Mutex{},
 		statusLock:     &sync.RWMutex{},
-		stoppedChan:    make(chan bool, 1),
 		factory:        factory,
 		snapVolumes:    make(map[string]*apitypes.PodVolume),
 		snapContainers: make(map[string]*Container),

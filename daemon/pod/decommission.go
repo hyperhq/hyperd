@@ -501,26 +501,6 @@ func (p *XPod) stopContainers(cList []string, graceful int) error {
 	return nil
 }
 
-/*
-func (p *XPod) waitStopDone(timeout int, comments string) bool {
-	select {
-	case s, ok := <-p.stoppedChan:
-		if ok {
-			p.Log(DEBUG, "got stop msg and push it again: %s", comments)
-			select {
-			case p.stoppedChan <- s:
-			default:
-			}
-		}
-		p.Log(DEBUG, "wait stop done: %s", comments)
-		return true
-	case <-utils.Timeout(timeout):
-		p.Log(DEBUG, "wait stop timeout: %s", comments)
-		return false
-	}
-}
-*/
-
 // waitVMStop() should only be call for the life monitoring, others should wait the `waitStopDone`
 func (p *XPod) waitVMStop() {
 	p.statusLock.RLock()
@@ -542,6 +522,8 @@ func (p *XPod) waitVMStop() {
 		}
 		p.Log(INFO, "got vm exit event: %v", ret)
 	}
+	//in the future, needed to kill the sandbox and delete it here, in case
+	//there is dad sandbox process
 	p.cleanup()
 }
 
