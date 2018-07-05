@@ -564,11 +564,17 @@ func containerMounts(cjson *dockertypes.ContainerJSON) []vc.Mount {
 	return mnts
 }
 
-func (c *Container) ociEnv() []string {
+func (c *Container) ociEnv(cjson *dockertypes.ContainerJSON) []string {
 	var envs []string
+
 	for _, env := range c.spec.Envs {
 		envs = append(envs, env.Env+"="+env.Value)
 	}
+
+	for _, env := range cjson.Config.Env {
+		envs = append(envs, env)
+	}
+
 	return envs
 }
 
@@ -580,7 +586,7 @@ func (c *Container) ociSpec(cjson *dockertypes.ContainerJSON) *specs.Spec {
 	ocispec.Root.Readonly = c.spec.ReadOnly
 
 	ocispec.Process.Args = c.spec.Command
-	ocispec.Process.Env = c.ociEnv()
+	ocispec.Process.Env = c.ociEnv(cjson)
 	ocispec.Process.Cwd = c.spec.Workdir
 	ocispec.Process.Terminal = c.spec.Tty
 	/*
