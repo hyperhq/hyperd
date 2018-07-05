@@ -27,10 +27,7 @@ func (p *XPod) Stop(graceful int) error {
 	}
 
 	p.Log(DEBUG, "pod stopped, now wait cleanup")
-	if cleanup := p.waitStopDone(graceful, "stop container"); !cleanup {
-		p.Log(WARNING, "timeout while wait cleanup pod")
-		return fmt.Errorf("did not finish clean up in %d seconds", graceful)
-	}
+	p.cleanup()
 
 	return nil
 }
@@ -46,6 +43,7 @@ func (p *XPod) ForceQuit() {
 	if err != nil {
 		p.Log(ERROR, "force quit failed: %v", err)
 	}
+	p.cleanup()
 }
 
 func (p *XPod) Remove(force bool) error {
@@ -59,9 +57,7 @@ func (p *XPod) Remove(force bool) error {
 		}
 		p.Log(DEBUG, "stop pod before remove")
 		p.doStopPod(10)
-		if cleanup := p.waitStopDone(60, "Remove Pod"); !cleanup {
-			p.Log(WARNING, "timeout while waiting pod stopped")
-		}
+		p.cleanup()
 	}
 
 	p.resourceLock.Lock()
@@ -505,6 +501,7 @@ func (p *XPod) stopContainers(cList []string, graceful int) error {
 	return nil
 }
 
+/*
 func (p *XPod) waitStopDone(timeout int, comments string) bool {
 	select {
 	case s, ok := <-p.stoppedChan:
@@ -522,6 +519,7 @@ func (p *XPod) waitStopDone(timeout int, comments string) bool {
 		return false
 	}
 }
+*/
 
 // waitVMStop() should only be call for the life monitoring, others should wait the `waitStopDone`
 func (p *XPod) waitVMStop() {
@@ -586,10 +584,6 @@ func (p *XPod) cleanup() {
 	p.statusLock.Unlock()
 
 	p.Log(INFO, "pod stopped")
-	select {
-	case p.stoppedChan <- true:
-	default:
-	}
 }
 
 func (p *XPod) decommissionResources() (err error) {
