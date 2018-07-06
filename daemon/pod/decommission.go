@@ -146,7 +146,17 @@ func (p *XPod) UnPause() error {
 
 	err := p.protectedSandboxOperation(
 		func(sb vc.VCSandbox) error {
-			return sb.Pause()
+			var err error
+			defer func() {
+				if err == nil {
+					go p.waitVMStop()
+				}
+			}()
+			err = sb.Resume()
+			if err != nil {
+				return err
+			}
+			return nil
 		},
 		time.Second*5,
 		"resume pod")
