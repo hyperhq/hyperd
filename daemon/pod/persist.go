@@ -108,12 +108,6 @@ func LoadXPod(factory *PodFactory, layout *types.PersistPodLayout) (*XPod, error
 		}
 	}
 
-	for _, cid := range layout.Containers {
-		if err = p.loadContainer(cid); err != nil {
-			return nil, err
-		}
-	}
-
 	err = p.loadSandbox()
 	if err != nil {
 		if !strings.Contains(err.Error(), "leveldb: not found") {
@@ -121,6 +115,12 @@ func LoadXPod(factory *PodFactory, layout *types.PersistPodLayout) (*XPod, error
 			return nil, err
 		}
 		p.status = S_POD_STOPPED
+	}
+
+	for _, cid := range layout.Containers {
+		if err = p.loadContainer(cid); err != nil {
+			return nil, err
+		}
 	}
 
 	// if sandbox is running, set all volume INSERTED
