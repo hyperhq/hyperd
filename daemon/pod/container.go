@@ -625,6 +625,12 @@ func (c *Container) containerConfig(cjson *dockertypes.ContainerJSON) (*vc.Conta
 		c.spec.StopSignal = "TERM"
 	}
 
+	if len(c.spec.Command) == 0 {
+		for _, cmd := range cjson.Config.Cmd.Slice() {
+			c.spec.Command = append(c.spec.Command, cmd)
+		}
+	}
+
 	ociSpec = c.ociSpec(cjson)
 	ociSpecJson, err := json.Marshal(ociSpec)
 	if err != nil {
