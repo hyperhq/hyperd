@@ -222,28 +222,39 @@ func (p *XPod) ContainerStart(cid string) error {
 
 // Start() means start a STOPPED pod.
 func (p *XPod) Start() error {
+	var err error
+
+	defer func() {
+		if err != nil && p.sandbox != nil {
+			status := p.sandbox.Status()
+			if status.State.State == vc.StateRunning {
+				vc.StopSandbox(p.sandbox.ID())
+				vc.DeleteSandbox(p.sandbox.ID())
+			}
+		}
+	}()
 
 	if p.IsStopped() {
-		if err := p.createSandbox(p.globalSpec); err != nil {
+		if err = p.createSandbox(p.globalSpec); err != nil {
 			p.Log(ERROR, "failed to create sandbox for the stopped pod: %v", err)
 			return err
 		}
 
-		if err := p.prepareResources(); err != nil {
+		if err = p.prepareResources(); err != nil {
 			return err
 		}
 
-		if err := p.addResourcesToSandbox(); err != nil {
+		if err = p.addResourcesToSandbox(); err != nil {
 			return err
 		}
 	}
 
-	err := p.waitPodRun("start pod")
+	err = p.waitPodRun("start pod")
 	if err != nil {
 		p.Log(ERROR, "wait running failed, cannot start pod")
 		return err
 	}
-	if err := p.startAll(); err != nil {
+	if err = p.startAll(); err != nil {
 		return err
 	}
 
