@@ -53,6 +53,7 @@ func (inf *Interface) prepare() error {
 			return err
 		}
 		inf.descript = &runv.InterfaceDescription{
+			Id:      inf.spec.Ifname,
 			Lo:      false,
 			Bridge:  setting.Bridge,
 			Ip:      setting.IPAddress,
@@ -65,6 +66,7 @@ func (inf *Interface) prepare() error {
 	}
 
 	inf.descript = &runv.InterfaceDescription{
+		Id:      inf.spec.Ifname,
 		Lo:      false,
 		Bridge:  inf.spec.Bridge,
 		Ip:      inf.spec.Ip,
