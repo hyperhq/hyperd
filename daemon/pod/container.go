@@ -1112,6 +1112,10 @@ func (c *Container) terminate(force bool) (err error) {
 	c.Log(DEBUG, "stopping: killing container with %d", sig)
 	err = c.p.sandbox.KillContainer(c.Id(), sig)
 	if err != nil {
+		if !c.IsRunning() {
+			c.Log(ERROR, "failed to kill container: %v.  Container state %v is not running(3), ignore this error", err, c.CurrentState())
+			return nil
+		}
 		c.Log(ERROR, "failed to kill container: %v", err)
 	}
 
