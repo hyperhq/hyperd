@@ -147,7 +147,10 @@ func agentDialer(addr *url.URL, enableYamux bool) dialer {
 		}()
 
 		var session *yamux.Session
-		session, err = yamux.Client(conn, nil)
+		sessionConfig := yamux.DefaultConfig()
+		// Disable keepAlive since we don't know how much time a container can be paused
+		sessionConfig.EnableKeepAlive = false
+		session, err = yamux.Client(conn, sessionConfig)
 		if err != nil {
 			return nil, err
 		}
