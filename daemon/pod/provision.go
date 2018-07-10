@@ -384,12 +384,31 @@ func (p *XPod) initResources(spec *apitypes.UserPod, allowCreate bool) error {
 		}
 	}
 
-	if len(spec.Interfaces) == 0 {
+	interfaceNum := len(spec.Interfaces)
+	if interfaceNum == 0 {
 		spec.Interfaces = append(spec.Interfaces, &apitypes.UserInterface{})
 	}
+	noIdInterfaces := make([]*Interface, 0, interfaceNum)
 	for _, nspec := range spec.Interfaces {
 		inf := newInterface(p, nspec)
-		p.interfaces[nspec.Ifname] = inf
+		if nspec.Id != "" {
+			p.interfaces[nspec.Id] = inf
+		} else {
+			noIdInterfaces = append(noIdInterfaces, inf)
+		}
+	}
+	idx := 0
+	for _, inf := range noIdInterfaces {
+		var id string
+		for {
+			idx++
+			id = fmt.Sprintf("%d", idx)
+			if _, ok := p.interfaces[id]; !ok {
+				break
+			}
+		}
+		inf.spec.Id = id
+		p.interfaces[id] = inf
 	}
 
 	p.services = newServices(p, spec.Services)

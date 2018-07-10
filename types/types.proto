@@ -438,6 +438,7 @@ message UserInterface {
   string mac    = 4;
   uint64 mtu    = 5;
   string gateway  = 6;
+  string id     = 100;
 }
 
 message UserServiceBackend {

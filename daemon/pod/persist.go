@@ -96,8 +96,8 @@ func LoadXPod(factory *PodFactory, layout *types.PersistPodLayout) (*XPod, error
 		}
 	}()
 
-	for _, ix := range layout.Interfaces {
-		if err = p.loadInterface(ix); err != nil {
+	for _, iId := range layout.Interfaces {
+		if err = p.loadInterface(iId); err != nil {
 			return nil, err
 		}
 	}
@@ -192,8 +192,8 @@ func (p *XPod) savePod() error {
 		}
 	}
 
-	for inf, i := range p.interfaces {
-		interfaces = append(interfaces, inf)
+	for iId, i := range p.interfaces {
+		interfaces = append(interfaces, iId)
 		if err := i.saveInterface(); err != nil {
 			return err
 		}
@@ -418,12 +418,12 @@ func (v *Volume) removeFromDB() error {
 
 func (inf *Interface) saveInterface() error {
 	ix := &types.PersistInterface{
-		Id:       inf.descript.Id,
+		Id:       inf.spec.Id,
 		Pod:      inf.p.Id(),
 		Spec:     inf.spec,
 		Descript: inf.descript,
 	}
-	return saveMessage(inf.p.factory.db, fmt.Sprintf(IF_KEY_FMT, inf.p.Id(), inf.descript.Id), ix, inf, "interface info")
+	return saveMessage(inf.p.factory.db, fmt.Sprintf(IF_KEY_FMT, inf.p.Id(), inf.spec.Id), ix, inf, "interface info")
 }
 
 func (p *XPod) loadInterface(id string) error {
@@ -434,7 +434,7 @@ func (p *XPod) loadInterface(id string) error {
 	}
 	inf := newInterface(p, ix.Spec)
 	inf.descript = ix.Descript
-	p.interfaces[inf.descript.Id] = inf
+	p.interfaces[inf.spec.Id] = inf
 	return nil
 }
 
@@ -498,7 +498,7 @@ func saveMessage(db *daemondb.DaemonDB, key string, message proto.Message, owner
 func loadMessage(db *daemondb.DaemonDB, key string, message proto.Message, owner hlog.LogOwner, op string) error {
 	v, err := db.Get([]byte(key))
 	if err != nil {
-		hlog.HLog(ERROR, owner, 2, "failed to load %s: %v", op, err)
+		hlog.HLog(ERROR, owner, 2, "failed to load %s: %v key: %s", op, err, key)
 		return err
 	}
 	err = proto.Unmarshal(v, message)
