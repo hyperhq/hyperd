@@ -499,6 +499,13 @@ func (p *XPod) TtyResize(cid, execId string, h, w int) error {
 		p.Log(ERROR, err)
 		return err
 	}
+
+	//if doesn't specify the execId, it means to ttyresize the container's
+	//tty, thus the execId is the same with the container id for Kata container.
+	if execId == "" {
+		execId = cid
+	}
+
 	return p.sandbox.WinsizeProcess(cid, execId, uint32(h), uint32(w))
 }
 
