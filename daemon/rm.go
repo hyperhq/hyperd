@@ -26,7 +26,7 @@ func (daemon *Daemon) RemovePod(podId string) (int, string, error) {
 
 	daemon.PodList.Release(podId)
 
-	if p.IsAlive() {
+	if !p.IsStopped() {
 		glog.V(1).Infof("remove pod %s, stop it firstly", podId)
 		p.Stop(5)
 	}
