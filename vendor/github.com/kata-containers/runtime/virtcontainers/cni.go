@@ -12,7 +12,7 @@ import (
 	cniV2Types "github.com/containernetworking/cni/pkg/types/020"
 	cniLatestTypes "github.com/containernetworking/cni/pkg/types/current"
 	cniPlugin "github.com/kata-containers/runtime/virtcontainers/pkg/cni"
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // CniPrimaryInterface Name chosen for the primary interface

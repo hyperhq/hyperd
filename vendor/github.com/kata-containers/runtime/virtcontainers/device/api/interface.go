@@ -7,7 +7,7 @@
 package api
 
 import (
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/kata-containers/runtime/virtcontainers/device/config"
 )

@@ -42,7 +42,7 @@ func (p *ccProxy) stop(sandbox *Sandbox, pid int) error {
 	return nil
 }
 
-// The ccproxy doesn't need to watch the vm console, thus return true always.
+// The ccproxy doesn't need to watch the vm console, thus return false always.
 func (p *ccProxy) consoleWatched() bool {
-	return true
+	return false
 }

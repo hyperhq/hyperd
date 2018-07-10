@@ -7,6 +7,7 @@ package virtcontainers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,7 +17,7 @@ import (
 
 	govmmQemu "github.com/intel/govmm/qemu"
 	"github.com/kata-containers/runtime/virtcontainers/pkg/uuid"
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/kata-containers/runtime/virtcontainers/device/api"
 	deviceDrivers "github.com/kata-containers/runtime/virtcontainers/device/drivers"
@@ -39,12 +40,15 @@ type CPUDevice struct {
 type QemuState struct {
 	Bridges []Bridge
 	// HotpluggedCPUs is the list of CPUs that were hot-added
-	HotpluggedVCPUs []CPUDevice
-	UUID            string
+	HotpluggedVCPUs  []CPUDevice
+	HotpluggedMemory int
+	UUID             string
 }
 
 // qemu is an Hypervisor interface implementation for the Linux qemu hypervisor.
 type qemu struct {
+	vmConfig Resources
+
 	config HypervisorConfig
 
 	qmpMonitorCh qmpChannel
@@ -63,6 +67,9 @@ const qmpCapErrMsg = "Failed to negoatiate QMP capabilities"
 const qmpSocket = "qmp.sock"
 
 const defaultConsole = "console.sock"
+
+var qemuMajorVersion int
+var qemuMinorVersion int
 
 // agnostic list of kernel parameters
 var defaultKernelParameters = []Param{
@@ -169,6 +176,7 @@ func (q *qemu) init(sandbox *Sandbox) error {
 		return err
 	}
 
+	q.vmConfig = sandbox.config.VMConfig
 	q.config = sandbox.config.HypervisorConfig
 	q.sandbox = sandbox
 	q.arch = newQemuArch(q.config)
@@ -204,20 +212,27 @@ func (q *qemu) cpuTopology() govmmQemu.SMP {
 	return q.arch.cpuTopology(q.config.DefaultVCPUs, q.config.DefaultMaxVCPUs)
 }
 
-func (q *qemu) memoryTopology(sandboxConfig SandboxConfig) (govmmQemu.Memory, error) {
+func (q *qemu) hostMemMB() (uint64, error) {
 	hostMemKb, err := getHostMemorySizeKb(procMemInfo)
 	if err != nil {
-		return govmmQemu.Memory{}, fmt.Errorf("Unable to read memory info: %s", err)
+		return 0, fmt.Errorf("Unable to read memory info: %s", err)
 	}
 	if hostMemKb == 0 {
-		return govmmQemu.Memory{}, fmt.Errorf("Error host memory size 0")
+		return 0, fmt.Errorf("Error host memory size 0")
 	}
 
-	hostMemMb := uint64(float64(hostMemKb / 1024))
+	return hostMemKb / 1024, nil
+}
+
+func (q *qemu) memoryTopology() (govmmQemu.Memory, error) {
+	hostMemMb, err := q.hostMemMB()
+	if err != nil {
+		return govmmQemu.Memory{}, err
+	}
 
 	memMb := uint64(q.config.DefaultMemSz)
-	if sandboxConfig.VMConfig.Memory > 0 {
-		memMb = uint64(sandboxConfig.VMConfig.Memory)
+	if q.vmConfig.Memory > 0 {
+		memMb = uint64(q.vmConfig.Memory)
 	}
 
 	return q.arch.memoryTopology(memMb, hostMemMb), nil
@@ -271,7 +286,7 @@ func (q *qemu) createSandbox(sandboxConfig SandboxConfig) error {
 
 	smp := q.cpuTopology()
 
-	memory, err := q.memoryTopology(sandboxConfig)
+	memory, err := q.memoryTopology()
 	if err != nil {
 		return err
 	}
@@ -297,10 +312,14 @@ func (q *qemu) createSandbox(sandboxConfig SandboxConfig) error {
 		return err
 	}
 
+	// Pass the sandbox name to the agent via the kernel command-line to
+	// allow the agent to use it in log messages.
+	params := q.kernelParameters() + " " + "agent.sandbox=" + sandboxConfig.ID
+
 	kernel := govmmQemu.Kernel{
 		Path:       kernelPath,
 		InitrdPath: initrdPath,
-		Params:     q.kernelParameters(),
+		Params:     params,
 	}
 
 	rtc := govmmQemu.RTC{
@@ -456,6 +475,8 @@ func (q *qemu) waitSandbox(timeout int) error {
 	}
 
 	q.qmpMonitorCh.qmp = qmp
+	qemuMajorVersion = ver.Major
+	qemuMinorVersion = ver.Minor
 
 	q.Logger().WithFields(logrus.Fields{
 		"qmp-major-version": ver.Major,
@@ -701,6 +722,9 @@ func (q *qemu) hotplugDevice(devInfo interface{}, devType deviceType, op operati
 		// TODO: find a way to remove dependency of deviceDrivers lib @weizhang555
 		device := devInfo.(deviceDrivers.VFIODevice)
 		return nil, q.hotplugVFIODevice(device, op)
+	case memoryDev:
+		memdev := devInfo.(*memoryDevice)
+		return nil, q.hotplugMemory(memdev, op)
 	default:
 		return nil, fmt.Errorf("cannot hotplug device: unsupported device type '%v'", devType)
 	}
@@ -831,6 +855,63 @@ func (q *qemu) hotplugRemoveCPUs(amount uint32) (uint32, error) {
 	}
 
 	return amount, q.sandbox.storage.storeHypervisorState(q.sandbox.id, q.state)
+}
+
+func (q *qemu) hotplugMemory(memDev *memoryDevice, op operation) error {
+	if memDev.sizeMB < 0 {
+		return fmt.Errorf("cannot hotplug negative size (%d) memory", memDev.sizeMB)
+	}
+
+	// We do not support memory hot unplug.
+	if op == removeDevice {
+		return errors.New("cannot hot unplug memory device")
+	}
+
+	maxMem, err := q.hostMemMB()
+	if err != nil {
+		return err
+	}
+
+	// calculate current memory
+	currentMemory := int(q.config.DefaultMemSz)
+	if q.vmConfig.Memory > 0 {
+		currentMemory = int(q.vmConfig.Memory)
+	}
+	currentMemory += q.state.HotpluggedMemory
+
+	// Don't exceed the maximum amount of memory
+	if currentMemory+memDev.sizeMB > int(maxMem) {
+		return fmt.Errorf("Unable to hotplug %d MiB memory, the SB has %d MiB and the maximum amount is %d MiB",
+			memDev.sizeMB, currentMemory, q.config.DefaultMemSz)
+	}
+
+	return q.hotplugAddMemory(memDev)
+}
+
+func (q *qemu) hotplugAddMemory(memDev *memoryDevice) error {
+	// setup qmp channel if necessary
+	if q.qmpMonitorCh.qmp == nil {
+		qmp, err := q.qmpSetup()
+		if err != nil {
+			return err
+		}
+
+		q.qmpMonitorCh.qmp = qmp
+
+		defer func() {
+			qmp.Shutdown()
+			q.qmpMonitorCh.qmp = nil
+		}()
+	}
+
+	err := q.qmpMonitorCh.qmp.ExecHotplugMemory(q.qmpMonitorCh.ctx, "memory-backend-ram", "mem"+strconv.Itoa(memDev.slot), "", memDev.sizeMB)
+	if err != nil {
+		q.Logger().WithError(err).Error("hotplug memory")
+		return err
+	}
+
+	q.state.HotpluggedMemory += memDev.sizeMB
+	return q.sandbox.storage.storeHypervisorState(q.sandbox.id, q.state)
 }
 
 func (q *qemu) pauseSandbox() error {

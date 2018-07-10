@@ -21,7 +21,7 @@ import (
 	"github.com/kata-containers/runtime/virtcontainers/utils"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
 )
 
@@ -340,11 +340,11 @@ func (h *hyper) exec(sandbox *Sandbox, c Container, cmd Cmd) (*Process, error) {
 	return process, nil
 }
 
-func (h *hyper) getProxy() proxy {
-	return h.proxy
-}
-
 func (h *hyper) startProxy(sandbox *Sandbox) error {
+	if h.proxy.consoleWatched() {
+		return nil
+	}
+
 	// Start the proxy here
 	pid, uri, err := h.proxy.start(sandbox, proxyParams{})
 	if err != nil {

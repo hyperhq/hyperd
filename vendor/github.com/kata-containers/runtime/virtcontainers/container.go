@@ -17,7 +17,7 @@ import (
 
 	"github.com/kata-containers/runtime/virtcontainers/pkg/annotations"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 
 	"github.com/kata-containers/runtime/virtcontainers/device/api"

@@ -14,7 +14,7 @@ import (
 
 	ns "github.com/kata-containers/runtime/virtcontainers/pkg/nsenter"
 	"github.com/mitchellh/mapstructure"
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // ShimType describes a shim type.

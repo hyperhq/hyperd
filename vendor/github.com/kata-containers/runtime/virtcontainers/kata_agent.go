@@ -28,7 +28,7 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	golangGrpc "google.golang.org/grpc"
 )
@@ -419,14 +419,15 @@ func (k *kataAgent) generateInterfacesAndRoutes(networkNS NetworkNamespace) ([]*
 	return ifaces, routes, nil
 }
 
-func (k *kataAgent) getProxy() proxy {
-	return k.proxy
-}
-
 func (k *kataAgent) startProxy(sandbox *Sandbox) error {
 	if k.proxy == nil {
 		return errorMissingProxy
 	}
+
+	if k.proxy.consoleWatched() {
+		return nil
+	}
+
 	// Get agent socket path to provide it to the proxy.
 	agentURL, err := k.agentURL()
 	if err != nil {
@@ -1111,6 +1112,7 @@ func (k *kataAgent) connect() error {
 		return nil
 	}
 
+	// This is for the first connection only, to prevent race
 	k.Lock()
 	defer k.Unlock()
 	if k.client != nil {

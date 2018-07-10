@@ -11,7 +11,7 @@ import (
 	"io"
 	"net"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // This is a kata builtin proxy implementation of the proxy interface. Kata proxy

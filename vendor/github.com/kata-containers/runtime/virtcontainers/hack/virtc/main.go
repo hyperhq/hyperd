@@ -13,7 +13,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/kata-containers/runtime/virtcontainers/pkg/uuid"
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
 	vc "github.com/kata-containers/runtime/virtcontainers"

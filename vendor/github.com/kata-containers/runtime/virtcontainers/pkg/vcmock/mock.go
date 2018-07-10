@@ -21,7 +21,7 @@ import (
 
 	vc "github.com/kata-containers/runtime/virtcontainers"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // mockErrorPrefix is a string that all errors returned by the mock

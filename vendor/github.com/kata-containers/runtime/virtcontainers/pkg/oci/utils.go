@@ -18,7 +18,7 @@ import (
 	criContainerdAnnotations "github.com/containerd/cri-containerd/pkg/annotations"
 	crioAnnotations "github.com/kubernetes-incubator/cri-o/pkg/annotations"
 	spec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	vc "github.com/kata-containers/runtime/virtcontainers"
 	"github.com/kata-containers/runtime/virtcontainers/device/config"

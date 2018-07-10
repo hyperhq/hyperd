@@ -20,7 +20,7 @@ import (
 
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/safchain/ethtool"
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
 	"golang.org/x/sys/unix"
@@ -280,7 +280,7 @@ func (endpoint *VhostUserEndpoint) Attach(h hypervisor) error {
 	}
 	id := hex.EncodeToString(randBytes)
 
-	d := drivers.VhostUserNetDevice{
+	d := &drivers.VhostUserNetDevice{
 		MacAddress: endpoint.HardAddr,
 	}
 	d.SocketPath = endpoint.SocketPath

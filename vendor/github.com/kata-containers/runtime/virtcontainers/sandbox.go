@@ -15,7 +15,7 @@ import (
 	"syscall"
 
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/kata-containers/runtime/virtcontainers/device/api"
 	"github.com/kata-containers/runtime/virtcontainers/device/config"
@@ -352,12 +352,15 @@ type SandboxConfig struct {
 	SharePidNs bool
 }
 
-func (sandbox *Sandbox) getProxyType() (ProxyType, error) {
-	if sandbox.config == nil {
-		return "", fmt.Errorf("Sandbox %s config pointer is nil", sandbox.ID())
+func (s *Sandbox) startProxy() error {
+
+	// If the proxy is KataBuiltInProxyType type, it needs to restart the proxy
+	// to watch the guest console if it hadn't been watched.
+	if s.agent == nil {
+		return fmt.Errorf("sandbox %s missed agent pointer", s.ID())
 	}
 
-	return sandbox.config.ProxyType, nil
+	return s.agent.startProxy(s)
 }
 
 // valid checks that the sandbox configuration is valid.
@@ -1198,6 +1201,14 @@ func (s *Sandbox) stop() error {
 func (s *Sandbox) Pause() error {
 	if err := s.hypervisor.pauseSandbox(); err != nil {
 		return err
+	}
+
+	//After the sandbox is paused, it's needed to stop its monitor,
+	//Otherwise, its monitors will receive timeout errors if it is
+	//paused for a long time, thus its monitor will not tell it's a
+	//crash caused timeout or just a paused timeout.
+	if s.monitor != nil {
+		s.monitor.stop()
 	}
 
 	return s.pauseSetStates()

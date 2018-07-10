@@ -10,7 +10,7 @@ import (
 
 	vc "github.com/kata-containers/runtime/virtcontainers"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // Sandbox is a fake Sandbox type used for testing

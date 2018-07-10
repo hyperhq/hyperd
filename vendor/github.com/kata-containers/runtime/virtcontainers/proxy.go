@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 
 	"github.com/mitchellh/mapstructure"
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // ProxyConfig is a structure storing information needed from any

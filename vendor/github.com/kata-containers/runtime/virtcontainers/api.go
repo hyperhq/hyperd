@@ -6,14 +6,13 @@
 package virtcontainers
 
 import (
-	"errors"
 	"os"
 	"runtime"
 	"syscall"
 
 	deviceApi "github.com/kata-containers/runtime/virtcontainers/device/api"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 func init() {
@@ -116,25 +115,12 @@ func FetchSandbox(sandboxID string) (VCSandbox, error) {
 		return nil, err
 	}
 
-	/* If the proxy is KataBuiltInProxyType type, it needs to restart the proxy to watch the
-	* guest console if it hadn't been watched.
-	 */
-	proxyType, err := sandbox.getProxyType()
-	if err != nil {
-		return nil, err
-	}
-
-	if proxyType == KataBuiltInProxyType {
-		if sandbox.agent == nil {
-			return nil, errors.New("Missing agent pointer")
-		}
-
-		proxy := sandbox.agent.getProxy()
-		if !proxy.consoleWatched() {
-			err := sandbox.agent.startProxy(sandbox)
-			if err != nil {
-				return nil, err
-			}
+	// If the proxy is KataBuiltInProxyType type, it needs to restart the proxy to watch the
+	// guest console if it hadn't been watched.
+	if isProxyBuiltIn(sandbox.config.ProxyType) {
+		err = sandbox.startProxy()
+		if err != nil {
+			return nil, err
 		}
 	}
 

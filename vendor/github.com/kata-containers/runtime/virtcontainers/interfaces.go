@@ -10,7 +10,7 @@ import (
 	"syscall"
 
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // VC is the Virtcontainers interface

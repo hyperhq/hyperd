@@ -6,7 +6,7 @@
 package virtcontainers
 
 import (
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // cnm is a network implementation for the CNM plugin.

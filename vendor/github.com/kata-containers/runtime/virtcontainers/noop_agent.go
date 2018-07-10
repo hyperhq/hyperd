@@ -16,11 +16,6 @@ import (
 type noopAgent struct {
 }
 
-//get the agent's proxy, it doesn't have a proxy, return nil
-func (n *noopAgent) getProxy() proxy {
-	return nil
-}
-
 //start the proxy to watch the vm console. It does nothing.
 func (n *noopAgent) startProxy(sandbox *Sandbox) error {
 	return nil

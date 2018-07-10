@@ -16,7 +16,7 @@ import (
 
 	vcAnnotations "github.com/kata-containers/runtime/virtcontainers/pkg/annotations"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // Hook represents an OCI hook, including its required parameters.

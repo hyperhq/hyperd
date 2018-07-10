@@ -2150,7 +2150,7 @@
 		},
 		{
 			"path": "github.com/kata-containers/runtime/virtcontainers",
-			"revision": "fca7eb822d29380502f38296b71b6e969253c4ee"
+			"revision": "ff7b4f6ed7f622217f456a9215f5e7c6215ff916"
 		},
 		{
 			"path": "github.com/kata-containers/agent/protocols/grpc",
