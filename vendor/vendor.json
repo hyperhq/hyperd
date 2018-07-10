@@ -45,7 +45,7 @@
 		},
 		{
 			"comment": "v0.11.4",
-			"path": "github.com/Sirupsen/logrus",
+			"path": "github.com/sirupsen/logrus",
 			"revision": "0208149b40d863d2c1a2f8fe5753096a9cf2cc8b"
 		},
 		{

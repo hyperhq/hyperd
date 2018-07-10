@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/docker/docker/pkg/system"
 	"github.com/docker/docker/pkg/version"
 	"github.com/docker/engine-api/types"

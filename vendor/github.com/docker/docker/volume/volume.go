@@ -5,7 +5,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	derr "github.com/docker/docker/errors"
 	"github.com/docker/docker/pkg/system"
 )

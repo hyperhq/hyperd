@@ -8,7 +8,7 @@ import (
 
 	ansiterm "github.com/Azure/go-ansiterm"
 	"github.com/Azure/go-ansiterm/winterm"
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 var logger *logrus.Logger

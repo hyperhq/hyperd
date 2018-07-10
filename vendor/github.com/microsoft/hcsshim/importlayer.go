@@ -8,7 +8,7 @@ import (
 	"runtime"
 
 	"github.com/Microsoft/go-winio"
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // ImportLayer will take the contents of the folder at importFolderPath and import

@@ -10,7 +10,7 @@ import (
 	"github.com/Azure/go-ansiterm/winterm"
 
 	ansiterm "github.com/Azure/go-ansiterm"
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"io/ioutil"
 )
 
