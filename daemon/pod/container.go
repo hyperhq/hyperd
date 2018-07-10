@@ -126,6 +126,9 @@ func (c *Container) SpecName() string {
 }
 
 func (c *Container) RuntimeName() string {
+	if c.SpecName()[0] != '/' {
+		return "/" + c.SpecName()
+	}
 	return c.SpecName()
 }
 
