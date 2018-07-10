@@ -504,6 +504,7 @@ func (c *Container) createByEngine() (*dockertypes.ContainerJSON, error) {
 	if len(c.spec.Envs) != 0 {
 		envs := []string{}
 		for _, env := range c.spec.Envs {
+
 			envs = append(envs, env.Env+"="+env.Value)
 		}
 		config.Env = envs
@@ -527,6 +528,19 @@ func (c *Container) createByEngine() (*dockertypes.ContainerJSON, error) {
 	if rsp, ok = r.(*dockertypes.ContainerJSON); !ok {
 		err = fmt.Errorf("fail to unpack container json response for %s of %s", c.spec.Name, c.p.Id())
 		return nil, err
+	}
+
+	for _, v := range rsp.Config.Env {
+		pair := strings.SplitN(v, "=", 2)
+		var env = apitypes.EnvironmentVar{}
+
+		if len(pair) == 2 {
+			env = apitypes.EnvironmentVar{Env: pair[0], Value: pair[1]}
+		} else if len(pair) == 1 {
+			env = apitypes.EnvironmentVar{Env: pair[0], Value: ""}
+		}
+
+		c.spec.Envs = append(c.spec.Envs, &env)
 	}
 
 	c.spec.Id = ccs.ID
@@ -567,15 +581,11 @@ func containerMounts(cjson *dockertypes.ContainerJSON) []vc.Mount {
 	return mnts
 }
 
-func (c *Container) ociEnv(cjson *dockertypes.ContainerJSON) []string {
+func (c *Container) ociEnv() []string {
 	var envs []string
 
 	for _, env := range c.spec.Envs {
 		envs = append(envs, env.Env+"="+env.Value)
-	}
-
-	for _, env := range cjson.Config.Env {
-		envs = append(envs, env)
 	}
 
 	return envs
@@ -589,7 +599,7 @@ func (c *Container) ociSpec(cjson *dockertypes.ContainerJSON) *specs.Spec {
 	ocispec.Root.Readonly = c.spec.ReadOnly
 
 	ocispec.Process.Args = c.spec.Command
-	ocispec.Process.Env = c.ociEnv(cjson)
+	ocispec.Process.Env = c.ociEnv()
 	ocispec.Process.Cwd = c.spec.Workdir
 	ocispec.Process.Terminal = c.spec.Tty
 	/*
