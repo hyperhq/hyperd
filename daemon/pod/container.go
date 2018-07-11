@@ -602,6 +602,9 @@ func (c *Container) ociSpec(cjson *dockertypes.ContainerJSON) *specs.Spec {
 	ocispec.Process.Env = c.ociEnv()
 	ocispec.Process.Cwd = c.spec.Workdir
 	ocispec.Process.Terminal = c.spec.Tty
+
+	ocispec.Hostname = c.p.globalSpec.Hostname
+
 	/*
 	* ocispec used the user's UID and GID instead of user name and group name,
 	* thus it needed to convert the user name and group name to UID and GID in
