@@ -34,16 +34,21 @@ func CreateXPod(factory *PodFactory, spec *apitypes.UserPod) (*XPod, error) {
 			p.releaseNames(spec.Containers)
 		}
 	}()
-	err = p.createSandbox(spec) //TODO: add defer for rollback
-	if err != nil {
-		return nil, err
-	}
 
 	defer func() {
 		if err != nil && p.sandbox != nil {
+			status := p.sandbox.Status()
+			if status.State.State == vc.StateRunning {
+				vc.StopSandbox(p.sandbox.ID())
+			}
 			p.sandbox.Delete()
 		}
 	}()
+
+	err = p.createSandbox(spec)
+	if err != nil {
+		return nil, err
+	}
 
 	err = p.initResources(spec, true)
 	if err != nil {
