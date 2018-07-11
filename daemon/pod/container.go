@@ -607,7 +607,7 @@ func (c *Container) ociSpec(cjson *dockertypes.ContainerJSON) *specs.Spec {
 	* thus it needed to convert the user name and group name to UID and GID in
 	* the future, here just set it to "0" as default.
 	 */
-	ocispec.Process.User = specs.User{UID: 0, GID: 0, Username: "root"}
+	ocispec.Process.User = specs.User{UID: 0, GID: 0}
 
 	for _, l := range c.spec.Ulimits {
 		ltype := strings.ToLower(l.Name)
