@@ -611,12 +611,13 @@ func (p *XPod) decommissionResources() (err error) {
 		}
 	}
 
-	err = p.sandbox.Delete()
-	if err != nil {
-		p.Log(ERROR, "remove sandbox failed: %v", err)
+	if p.sandbox != nil {
+		err = p.sandbox.Delete()
+		if err != nil {
+			p.Log(ERROR, "remove sandbox failed: %v", err)
+		}
+		p.sandbox = nil
 	}
-
-	p.sandbox = nil
 
 	cleanupHosts(p.Id())
 	// then it could be start again.
