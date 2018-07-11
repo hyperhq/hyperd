@@ -148,7 +148,7 @@ func (p *XPod) StartExec(stdin io.ReadCloser, stdout io.WriteCloser, containerId
 
 	go func(es *Exec) {
 		ret, err := p.sandbox.WaitProcess(containerId, es.Id)
-		if err == nil {
+		if err != nil {
 			es.Log(ERROR, "can not wait exec")
 			return
 		}
