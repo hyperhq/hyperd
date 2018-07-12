@@ -648,6 +648,18 @@ func (c *Container) containerConfig(cjson *dockertypes.ContainerJSON) (*vc.Conta
 	}
 
 	ociSpec = c.ociSpec(cjson)
+
+	//remove those namespace types from ocispec
+	for _, ns := range []specs.LinuxNamespaceType{
+		specs.NetworkNamespace,
+		specs.UserNamespace,
+		specs.UTSNamespace,
+		specs.IPCNamespace,
+		specs.CgroupNamespace,
+	} {
+		oci.RemoveNamespace(ociSpec, ns)
+	}
+
 	ociSpecJson, err := json.Marshal(ociSpec)
 	if err != nil {
 		return &vc.ContainerConfig{}, nil
