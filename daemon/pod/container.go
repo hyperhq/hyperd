@@ -424,18 +424,6 @@ func (c *Container) init(allowCreate bool) error {
 
 	c.status.CreatedAt, _ = time.Parse(time.RFC3339Nano, cjson.Created)
 
-	contConfig, err := c.containerConfig(cjson)
-	if err != nil {
-		c.Log(ERROR, err)
-		return err
-	}
-	c.contConfig = contConfig
-
-	if err != nil {
-		c.Log(ERROR, err)
-		return err
-	}
-
 	c.mergeVolumes(cjson)
 
 	if !loaded {
@@ -450,6 +438,13 @@ func (c *Container) init(allowCreate bool) error {
 		c.configDNS()
 		c.injectFiles(c.mountId)
 	}
+
+	contConfig, err := c.containerConfig(cjson)
+	if err != nil {
+		c.Log(ERROR, err)
+		return err
+	}
+	c.contConfig = contConfig
 
 	return nil
 }
@@ -559,26 +554,54 @@ func (c *Container) cmdEnvs(envs []vc.EnvVar) []vc.EnvVar {
 	return envs
 }
 
-func newMount(m dockertypes.MountPoint) vc.Mount {
+func newcMount(m dockertypes.MountPoint) vc.Mount {
 	return vc.Mount{
 		Source:      m.Source,
 		Destination: m.Destination,
 	}
 }
 
-func containerMounts(cjson *dockertypes.ContainerJSON) []vc.Mount {
+func newOciMount(m dockertypes.MountPoint) specs.Mount {
+	return specs.Mount{
+		Source:      m.Source,
+		Destination: m.Destination,
+	}
+}
+
+func (c *Container) containerOciMounts(cjson *dockertypes.ContainerJSON) ([]vc.Mount, []specs.Mount) {
 	cMounts := cjson.Mounts
 
-	if cMounts == nil {
-		return []vc.Mount{}
-	}
+	var cmnts []vc.Mount
+	var ocimnts []specs.Mount
 
-	var mnts []vc.Mount
 	for _, m := range cMounts {
-		mnts = append(mnts, newMount(m))
+		cmnts = append(cmnts, newcMount(m))
+		ocimnts = append(ocimnts, newOciMount(m))
 	}
 
-	return mnts
+	for _, vol := range c.spec.Volumes {
+		if vol.Detail.Format == "vfs" {
+			cmnt := vc.Mount{
+				Source:      vol.Detail.Source,
+				Destination: vol.Path,
+				Type:        "bind",
+				ReadOnly:    vol.ReadOnly,
+			}
+
+			cmnts = append(cmnts, cmnt)
+
+			ocimnt := specs.Mount{
+				Source:      vol.Detail.Source,
+				Destination: vol.Path,
+				Type:        "bind",
+				Options:     []string{"rbind", "rprivate"},
+			}
+
+			ocimnts = append(ocimnts, ocimnt)
+		}
+	}
+
+	return cmnts, ocimnts
 }
 
 func (c *Container) ociEnv() []string {
@@ -660,6 +683,11 @@ func (c *Container) containerConfig(cjson *dockertypes.ContainerJSON) (*vc.Conta
 		oci.RemoveNamespace(ociSpec, ns)
 	}
 
+	cmnts, ocimnts := c.containerOciMounts(cjson)
+	for _, mnt := range ocimnts {
+		ociSpec.Mounts = append(ociSpec.Mounts, mnt)
+	}
+
 	ociSpecJson, err := json.Marshal(ociSpec)
 	if err != nil {
 		return &vc.ContainerConfig{}, nil
@@ -704,7 +732,7 @@ func (c *Container) containerConfig(cjson *dockertypes.ContainerJSON) (*vc.Conta
 			vcAnnotations.ConfigJSONKey: string(ociSpecJson),
 			vcAnnotations.BundlePathKey: path.Join(c.p.sandboxShareDir(), mountId),
 		},
-		Mounts: containerMounts(cjson),
+		Mounts: cmnts,
 	}
 
 	c.Log(TRACE, "Container Info is \n%#v", containerConfig)
