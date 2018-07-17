@@ -548,10 +548,10 @@ func (p *XPod) cleanup() {
 	defer p.resourceLock.Unlock()
 
 	p.statusLock.Lock()
-	if p.status == S_POD_STOPPED || p.status == S_POD_NONE {
+	if p.status == S_POD_STOPPED {
 		p.statusLock.Unlock()
 		return
-	} else {
+	} else if p.status != S_POD_NONE {
 		p.status = S_POD_STOPPING
 	}
 	p.statusLock.Unlock()
