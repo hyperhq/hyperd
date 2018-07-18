@@ -614,14 +614,14 @@ func (c *Container) ociEnv() []string {
 	return envs
 }
 
-func (c *Container) ociSpec(cjson *dockertypes.ContainerJSON) *specs.Spec {
+func (c *Container) ociSpec(cjson *dockertypes.ContainerJSON, cmds []string) *specs.Spec {
 	var ocispec specs.Spec
 
 	ocispec = oci.DefaultSpec()
 	ocispec.Root.Path = ROOTFS
 	ocispec.Root.Readonly = c.spec.ReadOnly
 
-	ocispec.Process.Args = c.spec.Command
+	ocispec.Process.Args = cmds
 	ocispec.Process.Env = c.ociEnv()
 	ocispec.Process.Cwd = c.spec.Workdir
 	ocispec.Process.Terminal = c.spec.Tty
@@ -650,6 +650,7 @@ func (c *Container) ociSpec(cjson *dockertypes.ContainerJSON) *specs.Spec {
 func (c *Container) containerConfig(cjson *dockertypes.ContainerJSON) (*vc.ContainerConfig, error) {
 	var user, group string
 	var ociSpec *specs.Spec
+	var cmds []string
 
 	c.Log(TRACE, "container info config %#v, Cmd %v, Args %v", cjson.Config, cjson.Config.Cmd.Slice(), cjson.Args)
 
@@ -664,13 +665,10 @@ func (c *Container) containerConfig(cjson *dockertypes.ContainerJSON) (*vc.Conta
 		c.spec.StopSignal = "TERM"
 	}
 
-	if len(c.spec.Command) == 0 {
-		for _, cmd := range cjson.Config.Cmd.Slice() {
-			c.spec.Command = append(c.spec.Command, cmd)
-		}
-	}
+	cmds = append(cmds, cjson.Config.Entrypoint.Slice()...)
+	cmds = append(cmds, cjson.Config.Cmd.Slice()...)
 
-	ociSpec = c.ociSpec(cjson)
+	ociSpec = c.ociSpec(cjson, cmds)
 
 	//remove those namespace types from ocispec
 	for _, ns := range []specs.LinuxNamespaceType{
@@ -714,7 +712,7 @@ func (c *Container) containerConfig(cjson *dockertypes.ContainerJSON) (*vc.Conta
 	}
 
 	cmd := vc.Cmd{
-		Args:         c.spec.Command,
+		Args:         cmds,
 		Envs:         c.cmdEnvs([]vc.EnvVar{}),
 		WorkDir:      c.spec.Workdir,
 		User:         user,
