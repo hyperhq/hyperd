@@ -614,7 +614,7 @@ func (c *Container) ociEnv() []string {
 	return envs
 }
 
-func (c *Container) ociSpec(cjson *dockertypes.ContainerJSON, cmds []string) *specs.Spec {
+func (c *Container) ociSpec(cjson *dockertypes.ContainerJSON, cmds []string, user string) *specs.Spec {
 	var ocispec specs.Spec
 
 	ocispec = oci.DefaultSpec()
@@ -628,12 +628,7 @@ func (c *Container) ociSpec(cjson *dockertypes.ContainerJSON, cmds []string) *sp
 
 	ocispec.Hostname = c.p.globalSpec.Hostname
 
-	/*
-	* ocispec used the user's UID and GID instead of user name and group name,
-	* thus it needed to convert the user name and group name to UID and GID in
-	* the future, here just set it to "0" as default.
-	 */
-	ocispec.Process.User = specs.User{UID: 0, GID: 0}
+	ocispec.Process.User = specs.User{Username: user}
 
 	for _, l := range c.spec.Ulimits {
 		ltype := strings.ToLower(l.Name)
@@ -648,7 +643,8 @@ func (c *Container) ociSpec(cjson *dockertypes.ContainerJSON, cmds []string) *sp
 }
 
 func (c *Container) containerConfig(cjson *dockertypes.ContainerJSON) (*vc.ContainerConfig, error) {
-	var user, group string
+	var user = "0"
+	var group = "0"
 	var ociSpec *specs.Spec
 	var cmds []string
 
@@ -665,10 +661,30 @@ func (c *Container) containerConfig(cjson *dockertypes.ContainerJSON) (*vc.Conta
 		c.spec.StopSignal = "TERM"
 	}
 
+	if c.spec.User != nil {
+		if c.spec.User.Name != "" {
+			user = c.spec.User.Name
+		}
+		if c.spec.User.Group != "" {
+			group = c.spec.User.Group
+		}
+	} else if cjson.Config.User != "" {
+		users := strings.Split(cjson.Config.User, ":")
+		if len(users) > 2 {
+			return nil, fmt.Errorf("container %s invalid user group config: %s", cjson.Name, cjson.Config.User)
+		}
+		if len(users) == 2 {
+			user = users[0]
+			group = users[1]
+		} else {
+			user = cjson.Config.User
+		}
+	}
+
 	cmds = append(cmds, cjson.Config.Entrypoint.Slice()...)
 	cmds = append(cmds, cjson.Config.Cmd.Slice()...)
 
-	ociSpec = c.ociSpec(cjson, cmds)
+	ociSpec = c.ociSpec(cjson, cmds, user)
 
 	//remove those namespace types from ocispec
 	for _, ns := range []specs.LinuxNamespaceType{
@@ -705,11 +721,6 @@ func (c *Container) containerConfig(cjson *dockertypes.ContainerJSON) (*vc.Conta
 		return nil, err
 	}
 	c.Log(DEBUG, "mount id: %s", mountId)
-
-	if c.spec.User != nil {
-		user = c.spec.User.Name
-		group = c.spec.User.Group
-	}
 
 	cmd := vc.Cmd{
 		Args:         cmds,
