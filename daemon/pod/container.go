@@ -261,8 +261,6 @@ func (c *Container) start() error {
 
 	c.startLogging()
 
-	go c.waitFinish(-1)
-
 	c.Log(INFO, "start container")
 	if _, err := c.p.sandbox.StartContainer(c.Id()); err != nil {
 		c.Log(ERROR, "failed to start container: %v", err)
@@ -1039,8 +1037,6 @@ func (c *Container) associateToSandbox() error {
 		c.status.CreatedAt = time.Now()
 	}
 
-	go c.waitFinish(-1)
-
 	c.startLogging()
 
 	return nil
@@ -1498,6 +1494,12 @@ func (c *Container) AttachStreams(openStdin, stdinOnce, tty bool, stdin io.ReadC
 	go attachStream("stdout", stdout, cStdout)
 
 	wg.Wait()
+
+	//Once wait process completed, the kata agent will cleanup the container process,
+	//thus, it's better to do it after the IO terminated. Otherwise, it may cause
+	//losing some io contents befor it is read after cleanup container process.
+	go c.waitFinish(-1)
+
 	close(errors)
 	for err := range errors {
 		if err != nil {

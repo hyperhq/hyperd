@@ -146,6 +146,16 @@ func (p *XPod) StartExec(stdin io.ReadCloser, stdout io.WriteCloser, containerId
 	}
 	es.Id = process.Token
 
+	cstdin, cstdout, cstderr, err := p.sandbox.IOStream(containerId, es.Id)
+	if err != nil {
+		c.Log(ERROR, err)
+		return err
+	}
+
+	go streamCopy(tty, cstdin, cstdout, cstderr)
+
+	<-wReader.wait
+
 	go func(es *Exec) {
 		ret, err := p.sandbox.WaitProcess(containerId, es.Id)
 		if err != nil {
@@ -163,16 +173,6 @@ func (p *XPod) StartExec(stdin io.ReadCloser, stdout io.WriteCloser, containerId
 			es.Log(WARNING, "exec already set as stopped")
 		}
 	}(es)
-
-	cstdin, cstdout, cstderr, err := p.sandbox.IOStream(containerId, es.Id)
-	if err != nil {
-		c.Log(ERROR, err)
-		return err
-	}
-
-	go streamCopy(tty, cstdin, cstdout, cstderr)
-
-	<-wReader.wait
 
 	return nil
 }
