@@ -141,42 +141,27 @@ func (streamConfig *StreamConfig) CloseStreams() error {
 
 func streamCopy(tty *TtyIO, stdinPipe io.WriteCloser, stdoutPipe, stderrPipe io.Reader) {
 	var wg sync.WaitGroup
-	// old way cleanup all(expect stdinPipe) no matter what kinds of fails, TODO: change it
-	var once sync.Once
-	// cleanup closes tty.Stdin and thus terminates the first go routine
-	cleanup := func() {
-		tty.Close()
-	}
+
 	if tty.Stdin != nil {
 		go func() {
-			_, err := io.Copy(stdinPipe, tty.Stdin)
+			_, _ = io.Copy(stdinPipe, tty.Stdin)
 			stdinPipe.Close()
-			if err != nil {
-				// we should not call cleanup when tty.Stdin reaches EOF
-				once.Do(cleanup)
-			}
 		}()
 	}
 	if tty.Stdout != nil {
 		wg.Add(1)
 		go func() {
-			_, err := io.Copy(tty.Stdout, stdoutPipe)
-			if err != nil {
-				once.Do(cleanup)
-			}
+			_, _ = io.Copy(tty.Stdout, stdoutPipe)
 			wg.Done()
 		}()
 	}
 	if tty.Stderr != nil && stderrPipe != nil {
 		wg.Add(1)
 		go func() {
-			_, err := io.Copy(tty.Stderr, stderrPipe)
-			if err != nil {
-				once.Do(cleanup)
-			}
+			_, _ = io.Copy(tty.Stderr, stderrPipe)
 			wg.Done()
 		}()
 	}
 	wg.Wait()
-	once.Do(cleanup)
+	tty.Close()
 }
