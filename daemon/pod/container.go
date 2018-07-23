@@ -569,8 +569,10 @@ func newOciMount(m dockertypes.MountPoint) specs.Mount {
 func (c *Container) containerOciMounts() ([]vc.Mount, []specs.Mount) {
 	var cmnts []vc.Mount
 	var ocimnts []specs.Mount
+	var readonly = ""
 
 	for _, vol := range c.spec.Volumes {
+
 		if vol.Detail.Format == "vfs" {
 			cmnt := vc.Mount{
 				Source:      vol.Detail.Source,
@@ -579,13 +581,17 @@ func (c *Container) containerOciMounts() ([]vc.Mount, []specs.Mount) {
 				ReadOnly:    vol.ReadOnly,
 			}
 
+			if vol.ReadOnly {
+				readonly = "ro"
+			}
+
 			cmnts = append(cmnts, cmnt)
 
 			ocimnt := specs.Mount{
 				Source:      vol.Detail.Source,
 				Destination: vol.Path,
 				Type:        "bind",
-				Options:     []string{"rbind", "rprivate"},
+				Options:     []string{"rbind", "rprivate", readonly},
 			}
 
 			ocimnts = append(ocimnts, ocimnt)
