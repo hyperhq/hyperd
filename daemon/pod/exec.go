@@ -133,11 +133,6 @@ func (p *XPod) StartExec(stdin io.ReadCloser, stdout io.WriteCloser, containerId
 		PrimaryGroup: "0",
 	}
 
-	if c.spec.User != nil {
-		cmd.User = c.spec.User.Name
-		cmd.PrimaryGroup = c.spec.User.Group
-	}
-
 	_, process, err := p.sandbox.EnterContainer(containerId, cmd)
 	if err != nil {
 		err := fmt.Errorf("cannot enter container %s, with err %s", containerId, err)
