@@ -174,9 +174,9 @@ hyper::test::remove_container_with_volume() {
 hyper::test::imageuser() {
   echo "Pod image user config test"
   # irssi image has "User": "user"
-  # id=$(sudo hyperctl run -d --env="TERM=xterm" irssi:1 | sed -ne "s/POD id is \(.*\)/\1/p")
-  res=$(sudo hyperctl run --rm --env="TERM=xterm" irssi:1 whoami | grep user > /dev/null 2>&1; echo $?)
-  # sudo hyperctl rm $id
+  id=$(sudo hyperctl run -d --env="TERM=xterm" irssi:1.0 | sed -ne "s/POD id is \(.*\)/\1/p")
+  res=$(sudo hyperctl exec $id ps aux | grep user > /dev/null 2>&1; echo $?)
+  sudo hyperctl rm $id
   test $res -eq 0
 }
 

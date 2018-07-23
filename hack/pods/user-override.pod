@@ -1,6 +1,6 @@
 {
 	"containers" : [{
-	    "image": "irssi:1",
+	    "image": "irssi:1.0",
 	    "user": {
 		"name": "nobody"
 	    },
