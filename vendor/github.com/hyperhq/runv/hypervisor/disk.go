@@ -19,6 +19,7 @@ type DiskDescriptor struct {
 	ScsiAddr     string
 	DockerVolume bool
 	ReadOnly     bool
+	Cache        string
 	Options      map[string]string
 }
 
@@ -49,6 +50,7 @@ func NewDiskContext(ctx *VmContext, vol *api.VolumeDescription) *DiskContext {
 			Fstype:       vol.Fstype,
 			DockerVolume: vol.DockerVolume,
 			ReadOnly:     vol.ReadOnly,
+			Cache:        vol.Cache,
 		},
 		sandbox:   ctx,
 		observers: make(map[string]*sync.WaitGroup),

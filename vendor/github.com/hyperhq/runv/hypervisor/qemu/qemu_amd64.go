@@ -5,13 +5,17 @@ package qemu
 import (
 	"fmt"
 	"os"
+	"runtime"
+	"syscall"
 
 	"github.com/golang/glog"
+	"github.com/hyperhq/hypercontainer-utils/hlog"
 	"github.com/hyperhq/runv/hypervisor"
 )
 
 const (
-	QEMU_SYSTEM_EXE = "qemu-system-x86_64"
+	QEMU_SYSTEM_EXE       = "qemu-system-x86_64"
+	X86_64_CONFIG_NR_CPUS = 64
 )
 
 func (qc *QemuContext) arguments(ctx *hypervisor.VmContext) []string {
@@ -26,10 +30,23 @@ func (qc *QemuContext) arguments(ctx *hypervisor.VmContext) []string {
 	boot := ctx.Boot
 	qc.cpus = boot.CPU
 
+	maxmem := hypervisor.DefaultMaxMem
+	var sysInfo syscall.Sysinfo_t
+	err := syscall.Sysinfo(&sysInfo)
+	if err == nil {
+		maxmem = int(sysInfo.Totalram / 1024 / 1024)
+	} else {
+		ctx.Log(hlog.DEBUG, "syscall.Sysinfo got error %v, use hypervisor.DefaultMaxMem", err)
+	}
+	maxcpus := runtime.NumCPU()
+	if maxcpus > X86_64_CONFIG_NR_CPUS {
+		maxcpus = X86_64_CONFIG_NR_CPUS
+	}
+
 	var machineClass, memParams, cpuParams string
 	machineClass = "pc-i440fx-2.1"
-	memParams = fmt.Sprintf("size=%d,slots=1,maxmem=%dM", boot.Memory, hypervisor.DefaultMaxMem) // TODO set maxmem to the total memory of the system
-	cpuParams = fmt.Sprintf("cpus=%d,maxcpus=%d", boot.CPU, hypervisor.DefaultMaxCpus)           // TODO set it to the cpus of the system
+	memParams = fmt.Sprintf("size=%d,slots=1,maxmem=%dM", boot.Memory, maxmem)
+	cpuParams = fmt.Sprintf("cpus=%d,maxcpus=%d", boot.CPU, maxcpus)
 
 	cmdline := "console=ttyS0 panic=1 no_timer_check iommu=off"
 	params := []string{
@@ -64,20 +81,20 @@ func (qc *QemuContext) arguments(ctx *hypervisor.VmContext) []string {
 		//TODO: mount hugetlbfs on /dev/hugepages
 		boot.MemoryPath = "/dev/hugepages"
 		memObject := fmt.Sprintf("memory-backend-file,id=hyper-memory,size=%dM,mem-path=%s,share=on", boot.Memory, boot.MemoryPath)
-		nodeConfig := fmt.Sprintf("node,nodeid=0,cpus=0-%d,memdev=hyper-memory", hypervisor.DefaultMaxCpus-1)
+		nodeConfig := fmt.Sprintf("node,nodeid=0,cpus=0-%d,memdev=hyper-memory", maxcpus-1)
 		params = append(params, "-object", memObject, "-numa", nodeConfig)
 	} else if boot.BootToBeTemplate || boot.BootFromTemplate {
 		memObject := fmt.Sprintf("memory-backend-file,id=hyper-template-memory,size=%dM,mem-path=%s", boot.Memory, boot.MemoryPath)
 		if boot.BootToBeTemplate {
 			memObject = memObject + ",share=on"
 		}
-		nodeConfig := fmt.Sprintf("node,nodeid=0,cpus=0-%d,memdev=hyper-template-memory", hypervisor.DefaultMaxCpus-1)
+		nodeConfig := fmt.Sprintf("node,nodeid=0,cpus=0-%d,memdev=hyper-template-memory", maxcpus-1)
 		params = append(params, "-object", memObject, "-numa", nodeConfig)
 		if boot.BootFromTemplate {
 			params = append(params, "-S", "-incoming", fmt.Sprintf("exec:cat %s", boot.DevicesStatePath))
 		}
 	} else {
-		nodeConfig := fmt.Sprintf("node,nodeid=0,cpus=0-%d,mem=%d", hypervisor.DefaultMaxCpus-1, boot.Memory)
+		nodeConfig := fmt.Sprintf("node,nodeid=0,cpus=0-%d,mem=%d", maxcpus-1, boot.Memory)
 		params = append(params, "-numa", nodeConfig)
 	}
 
