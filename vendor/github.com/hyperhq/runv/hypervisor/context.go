@@ -62,6 +62,8 @@ type VmContext struct {
 
 	logPrefix string
 
+	GDBTCPPort int
+
 	lock      sync.RWMutex //protect update of context
 	idLock    sync.Mutex
 	pauseLock sync.Mutex
@@ -140,6 +142,7 @@ func InitContext(id string, hub chan VmEvent, client chan *types.VmResponse, dc 
 		logPrefix:             fmt.Sprintf("SB[%s] ", id),
 		sockConnected:         make(chan bool),
 		cancelWatchHyperstart: make(chan struct{}),
+		GDBTCPPort:            boot.GDBTCPPort,
 	}
 	ctx.networks.sandbox = ctx
 

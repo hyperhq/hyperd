@@ -3,6 +3,7 @@ package types
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/Unknwon/goconfig"
@@ -28,6 +29,7 @@ type HyperConfig struct {
 	EnableVsock     bool
 	DefaultLog      string
 	DefaultLogOpt   map[string]string
+	GDBTCPPort      int
 
 	logPrefix string
 }
@@ -70,6 +72,14 @@ func NewHyperConfig(config string) *HyperConfig {
 	c.DefaultLogOpt, _ = cfg.GetSection("Log")
 	c.VmFactoryPolicy, _ = cfg.GetValue(goconfig.DEFAULT_SECTION, "VmFactoryPolicy")
 	c.GRPCHost, _ = cfg.GetValue(goconfig.DEFAULT_SECTION, "gRPCHost")
+	port, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "GDBTCPPort")
+	if port != "" {
+		c.GDBTCPPort, err = strconv.Atoi(port)
+		if err != nil {
+			c.Log(hlog.ERROR, "read config file GDBTCPPort %s failed: %v", port, err)
+			return nil
+		}
+	}
 
 	c.Log(hlog.INFO, "config items: %#v", c)
 	return c
