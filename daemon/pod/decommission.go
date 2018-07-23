@@ -10,10 +10,10 @@ import (
 	dockertypes "github.com/docker/engine-api/types"
 
 	"github.com/hyperhq/hyperd/utils"
-	"github.com/hyperhq/runv/hypervisor"
+	vc "github.com/kata-containers/runtime/virtcontainers"
 )
 
-type sandboxOp func(sb *hypervisor.Vm) error
+type sandboxOp func(sb vc.VCSandbox) error
 type stateValidator func(state PodState) bool
 
 func (p *XPod) DelayDeleteOn() bool {
@@ -27,40 +27,37 @@ func (p *XPod) Stop(graceful int) error {
 	}
 
 	p.Log(DEBUG, "pod stopped, now wait cleanup")
-	if cleanup := p.waitStopDone(graceful, "stop container"); !cleanup {
-		p.Log(WARNING, "timeout while wait cleanup pod")
-		return fmt.Errorf("did not finish clean up in %d seconds", graceful)
-	}
+	p.cleanup()
 
 	return nil
 }
 
 func (p *XPod) ForceQuit() {
 	err := p.protectedSandboxOperation(
-		func(sb *hypervisor.Vm) error {
-			sb.Kill()
-			return nil
+		func(sb vc.VCSandbox) error {
+			_, err := vc.StopSandbox(sb.ID())
+			return err
 		},
 		time.Second*5,
 		"kill pod")
 	if err != nil {
 		p.Log(ERROR, "force quit failed: %v", err)
 	}
+	p.cleanup()
 }
 
 func (p *XPod) Remove(force bool) error {
+	var err error
 
 	if p.IsRunning() {
 		if !force {
-			err := fmt.Errorf("pod is running, cannot be removed")
+			err = fmt.Errorf("pod is running, cannot be removed")
 			p.Log(ERROR, err)
 			return err
 		}
 		p.Log(DEBUG, "stop pod before remove")
 		p.doStopPod(10)
-		if cleanup := p.waitStopDone(60, "Remove Pod"); !cleanup {
-			p.Log(WARNING, "timeout while waiting pod stopped")
-		}
+		p.cleanup()
 	}
 
 	p.resourceLock.Lock()
@@ -118,8 +115,8 @@ func (p *XPod) Pause() error {
 	p.statusLock.Unlock()
 
 	err := p.protectedSandboxOperation(
-		func(sb *hypervisor.Vm) error {
-			return sb.Pause(true)
+		func(sb vc.VCSandbox) error {
+			return sb.Pause()
 		},
 		time.Second*5,
 		"pause pod")
@@ -148,8 +145,18 @@ func (p *XPod) UnPause() error {
 	p.statusLock.Unlock()
 
 	err := p.protectedSandboxOperation(
-		func(sb *hypervisor.Vm) error {
-			return sb.Pause(false)
+		func(sb vc.VCSandbox) error {
+			var err error
+			defer func() {
+				if err == nil {
+					go p.waitVMStop()
+				}
+			}()
+			err = sb.Resume()
+			if err != nil {
+				return err
+			}
+			return nil
 		},
 		time.Second*5,
 		"resume pod")
@@ -176,8 +183,8 @@ func (p *XPod) KillContainer(id string, sig int64) error {
 	}
 	c.setKill()
 	return p.protectedSandboxOperation(
-		func(sb *hypervisor.Vm) error {
-			return sb.KillContainer(id, syscall.Signal(sig))
+		func(sb vc.VCSandbox) error {
+			return sb.SignalProcess(id, id, syscall.Signal(sig), true)
 		},
 		time.Second*5,
 		fmt.Sprintf("Kill container %s with %d", id, sig))
@@ -307,7 +314,7 @@ func (p *XPod) RemoveContainer(id string) error {
 // protectedSandboxOperation() protect the hypervisor operations, which may
 // panic or hang too long time.
 func (p *XPod) protectedSandboxOperation(op sandboxOp, timeout time.Duration, comment string) error {
-	dangerousOp := func(sb *hypervisor.Vm, errChan chan<- error) {
+	dangerousOp := func(sb vc.VCSandbox, errChan chan<- error) {
 		defer func() {
 			err := recover()
 			if err != nil {
@@ -393,13 +400,13 @@ func (p *XPod) doStopPod(graceful int) error {
 	}
 
 	p.Log(INFO, "stop container success, shutdown sandbox")
-	result := p.sandbox.Shutdown()
-	if result.IsSuccess() {
+	_, err = vc.StopSandbox(p.sandbox.ID())
+	if err == nil {
 		p.Log(INFO, "pod is stopped")
 		return nil
 	}
 
-	err = fmt.Errorf("failed to shuting down: %s", result.Message())
+	err = fmt.Errorf("failed to shuting down: %s", err)
 	p.Log(ERROR, err)
 	return err
 }
@@ -448,13 +455,20 @@ func (p *XPod) stopContainers(cList []string, graceful int) error {
 		}
 		future.Add(c.Id(), func() error {
 			var toc <-chan time.Time
+			var retch = make(chan int32)
+
 			if int64(graceful) < 0 {
 				toc = make(chan time.Time)
 			} else {
 				toc = time.After(waitTime)
 			}
+
 			forceKill := graceful == 0
-			resChan := p.sandbox.WaitProcess(true, []string{c.Id()}, -1)
+			go func(retch chan int32, c *Container) {
+				ret, _ := p.sandbox.WaitProcess(c.Id(), c.Id())
+				retch <- ret
+			}(retch, c)
+
 			c.Log(DEBUG, "now, stop container")
 			err := c.terminate(forceKill)
 			// TODO filter container/process can't find error
@@ -464,20 +478,11 @@ func (p *XPod) stopContainers(cList []string, graceful int) error {
 					return err
 				}
 			}
-			if resChan == nil {
-				err := fmt.Errorf("cannot wait container %s", c.Id())
-				p.Log(ERROR, err)
-				return err
-			}
+
 			for {
 				select {
-				case ex, ok := <-resChan:
-					if !ok {
-						err := fmt.Errorf("chan broken while waiting container: %s", c.Id())
-						p.Log(WARNING, err)
-						return err
-					}
-					p.Log(DEBUG, "container %s stopped (%v)", ex.Id, ex.Code)
+				case ret := <-retch:
+					p.Log(DEBUG, "container %s stopped (%d)", c.Id(), ret)
 					return nil
 				case <-toc:
 					if forceKill {
@@ -493,6 +498,7 @@ func (p *XPod) stopContainers(cList []string, graceful int) error {
 				}
 			}
 			return nil
+
 		})
 	}
 
@@ -505,24 +511,6 @@ func (p *XPod) stopContainers(cList []string, graceful int) error {
 	return nil
 }
 
-func (p *XPod) waitStopDone(timeout int, comments string) bool {
-	select {
-	case s, ok := <-p.stoppedChan:
-		if ok {
-			p.Log(DEBUG, "got stop msg and push it again: %s", comments)
-			select {
-			case p.stoppedChan <- s:
-			default:
-			}
-		}
-		p.Log(DEBUG, "wait stop done: %s", comments)
-		return true
-	case <-utils.Timeout(timeout):
-		p.Log(DEBUG, "wait stop timeout: %s", comments)
-		return false
-	}
-}
-
 // waitVMStop() should only be call for the life monitoring, others should wait the `waitStopDone`
 func (p *XPod) waitVMStop() {
 	p.statusLock.RLock()
@@ -532,8 +520,20 @@ func (p *XPod) waitVMStop() {
 	}
 	p.statusLock.RUnlock()
 
-	_, _ = <-p.sandbox.WaitVm(-1)
-	p.Log(INFO, "got vm exit event")
+	monitor, err := p.sandbox.Monitor()
+	if err != nil {
+		p.Log(INFO, "cannot monitor the vm, %v", err)
+	} else {
+		ret, ok := <-monitor
+		/*get the sandbox released notification, thus it doesn't need to do cleanup*/
+		if !ok {
+			p.Log(INFO, "got vm disassociate event")
+			return
+		}
+		p.Log(INFO, "got vm exit event: %v", ret)
+	}
+	//in the future, needed to kill the sandbox and delete it here, in case
+	//there is dad sandbox process
 	p.cleanup()
 }
 
@@ -576,10 +576,6 @@ func (p *XPod) cleanup() {
 	p.statusLock.Unlock()
 
 	p.Log(INFO, "pod stopped")
-	select {
-	case p.stoppedChan <- true:
-	default:
-	}
 }
 
 func (p *XPod) decommissionResources() (err error) {
@@ -615,7 +611,13 @@ func (p *XPod) decommissionResources() (err error) {
 		}
 	}
 
-	p.sandbox = nil
+	if p.sandbox != nil {
+		err = p.sandbox.Delete()
+		if err != nil {
+			p.Log(ERROR, "remove sandbox failed: %v", err)
+		}
+		p.sandbox = nil
+	}
 
 	cleanupHosts(p.Id())
 	// then it could be start again.

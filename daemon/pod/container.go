@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 
+	"encoding/json"
 	"github.com/docker/docker/daemon/logger"
 	"github.com/docker/docker/daemon/logger/jsonfilelog"
 	"github.com/docker/docker/pkg/stdcopy"
@@ -18,7 +20,6 @@ import (
 	dockertypes "github.com/docker/engine-api/types"
 	"github.com/docker/engine-api/types/container"
 	"github.com/docker/engine-api/types/strslice"
-
 	"github.com/hyperhq/hypercontainer-utils/hlog"
 	"github.com/hyperhq/hyperd/errors"
 	apitypes "github.com/hyperhq/hyperd/types"
@@ -26,6 +27,10 @@ import (
 	runv "github.com/hyperhq/runv/api"
 	"github.com/hyperhq/runv/hypervisor"
 	"github.com/hyperhq/runv/lib/term"
+	vc "github.com/kata-containers/runtime/virtcontainers"
+	vcAnnotations "github.com/kata-containers/runtime/virtcontainers/pkg/annotations"
+	"github.com/moby/oci"
+	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
 var epocZero = time.Time{}
@@ -40,6 +45,8 @@ const (
 	S_CONTAINER_RUNNING
 	S_CONTAINER_STOPPING
 )
+
+const ROOTFS string = "rootfs"
 
 type ContainerStatus struct {
 	State      ContainerState
@@ -58,10 +65,11 @@ type ContainerStatus struct {
 type Container struct {
 	p *XPod
 
-	spec     *apitypes.UserContainer
-	descript *runv.ContainerDescription
-	status   *ContainerStatus
-	streams  *StreamConfig
+	spec       *apitypes.UserContainer
+	mountId    string
+	contConfig *vc.ContainerConfig
+	status     *ContainerStatus
+	streams    *StreamConfig
 
 	logger    LogStatus
 	logPrefix string
@@ -118,10 +126,10 @@ func (c *Container) SpecName() string {
 }
 
 func (c *Container) RuntimeName() string {
-	if c.descript != nil {
-		return c.descript.Name
+	if c.SpecName()[0] != '/' {
+		return "/" + c.SpecName()
 	}
-	return ""
+	return c.SpecName()
 }
 
 func (c *Container) hasTty() bool {
@@ -162,16 +170,17 @@ func (c *Container) InfoLocked() *apitypes.Container {
 			ReadOnly:  vol.ReadOnly,
 		})
 	}
-	if c.descript != nil {
-		cinfo.ImageID = c.descript.Image
-		cinfo.Args = c.descript.Args
-		cinfo.WorkingDir = c.descript.Workdir
-		cinfo.Env = make([]*apitypes.EnvironmentVar, 0, len(c.descript.Envs))
-		for e, v := range c.descript.Envs {
-			cinfo.Env = append(cinfo.Env, &apitypes.EnvironmentVar{
-				Env:   e,
-				Value: v,
-			})
+	if c.contConfig != nil {
+		cinfo.ImageID = c.spec.Image
+		cinfo.Args = c.spec.Command
+		cinfo.WorkingDir = c.contConfig.Cmd.WorkDir
+		cinfo.Env = make([]*apitypes.EnvironmentVar, 0, len(c.contConfig.Cmd.Envs))
+		for _, e := range c.contConfig.Cmd.Envs {
+			environmentVar := apitypes.EnvironmentVar{
+				Env:   e.Var,
+				Value: e.Value,
+			}
+			cinfo.Env = append(cinfo.Env, &environmentVar)
 		}
 	} else {
 		cinfo.Env = make([]*apitypes.EnvironmentVar, 0, len(c.spec.Envs))
@@ -252,10 +261,8 @@ func (c *Container) start() error {
 
 	c.startLogging()
 
-	go c.waitFinish(-1)
-
 	c.Log(INFO, "start container")
-	if err := c.p.sandbox.StartContainer(c.Id()); err != nil {
+	if _, err := c.p.sandbox.StartContainer(c.Id()); err != nil {
 		c.Log(ERROR, "failed to start container: %v", err)
 		return err
 	}
@@ -276,7 +283,7 @@ func (c *Container) Remove() error {
 
 // Container operations:
 func (c *Container) attach(stdin io.ReadCloser, stdout io.WriteCloser, rsp chan<- error) error {
-	if c.p.sandbox == nil || c.descript == nil {
+	if c.p.sandbox == nil || c.contConfig == nil {
 		err := fmt.Errorf("container not ready for attach")
 		c.Log(ERROR, err)
 		return err
@@ -415,12 +422,6 @@ func (c *Container) init(allowCreate bool) error {
 
 	c.status.CreatedAt, _ = time.Parse(time.RFC3339Nano, cjson.Created)
 
-	desc, err := c.describeContainer(cjson)
-	if err != nil {
-		c.Log(ERROR, err)
-		return err
-	}
-
 	c.mergeVolumes(cjson)
 
 	if !loaded {
@@ -433,12 +434,15 @@ func (c *Container) init(allowCreate bool) error {
 		c.configEtcHosts()
 
 		c.configDNS()
-		c.injectFiles(desc.MountId)
+		c.injectFiles(c.mountId)
 	}
 
-	desc.Volumes = c.parseVolumes()
-	desc.Initialize = !loaded
-	c.descript = desc
+	contConfig, err := c.containerConfig(cjson)
+	if err != nil {
+		c.Log(ERROR, err)
+		return err
+	}
+	c.contConfig = contConfig
 
 	return nil
 }
@@ -493,6 +497,7 @@ func (c *Container) createByEngine() (*dockertypes.ContainerJSON, error) {
 	if len(c.spec.Envs) != 0 {
 		envs := []string{}
 		for _, env := range c.spec.Envs {
+
 			envs = append(envs, env.Env+"="+env.Value)
 		}
 		config.Env = envs
@@ -518,79 +523,147 @@ func (c *Container) createByEngine() (*dockertypes.ContainerJSON, error) {
 		return nil, err
 	}
 
+	for _, v := range rsp.Config.Env {
+		pair := strings.SplitN(v, "=", 2)
+		var env = apitypes.EnvironmentVar{}
+
+		if len(pair) == 2 {
+			env = apitypes.EnvironmentVar{Env: pair[0], Value: pair[1]}
+		} else if len(pair) == 1 {
+			env = apitypes.EnvironmentVar{Env: pair[0], Value: ""}
+		}
+
+		c.spec.Envs = append(c.spec.Envs, &env)
+	}
+
 	c.spec.Id = ccs.ID
 	c.updateLogPrefix()
 	return rsp, nil
 }
 
-func (c *Container) describeContainer(cjson *dockertypes.ContainerJSON) (*runv.ContainerDescription, error) {
-
-	c.Log(TRACE, "container info config %#v, Cmd %v, Args %v", cjson.Config, cjson.Config.Cmd.Slice(), cjson.Args)
-
-	if c.spec.Image == "" {
-		c.spec.Image = cjson.Config.Image
+func (c *Container) cmdEnvs(envs []vc.EnvVar) []vc.EnvVar {
+	for _, env := range c.spec.Envs {
+		envs = append(envs,
+			vc.EnvVar{
+				Var:   env.Env,
+				Value: env.Value,
+			})
 	}
-	c.Log(INFO, "describe container")
+	return envs
+}
 
-	mountId, err := GetMountIdByContainer(c.p.factory.sd.Type(), c.spec.Id)
-	if err != nil {
-		err = fmt.Errorf("Cannot find mountID for container %s : %s", c.spec.Id, err)
-		c.Log(ERROR, "Cannot find mountID for container %s", err)
-		return nil, err
+func newcMount(m dockertypes.MountPoint) vc.Mount {
+	return vc.Mount{
+		Source:      m.Source,
+		Destination: m.Destination,
 	}
-	c.Log(DEBUG, "mount id: %s", mountId)
+}
 
-	cdesc := &runv.ContainerDescription{
-		Id: c.spec.Id,
+func newOciMount(m dockertypes.MountPoint) specs.Mount {
+	return specs.Mount{
+		Source:      m.Source,
+		Destination: m.Destination,
+	}
+}
 
-		Name:  cjson.Name, // will have a "/"
-		Image: cjson.Image,
+func (c *Container) containerOciMounts() ([]vc.Mount, []specs.Mount) {
+	var cmnts []vc.Mount
+	var ocimnts []specs.Mount
+	var readonly = ""
 
-		Labels: c.spec.Labels,
-		Tty:    c.spec.Tty,
+	for _, vol := range c.spec.Volumes {
 
-		RootVolume: &runv.VolumeDescription{},
-		MountId:    mountId,
-		RootPath:   "rootfs",
+		if vol.Detail.Format == "vfs" {
+			cmnt := vc.Mount{
+				Source:      vol.Detail.Source,
+				Destination: vol.Path,
+				Type:        "bind",
+				ReadOnly:    vol.ReadOnly,
+			}
 
-		Envs:    make(map[string]string),
-		Workdir: cjson.Config.WorkingDir,
-		Path:    cjson.Path,
-		Args:    cjson.Args,
-		Rlimits: make([]*runv.Rlimit, 0, len(c.spec.Ulimits)),
+			if vol.ReadOnly {
+				readonly = "ro"
+			}
 
-		StopSignal: strings.ToUpper(cjson.Config.StopSignal),
+			cmnts = append(cmnts, cmnt)
+
+			ocimnt := specs.Mount{
+				Source:      vol.Detail.Source,
+				Destination: vol.Path,
+				Type:        "bind",
+				Options:     []string{"rbind", "rprivate", readonly},
+			}
+
+			ocimnts = append(ocimnts, ocimnt)
+		}
 	}
 
-	//make sure workdir has an initial val
-	if cdesc.Workdir == "" {
-		cdesc.Workdir = "/"
+	return cmnts, ocimnts
+}
+
+func (c *Container) ociEnv() []string {
+	var envs []string
+
+	for _, env := range c.spec.Envs {
+		envs = append(envs, env.Env+"="+env.Value)
 	}
+
+	return envs
+}
+
+func (c *Container) ociSpec(cjson *dockertypes.ContainerJSON, cmds []string, user string) *specs.Spec {
+	var ocispec specs.Spec
+
+	ocispec = oci.DefaultSpec()
+	ocispec.Root.Path = ROOTFS
+	ocispec.Root.Readonly = c.spec.ReadOnly
+
+	ocispec.Process.Args = cmds
+	ocispec.Process.Env = c.ociEnv()
+	ocispec.Process.Cwd = c.spec.Workdir
+	ocispec.Process.Terminal = c.spec.Tty
+
+	ocispec.Hostname = c.p.globalSpec.Hostname
+
+	ocispec.Process.User = specs.User{Username: user}
 
 	for _, l := range c.spec.Ulimits {
 		ltype := strings.ToLower(l.Name)
-		cdesc.Rlimits = append(cdesc.Rlimits, &runv.Rlimit{
+		ocispec.Process.Rlimits = append(ocispec.Process.Rlimits, specs.LinuxRlimit{
 			Type: ltype,
 			Hard: l.Hard,
 			Soft: l.Soft,
 		})
 	}
 
-	if c.spec.StopSignal != "" {
-		cdesc.StopSignal = c.spec.StopSignal
+	return &ocispec
+}
+
+func (c *Container) containerConfig(cjson *dockertypes.ContainerJSON) (*vc.ContainerConfig, error) {
+	var user = "0"
+	var group = "0"
+	var ociSpec *specs.Spec
+	var cmds []string
+
+	c.Log(TRACE, "container info config %#v, Cmd %v, Args %v", cjson.Config, cjson.Config.Cmd.Slice(), cjson.Args)
+
+	if c.spec.StopSignal == "" {
+		c.spec.StopSignal = strings.ToUpper(cjson.Config.StopSignal)
 	}
-	if strings.HasPrefix(cdesc.StopSignal, "SIG") {
-		cdesc.StopSignal = cdesc.StopSignal[len("SIG"):]
-	}
-	if cdesc.StopSignal == "" {
-		cdesc.StopSignal = "TERM"
+	if strings.HasPrefix(c.spec.StopSignal, "SIG") {
+		c.spec.StopSignal = c.spec.StopSignal[len("SIG"):]
 	}
 
-	if c.spec.User != nil && c.spec.User.Name != "" {
-		cdesc.UGI = &runv.UserGroupInfo{
-			User:             c.spec.User.Name,
-			Group:            c.spec.User.Group,
-			AdditionalGroups: c.spec.User.AdditionalGroups,
+	if c.spec.StopSignal == "" {
+		c.spec.StopSignal = "TERM"
+	}
+
+	if c.spec.User != nil {
+		if c.spec.User.Name != "" {
+			user = c.spec.User.Name
+		}
+		if c.spec.User.Group != "" {
+			group = c.spec.User.Group
 		}
 	} else if cjson.Config.User != "" {
 		users := strings.Split(cjson.Config.User, ":")
@@ -598,29 +671,79 @@ func (c *Container) describeContainer(cjson *dockertypes.ContainerJSON) (*runv.C
 			return nil, fmt.Errorf("container %s invalid user group config: %s", cjson.Name, cjson.Config.User)
 		}
 		if len(users) == 2 {
-			cdesc.UGI = &runv.UserGroupInfo{
-				User:  users[0],
-				Group: users[1],
-			}
+			user = users[0]
+			group = users[1]
 		} else {
-			cdesc.UGI = &runv.UserGroupInfo{
-				User: cjson.Config.User,
-			}
+			user = cjson.Config.User
 		}
 	}
 
-	for _, v := range cjson.Config.Env {
-		pair := strings.SplitN(v, "=", 2)
-		if len(pair) == 2 {
-			cdesc.Envs[pair[0]] = pair[1]
-		} else if len(pair) == 1 {
-			cdesc.Envs[pair[0]] = ""
-		}
+	cmds = append(cmds, cjson.Config.Entrypoint.Slice()...)
+	cmds = append(cmds, cjson.Config.Cmd.Slice()...)
+
+	ociSpec = c.ociSpec(cjson, cmds, user)
+
+	//remove those namespace types from ocispec
+	for _, ns := range []specs.LinuxNamespaceType{
+		specs.NetworkNamespace,
+		specs.UserNamespace,
+		specs.UTSNamespace,
+		specs.IPCNamespace,
+		specs.CgroupNamespace,
+	} {
+		oci.RemoveNamespace(ociSpec, ns)
 	}
 
-	c.Log(TRACE, "Container Info is \n%#v", cdesc)
+	cmnts, ocimnts := c.containerOciMounts()
+	for _, mnt := range ocimnts {
+		ociSpec.Mounts = append(ociSpec.Mounts, mnt)
+	}
 
-	return cdesc, nil
+	ociSpecJson, err := json.Marshal(ociSpec)
+	if err != nil {
+		return &vc.ContainerConfig{}, nil
+	}
+
+	if c.spec.Image == "" {
+		c.spec.Image = cjson.Config.Image
+	}
+	c.Log(INFO, "describe container")
+
+	mountId, err := GetMountIdByContainer(c.p.factory.sd.Type(), c.spec.Id)
+	c.mountId = mountId
+
+	if err != nil {
+		err = fmt.Errorf("Cannot find mountID for container %s : %s", c.spec.Id, err)
+		c.Log(ERROR, "Cannot find mountID for container %s", err)
+		return nil, err
+	}
+	c.Log(DEBUG, "mount id: %s", mountId)
+
+	cmd := vc.Cmd{
+		Args:         cmds,
+		Envs:         c.cmdEnvs([]vc.EnvVar{}),
+		WorkDir:      c.spec.Workdir,
+		User:         user,
+		PrimaryGroup: group,
+		Interactive:  c.spec.Tty,
+		Detach:       !c.HasTty(),
+	}
+
+	containerConfig := &vc.ContainerConfig{
+		ID:             c.spec.Id,
+		RootFs:         path.Join(c.p.sandboxShareDir(), mountId, ROOTFS),
+		ReadonlyRootfs: c.spec.ReadOnly,
+		Cmd:            cmd,
+		Annotations: map[string]string{
+			vcAnnotations.ConfigJSONKey: string(ociSpecJson),
+			vcAnnotations.BundlePathKey: path.Join(c.p.sandboxShareDir(), mountId),
+		},
+		Mounts: cmnts,
+	}
+
+	c.Log(TRACE, "Container Info is \n%#v", containerConfig)
+
+	return containerConfig, nil
 }
 
 func (c *Container) parseVolumes() map[string]*runv.VolumeReference {
@@ -664,6 +787,7 @@ func (c *Container) mergeVolumes(cjson *dockertypes.ContainerJSON) {
 		v := &apitypes.UserVolume{
 			Name:   n,
 			Source: "",
+			Format: "vfs",
 		}
 		r := apitypes.UserVolumeReference{
 			Volume:   n,
@@ -872,45 +996,19 @@ func (c *Container) volumes() []*apitypes.UserVolume {
 }
 
 func (c *Container) addToSandbox() error {
-	var (
-		volmap = make(map[string]bool)
-		wg     = &utils.WaitGroupWithFail{}
-	)
 	c.Log(DEBUG, "begin add to sandbox")
 	c.status.Create()
-	for _, v := range c.spec.Volumes {
-		if volmap[v.Volume] {
-			continue
-		}
-		if vol, ok := c.p.volumes[v.Volume]; ok {
-			volmap[v.Volume] = true
-			if err := vol.subscribeInsert(wg); err != nil {
-				c.Log(ERROR, "container depends on an impossible volume: %v", err)
-				return err
-			}
-		}
-	}
 
-	root, err := c.p.factory.sd.PrepareContainer(c.descript.MountId, c.p.sandboxShareDir(), c.spec.ReadOnly)
+	_, err := c.p.factory.sd.PrepareContainer(c.mountId, c.p.sandboxShareDir(), c.spec.ReadOnly)
 	if err != nil {
 		c.Log(ERROR, "failed to prepare rootfs: %v", err)
 		return err
 	}
-	c.descript.RootVolume = root
-
-	c.Log(TRACE, "finished container prepare, wait for volumes")
-	if len(volmap) > 0 {
-		err := wg.Wait()
-		if err != nil {
-			c.Log(ERROR, "failed to add volume: %v", err)
-			return err
-		}
-	}
 
 	c.Log(DEBUG, "resources ready, insert container to sandbox")
-	r := c.p.sandbox.AddContainer(c.descript)
-	if !r.IsSuccess() {
-		err := fmt.Errorf("failed to add container to sandbox: %s", r.Message())
+	_, err = c.p.sandbox.CreateContainer(*(c.contConfig))
+	if err != nil {
+		err := fmt.Errorf("failed to add container to sandbox")
 		c.Log(ERROR, err)
 		c.status.UnexpectedStopped()
 		return err
@@ -922,20 +1020,22 @@ func (c *Container) addToSandbox() error {
 
 func (c *Container) associateToSandbox() error {
 	c.Log(DEBUG, "try to associate container %s to sandbox", c.Id())
-	alive, err := c.p.sandbox.AssociateContainer(c.Id())
+
+	containerStatus, err := c.p.sandbox.StatusContainer(c.Id())
 	if err != nil {
+		c.Log(ERROR, err)
 		return err
 	}
-	// FIXME missing container status history here.
-	if alive {
+
+	switch containerStatus.State.State {
+	case vc.StateRunning:
 		c.status.State = S_CONTAINER_RUNNING
-		c.status.StartedAt = time.Now()
-	} else {
+		c.status.StartedAt = containerStatus.StartTime
+
+	default:
 		c.status.State = S_CONTAINER_CREATED
 		c.status.CreatedAt = time.Now()
 	}
-
-	go c.waitFinish(-1)
 
 	c.startLogging()
 
@@ -954,15 +1054,24 @@ func (c *Container) initStreams() error {
 	c.Log(TRACE, "init io streams")
 	c.streams = NewStreamConfig()
 	c.streams.NewInputPipes()
-	tty := &hypervisor.TtyIO{
+	tty := &TtyIO{
 		Stdin:  c.streams.Stdin(),
 		Stdout: c.streams.Stdout(),
-		Stderr: c.streams.Stderr(),
 	}
-	if err := c.p.sandbox.Attach(tty, c.Id()); err != nil {
+
+	/*kata agent had merged stderr and stdout into one stream if process had an tty*/
+	if !c.HasTty() {
+		tty.Stderr = c.streams.Stderr()
+	}
+
+	stdin, stdout, stderr, err := c.p.sandbox.IOStream(c.Id(), c.Id())
+	if err != nil {
 		c.Log(ERROR, err)
 		return err
 	}
+
+	go streamCopy(tty, stdin, stdout, stderr)
+
 	return nil
 }
 
@@ -976,14 +1085,14 @@ func (c *Container) initLogger() {
 	}
 
 	ctx := logger.Context{
-		Config:              c.p.factory.logCfg.Config,
-		ContainerID:         c.Id(),
-		ContainerName:       c.RuntimeName(),
-		ContainerImageName:  c.descript.Image,
-		ContainerCreated:    c.status.CreatedAt,
-		ContainerEntrypoint: c.descript.Path,
-		ContainerArgs:       c.descript.Args,
-		ContainerImageID:    c.descript.Image,
+		Config:             c.p.factory.logCfg.Config,
+		ContainerID:        c.Id(),
+		ContainerName:      c.RuntimeName(),
+		ContainerImageName: c.spec.Image,
+		ContainerCreated:   c.status.CreatedAt,
+		//		ContainerEntrypoint: c.descript.Path,
+		ContainerArgs:    c.spec.Command,
+		ContainerImageID: c.spec.Image,
 	}
 
 	if c.p.factory.logCfg.Type == jsonfilelog.Name {
@@ -1060,21 +1169,13 @@ func (c *Container) getLogger() logger.Logger {
 func (c *Container) waitFinish(timeout int) {
 	var firstStop bool
 
-	result := c.p.sandbox.WaitProcess(true, []string{c.Id()}, timeout)
-	if result == nil {
+	result, err := c.p.sandbox.WaitProcess(c.Id(), c.Id())
+	if err != nil {
 		c.Log(INFO, "wait container failed")
 		firstStop = c.status.UnexpectedStopped()
 	} else {
-		r, ok := <-result
-		if !ok {
-			if timeout < 0 {
-				c.Log(INFO, "container unexpected failed, chan broken")
-				firstStop = c.status.UnexpectedStopped()
-			}
-		} else {
-			c.Log(INFO, "container exited with code %v (at %v)", r.Code, r.FinishedAt)
-			firstStop = c.status.Stopped(r.FinishedAt, r.Code)
-		}
+		c.Log(INFO, "container exited with code %d", result)
+		firstStop = c.status.Stopped(time.Now(), int(result))
 	}
 
 	if firstStop {
@@ -1101,7 +1202,7 @@ func (c *Container) waitFinish(timeout int) {
 }
 
 func (c *Container) terminate(force bool) (err error) {
-	if c.descript == nil {
+	if c.contConfig == nil {
 		return
 	}
 
@@ -1113,12 +1214,18 @@ func (c *Container) terminate(force bool) (err error) {
 	}()
 
 	sig := syscall.SIGKILL
+
 	if !force {
-		sig = utils.StringToSignal(c.descript.StopSignal)
+		if c.spec.StopSignal != "" {
+			sig = utils.StringToSignal(c.spec.StopSignal)
+		} else {
+			sig = syscall.SIGTERM
+		}
 	}
+
 	c.setKill()
 	c.Log(DEBUG, "stopping: killing container with %d", sig)
-	err = c.p.sandbox.KillContainer(c.Id(), sig)
+	err = c.p.sandbox.SignalProcess(c.Id(), c.Id(), sig, true)
 	if err != nil {
 		c.Log(ERROR, "failed to kill container: %v", err)
 	}
@@ -1127,9 +1234,9 @@ func (c *Container) terminate(force bool) (err error) {
 }
 
 func (c *Container) removeFromSandbox() error {
-	r := c.p.sandbox.RemoveContainer(c.Id())
-	if !r.IsSuccess() {
-		err := fmt.Errorf("failed to remove container: %s", r.Message())
+	_, r := c.p.sandbox.DeleteContainer(c.Id())
+	if r != nil {
+		err := fmt.Errorf("failed to remove container: %s", r)
 		c.Log(ERROR, err)
 		return err
 	}
@@ -1138,11 +1245,11 @@ func (c *Container) removeFromSandbox() error {
 }
 
 func (c *Container) umountRootVol() error {
-	if c.descript == nil || c.descript.MountId == "" {
+	if c.mountId == "" {
 		c.Log(DEBUG, "no root volume to umount")
 		return nil
 	}
-	err := c.p.factory.sd.CleanupContainer(c.descript.MountId, c.p.sandboxShareDir())
+	err := c.p.factory.sd.CleanupContainer(c.mountId, c.p.sandboxShareDir())
 	if err != nil {
 		c.Log(ERROR, "failed to umount root volume: %v", err)
 		return err
@@ -1171,7 +1278,7 @@ func (c *Container) rename(name string) error {
 			c.p.factory.registry.ReleaseContainerName(name)
 		}
 	}()
-	if c.Id() != "" || c.descript != nil {
+	if c.Id() != "" || c.contConfig != nil {
 		err = c.p.factory.engine.ContainerRename(old, name)
 		if err != nil {
 			return err
@@ -1179,9 +1286,6 @@ func (c *Container) rename(name string) error {
 	}
 	c.p.factory.registry.ReleaseContainerName(old)
 	c.spec.Name = name
-	if c.descript != nil {
-		c.descript.Name = "/" + name
-	}
 	return err
 }
 
@@ -1326,7 +1430,7 @@ func (c *Container) AttachStreams(openStdin, stdinOnce, tty bool, stdin io.ReadC
 		wg.Add(1)
 	}
 
-	if stderr != nil {
+	if stderr != nil && !tty {
 		cStderr = streamConfig.StderrPipe()
 		wg.Add(1)
 	}
@@ -1384,10 +1488,18 @@ func (c *Container) AttachStreams(openStdin, stdinOnce, tty bool, stdin io.ReadC
 		wg.Done()
 	}
 
+	if !tty {
+		go attachStream("stderr", stderr, cStderr)
+	}
 	go attachStream("stdout", stdout, cStdout)
-	go attachStream("stderr", stderr, cStderr)
 
 	wg.Wait()
+
+	//Once wait process completed, the kata agent will cleanup the container process,
+	//thus, it's better to do it after the IO terminated. Otherwise, it may cause
+	//losing some io contents befor it is read after cleanup container process.
+	go c.waitFinish(-1)
+
 	close(errors)
 	for err := range errors {
 		if err != nil {

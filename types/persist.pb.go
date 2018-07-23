@@ -8,6 +8,7 @@ import proto "github.com/gogo/protobuf/proto"
 import fmt "fmt"
 import math "math"
 import api "github.com/hyperhq/runv/api"
+import vc "github.com/kata-containers/runtime/virtcontainers"
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
@@ -127,10 +128,10 @@ func (m *SandboxPersistInfo) GetPersistInfo() []byte {
 }
 
 type PersistContainer struct {
-	Id       string                    `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Pod      string                    `protobuf:"bytes,2,opt,name=pod,proto3" json:"pod,omitempty"`
-	Spec     *UserContainer            `protobuf:"bytes,11,opt,name=spec" json:"spec,omitempty"`
-	Descript *api.ContainerDescription `protobuf:"bytes,12,opt,name=descript" json:"descript,omitempty"`
+	Id         string              `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Pod        string              `protobuf:"bytes,2,opt,name=pod,proto3" json:"pod,omitempty"`
+	Spec       *UserContainer      `protobuf:"bytes,11,opt,name=spec" json:"spec,omitempty"`
+	ContConfig *vc.ContainerConfig `protobuf:"bytes,12,opt,name=descript" json:"descript,omitempty"`
 }
 
 func (m *PersistContainer) Reset()                    { *m = PersistContainer{} }
@@ -159,9 +160,9 @@ func (m *PersistContainer) GetSpec() *UserContainer {
 	return nil
 }
 
-func (m *PersistContainer) GetDescript() *api.ContainerDescription {
+func (m *PersistContainer) GetDescript() *vc.ContainerConfig {
 	if m != nil {
-		return m.Descript
+		return m.ContConfig
 	}
 	return nil
 }

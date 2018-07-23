@@ -3,7 +3,7 @@ package daemon
 import (
 	"time"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/docker/docker/container"
 	derr "github.com/docker/docker/errors"
 )

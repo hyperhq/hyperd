@@ -8,11 +8,9 @@ import (
 	"time"
 
 	"github.com/docker/docker/pkg/stdcopy"
-
 	"github.com/hyperhq/hypercontainer-utils/hlog"
 	"github.com/hyperhq/hyperd/utils"
-	"github.com/hyperhq/runv/api"
-	"github.com/hyperhq/runv/hypervisor"
+	vc "github.com/kata-containers/runtime/virtcontainers"
 )
 
 type Exec struct {
@@ -57,7 +55,7 @@ func (p *XPod) CreateExec(containerId, cmds string, terminal bool) (string, erro
 	p.statusLock.Lock()
 	p.execs[execId] = &Exec{
 		Container: containerId,
-		Id:        execId,
+		Id:        "",
 		Cmds:      command,
 		Terminal:  terminal,
 		ExitCode:  255,
@@ -85,6 +83,7 @@ type writeCloser struct {
 }
 
 func (p *XPod) StartExec(stdin io.ReadCloser, stdout io.WriteCloser, containerId, execId string) error {
+
 	c, ok := p.containers[containerId]
 	if !ok {
 		err := fmt.Errorf("no container %s available for exec %s", containerId, execId)
@@ -103,7 +102,7 @@ func (p *XPod) StartExec(stdin io.ReadCloser, stdout io.WriteCloser, containerId
 	}
 
 	wReader := &waitClose{ReadCloser: stdin, wait: make(chan bool)}
-	tty := &hypervisor.TtyIO{
+	tty := &TtyIO{
 		Stdin:  wReader,
 		Stdout: stdout,
 	}
@@ -124,21 +123,44 @@ func (p *XPod) StartExec(stdin io.ReadCloser, stdout io.WriteCloser, containerId
 		}
 	}
 
+	cmd := vc.Cmd{
+		Args:         es.Cmds,
+		Envs:         c.cmdEnvs([]vc.EnvVar{}),
+		WorkDir:      c.spec.Workdir,
+		Interactive:  es.Terminal,
+		Detach:       !es.Terminal,
+		User:         "0", //set the default user and group
+		PrimaryGroup: "0",
+	}
+
+	_, process, err := p.sandbox.EnterContainer(containerId, cmd)
+	if err != nil {
+		err := fmt.Errorf("cannot enter container %s, with err %s", containerId, err)
+		p.Log(ERROR, err)
+		return err
+	}
+	es.Id = process.Token
+
+	cstdin, cstdout, cstderr, err := p.sandbox.IOStream(containerId, es.Id)
+	if err != nil {
+		c.Log(ERROR, err)
+		return err
+	}
+
+	go streamCopy(tty, cstdin, cstdout, cstderr)
+
+	<-wReader.wait
+
 	go func(es *Exec) {
-		result := p.sandbox.WaitProcess(false, []string{execId}, -1)
-		if result == nil {
+		ret, err := p.sandbox.WaitProcess(containerId, es.Id)
+		if err != nil {
 			es.Log(ERROR, "can not wait exec")
 			return
 		}
 
-		r, ok := <-result
-		if !ok {
-			es.Log(ERROR, "waiting exec interrupted")
-			return
-		}
+		es.Log(DEBUG, "exec terminated at %v with code %d", time.Now(), int(ret))
+		es.ExitCode = uint8(ret)
 
-		es.Log(DEBUG, "exec terminated at %v with code %d", r.FinishedAt, r.Code)
-		es.ExitCode = uint8(r.Code)
 		select {
 		case es.finChan <- true:
 			es.Log(DEBUG, "wake exec stopped chan")
@@ -147,30 +169,7 @@ func (p *XPod) StartExec(stdin io.ReadCloser, stdout io.WriteCloser, containerId
 		}
 	}(es)
 
-	var envs []string
-	for e, v := range c.descript.Envs {
-		envs = append(envs, fmt.Sprintf("%s=%s", e, v))
-	}
-
-	process := &api.Process{
-		Container: es.Container,
-		Id:        es.Id,
-		Terminal:  es.Terminal,
-		Args:      es.Cmds,
-		Envs:      envs,
-		Workdir:   c.descript.Workdir,
-	}
-
-	if c.descript.UGI != nil {
-		process.User = c.descript.UGI.User
-		process.Group = c.descript.UGI.Group
-		process.AdditionalGroup = c.descript.UGI.AdditionalGroups
-	}
-
-	err := p.sandbox.AddProcess(process, tty)
-
-	<-wReader.wait
-	return err
+	return nil
 }
 
 func (p *XPod) GetExecExitCode(containerId, execId string) (uint8, error) {
@@ -208,8 +207,8 @@ func (p *XPod) KillExec(execId string, sig int64) error {
 	}
 
 	return p.protectedSandboxOperation(
-		func(sb *hypervisor.Vm) error {
-			return sb.SignalProcess(es.Container, es.Id, syscall.Signal(sig))
+		func(sb vc.VCSandbox) error {
+			return sb.SignalProcess(es.Container, es.Id, syscall.Signal(sig), true)
 		},
 		time.Second*5,
 		fmt.Sprintf("Kill process %s with %d", es.Id, sig))
@@ -228,16 +227,20 @@ func (p *XPod) CleanupExecs() {
 }
 
 func (p *XPod) ExecVM(cmd string, stdin io.ReadCloser, stdout, stderr io.WriteCloser) (int, error) {
-	wReader := &waitClose{ReadCloser: stdin, wait: make(chan bool)}
-	tty := &hypervisor.TtyIO{
-		Stdin:  wReader,
-		Stdout: stdout,
-		Stderr: stderr,
-	}
-	res, err := p.sandbox.HyperstartExec(cmd, tty)
-	if err != nil {
-		return res, err
-	}
-	<-wReader.wait
-	return res, err
+	/*
+		wReader := &waitClose{ReadCloser: stdin, wait: make(chan bool)}
+		tty := &hypervisor.TtyIO{
+			Stdin:  wReader,
+			Stdout: stdout,
+			Stderr: stderr,
+		}
+
+		res, err := p.sandbox.HyperstartExec(cmd, tty)
+		if err != nil {
+			return res, err
+		}
+		<-wReader.wait
+	*/
+	//	return res, err
+	return 0, nil
 }

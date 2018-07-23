@@ -6,7 +6,7 @@ import (
 	"errors"
 	"syscall"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/docker/docker/daemon/execdriver"
 )
 

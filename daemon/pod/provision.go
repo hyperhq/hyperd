@@ -11,8 +11,8 @@ import (
 	"github.com/hyperhq/hyperd/errors"
 	apitypes "github.com/hyperhq/hyperd/types"
 	"github.com/hyperhq/hyperd/utils"
-	runv "github.com/hyperhq/runv/api"
 	"github.com/hyperhq/runv/hypervisor"
+	vc "github.com/kata-containers/runtime/virtcontainers"
 )
 
 var (
@@ -34,16 +34,21 @@ func CreateXPod(factory *PodFactory, spec *apitypes.UserPod) (*XPod, error) {
 			p.releaseNames(spec.Containers)
 		}
 	}()
-	err = p.createSandbox(spec) //TODO: add defer for rollback
-	if err != nil {
-		return nil, err
-	}
 
 	defer func() {
 		if err != nil && p.sandbox != nil {
-			p.sandbox.Kill()
+			status := p.sandbox.Status()
+			if status.State.State == vc.StateRunning {
+				vc.StopSandbox(p.sandbox.ID())
+			}
+			p.sandbox.Delete()
 		}
 	}()
+
+	err = p.createSandbox(spec)
+	if err != nil {
+		return nil, err
+	}
 
 	err = p.initResources(spec, true)
 	if err != nil {
@@ -99,7 +104,6 @@ func newXPod(factory *PodFactory, spec *apitypes.UserPod) (*XPod, error) {
 		execs:          make(map[string]*Exec),
 		resourceLock:   &sync.Mutex{},
 		statusLock:     &sync.RWMutex{},
-		stoppedChan:    make(chan bool, 1),
 		factory:        factory,
 		snapVolumes:    make(map[string]*apitypes.PodVolume),
 		snapContainers: make(map[string]*Container),
@@ -223,28 +227,39 @@ func (p *XPod) ContainerStart(cid string) error {
 
 // Start() means start a STOPPED pod.
 func (p *XPod) Start() error {
+	var err error
+
+	defer func() {
+		if err != nil && p.sandbox != nil {
+			status := p.sandbox.Status()
+			if status.State.State == vc.StateRunning {
+				vc.StopSandbox(p.sandbox.ID())
+				vc.DeleteSandbox(p.sandbox.ID())
+			}
+		}
+	}()
 
 	if p.IsStopped() {
-		if err := p.createSandbox(p.globalSpec); err != nil {
+		if err = p.createSandbox(p.globalSpec); err != nil {
 			p.Log(ERROR, "failed to create sandbox for the stopped pod: %v", err)
 			return err
 		}
 
-		if err := p.prepareResources(); err != nil {
+		if err = p.prepareResources(); err != nil {
 			return err
 		}
 
-		if err := p.addResourcesToSandbox(); err != nil {
+		if err = p.addResourcesToSandbox(); err != nil {
 			return err
 		}
 	}
 
-	err := p.waitPodRun("start pod")
+	err = p.waitPodRun("start pod")
 	if err != nil {
 		p.Log(ERROR, "wait running failed, cannot start pod")
 		return err
 	}
-	if err := p.startAll(); err != nil {
+	if err = p.startAll(); err != nil {
 		return err
 	}
 
@@ -253,7 +268,7 @@ func (p *XPod) Start() error {
 
 func (p *XPod) createSandbox(spec *apitypes.UserPod) error {
 	//in the future, here
-	sandbox, err := startSandbox(p.factory.vmFactory, int(spec.Resource.Vcpu), int(spec.Resource.Memory), "", "")
+	sandbox, err := startSandbox(spec, "", "")
 	if err != nil {
 		p.Log(ERROR, err)
 		return err
@@ -263,25 +278,10 @@ func (p *XPod) createSandbox(spec *apitypes.UserPod) error {
 		return errors.ErrSandboxNotExist
 	}
 
-	config := &runv.SandboxConfig{
-		Hostname:   spec.Hostname,
-		Dns:        spec.Dns,
-		DnsOptions: spec.DnsOptions,
-		DnsSearch:  spec.DnsSearch,
-		Neighbors: &runv.NeighborNetworks{
-			InternalNetworks: spec.PortmappingWhiteLists.InternalNetworks,
-			ExternalNetworks: spec.PortmappingWhiteLists.ExternalNetworks,
-		},
-	}
-
 	p.sandbox = sandbox
 	p.status = S_POD_STARTING
 
 	go p.waitVMStop()
-	err = sandbox.InitSandbox(config)
-	if err != nil {
-		go sandbox.Shutdown()
-	}
 	p.Log(INFO, "sandbox init result: %#v", err)
 	p.setPodInitStatus(err == nil)
 	return err
@@ -289,25 +289,25 @@ func (p *XPod) createSandbox(spec *apitypes.UserPod) error {
 
 func (p *XPod) reconnectSandbox(sandboxId string, pinfo []byte) error {
 	var (
-		sandbox *hypervisor.Vm
-		err     error
+		vcsandbox vc.VCSandbox
+		err       error
 	)
 
 	if sandboxId != "" {
-		sandbox, err = hypervisor.AssociateVm(sandboxId, pinfo)
+		vcsandbox, err = vc.FetchSandbox(sandboxId)
 		if err != nil {
 			p.Log(ERROR, err)
-			sandbox = nil
+			vcsandbox = nil
 		}
 	}
 
-	if sandbox == nil {
+	if vcsandbox == nil {
 		p.status = S_POD_STOPPED
 		return err
 	}
 
 	p.status = S_POD_RUNNING
-	p.sandbox = sandbox
+	p.sandbox = vcsandbox
 	go p.waitVMStop()
 	return nil
 }
@@ -464,23 +464,25 @@ func (p *XPod) addResourcesToSandbox() error {
 	p.Log(INFO, "adding resource to sandbox")
 	future := utils.NewFutureSet()
 
-	future.Add("addInterface", func() error {
-		for _, inf := range p.interfaces {
-			if err := inf.add(); err != nil {
-				return err
+	/*
+		future.Add("addInterface", func() error {
+			for _, inf := range p.interfaces {
+				if err := inf.add(); err != nil {
+					return err
+				}
 			}
-		}
-		err := p.sandbox.AddRoute()
-		if err != nil {
-			p.Log(ERROR, "fail to add Route: %v", err)
-		}
-		return err
-	})
+			err := p.sandbox.AddRoute()
+			if err != nil {
+				p.Log(ERROR, "fail to add Route: %v", err)
+			}
+			return err
+		})
 
-	for iv, vol := range p.volumes {
-		future.Add(iv, vol.add)
-	}
+		for iv, vol := range p.volumes {
+			future.Add(iv, vol.add)
+		}
 
+	*/
 	for ic, c := range p.containers {
 		future.Add(ic, c.addToSandbox)
 	}
@@ -499,16 +501,16 @@ func (p *XPod) addResourcesToSandbox() error {
 func (p *XPod) startAll() error {
 	p.Log(INFO, "start all containers")
 	future := utils.NewFutureSet()
-
-	for _, pre := range p.prestartExecs {
-		p.Log(DEBUG, "run prestart exec %v", pre)
-		_, stderr, err := p.sandbox.HyperstartExecSync(pre, nil)
-		if err != nil {
-			p.Log(ERROR, "failed to execute prestart command %v: %v [ %s", pre, err, string(stderr))
-			return err
+	/*
+		for _, pre := range p.prestartExecs {
+			p.Log(DEBUG, "run prestart exec %v", pre)
+			_, stderr, err := p.sandbox.HyperstartExecSync(pre, nil)
+			if err != nil {
+				p.Log(ERROR, "failed to execute prestart command %v: %v [ %s", pre, err, string(stderr))
+				return err
+			}
 		}
-	}
-
+	*/
 	for ic, c := range p.containers {
 		future.Add(ic, c.start)
 	}
@@ -525,7 +527,7 @@ func (p *XPod) sandboxShareDir() string {
 		// the /dev/null is not a dir, then, can not create or open it
 		return "/dev/null/no-such-dir"
 	}
-	return filepath.Join(hypervisor.BaseDir, p.sandbox.Id, hypervisor.ShareDirTag)
+	return filepath.Join(hypervisor.BaseDir, p.sandbox.ID(), hypervisor.ShareDirTag)
 }
 
 func (p *XPod) waitPodRun(activity string) error {

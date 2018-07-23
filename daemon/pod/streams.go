@@ -5,6 +5,7 @@ import (
 	"io"
 	"io/ioutil"
 	"strings"
+	"sync"
 
 	"github.com/docker/docker/pkg/broadcaster"
 	"github.com/docker/docker/pkg/ioutils"
@@ -32,6 +33,30 @@ type StreamCloser struct {
 
 func (sc *StreamCloser) Close() error {
 	return sc.Clean()
+}
+
+type TtyIO struct {
+	Stdin  io.ReadCloser
+	Stdout io.Writer
+	Stderr io.Writer
+}
+
+func (tty *TtyIO) Close() {
+	//	hlog.Log(TRACE, "Close tty")
+
+	if tty.Stdin != nil {
+		tty.Stdin.Close()
+	}
+	cf := func(w io.Writer) {
+		if w == nil {
+			return
+		}
+		if c, ok := w.(io.WriteCloser); ok {
+			c.Close()
+		}
+	}
+	cf(tty.Stdout)
+	cf(tty.Stderr)
 }
 
 // NewStreamConfig creates a stream config and initializes
@@ -112,4 +137,31 @@ func (streamConfig *StreamConfig) CloseStreams() error {
 	}
 
 	return nil
+}
+
+func streamCopy(tty *TtyIO, stdinPipe io.WriteCloser, stdoutPipe, stderrPipe io.Reader) {
+	var wg sync.WaitGroup
+
+	if tty.Stdin != nil {
+		go func() {
+			_, _ = io.Copy(stdinPipe, tty.Stdin)
+			stdinPipe.Close()
+		}()
+	}
+	if tty.Stdout != nil {
+		wg.Add(1)
+		go func() {
+			_, _ = io.Copy(tty.Stdout, stdoutPipe)
+			wg.Done()
+		}()
+	}
+	if tty.Stderr != nil && stderrPipe != nil {
+		wg.Add(1)
+		go func() {
+			_, _ = io.Copy(tty.Stderr, stderrPipe)
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+	tty.Close()
 }

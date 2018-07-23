@@ -8,12 +8,10 @@ import (
 	"time"
 
 	"github.com/docker/docker/daemon/logger"
-
 	"github.com/hyperhq/hypercontainer-utils/hlog"
 	apitypes "github.com/hyperhq/hyperd/types"
 	"github.com/hyperhq/hyperd/utils"
-	"github.com/hyperhq/runv/hypervisor"
-	runvtypes "github.com/hyperhq/runv/hypervisor/types"
+	vc "github.com/kata-containers/runtime/virtcontainers"
 )
 
 const (
@@ -65,19 +63,15 @@ type XPod struct {
 
 	prestartExecs [][]string
 
-	sandbox *hypervisor.Vm
+	sandbox vc.VCSandbox
 	factory *PodFactory
 
 	info       *apitypes.PodInfo
 	status     PodState
 	execs      map[string]*Exec
 	statusLock *sync.RWMutex
-	// stoppedChan: When the sandbox is down and the pod is stopped, a bool will be put into this channel,
-	// if you want to do some op after the pod is clean stopped, just wait for this channel. And if an op
-	// got a value from this chan, it should put an element to it again, in case other procedure may wait
-	// on it too.
-	stoppedChan chan bool
-	initCond    *sync.Cond
+
+	initCond *sync.Cond
 
 	//Protected by statusLock
 	snapVolumes    map[string]*apitypes.PodVolume
@@ -108,7 +102,7 @@ func (p *XPod) Name() string {
 func (p *XPod) SandboxNameLocked() string {
 	var sbn = ""
 	if p.sandbox != nil {
-		sbn = p.sandbox.Id
+		sbn = p.sandbox.ID()
 	}
 	return sbn
 }
@@ -301,16 +295,17 @@ func (p *XPod) ContainerInfo(cid string) (*apitypes.ContainerInfo, error) {
 
 }
 
-func (p *XPod) Stats() *runvtypes.PodStats {
+func (p *XPod) Stats() *vc.SandboxStatus {
 	//use channel, don't block in resourceLock
-	ch := make(chan *runvtypes.PodStats, 1)
-
+	ch := make(chan *vc.SandboxStatus, 1)
+	var status vc.SandboxStatus
 	p.resourceLock.Lock()
 	if p.sandbox == nil {
 		ch <- nil
 	} else {
-		go func(sb *hypervisor.Vm) {
-			ch <- sb.Stats()
+		go func(sb vc.VCSandbox) {
+			status = sb.Status()
+			ch <- &status
 		}(p.sandbox)
 	}
 	p.resourceLock.Unlock()
@@ -336,7 +331,7 @@ func (p *XPod) initPodInfo() {
 		},
 	}
 	if p.sandbox != nil {
-		info.Vm = p.sandbox.Id
+		info.Vm = p.sandbox.ID()
 	}
 
 	p.info = info
@@ -388,10 +383,11 @@ func (p *XPod) updatePodInfo() error {
 	case S_POD_ERROR:
 		p.info.Status.Phase = "Failed"
 	}
-	if p.status == S_POD_RUNNING && p.sandbox != nil && len(p.info.Status.PodIP) == 0 {
-		p.info.Status.PodIP = p.sandbox.GetIPAddrs()
-	}
-
+	/*
+		if p.status == S_POD_RUNNING && p.sandbox != nil && len(p.info.Status.PodIP) == 0 {
+			p.info.Status.PodIP = p.sandbox.GetIPAddrs()
+		}
+	*/
 	return nil
 }
 
@@ -503,7 +499,14 @@ func (p *XPod) TtyResize(cid, execId string, h, w int) error {
 		p.Log(ERROR, err)
 		return err
 	}
-	return p.sandbox.Tty(cid, execId, h, w)
+
+	//if doesn't specify the execId, it means to ttyresize the container's
+	//tty, thus the execId is the same with the container id for Kata container.
+	if execId == "" {
+		execId = cid
+	}
+
+	return p.sandbox.WinsizeProcess(cid, execId, uint32(h), uint32(w))
 }
 
 func (p *XPod) WaitContainer(cid string, second int) (int, error) {
@@ -522,19 +525,13 @@ func (p *XPod) WaitContainer(cid string, second int) (int, error) {
 		p.Log(DEBUG, "container is already stopped")
 		return 0, nil
 	}
-	ch := p.sandbox.WaitProcess(true, []string{cid}, second)
-	if ch == nil {
+	ret, err := p.sandbox.WaitProcess(cid, cid)
+	if err == nil {
 		c.Log(WARNING, "connot wait container, possiblely already down")
 		return -1, nil
 	}
-	r, ok := <-ch
-	if !ok {
-		err := fmt.Errorf("break")
-		c.Log(ERROR, "chan broken while waiting container")
-		return -1, err
-	}
-	c.Log(INFO, "container stopped: %v", r.Code)
-	return r.Code, nil
+	c.Log(INFO, "container stopped: %v", ret)
+	return int(ret), nil
 }
 
 func (p *XPod) RenameContainer(cid, name string) error {

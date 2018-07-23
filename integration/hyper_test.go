@@ -590,7 +590,10 @@ func (s *TestSuite) TestSendExecSignal(c *C) {
 
 	exitCode, err := s.client.Wait(cName, execId, false)
 	c.Assert(err, IsNil)
-	c.Assert(exitCode, Equals, int32(0))
+	//in kata, the exitCode is the process's exit code,
+	//thus, the process is killed with signal '9', its
+	//exitcode is '127'.
+	c.Assert(exitCode, Equals, int32(137))
 }
 
 func (s *TestSuite) TestTTYResize(c *C) {

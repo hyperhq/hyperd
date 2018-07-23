@@ -108,12 +108,6 @@ func LoadXPod(factory *PodFactory, layout *types.PersistPodLayout) (*XPod, error
 		}
 	}
 
-	for _, cid := range layout.Containers {
-		if err = p.loadContainer(cid); err != nil {
-			return nil, err
-		}
-	}
-
 	err = p.loadSandbox()
 	if err != nil {
 		if !strings.Contains(err.Error(), "leveldb: not found") {
@@ -121,6 +115,12 @@ func LoadXPod(factory *PodFactory, layout *types.PersistPodLayout) (*XPod, error
 			return nil, err
 		}
 		p.status = S_POD_STOPPED
+	}
+
+	for _, cid := range layout.Containers {
+		if err = p.loadContainer(cid); err != nil {
+			return nil, err
+		}
 	}
 
 	// if sandbox is running, set all volume INSERTED
@@ -356,10 +356,10 @@ func (p *XPod) removePortMappingFromDB() error {
 
 func (c *Container) saveContainer() error {
 	cx := &types.PersistContainer{
-		Id:       c.Id(),
-		Pod:      c.p.Id(),
-		Spec:     c.spec,
-		Descript: c.descript,
+		Id:   c.Id(),
+		Pod:  c.p.Id(),
+		Spec: c.spec,
+		//		ContConfig: c.contConfig,
 	}
 	return saveMessage(c.p.factory.db, fmt.Sprintf(CX_KEY_FMT, c.Id()), cx, c, "container info")
 }
@@ -448,6 +448,7 @@ func (inf *Interface) removeFromDB() error {
 }
 
 func (p *XPod) saveSandbox() error {
+
 	var (
 		sb  types.SandboxPersistInfo
 		err error
@@ -461,14 +462,19 @@ func (p *XPod) saveSandbox() error {
 	p.statusLock.RLock()
 	defer p.statusLock.RUnlock()
 	if !stop_status[p.status] {
-		sb.Id = p.sandbox.Id
-		sb.PersistInfo, err = p.sandbox.Dump()
+		sb.Id = p.sandbox.ID()
+		/*By now the sandbox info had been managed by kata, thus there is no need
+		*to keep those info here.
+		 */
+		sb.PersistInfo = nil
 		if err != nil {
 			hlog.HLog(ERROR, p, 2, "failed to dump sandbox %s: %v", sb.Id, err)
 			return err
 		}
 		return saveMessage(p.factory.db, fmt.Sprintf(SB_KEY_FMT, p.Id()), &sb, p, "sandbox info")
+
 	}
+
 	return nil
 }
 
