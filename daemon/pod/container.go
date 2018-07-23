@@ -566,16 +566,9 @@ func newOciMount(m dockertypes.MountPoint) specs.Mount {
 	}
 }
 
-func (c *Container) containerOciMounts(cjson *dockertypes.ContainerJSON) ([]vc.Mount, []specs.Mount) {
-	cMounts := cjson.Mounts
-
+func (c *Container) containerOciMounts() ([]vc.Mount, []specs.Mount) {
 	var cmnts []vc.Mount
 	var ocimnts []specs.Mount
-
-	for _, m := range cMounts {
-		cmnts = append(cmnts, newcMount(m))
-		ocimnts = append(ocimnts, newOciMount(m))
-	}
 
 	for _, vol := range c.spec.Volumes {
 		if vol.Detail.Format == "vfs" {
@@ -695,7 +688,7 @@ func (c *Container) containerConfig(cjson *dockertypes.ContainerJSON) (*vc.Conta
 		oci.RemoveNamespace(ociSpec, ns)
 	}
 
-	cmnts, ocimnts := c.containerOciMounts(cjson)
+	cmnts, ocimnts := c.containerOciMounts()
 	for _, mnt := range ocimnts {
 		ociSpec.Mounts = append(ociSpec.Mounts, mnt)
 	}
@@ -788,6 +781,7 @@ func (c *Container) mergeVolumes(cjson *dockertypes.ContainerJSON) {
 		v := &apitypes.UserVolume{
 			Name:   n,
 			Source: "",
+			Format: "vfs",
 		}
 		r := apitypes.UserVolumeReference{
 			Volume:   n,
