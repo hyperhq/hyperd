@@ -403,6 +403,7 @@ message UserContainer {
   repeated Ulimit ulimits               = 18;
   string logPath                        = 19;
   bool readOnly                         = 20;
+  string cache                          = 21;
 }
 
 message UserResource {
@@ -429,6 +430,7 @@ message UserVolume {
   string format           = 3;
   UserVolumeOption option = 4;
   string fstype           = 5;
+  string cache            = 6;
 }
 
 message UserInterface {
