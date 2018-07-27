@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/url"
+	"strings"
 
 	"github.com/hyperhq/hyperd/engine"
 )
@@ -22,7 +23,16 @@ func (cli *Client) Commit(container, repo, author, message string, changes []str
 		v.Set("pause", "no")
 	}
 	v.Set("container", container)
+	tag := ""
+	if repo != "" {
+		s := strings.Split(repo, ":")
+		if len(s) == 2 {
+			repo = s[0]
+			tag = s[1]
+		}
+	}
 	v.Set("repo", repo)
+	v.Set("tag", tag)
 	body, _, err := readBody(cli.call("POST", "/container/commit?"+v.Encode(), nil, nil))
 	if err != nil {
 		return "", err
