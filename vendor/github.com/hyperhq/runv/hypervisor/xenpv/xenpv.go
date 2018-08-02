@@ -35,6 +35,7 @@ type XenPvContext struct {
 func InitDriver() *XenPvDriver {
 	cmd, err := exec.LookPath(XENLIGHT_EXEC)
 	if err != nil {
+		glog.Errorf("LookPath %s failed: %v", XENLIGHT_EXEC, err)
 		return nil
 	}
 

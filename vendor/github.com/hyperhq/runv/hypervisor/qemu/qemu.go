@@ -44,13 +44,17 @@ func qemuContext(ctx *hypervisor.VmContext) *QemuContext {
 func InitDriver() *QemuDriver {
 	cmd, err := exec.LookPath(QEMU_SYSTEM_EXE)
 	if err != nil {
+		glog.Errorf("LookPath %s failed: %v", QEMU_SYSTEM_EXE, err)
 		return nil
 	}
 
 	var hasVsock bool
 	_, err = exec.Command("/sbin/modprobe", "vhost_vsock").Output()
 	if err == nil {
+		glog.V(3).Infof("Current system supports vsock")
 		hasVsock = true
+	} else {
+		glog.V(3).Infof("Current system doesn't support vsock because modprobe vhost_vsock failed")
 	}
 
 	return &QemuDriver{
