@@ -42,6 +42,7 @@ type KvmtoolContext struct {
 func InitDriver() *KvmtoolDriver {
 	cmd, err := exec.LookPath(KVMTOOL_EXEC)
 	if err != nil {
+		glog.Errorf("LookPath %s failed: %v", KVMTOOL_EXEC, err)
 		return nil
 	}
 
