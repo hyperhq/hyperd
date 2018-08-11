@@ -12,8 +12,6 @@ import (
 )
 
 func (s *ServerRPC) ContainerLogs(req *types.ContainerLogsRequest, stream types.PublicAPI_ContainerLogsServer) error {
-	glog.V(3).Infof("ContainerLogs with request %s", req.String())
-
 	var since time.Time
 	if req.Since != "" {
 		s, n, err := timetypes.ParseTimestamps(req.Since, 0)
@@ -71,6 +69,5 @@ func (s *ServerRPC) ContainerLogs(req *types.ContainerLogsRequest, stream types.
 		}
 	}
 
-	glog.V(3).Infof("ContainerLogs done with request %s", req.String())
 	return nil
 }

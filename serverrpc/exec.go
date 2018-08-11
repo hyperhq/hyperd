@@ -11,8 +11,6 @@ import (
 )
 
 func (s *ServerRPC) ExecCreate(ctx context.Context, req *types.ExecCreateRequest) (*types.ExecCreateResponse, error) {
-	glog.V(3).Infof("ExecCreate with request %s", req.String())
-
 	cmd, err := json.Marshal(req.Command)
 	if err != nil {
 		return nil, err
@@ -20,12 +18,8 @@ func (s *ServerRPC) ExecCreate(ctx context.Context, req *types.ExecCreateRequest
 
 	execId, err := s.daemon.CreateExec(req.ContainerID, string(cmd), req.Tty)
 	if err != nil {
-		glog.Errorf("ExecCreate failed %v with request %s", err, req.String())
-
 		return nil, err
 	}
-
-	glog.V(3).Infof("ExecCreate done with request %s", req.String())
 
 	return &types.ExecCreateResponse{
 		ExecID: execId,
@@ -95,16 +89,12 @@ func (s *ServerRPC) ExecStart(stream types.PublicAPI_ExecStartServer) error {
 
 // Wait gets exitcode by container and processId
 func (s *ServerRPC) Wait(c context.Context, req *types.WaitRequest) (*types.WaitResponse, error) {
-	glog.V(3).Infof("Wait with request %s", req.String())
-
 	//FIXME need update if param NoHang is enabled
 	code, err := s.daemon.ExitCode(req.Container, req.ProcessId)
 	if err != nil {
-		glog.Errorf("Wait failed %v with request %s", err, req.String())
 		return nil, err
 	}
 
-	glog.V(3).Infof("Wait done with request %s", req.String())
 	return &types.WaitResponse{
 		ExitCode: int32(code),
 	}, nil
@@ -112,15 +102,11 @@ func (s *ServerRPC) Wait(c context.Context, req *types.WaitRequest) (*types.Wait
 
 // ExecSignal sends a singal to specified exec of specified container
 func (s *ServerRPC) ExecSignal(ctx context.Context, req *types.ExecSignalRequest) (*types.ExecSignalResponse, error) {
-	glog.V(3).Infof("ExecSignal with request %s", req.String())
-
 	err := s.daemon.KillExec(req.ContainerID, req.ExecID, req.Signal)
 	if err != nil {
-		glog.Errorf("ExecSignal failed %v with request %s", err, req.String())
 		return nil, err
 	}
 
-	glog.V(3).Infof("ExecSignal done with request %s", req.String())
 	return &types.ExecSignalResponse{}, nil
 }
 

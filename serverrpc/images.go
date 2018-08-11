@@ -13,11 +13,8 @@ import (
 
 // ImageList implements GET /images/get
 func (s *ServerRPC) ImageList(ctx context.Context, req *types.ImageListRequest) (*types.ImageListResponse, error) {
-	glog.V(3).Infof("ImageList with request %s", req.String())
-
 	images, err := s.daemon.Daemon.Images(req.FilterArgs, req.Filter, req.All)
 	if err != nil {
-		glog.Errorf("ImageList failed %v with request %s", err, req.String())
 		return nil, err
 	}
 
@@ -34,7 +31,6 @@ func (s *ServerRPC) ImageList(ctx context.Context, req *types.ImageListRequest) 
 		})
 	}
 
-	glog.V(3).Infof("ImageList done with request %s", req.String())
 	return &types.ImageListResponse{
 		ImageList: result,
 	}, nil
@@ -42,8 +38,6 @@ func (s *ServerRPC) ImageList(ctx context.Context, req *types.ImageListRequest) 
 
 // ImagePull pulls a image from registry
 func (s *ServerRPC) ImagePull(req *types.ImagePullRequest, stream types.PublicAPI_ImagePullServer) error {
-	glog.V(3).Infof("ImagePull with request %s", req.String())
-
 	authConfig := &enginetypes.AuthConfig{}
 	if req.Auth != nil {
 		authConfig = &enginetypes.AuthConfig{
@@ -89,14 +83,11 @@ func (s *ServerRPC) ImagePull(req *types.ImagePullRequest, stream types.PublicAP
 	pullResult = s.daemon.CmdImagePull(req.Image, req.Tag, authConfig, nil, w)
 	complete = true
 
-	glog.V(3).Infof("ImagePull done with request %s", req.String())
 	return pullResult
 }
 
 // ImagePush pushes a local image to registry
 func (s *ServerRPC) ImagePush(req *types.ImagePushRequest, stream types.PublicAPI_ImagePushServer) error {
-	glog.V(3).Infof("ImagePush with request %s", req.String())
-
 	authConfig := &enginetypes.AuthConfig{}
 	if req.Auth != nil {
 		authConfig = &enginetypes.AuthConfig{
@@ -137,21 +128,16 @@ func (s *ServerRPC) ImagePush(req *types.ImagePushRequest, stream types.PublicAP
 		}
 	}
 
-	glog.V(3).Infof("ImagePush done with request %s", req.String())
 	return pushResult
 }
 
 // ImageRemove deletes a image from hyperd
 func (s *ServerRPC) ImageRemove(ctx context.Context, req *types.ImageRemoveRequest) (*types.ImageRemoveResponse, error) {
-	glog.V(3).Infof("ImageDelete with request %s", req.String())
-
 	resp, err := s.daemon.CmdImageDelete(req.Image, req.Force, req.Prune)
 	if err != nil {
-		glog.Errorf("ImageDelete failed %v with request %s", err, req.String())
 		return nil, err
 	}
 
-	glog.V(3).Infof("ImageDelete done with request %s", req.String())
 	return &types.ImageRemoveResponse{
 		Images: resp,
 	}, nil

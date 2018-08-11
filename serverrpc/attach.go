@@ -14,7 +14,6 @@ func (s *ServerRPC) Attach(stream types.PublicAPI_AttachServer) error {
 	if err != nil {
 		return err
 	}
-	glog.V(3).Infof("Attach with request %s", req.String())
 
 	ir, iw := io.Pipe()
 	or, ow := io.Pipe()
