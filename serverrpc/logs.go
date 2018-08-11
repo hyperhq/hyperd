@@ -5,6 +5,7 @@ import (
 	"io"
 	"time"
 
+	"fmt"
 	timetypes "github.com/docker/engine-api/types/time"
 	"github.com/golang/glog"
 	"github.com/hyperhq/hyperd/daemon"
@@ -12,12 +13,13 @@ import (
 )
 
 func (s *ServerRPC) ContainerLogs(req *types.ContainerLogsRequest, stream types.PublicAPI_ContainerLogsServer) error {
+	glog.V(3).Infof("ContainerLogs with ServerStream %s request %s", stream, req.String())
+
 	var since time.Time
 	if req.Since != "" {
 		s, n, err := timetypes.ParseTimestamps(req.Since, 0)
 		if err != nil {
-			glog.Errorf("ContainerLogs failed %v with request %s", err, req.String())
-			return err
+			return fmt.Errorf("timetypes.ParseTimestamps with request %s error: %v", req.String(), err)
 		}
 		since = time.Unix(s, n)
 	}
@@ -42,8 +44,7 @@ func (s *ServerRPC) ContainerLogs(req *types.ContainerLogsRequest, stream types.
 	} else {
 		err := s.daemon.GetContainerLogs(req.Container, logsConfig)
 		if err != nil {
-			glog.Errorf("ContainerLogs failed %v with request %s", err, req.String())
-			return err
+			return fmt.Errorf("s.daemon.GetContainerLogs with request %s error: %v", req.String(), err)
 		}
 	}
 
@@ -55,13 +56,12 @@ func (s *ServerRPC) ContainerLogs(req *types.ContainerLogsRequest, stream types.
 				eof = true
 			}
 		} else if err != nil {
-			glog.Errorf("ContainerLogs failed %v with request %s", err, req.String())
-			return err
+			return fmt.Errorf("buffer.ReadBytes with request %s error: %v", req.String(), err)
 		}
 
 		if err := stream.Send(&types.ContainerLogsResponse{Log: s}); err != nil {
 			stop <- true
-			return err
+			return fmt.Errorf("stream.Send with request %s error: %v", req.String(), err)
 		}
 
 		if eof == true {

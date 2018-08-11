@@ -1,6 +1,7 @@
 package serverrpc
 
 import (
+	"fmt"
 	"github.com/golang/glog"
 	"github.com/hyperhq/hyperd/types"
 	"io"
@@ -12,8 +13,9 @@ func (s *ServerRPC) Attach(stream types.PublicAPI_AttachServer) error {
 		return nil
 	}
 	if err != nil {
-		return err
+		return fmt.Errorf("stream.Recv error: %v", err)
 	}
+	glog.V(3).Infof("Attach with ServerStream %s request %s", stream, req.String())
 
 	ir, iw := io.Pipe()
 	or, ow := io.Pipe()
@@ -63,5 +65,10 @@ func (s *ServerRPC) Attach(stream types.PublicAPI_AttachServer) error {
 		}
 	}()
 
-	return s.daemon.Attach(ir, ow, req.ContainerID)
+	err = s.daemon.Attach(ir, ow, req.ContainerID)
+	if err != nil {
+		return fmt.Errorf("s.daemon.Attach with request %s error: %v", req.String(), err)
+	}
+
+	return nil
 }

@@ -1,9 +1,7 @@
 package serverrpc
 
 import (
-	"errors"
-
-	"github.com/hyperhq/hypercontainer-utils/hlog"
+	"fmt"
 	"github.com/hyperhq/hyperd/types"
 	"golang.org/x/net/context"
 )
@@ -12,8 +10,7 @@ import (
 func (s *ServerRPC) PortMappingList(ctx context.Context, req *types.PortMappingListRequest) (*types.PortMappingListResponse, error) {
 	p, ok := s.daemon.PodList.Get(req.PodID)
 	if !ok {
-		err := errors.New("Pod not found")
-		return nil, err
+		return nil, fmt.Errorf("Pod not found")
 	}
 
 	return &types.PortMappingListResponse{
@@ -25,15 +22,12 @@ func (s *ServerRPC) PortMappingList(ctx context.Context, req *types.PortMappingL
 func (s *ServerRPC) PortMappingAdd(ctx context.Context, req *types.PortMappingModifyRequest) (*types.PortMappingModifyResponse, error) {
 	p, ok := s.daemon.PodList.Get(req.PodID)
 	if !ok {
-		err := errors.New("Pod not found")
-		s.Log(hlog.ERROR, "PortMappingAdd failed %v with request %s", err, req.String())
-		return nil, err
+		return nil, fmt.Errorf("Pod not found")
 	}
 
 	err := p.AddPortMapping(req.PortMappings)
 	if err != nil {
-		s.Log(hlog.ERROR, "PortMappingAdd failed %v with request %s", err, req.String())
-		return nil, err
+		return nil, fmt.Errorf("p.AddPortMapping error: %v", err)
 	}
 
 	return &types.PortMappingModifyResponse{}, nil
@@ -43,15 +37,12 @@ func (s *ServerRPC) PortMappingAdd(ctx context.Context, req *types.PortMappingMo
 func (s *ServerRPC) PortMappingDel(ctx context.Context, req *types.PortMappingModifyRequest) (*types.PortMappingModifyResponse, error) {
 	p, ok := s.daemon.PodList.Get(req.PodID)
 	if !ok {
-		err := errors.New("Pod not found")
-		s.Log(hlog.ERROR, "PortMappingDel failed %v with request %s", err, req.String())
-		return nil, err
+		return nil, fmt.Errorf("Pod not found")
 	}
 
 	err := p.RemovePortMappingByDest(req.PortMappings)
 	if err != nil {
-		s.Log(hlog.ERROR, "PortMappingDel failed %v with request %s", err, req.String())
-		return nil, err
+		return nil, fmt.Errorf("p.RemovePortMappingByDest error: %v", err)
 	}
 
 	return &types.PortMappingModifyResponse{}, nil

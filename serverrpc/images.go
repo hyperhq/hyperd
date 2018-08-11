@@ -5,6 +5,7 @@ import (
 	"io"
 	"io/ioutil"
 
+	"fmt"
 	enginetypes "github.com/docker/engine-api/types"
 	"github.com/golang/glog"
 	"github.com/hyperhq/hyperd/types"
@@ -49,6 +50,7 @@ func (s *ServerRPC) ImagePull(req *types.ImagePullRequest, stream types.PublicAP
 			RegistryToken: req.Auth.Registrytoken,
 		}
 	}
+	glog.V(3).Infof("ImagePull with ServerStream %s request %s", stream, req.String())
 
 	r, w := io.Pipe()
 
@@ -74,7 +76,7 @@ func (s *ServerRPC) ImagePull(req *types.ImagePullRequest, stream types.PublicAP
 			}
 
 			if err := stream.Send(&types.ImagePullResponse{Data: data[:n]}); err != nil {
-				glog.Errorf("Send image pull  progress to stream error: %v", err)
+				glog.Errorf("Send image pull progress to stream error: %v", err)
 				return
 			}
 		}
@@ -83,6 +85,9 @@ func (s *ServerRPC) ImagePull(req *types.ImagePullRequest, stream types.PublicAP
 	pullResult = s.daemon.CmdImagePull(req.Image, req.Tag, authConfig, nil, w)
 	complete = true
 
+	if pullResult != nil {
+		pullResult = fmt.Errorf("s.daemon.CmdImagePull with request %s error: %v", req.String(), pullResult)
+	}
 	return pullResult
 }
 
@@ -99,6 +104,7 @@ func (s *ServerRPC) ImagePush(req *types.ImagePushRequest, stream types.PublicAP
 			RegistryToken: req.Auth.Registrytoken,
 		}
 	}
+	glog.V(3).Infof("ImagePush with ServerStream %s request %s", stream, req.String())
 
 	buffer := bytes.NewBuffer([]byte{})
 	var pushResult error
@@ -119,15 +125,17 @@ func (s *ServerRPC) ImagePush(req *types.ImagePushRequest, stream types.PublicAP
 		}
 
 		if err != nil {
-			glog.Errorf("ImagePush read image push stream failed %v with request %s", err, req.String())
-			return err
+			return fmt.Errorf("ImagePush read image push stream with request %s error: %v", req.String(), err)
 		}
 
 		if err := stream.Send(&types.ImagePushResponse{Data: data}); err != nil {
-			return err
+			return fmt.Errorf("stream.Send with request %s error: %v", req.String(), err)
 		}
 	}
 
+	if pushResult != nil {
+		pushResult = fmt.Errorf("s.daemon.CmdImagePush with request %s error: %v", req.String(), pushResult)
+	}
 	return pushResult
 }
 

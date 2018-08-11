@@ -3,7 +3,6 @@ package serverrpc
 import (
 	"fmt"
 
-	"github.com/golang/glog"
 	"github.com/hyperhq/hyperd/types"
 	runvtypes "github.com/hyperhq/runv/hypervisor/types"
 	"golang.org/x/net/context"
@@ -34,13 +33,12 @@ func (s *ServerRPC) PodStart(ctx context.Context, req *types.PodStartRequest) (*
 // PodRemove removes a pod by podID
 func (s *ServerRPC) PodRemove(ctx context.Context, req *types.PodRemoveRequest) (*types.PodRemoveResponse, error) {
 	if req.PodID == "" {
-		return nil, fmt.Errorf("PodRemove failed PodID is required for PodRemove with request %s", req.String())
+		return nil, fmt.Errorf("PodRemove failed PodID is required for PodRemove")
 	}
 
 	code, cause, err := s.daemon.RemovePod(req.PodID)
 	if err != nil {
-		glog.Errorf("PodRemove failed %v with request %s", err, req.String())
-		return nil, err
+		return nil, fmt.Errorf("s.daemon.RemovePod error: %v", err)
 	}
 
 	return &types.PodRemoveResponse{
