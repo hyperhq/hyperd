@@ -7,6 +7,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/hyperhq/hyperd/daemon/buffer"
 	"github.com/hyperhq/hyperd/daemon/daemondb"
 	"github.com/hyperhq/hyperd/daemon/pod"
 	"github.com/hyperhq/hyperd/networking/portmapping"
@@ -41,6 +42,8 @@ type Daemon struct {
 	Storage    Storage
 	Hypervisor string
 	DefaultLog *pod.GlobalLogConfig
+
+	buffer *buffer.Buffer
 }
 
 func (daemon *Daemon) Restore() error {
@@ -117,6 +120,7 @@ func NewDaemon(cfg *apitypes.HyperConfig) (*Daemon, error) {
 		db:      db,
 		PodList: pod.NewPodList(),
 		Host:    cfg.Host,
+		buffer:  buffer.NewBuffer(cfg),
 	}
 
 	daemon.Daemon, err = docker.NewDaemon(dockerCfg, registryCfg)

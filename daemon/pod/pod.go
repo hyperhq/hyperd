@@ -78,6 +78,8 @@ type XPod struct {
 	// on it too.
 	stoppedChan chan bool
 	initCond    *sync.Cond
+
+	containerBuffers map[string]*ContainerBuffer
 }
 
 // The Log infrastructure, to add pod name as prefix of the log message.
@@ -291,6 +293,12 @@ func (p *XPod) ContainerInfo(cid string) (*apitypes.ContainerInfo, error) {
 		}
 		return ci, nil
 	}
+
+	ci := p.ContainerBufferInfo(cid)
+	if ci != nil {
+		return ci, nil
+	}
+
 	err := fmt.Errorf("container %s does not existing", cid)
 	p.Log(ERROR, err)
 	return nil, err
@@ -343,7 +351,7 @@ func (p *XPod) updatePodInfo() error {
 	defer p.statusLock.RUnlock()
 
 	var (
-		containers      = make([]*apitypes.Container, 0, len(p.containers))
+		containers      = make([]*apitypes.Container, 0, len(p.containers)+len(p.containerBuffers))
 		volumes         = make([]*apitypes.PodVolume, 0, len(p.volumes))
 		containerStatus = make([]*apitypes.ContainerStatus, 0, len(p.containers))
 	)
@@ -364,6 +372,12 @@ func (p *XPod) updatePodInfo() error {
 		if cs.Phase == "failed" {
 			succeeeded = "Failed"
 		}
+	}
+	for _, cb := range p.containerBuffers {
+		ci := cb.info()
+		cs := cb.infoStatus()
+		containers = append(containers, ci)
+		containerStatus = append(containerStatus, cs)
 	}
 	p.info.Spec.Containers = containers
 	p.info.Status.ContainerStatus = containerStatus

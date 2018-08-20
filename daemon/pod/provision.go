@@ -87,32 +87,27 @@ func newXPod(factory *PodFactory, spec *apitypes.UserPod) (*XPod, error) {
 	factory.hosts = HostsCreator(spec.Id)
 	factory.logCreator = initLogCreator(factory, spec)
 	p := &XPod{
-		name:          spec.Id,
-		logPrefix:     fmt.Sprintf("Pod[%s] ", spec.Id),
-		globalSpec:    spec.CloneGlobalPart(),
-		containers:    make(map[string]*Container),
-		volumes:       make(map[string]*Volume),
-		interfaces:    make(map[string]*Interface),
-		portMappings:  spec.Portmappings,
-		labels:        spec.Labels,
-		prestartExecs: [][]string{},
-		execs:         make(map[string]*Exec),
-		resourceLock:  &sync.Mutex{},
-		statusLock:    &sync.RWMutex{},
-		stoppedChan:   make(chan bool, 1),
-		factory:       factory,
+		name:             spec.Id,
+		logPrefix:        fmt.Sprintf("Pod[%s] ", spec.Id),
+		globalSpec:       spec.CloneGlobalPart(),
+		containers:       make(map[string]*Container),
+		volumes:          make(map[string]*Volume),
+		interfaces:       make(map[string]*Interface),
+		portMappings:     spec.Portmappings,
+		labels:           spec.Labels,
+		prestartExecs:    [][]string{},
+		execs:            make(map[string]*Exec),
+		resourceLock:     &sync.Mutex{},
+		statusLock:       &sync.RWMutex{},
+		stoppedChan:      make(chan bool, 1),
+		factory:          factory,
+		containerBuffers: make(map[string]*ContainerBuffer),
 	}
 	p.initCond = sync.NewCond(p.statusLock.RLocker())
 	return p, nil
 }
 
-func (p *XPod) ContainerCreate(c *apitypes.UserContainer) (string, error) {
-	if !p.IsAlive() {
-		err := fmt.Errorf("pod is not running")
-		p.Log(ERROR, err)
-		return "", err
-	}
-
+func (p *XPod) ReserveContainerName(c *apitypes.UserContainer) error {
 	if c.Name == "" {
 		_, img, _ := utils.ParseImageRepoTag(c.Image)
 		if !utils.IsDNSLabel(img) {
@@ -123,13 +118,38 @@ func (p *XPod) ContainerCreate(c *apitypes.UserContainer) (string, error) {
 	}
 
 	if err := p.factory.registry.ReserveContainerName(c.Name, p.Id()); err != nil {
-		p.Log(ERROR, "could not reserve name %s: %v", c.Name, err)
-		return "", nil
+		err = fmt.Errorf("could not reserve name %s: %v", c.Name, err)
+		p.Log(ERROR, "%v", err)
+		return err
 	}
 
+	return nil
+}
+
+func (p *XPod) ContainerCreate(c *apitypes.UserContainer) (string, error) {
+	if !p.IsAlive() {
+		err := fmt.Errorf("pod is not running")
+		p.Log(ERROR, "%v", err)
+		return "", err
+	}
+
+	if err := p.ReserveContainerName(c); err != nil {
+		return "", err
+	}
+
+	return p.DoContainerCreate(c, "")
+}
+
+func (p *XPod) DoContainerCreate(c *apitypes.UserContainer, oldId string) (string, error) {
 	p.resourceLock.Lock()
 	id, err := p.doContainerCreate(c)
-	p.factory.registry.ReserveContainerID(c.Id, p.Id())
+	if err == nil {
+		if oldId != "" {
+			p.factory.registry.ChangeContainerId(oldId, c.Id, p.Id())
+		} else {
+			p.factory.registry.ReserveContainerID(c.Id, p.Id())
+		}
+	}
 	p.resourceLock.Unlock()
 
 	return id, err
