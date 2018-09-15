@@ -1,6 +1,6 @@
 Summary:            Hyperstart is the initrd for hyper VM
 Name:               hyperstart
-Version:            1.0.0
+Version:            1.1.0
 Release:            1%{?dist}
 License:            Apache License, Version 2.0
 Group:              System Environment/Base
@@ -8,12 +8,12 @@ Group:              System Environment/Base
 # following commands to generate the tarball:
 #  git archive --format=tar.gz master > hyperstart-%{version}.tar.gz
 Source0:            %{name}-%{version}.tar.gz
-URL:                https://hyper.sh/
+URL:                https://github.com/hyperhq/hyperstart/
 ExclusiveArch:      x86_64
 
 %description
-Hyperstart is the initrd for hyper VM, hyperstart 
-includes the kernel and initrd.
+Hyperstart is the init process for hyper VM, hyperstart package
+includes the guest kernel and the initramfs image.
 
 %prep
 mkdir -p %{_builddir}/src/github.com/hyperhq/hyperstart
@@ -37,6 +37,8 @@ rm -rf %{buildroot}
 %{_sharedstatedir}/*
 
 %changelog
+* Sat Sep 15 2018 Hyper Dev Team <dev@hyper.sh> - 1.1.0-1
+- update source to 1.1.0
 * Thu Sep 28 2017 Hyper Dev Team <dev@hyper.sh> - 1.0.0-1
 - update source to 1.0.0
 * Mon May 8 2017 Hyper Dev Team <dev@hyper.sh> - 0.8.1-1

@@ -5,7 +5,7 @@ Maintainer: Hyper Dev Team <dev@hyper.sh>
 Build-Depends: debhelper (>=9),
                cpio
 Standards-Version: 3.9.6
-Homepage: http://hypercontainer.io
+Homepage: https://github.com/hyperhq/hyperstart
 Vcs-Git: git://github.com/hyperhq/hyperstart.git
 Vcs-Browser: https://github.com/hyperhq/hyperstart
 
