@@ -37,7 +37,7 @@ rm -rf %{buildroot}
 %{_sharedstatedir}/*
 
 %changelog
-* Sat Sep 15 2017 Hyper Dev Team <dev@hyper.sh> - 1.1.0-1
+* Mon Sep 17 2018 Hyper Dev Team <dev@hyper.sh> - 1.1.0-1
 - update source to 1.1.0
 * Thu Sep 28 2017 Hyper Dev Team <dev@hyper.sh> - 1.0.0-1
 - update source to 1.0.0
