@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([hyper], [1.0.0], [dev@hyper.sh])
+AC_INIT([hyper], [1.1.0], [dev@hyper.sh])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign subdir-objects])
 AM_EXTRA_RECURSIVE_TARGETS([pkg])
 
