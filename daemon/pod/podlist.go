@@ -71,6 +71,20 @@ func (pl *PodList) ReserveContainer(id, name, pod string) error {
 	return nil
 }
 
+func (pl *PodList) ChangeContainerId(oldId, newId, pod string) error {
+	pl.mu.Lock()
+	defer pl.mu.Unlock()
+	if _, ok := pl.pods[pod]; !ok {
+		return fmt.Errorf("pod %s not exist for Changing container %s", pod, oldId)
+	}
+	if pn, ok := pl.containers[newId]; ok && pn != pod {
+		return fmt.Errorf("the container id %s has already taken by pod %s", newId, pn)
+	}
+	delete(pl.containers, oldId)
+	pl.containers[newId] = pod
+	return nil
+}
+
 func (pl *PodList) ReservePod(p *XPod) error {
 	pl.mu.Lock()
 	defer pl.mu.Unlock()

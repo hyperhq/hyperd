@@ -77,6 +77,10 @@ func (daemon *Daemon) CreateContainerInPod(podId string, spec *apitypes.UserCont
 		return "", fmt.Errorf("The pod(%s) can not be found", podId)
 	}
 
+	if daemon.buffer != nil {
+		return daemon.buffer.CreateContainerInPod(p, spec)
+	}
+
 	return p.ContainerCreate(spec)
 }
 

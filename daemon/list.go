@@ -55,6 +55,7 @@ func (daemon *Daemon) ListContainers(podId, vmId string) ([]*apitypes.ContainerL
 				result = append(result, status)
 			}
 		}
+		result = p.AppendContainerBufferStatus(result)
 	}
 	return result, nil
 }
@@ -118,6 +119,7 @@ func (daemon *Daemon) List(item, podId, vmId string) (map[string][]string, error
 				if status != "" {
 					containerJsonResponse = append(containerJsonResponse, status)
 				}
+				containerJsonResponse = p.AppendContainerBufferStatusString(containerJsonResponse)
 			}
 		}
 	}

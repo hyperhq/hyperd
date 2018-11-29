@@ -32,6 +32,9 @@ type HyperConfig struct {
 	GDBTCPPort      int
 
 	logPrefix string
+
+	BufferGoroutinesMax uint64
+	BufferChannelSize   uint64
 }
 
 func NewHyperConfig(config string) *HyperConfig {
@@ -77,6 +80,25 @@ func NewHyperConfig(config string) *HyperConfig {
 		c.GDBTCPPort, err = strconv.Atoi(port)
 		if err != nil {
 			c.Log(hlog.ERROR, "read config file GDBTCPPort %s failed: %v", port, err)
+			return nil
+		}
+	}
+
+	max, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "BufferGoroutinesMax")
+	if max != "" {
+		var err error
+		c.BufferGoroutinesMax, err = strconv.ParseUint(max, 0, 64)
+		if err != nil {
+			c.Log(hlog.ERROR, "read config file BufferGoroutinesMax failed: %v", err)
+			return nil
+		}
+	}
+	size, _ := cfg.GetValue(goconfig.DEFAULT_SECTION, "BufferChannelSize")
+	if size != "" {
+		var err error
+		c.BufferChannelSize, err = strconv.ParseUint(size, 0, 64)
+		if err != nil {
+			c.Log(hlog.ERROR, "read config file BufferChannelSize failed: %v", err)
 			return nil
 		}
 	}
